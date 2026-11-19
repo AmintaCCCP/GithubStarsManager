@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   setVectorSearchConfig: vi.fn(),
   setVectorSearchStatus: vi.fn(),
   updateRepositoriesMetadata: vi.fn(),
+  backend: {
+    isAvailable: true,
+    fetchRepositories: vi.fn(),
+  },
 }));
 
 vi.mock('../../../store/useAppStore', () => ({
@@ -23,6 +27,10 @@ vi.mock('../../../store/useAppStore', () => ({
   isKnownEmbeddingFormatVersion: (value: unknown) => value === 1 || value === 2 || value === 3 || value === 4,
   useAppStore: mocks.useAppStore,
 }));
+
+// 审计修复（R5）：清理删除的授权核对依赖后端权威快照——useVectorSearchActions
+// 仅在后端可用且快照核对通过时才执行 cleanup，测试必须提供同一契约。
+vi.mock('../../../services/backendAdapter', () => ({ backend: mocks.backend }));
 vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../services/vectorSearchService')>();
   return {
@@ -113,6 +121,13 @@ describe('useVectorSearchActions', () => {
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
     mocks.cleanup.mockResolvedValue({ deleted: 0, partial: false });
     mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536, accountScopedCleanup: true });
+    // R5：后端可用且权威快照与本地一致——默认放行 cleanup 授权核对；
+    // 权威列表按实时 store 仓库动态构造（与「完全同步」的后端等价）。
+    mocks.backend.isAvailable = true;
+    mocks.backend.fetchRepositories.mockImplementation(async () => ({
+      repositories: storeState.repositories,
+      total: storeState.repositories.length,
+    }));
     mocks.needsReindex.mockReset();
     mocks.needsReindex.mockReturnValue(false);
   });
@@ -220,6 +235,12 @@ describe('useVectorSearchActions account switch guards', () => {
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
     mocks.cleanup.mockResolvedValue({ deleted: 0, partial: false });
     mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536, accountScopedCleanup: true });
+    // R5：后端权威快照核对默认通过（与完全同步的后端等价），与外层 describe 一致
+    mocks.backend.isAvailable = true;
+    mocks.backend.fetchRepositories.mockImplementation(async () => ({
+      repositories: storeState.repositories,
+      total: storeState.repositories.length,
+    }));
     mocks.needsReindex.mockReset();
     mocks.needsReindex.mockReturnValue(false);
   });
@@ -321,6 +342,43 @@ describe('useVectorSearchActions account switch guards', () => {
       includeLegacy: false,
       signal: expect.any(AbortSignal),
     });
+  });
+
+  it('skips vector cleanup when no authoritative starred list is available (R5)', async () => {
+    // R5（CodeRabbit Major）：两台设备可以在不启用后端同步的情况下共享同一
+    // GitHub 账号与 Worker——本地「起止快照一致 + lastSync」不能替代权威列表，
+    // 无法核对时一律跳过删除并保留已上传向量。
+    mocks.backend.isAvailable = false;
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.backend.fetchRepositories).not.toHaveBeenCalled();
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    // 索引本身照常完成并更新本账号状态
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
+      isIndexing: false,
+      result: expect.objectContaining({ indexed: 1 }),
+    }));
+  });
+
+  it('skips vector cleanup when the backend authoritative snapshot diverges from the local list', async () => {
+    // 权威列表与本地列表不一致（另一台设备已加星新仓库）时不执行删除
+    mocks.backend.fetchRepositories.mockResolvedValue({
+      repositories: [{ id: 1 }, { id: 2 }],
+      total: 2,
+    });
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
+      isIndexing: false,
+      result: expect.objectContaining({ indexed: 1 }),
+    }));
   });
 
   it('skips cleanup when the list has no authoritative sync basis (R2-C24)', async () => {
@@ -487,9 +545,12 @@ describe('useVectorSearchActions account switch guards', () => {
     // 不写入 vectorSearchStatus.vectorCount——已有账号计数保留，总向量数仅在
     // workerTestResult（测试结果）中可见。
     mocks.vectorTestConnection.mockResolvedValue({ success: true, vectorCount: 5, dimensions: 1536 });
-    (storeState as { vectorSearchConfig: { workerUrl?: string; embeddingFormatVersion?: number } }).vectorSearchConfig = {
+    // 审计修复：URL 之外还必须核对我测令牌与已保存令牌一致——已保存配置
+    // 与被测 draft 使用同一 Worker 地址与令牌。
+    (storeState as { vectorSearchConfig: { workerUrl?: string; authToken?: string; embeddingFormatVersion?: number } }).vectorSearchConfig = {
       ...storeState.vectorSearchConfig,
       workerUrl: 'https://worker.example.com',
+      authToken: 'worker-token',
     };
     (storeState as { vectorSearchStatus?: { connected: boolean; vectorCount: number; dimensions: number } }).vectorSearchStatus = { connected: false, vectorCount: 3, dimensions: 1536 };
     const { result } = renderHook(() => useVectorSearchActions());
@@ -503,16 +564,29 @@ describe('useVectorSearchActions account switch guards', () => {
     mocks.setVectorSearchStatus.mockClear();
     await act(async () => { await result.current.testWorker({ workerUrl: 'https://other-worker.example.com', authToken: 'worker-token' }); });
     expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
+
+    // 审计修复：同一地址但令牌不同（已保存令牌失效、用新令牌测试成功）时，
+    // 不得把仍使用旧令牌的已保存配置标成 connected；草稿结果照常独立展示。
+    mocks.setVectorSearchStatus.mockClear();
+    await act(async () => { await result.current.testWorker({ workerUrl: 'https://worker.example.com', authToken: 'rotated-token' }); });
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
   });
 
   it('skips the connection status write when the account switched during the worker test', async () => {
     // 审计修复回归：连接测试等待期间切号后，发起账号 A 的连接状态/向量数量/
     // 维度不得写入当前账号 B 的共享 vectorSearchStatus（runIndex 对同类写入
-    // 已有账号保护，testWorker 补齐同一约束）；本地测试结果照常展示
+    // 已有账号保护，testWorker 补齐同一约束）；本地测试结果照常展示。
+    // CodeRabbit 审计：先把已保存地址（与令牌）配置成与被测 draft 相同——
+    // 否则 sameWorkerIndex 恒为 false，即使移除账号守卫该测试也会通过。
     mocks.vectorTestConnection.mockImplementation(async () => {
       (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
       return { success: true, vectorCount: 5, dimensions: 1536 };
     });
+    (storeState as { vectorSearchConfig: { workerUrl?: string; authToken?: string; embeddingFormatVersion?: number } }).vectorSearchConfig = {
+      ...storeState.vectorSearchConfig,
+      workerUrl: 'https://worker.example.com',
+      authToken: 'worker-token',
+    };
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.testWorker({ workerUrl: 'https://worker.example.com', authToken: 'worker-token' }); });

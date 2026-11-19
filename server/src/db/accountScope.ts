@@ -128,20 +128,42 @@ export const INTERNAL_SETTING_KEYS: ReadonlySet<string> = new Set([
   'legacy_default_github_token',
 ]);
 
-/** 从请求头提取合法的账号 ID；非法/缺失格式一律视为未传（防垃圾字符串污染分区名）。 */
+/**
+ * 账号请求头的三态解析（Issue #612 审计：区分缺失 / 有效 / 无效）。
+ * - absent：请求头未发送——旧客户端回退规则仅在此状态启用；
+ * - valid：合法数字 ID 形态；
+ * - invalid：已发送但值为空白或非数字形态。空白值不再与缺失混同：显式发送
+ *   的空头部同样判为无效，绝不回退到可变的活跃账号 / default 分区。
+ *
+ * 注：Express 的头部读取大小写不敏感，`x-github-account-id` 与
+ * `X-GitHub-Account-Id` 是同一个头。
+ */
+export type AccountHeaderResolution =
+  | { state: 'absent' }
+  | { state: 'valid'; accountId: string }
+  | { state: 'invalid' };
+
+function readAccountHeader(req: Request): AccountHeaderResolution {
+  const rawHeader = req.header('x-github-account-id');
+  if (rawHeader === undefined) return { state: 'absent' };
+  const trimmed = rawHeader.trim();
+  if (trimmed && ACCOUNT_ID_PATTERN.test(trimmed)) return { state: 'valid', accountId: trimmed };
+  return { state: 'invalid' };
+}
+
+/** 从请求头提取合法的账号 ID；缺失/空白/非法格式一律返回 null（防垃圾字符串污染分区名）。 */
 export function extractRequestedAccountId(req: Request): string | null {
-  const raw = req.header('x-github-account-id')?.trim() ?? req.header('X-GitHub-Account-Id')?.trim() ?? '';
-  return raw && ACCOUNT_ID_PATTERN.test(raw) ? raw : null;
+  const header = readAccountHeader(req);
+  return header.state === 'valid' ? header.accountId : null;
 }
 
 /**
- * Issue #612 R2-A3：请求是否显式携带了格式无效的账号头（有值但不匹配数字 ID
- * 形态，如 `abc`）。这类请求与「真正无头请求」必须区分处理：解析写入范围时
- * 直接拒绝，绝不回退到可变的活跃账号 / default 分区。
+ * Issue #612 R2-A3（审计修订）：请求是否携带了无效的账号头（已发送但值为空白
+ * 或非数字形态，如 `abc` / `''`）。这类请求与「真正无头请求」必须区分处理：
+ * 解析写入范围时直接拒绝，绝不回退到可变的活跃账号 / default 分区。
  */
 export function hasInvalidAccountHeader(req: Request): boolean {
-  const raw = req.header('x-github-account-id')?.trim() ?? req.header('X-GitHub-Account-Id')?.trim() ?? '';
-  return raw !== '' && !ACCOUNT_ID_PATTERN.test(raw);
+  return readAccountHeader(req).state === 'invalid';
 }
 
 function readSetting(db: Database.Database, key: string): string | null {
@@ -497,6 +519,20 @@ export function bumpAccountRevision(db: Database.Database, accountId: string): n
 }
 
 /**
+ * 认领事务内直接设定目标分区快照版本（Issue #612 审计：认领后的版本必须高于
+ * default 与目标分区迁移前版本的最大值，bumpAccountRevision 的 +1 无法保证）。
+ * 失败容忍范围与 bumpAccountRevision 一致：仅轻量 stub 缺 partition_meta 表。
+ */
+function setAccountRevision(db: Database.Database, accountId: string, value: number): void {
+  try {
+    db.prepare('INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES (?, ?, ?)')
+      .run(accountId, 'repo_revision', String(value));
+  } catch (err) {
+    if (!isMissingPartitionMetaTableError(err)) throw err;
+  }
+}
+
+/**
  * 账号分区凭据版本（Issue #612 R2-A1：并发凭据变更检测）。
  * 新 PAT 写入与显式清空都会推进版本；PUT /api/settings 在 GitHub 校验等待
  * 前记录版本、写入事务内复核，版本已变化时放弃本次 PAT 写回。
@@ -588,12 +624,18 @@ async function performLegacyOwnerIdentityCheck(
   try {
     const ownerId = await fetchGitHubUserId(token);
     if (ownerId) {
-      try {
-        // 首次成功校验即冻结归属（同时记录被校验的加密 Token）：此后认领判定
-        // 只认这份已验证所有者，不再随 Token 轮换重新判定，且供后续请求免网络复用。
-        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-          .run(LEGACY_OWNER_CACHE_KEY, JSON.stringify({ ownerId, token: encryptedToken }));
-      } catch { /* cache write is best-effort */ }
+      // Issue #612 审计：/user 校验是异步的——发起时存量数据可能尚未认领，
+      // 返回时其他账号可能已通过管理员确认完成认领。认领已完成后绝不再冻结
+      // 迟到的校验结果（ownerId 与密文绑定）：否则「B 已认领」+「全局密文匹配」
+      // 两项检查会同时成立，让代理在 B 的分区上下文中复用 A 的凭据。
+      if (isLegacyClaimPending(db)) {
+        try {
+          // 首次成功校验即冻结归属（同时记录被校验的加密 Token）：此后认领判定
+          // 只认这份已验证所有者，不再随 Token 轮换重新判定，且供后续请求免网络复用。
+          db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+            .run(LEGACY_OWNER_CACHE_KEY, JSON.stringify({ ownerId, token: encryptedToken }));
+        } catch { /* cache write is best-effort */ }
+      }
       return { ownerId, verifiedToken: encryptedToken };
     }
     // 校验被拒绝（401 / 无效 Token / 无法解析的载荷）：归属未确立，不冻结、不认领。
@@ -722,21 +764,89 @@ function readFrozenLegacyOwner(db: Database.Database): string | null {
   }
 }
 
+/**
+ * 读取已验证归属密文（legacy_default_owner_id）绑定的所有者（Issue #612 审计）。
+ * 代理使用全局密文回退前，用它确认「密文绑定的所有者 === 解析出的账号 ID」：
+ * 归属校验是异步的，迟到结果可能在他人认领后写坏绑定（594），仅凭「全局密文
+ * 与校验时一致」不足以证明当前分区可以复用该凭据。
+ */
+export function getLegacyDefaultVerifiedOwnerBinding(db: Database.Database): string | null {
+  return readFrozenLegacyOwner(db);
+}
+
 interface LegacyClaimCounts {
   repositories: number;
   releases: number;
   categories: number;
 }
 
+/** 认领完整性冲突的单条记录（供管理端点返回可处理的明细）。 */
+export interface LegacyClaimConflict {
+  table: 'repositories' | 'releases' | 'categories';
+  id: string | number;
+  /** repositories 的 full_name / releases 的 tag_name / categories 的 name。 */
+  label: string | null;
+}
+
+/**
+ * 认领完整性冲突（Issue #612 审计 847）：防误合并条件（A16）正确保留了无法
+ * 自动归并的 default 行（如「目标行已按 ID 配对、另一条旧记录仅同名」的歧义
+ * 行），整体回滚保持可重试。冲突明细随错误携带：自动路径记录日志，管理员
+ * 端点返回可处理清单。管理员解决冲突后重新发起认领即可续办；自动重试在
+ * 冲突解决前不会重复成功。
+ */
+export class LegacyClaimConflictError extends Error {
+  readonly conflicts: LegacyClaimConflict[];
+  constructor(conflicts: LegacyClaimConflict[]) {
+    super('legacy default claim incomplete: unmigrated default rows remain (ambiguous same-name rows kept for resolution)');
+    this.name = 'LegacyClaimConflictError';
+    this.conflicts = conflicts;
+  }
+}
+
+/**
+ * Issue #612 审计 847 的安全冲突解决：把无法自动归并的 default 仓库行（同名
+ * 歧义行）改名后按独立行迁移进目标账号分区——保留防误合并条件（绝不把歧义
+ * 行合并进已按 ID 配对的目标行），又不让认领永久卡死。改名追加稳定后缀并在
+ * 目标分区内去重；发行版/分类无同名唯一约束，正常不会残留、不走该路径。
+ * 返回成功迁移的行数（改名碰撞被 OR IGNORE 跳过的行不计入，仍按冲突回滚）。
+ */
+function resolveClaimConflictsByRename(db: Database.Database, accountId: string): number {
+  const rows = db.prepare(
+    "SELECT id, full_name FROM repositories WHERE account_id = 'default'"
+  ).all() as Array<{ id: number; full_name: string }>;
+  const renameStmt = db.prepare(
+    "UPDATE OR IGNORE repositories SET account_id = ?, full_name = ? WHERE account_id = 'default' AND id = ?"
+  );
+  const existsStmt = db.prepare(
+    'SELECT 1 AS one FROM repositories WHERE account_id = ? AND full_name = ?'
+  );
+  let migrated = 0;
+  for (const row of rows) {
+    const baseName = `${row.full_name} (legacy-${row.id})`;
+    let candidate = baseName;
+    let suffix = 2;
+    while (existsStmt.get(accountId, candidate)) {
+      candidate = `${baseName}#${suffix}`;
+      suffix++;
+    }
+    migrated += renameStmt.run(accountId, candidate, row.id).changes;
+  }
+  return migrated;
+}
+
 /**
  * 认领事务本体（供自动认领与管理员显式确认共用）：迁移 default 分区数据进
  * 目标账号分区，写入认领标记。verifiedToken 为 null 时不复制任何凭据。
  * 返回 null 表示并发下认领已完成（二次确认），抛出异常表示事务回滚。
+ * options.renameConflicts：审计 847 的管理员续办选项——把同名歧义行改名后
+ * 按独立行迁移（见 resolveClaimConflictsByRename），其余调用方保持回滚语义。
  */
 function runLegacyDefaultClaimTransaction(
   db: Database.Database,
   accountId: string,
   verifiedToken: string | null,
+  options: { renameConflicts?: boolean } = {},
 ): LegacyClaimCounts | null {
   const claim = db.transaction((): LegacyClaimCounts | null => {
     const claimed = readSetting(db, CLAIMED_BY_KEY);
@@ -837,16 +947,34 @@ function runLegacyDefaultClaimTransaction(
       )
     `).run(accountId);
 
-    // 迁移完整性校验：仍有 default 残留行（意外冲突）时整体回滚，保留可重试状态；
-    // 绝不在迁移未完成时写入 legacy_default_claimed_by。
+    // 迁移完整性校验：仍有 default 残留行（防误合并条件保留的歧义行）时整体
+    // 回滚，保留可重试状态；绝不在迁移未完成时写入 legacy_default_claimed_by。
+    // Issue #612 审计 847：残留行明细随 LegacyClaimConflictError 携带（管理端点
+    // 返回可处理的冲突清单），不再只抛无信息的通用错误；管理员可按明细解决
+    // 冲突后重试，或携带 renameConflicts 选项把歧义仓库行改名后按独立行续办。
+    const conflicts: LegacyClaimConflict[] = [];
     let leftover = 0;
     for (const table of ['repositories', 'releases', 'categories'] as const) {
-      const row = db.prepare(`SELECT COUNT(*) as total FROM ${table} WHERE account_id = 'default'`).get() as { total: number };
-      leftover += row.total;
+      const rows = db.prepare(`SELECT * FROM ${table} WHERE account_id = 'default'`).all() as Array<Record<string, unknown>>;
+      leftover += rows.length;
+      for (const row of rows) {
+        conflicts.push({
+          table,
+          id: (row.id as string | number | undefined) ?? '',
+          label: table === 'repositories'
+            ? ((row.full_name as string | null) ?? null)
+            : table === 'releases'
+              ? ((row.tag_name as string | null) ?? null)
+              : ((row.name as string | null) ?? null),
+        });
+      }
+    }
+    if (leftover > 0 && options.renameConflicts) {
+      leftover -= resolveClaimConflictsByRename(db, accountId);
     }
     if (leftover > 0) {
-      logger.warn('db.accountScope', 'Legacy default claim aborted: unmigrated default rows remain', { leftover });
-      throw new Error('legacy default claim incomplete');
+      logger.warn('db.accountScope', 'Legacy default claim aborted: unmigrated default rows remain', { leftover, conflicts });
+      throw new LegacyClaimConflictError(conflicts);
     }
 
     for (const key of ACCOUNT_SCOPED_SETTING_KEYS) {
@@ -863,15 +991,41 @@ function runLegacyDefaultClaimTransaction(
       db.prepare('INSERT OR IGNORE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)')
         .run(accountId, key, value);
     }
+    // Issue #612 审计（852）：v3 旧版数据可能把账号级设置存进 account_settings
+    // 的 'default' 行（预检把该行视为待认领数据，但此前认领只复制全局 settings，
+    // 迁移遗漏却仍标记完成并阻止重试）。认领同时处理两个旧版设置来源：只补
+    // 缺失地迁移账号级键（目标账号已保存的新值绝不被覆盖），随后删除 default
+    // 行——default 设置行全部处理完是写认领标记的前提。default 行的 github_token
+    // 来源无法证明归属，按 R2-A5 语义不迁移（宁可缺失，不可错配）。
+    try {
+      const legacyDefaultSettingRows = db
+        .prepare("SELECT key, value FROM account_settings WHERE account_id = 'default'")
+        .all() as Array<{ key: string; value: string | null }>;
+      for (const row of legacyDefaultSettingRows) {
+        if (ACCOUNT_SCOPED_SETTING_KEYS.has(row.key) && row.key !== 'github_token') {
+          db.prepare('INSERT OR IGNORE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)')
+            .run(accountId, row.key, row.value);
+        }
+        db.prepare("DELETE FROM account_settings WHERE account_id = 'default' AND key = ?").run(row.key);
+      }
+    } catch {
+      // 轻量 stub 缺 account_settings 表时跳过
+    }
     // 仅在多账号共存时清除存量仓库的 vector_indexed_at，避免单账号老用户升级后被迫全量重建向量。
     if (collectNonDefaultPartitionIds(db).size > 1) {
       db.prepare(
         'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
       ).run(accountId);
     }
-    // Issue #612 R2-A6：认领迁移了仓库/发行版数据，在写入认领标记前推进目标
-    // 账号快照版本——认领前快照的全量 PUT 会因版本过期返回 409，避免覆盖。
-    bumpAccountRevision(db, accountId);
+    // Issue #612 R2-A6（审计修订 874）：认领迁移了仓库/发行版数据，在写入认领
+    // 标记前把目标账号快照版本推进到 default 与目标分区已有版本的最大值之上——
+    // 认领前从任一分区读取的快照（expectedRevision）都无法通过认领后的版本
+    // 检查，防止旧客户端用旧快照做全量同步、误删认领迁移进来的数据。
+    const claimRevisionFloor = Math.max(
+      getAccountRevision(db, DEFAULT_SCOPE),
+      getAccountRevision(db, accountId),
+    ) + 1;
+    setAccountRevision(db, accountId, claimRevisionFloor);
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(CLAIMED_BY_KEY, accountId);
     // 认领只补「尚无有效活跃账号」的缺口：用户可能已在设置里显式切到其他账号，
     // 认领不得把它改回存量归属账号。
@@ -935,6 +1089,15 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
   try {
     claimed = runLegacyDefaultClaimTransaction(db, accountId, verifiedToken);
   } catch (err) {
+    if (err instanceof LegacyClaimConflictError) {
+      // Issue #612 审计 847：防误合并条件保留的歧义行让自动认领无法一次完成——
+      // 冲突明细已记录，事务回滚、存量数据保持可重试状态；管理员解决冲突或经
+      // 管理端点 resolve_conflicts: 'rename' 改名续办后，重试即完成认领。
+      logger.warn('db.accountScope', 'Legacy default claim blocked by ambiguous default rows (see conflicts)', {
+        conflicts: err.conflicts,
+      });
+      return;
+    }
     // 事务已回滚：保留 default 数据与可重试状态，本次请求照常继续。
     logger.warn('db.accountScope', 'Legacy default claim transaction rolled back', {
       error: err instanceof Error ? err.message : String(err),
@@ -956,14 +1119,25 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
 export function claimLegacyDefaultWithAdminConfirmation(
   db: Database.Database,
   accountId: string,
-): { ok: true; claimed: LegacyClaimCounts } | { ok: false; code: string } {
+  options: { renameConflicts?: boolean } = {},
+): { ok: true; claimed: LegacyClaimCounts } | { ok: false; code: string; conflicts?: LegacyClaimConflict[] } {
   if (!ACCOUNT_ID_PATTERN.test(accountId)) return { ok: false, code: 'INVALID_ACCOUNT_ID' };
   if (!isLegacyClaimPending(db)) return { ok: false, code: 'LEGACY_DEFAULT_ALREADY_CLAIMED' };
   const frozenOwner = readFrozenLegacyOwner(db);
   if (frozenOwner && frozenOwner !== accountId) {
     return { ok: false, code: 'LEGACY_OWNER_FROZEN_MISMATCH' };
   }
-  const claimed = runLegacyDefaultClaimTransaction(db, accountId, null);
+  let claimed: LegacyClaimCounts | null = null;
+  try {
+    claimed = runLegacyDefaultClaimTransaction(db, accountId, null, options);
+  } catch (err) {
+    // Issue #612 审计 847：无法自动归并的歧义行返回可处理的冲突明细（不再让
+    // 管理员确认与自动重试重复执行同一失败事务而拿不到任何定位信息）。
+    if (err instanceof LegacyClaimConflictError) {
+      return { ok: false, code: 'LEGACY_CLAIM_CONFLICT', conflicts: err.conflicts };
+    }
+    throw err;
+  }
   if (!claimed) return { ok: false, code: 'LEGACY_DEFAULT_ALREADY_CLAIMED' };
   logger.info('db.accountScope', 'Legacy default data claimed via admin confirmation', { accountId, ...claimed });
   return { ok: true, claimed };

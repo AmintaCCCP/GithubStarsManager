@@ -246,7 +246,8 @@
     "unstar-confirmation": "スター確認をキャンセルする",
     "unstar": "キャンセルスター",
     "successfully-unstarred": "スターは正常にキャンセルされました",
-    "failed-to-unstar-repository-please-check-your-ne": "スターのキャンセルに失敗しました。ネットワーク接続を確認するか、再度ログインしてください。"
+    "failed-to-unstar-repository-please-check-your-ne": "スターのキャンセルに失敗しました。ネットワーク接続を確認するか、再度ログインしてください。",
+    "similar-results-may-be-incomplete-the-dens": "類似リポジトリの結果は不完全な可能性があります：密ベクトルインデックスを利用できません。({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "最初に設定で GitHub トークンを構成するか、バックエンド サービスに接続してください。",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "同期に失敗しました。ネットワーク接続を確認するか、後でもう一度試してください。",
     "list-sync-new-categories_one": "（{{count}} 個の分類を新規作成）",
     "list-sync-new-categories_other": "（{{count}} 個の分類を新規作成）",
-    "list-sync-complete": "{{lists}} 個の list を同期しました（{{newCount}} 個の分類を新規作成）。"
+    "list-sync-complete": "{{lists}} 個の list を同期しました（{{newCount}} 個の分類を新規作成）。",
+    "vector-worker-does-not-support-account-scoped-recall": "ベクトル Worker はアカウント単位の検索に対応していません。リポジトリ同梱の cloudflare-worker を再デプロイし、インデックスを再構築してください。",
+    "account-metadata-index-is-not-ready-create-the-accountid": "アカウントメタデータのインデックスが準備できていません。accountId メタデータインデックスを作成し、ベクトルをバックフィルして、ACCOUNT_METADATA_INDEXED を有効にしてください。",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "ベクトル Worker の状態を確認できなかったため、ローカル検索にフォールバックしました。",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "マルチアカウント検索にはベクトルインデックスの再構築が必要なため、ローカル検索にフォールバックしました。"
   },
   "repositoryHealthPanel": {
     "activity": "アクティビティ",

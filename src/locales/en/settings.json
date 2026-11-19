@@ -26,7 +26,8 @@
     "backup-file-is-empty-cannot-restore": "Backup file is empty, cannot restore.",
     "data-restored-from-backup-repositories-v1-releas": "Data restored from backup: repositories {{v1}}, releases {{v2}}, custom categories {{v3}}.",
     "restore-failed": "Restore failed",
-    "account-changed-during-restore": "The account changed during restore. This restore was aborted to protect your data."
+    "account-changed-during-restore": "The account changed during restore. This restore was aborted to protect your data.",
+    "gist-data-in-the-backup-contained-invalid-entries-th": "Gist data in the backup contained invalid entries; the affected fields were skipped and keep their previous values."
   },
   "useDesktopActions": {
     "load-failed": "Load failed",

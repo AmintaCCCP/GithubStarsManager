@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyAccountWorkspaceForTypes,
   buildFullWorkspaces,
+  hasMaskedBackupSecrets,
   maskSavedAccountsForBackup,
   mergeWorkspacesById,
   replaceWorkspacesForSelectedTypes,
@@ -347,5 +348,61 @@ describe('multi-account backup helpers (Issue #611)', () => {
     expect(all.releaseSubscriptions).toEqual(new Set([42]));
     expect(all.readReleases).toEqual(new Set([43]));
     expect(all.categoryListIdMap).toEqual(workspace.categoryListIdMap);
+  });
+
+  it('treats an invalid forks field as missing instead of a clear instruction (audit fix)', () => {
+    const workspace = { ...workspaceOf([repo(1)]), forks: [{ id: 900 } as never] };
+
+    // forks: null 归一化成 []，实时补丁不得把无效字段当清空指令——保留本机 Fork 列表
+    const patchWithNull = applyAccountWorkspaceForTypes(
+      workspace,
+      ['repositories'],
+      { repositories: [repo(1)], forks: null },
+    );
+    expect(patchWithNull.forks).toBeUndefined();
+
+    // 非数组同样按「未提供」忽略
+    const patchWithGarbage = applyAccountWorkspaceForTypes(
+      workspace,
+      ['repositories'],
+      { repositories: [repo(1)], forks: 'nope' },
+    );
+    expect(patchWithGarbage.forks).toBeUndefined();
+
+    // 显式 [] 仍是有效的清空语义（workspace 为归一化后的备份工作区，与面板
+    // 调用一致）；与归档补丁（replace）行为一致
+    const patchWithEmpty = applyAccountWorkspaceForTypes(
+      { ...workspaceOf([]), forks: [] },
+      ['repositories'],
+      { repositories: [repo(1)], forks: [] },
+    );
+    expect(patchWithEmpty.forks).toEqual([]);
+
+    const replaced = replaceWorkspacesForSelectedTypes(
+      { '1': workspace },
+      { '1': { repositories: [repo(1)], forks: null } },
+      ['repositories'],
+    );
+    expect(replaced['1'].forks).toEqual(workspace.forks);
+  });
+});
+
+describe('hasMaskedBackupSecrets with unvalidated import payloads (audit fix)', () => {
+  it('does not throw on null/non-object config entries and still detects real masks', () => {
+    // 导入预览直接渲染备份 JSON 的掩码检测：null 条目不得让预览抛异常，
+    // 否则用户看不到正常的文件错误提示流程。
+    expect(hasMaskedBackupSecrets({ aiConfigs: [null] as never })).toBe(false);
+    expect(hasMaskedBackupSecrets({ webdavConfigs: [null, 42] as never })).toBe(false);
+    expect(hasMaskedBackupSecrets({ aiConfigs: 'nope' as never })).toBe(false);
+    expect(hasMaskedBackupSecrets({ savedAccounts: { '1': null } as never })).toBe(false);
+    expect(hasMaskedBackupSecrets({})).toBe(false);
+
+    expect(hasMaskedBackupSecrets({ aiConfigs: [{ apiKey: '***' }] })).toBe(true);
+    expect(hasMaskedBackupSecrets({ webdavConfigs: [{ password: '***' }] })).toBe(true);
+    expect(hasMaskedBackupSecrets({ proxyConfig: { password: '***' } })).toBe(true);
+    expect(hasMaskedBackupSecrets({ rpcDownloadConfig: { secret: '***' } })).toBe(true);
+    expect(hasMaskedBackupSecrets({ backendApiSecret: '***' })).toBe(true);
+    expect(hasMaskedBackupSecrets({ savedAccounts: { '1': { ...savedAccount('1', userA, '***') } } })).toBe(true);
+    expect(hasMaskedBackupSecrets({ aiConfigs: [{ apiKey: 'real-key' }] })).toBe(false);
   });
 });

@@ -26,7 +26,8 @@
     "backup-file-is-empty-cannot-restore": "El contenido del archivo de copia de seguridad está vacío y no se puede restaurar.",
     "data-restored-from-backup-repositories-v1-releas": "Datos restaurados desde la copia de seguridad: Almacén {{v1}}, Versión {{v2}}, Clasificación personalizada {{v3}}.",
     "restore-failed": "La recuperación falló",
-    "account-changed-during-restore": "La cuenta cambió durante la restauración. Se abortó la restauración para proteger tus datos."
+    "account-changed-during-restore": "La cuenta cambió durante la restauración. Se abortó la restauración para proteger tus datos.",
+    "gist-data-in-the-backup-contained-invalid-entries-th": "Los datos de Gist de la copia de seguridad contenían entradas no válidas; los campos afectados se omitieron y conservan sus valores anteriores."
   },
   "useDesktopActions": {
     "load-failed": "Error al cargar",

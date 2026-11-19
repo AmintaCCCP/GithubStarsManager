@@ -151,51 +151,13 @@ export default {
           );
         }
 
-        // Issue #612 R2-A28：可验证的待删集合判断——优先用 Vectorize 分页列举
-        // 接口完整枚举向量 ID，应用范围与 keepIds 条件，游标耗尽（枚举完成）
-        // 才报告完成。采样只能观察有限窗口：keepSet 全保留时永远采样不到
-        // 待删向量，跑满轮次也无法与「清理完成」区分——只能采样时结果一律
-        // 标「未验证」（partial: true + verified: false），绝不谎报 partial: false。
-        if (typeof env.VECTORIZE.list === 'function') {
-          try {
-            let cursor;
-            let totalDeleted = 0;
-            let listedAll = false;
-            // 分页安全上限（1000/页 × 500 页）：超出按未验证处理，避免游标异常导致死循环。
-            const MAX_LIST_PAGES = 500;
-            for (let page = 0; page < MAX_LIST_PAGES; page++) {
-              const pageResult = await env.VECTORIZE.list({ limit: 1000, ...(cursor ? { cursor } : {}) });
-              const vectors = Array.isArray(pageResult?.vectors) ? pageResult.vectors : [];
-              const staleIds = vectors
-                .map((v) => (typeof v === 'string' ? v : String((v && v.id) ?? '')))
-                .filter((id) => isDeletableId(id));
-              // deleteByIds 分批提交（与采样路径的单批上限一致）
-              for (let i = 0; i < staleIds.length; i += 100) {
-                await env.VECTORIZE.deleteByIds(staleIds.slice(i, i + 100));
-              }
-              totalDeleted += staleIds.length;
-              const rawNext = pageResult && (pageResult.nextCursor ?? pageResult.cursor);
-              const next = typeof rawNext === 'string' && rawNext ? rawNext : undefined;
-              if (!next) {
-                // 游标耗尽：快照范围内待删向量已全部提交删除 → 可验证完成。
-                listedAll = true;
-                break;
-              }
-              // 异常分页（带游标却无向量）：按未验证处理，避免空页死循环。
-              if (vectors.length === 0) break;
-              cursor = next;
-            }
-            if (listedAll) {
-              return jsonResponse({ success: true, deleted: totalDeleted, partial: false });
-            }
-            // 超出分页上限仍未枚举完：覆盖未确认 → 明确标注未验证。
-            return jsonResponse({ success: true, deleted: totalDeleted, partial: true, verified: false });
-          } catch {
-            // list 运行时不可用 / 调用失败：回退采样路径（结果标未验证）。
-          }
-        }
-
-        // 采样回退路径：使用 query + 随机向量采样，循环删除不在 keepSet 中的向量。
+        // Issue #612 R2-A28（R2 review 更正）：生产 Vectorize binding 不提供 list()
+        // ——完整枚举只有 REST API 与 `wrangler vectorize list-vectors` 提供，Worker
+        // 内没有可用的列举接口。因此清理只能用 query + 随机向量采样，采样只能
+        // 观察有限窗口：keepSet 全保留时永远采样不到待删向量，跑满轮次也无法
+        // 与「清理完成」区分——结果一律标「未验证」（partial: true + verified: false），
+        // 绝不谎报 partial: false。
+        // 采样路径：使用 query + 随机向量采样，循环删除不在 keepSet 中的向量。
         let totalDeleted = 0;
         // 采样收敛判定：某轮没有待删向量时不能直接判定完成——采样可能恰好
         // 没命中当前账号前缀。持续到没有新向量出现为止。

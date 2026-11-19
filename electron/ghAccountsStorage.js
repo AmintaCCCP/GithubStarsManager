@@ -40,6 +40,34 @@ function normalizeGhAccounts(value) {
   return tokens;
 }
 
+/**
+ * Audit R2-B4 fix-up: delete both the encrypted token map and the
+ * interrupted-write temp file (`gh-accounts.enc.tmp`, which holds the full
+ * encrypted token table when the process dies between write and rename).
+ * Shared by explicit clear and empty-map save. Success is reported only when
+ * both files are removed or already absent; any other failure surfaces
+ * (Audit R2-B3) instead of reporting a wipe that did not fully happen.
+ */
+function removeGhAccountsFiles({ fs, pathModule, userDataPath }) {
+  const filePath = getGhAccountsPath(userDataPath, pathModule);
+  const tempPath = `${filePath}.tmp`;
+  try {
+    fs.unlinkSync(filePath);
+  } catch (error) {
+    if (!error || error.code !== 'ENOENT') {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  try {
+    fs.unlinkSync(tempPath);
+  } catch (error) {
+    if (!error || error.code !== 'ENOENT') {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  return { success: true };
+}
+
 function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }, tokens) {
   const filePath = getGhAccountsPath(userDataPath, pathModule);
   const normalized = normalizeGhAccounts(tokens);
@@ -47,20 +75,10 @@ function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }, 
     return { success: false, error: 'invalid gh-accounts payload' };
   }
   const accountIds = Object.keys(normalized);
-  // Empty map (or null payload) means nothing left to keep on disk.
-  // Audit R2-B3: a failing unlink (permissions, locked file) must surface as a
-  // failure — reporting success while the stale file survives would let the
-  // renderer believe tokens were wiped when they are not.
+  // Empty map (or null payload) means nothing left to keep on disk. Shares the
+  // clear-path cleanup so an interrupted write's temp file cannot survive.
   if (accountIds.length === 0) {
-    try {
-      fs.unlinkSync(filePath);
-      return { success: true };
-    } catch (error) {
-      if (error && error.code === 'ENOENT') {
-        return { success: true };
-      }
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    return removeGhAccountsFiles({ fs, pathModule, userDataPath });
   }
   if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
     return {
@@ -111,7 +129,17 @@ function loadEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }) 
     }
 
     const payloadStr = safeStorage.decryptString(buf);
-    const data = JSON.parse(payloadStr);
+    let data;
+    try {
+      data = JSON.parse(payloadStr);
+    } catch {
+      // Audit fix: the decrypted payload may be non-JSON (tampered ciphertext
+      // that still decrypts). V8 SyntaxError messages can include fragments of
+      // the offending source — potentially decrypted token material — so the
+      // raw message must never reach main.js failure logs. Return a fixed,
+      // content-free error text instead.
+      return { status: 'error', error: 'gh-accounts.enc does not contain valid JSON' };
+    }
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       // 解密成功但不是 Token 映射：内容未知，不能当作「磁盘为空」——
       // 否则下次保存会整表覆写丢掉未知内容。
@@ -135,17 +163,11 @@ function loadEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }) 
   }
 }
 
-function clearEncryptedGhAccounts({ fs, pathModule, userDataPath }) {
-  try {
-    const filePath = getGhAccountsPath(userDataPath, pathModule);
-    fs.unlinkSync(filePath);
-    return { success: true };
-  } catch (error) {
-    if (error && error.code === 'ENOENT') {
-      return { success: true };
-    }
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
-  }
+function clearEncryptedGhAccounts(ctx) {
+  // Audit fix: explicit clear must also remove the interrupted-write temp file
+  // (same directory, full encrypted token table) — only a wipe of both the
+  // target and the temp file may report success.
+  return removeGhAccountsFiles(ctx);
 }
 
 module.exports = {

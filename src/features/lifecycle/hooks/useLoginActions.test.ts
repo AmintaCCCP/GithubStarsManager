@@ -1,11 +1,13 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppStore } from '../../../store/useAppStore';
 
 const mocks = vi.hoisted(() => ({
   apiTokens: [] as string[],
   getCurrentUser: vi.fn(),
   syncFromBackend: vi.fn(),
+  backendAuthHeaders: vi.fn(),
+  fetch: vi.fn(),
   backend: {
     configuredUrl: 'https://backend.example/api',
     backendUrl: null as string | null,
@@ -33,7 +35,12 @@ vi.mock('../../../services/githubApi', () => ({
     }
   },
 }));
-vi.mock('../../../services/backendAdapter', () => ({ backend: mocks.backend }));
+// 转交 2：显式账号定向恢复复用适配器导出的 getBackendAuthHeaders(accountId)
+// 构造请求头（Bearer + X-GitHub-Account-Id）——测试桩记录调用参数。
+vi.mock('../../../services/backendAdapter', () => ({
+  backend: mocks.backend,
+  getBackendAuthHeaders: mocks.backendAuthHeaders,
+}));
 vi.mock('../../../services/autoSync', () => ({
   syncFromBackend: mocks.syncFromBackend,
   withAccountSwitchFrozen: (fn: () => Promise<unknown>) => fn(),
@@ -64,6 +71,17 @@ describe('useLoginActions', () => {
     mocks.backend.verifyAuth.mockResolvedValue(true);
     mocks.backend.restoreAuth.mockResolvedValue({ github_token: 'ghp_restored', accounts: [] });
     mocks.getCurrentUser.mockResolvedValue(user);
+    mocks.backendAuthHeaders.mockImplementation((accountId?: string | null) => ({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer test-secret',
+      ...(accountId ? { 'X-GitHub-Account-Id': accountId } : {}),
+    }));
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ github_token: 'ghp_restored', accounts: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', mocks.fetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('restores a GitHub session from an authenticated backend', async () => {
@@ -93,6 +111,59 @@ describe('useLoginActions', () => {
     });
     expect(mocks.getCurrentUser).not.toHaveBeenCalled();
     expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
+  });
+
+  it('reports the restore ambiguity with selectable accounts instead of github-token-required (handoff 2)', async () => {
+    // server/src/routes/authRestore.ts A19：无账号头恢复无法唯一确定目标分区时，
+    // 服务端返回 account_selection_required: true + accounts + 空 github_token——
+    // 在把空 token 判为 github-token-required 之前先检查该标志。
+    const selectableAccounts = [
+      { accountId: '2', user: { id: 2, login: 'bob', avatar_url: '', email: null }, githubToken: 'ghp_b' },
+      { accountId: '3', user: null, githubToken: null },
+    ];
+    mocks.backend.restoreAuth.mockResolvedValueOnce({
+      github_token: null,
+      account_selection_required: true,
+      accounts: selectableAccounts,
+    });
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example')).resolves.toEqual({
+      status: 'account-selection-required',
+      accounts: selectableAccounts,
+    });
+    // 歧义不进入令牌配置流程，也不做 GitHub 身份校验
+    expect(mocks.getCurrentUser).not.toHaveBeenCalled();
+    expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
+  });
+
+  it('retries the restore with the selected account via an explicit account header (handoff 2)', async () => {
+    // 显式账号重试：restoreAuth（读取 Store 账号/省略账号头）不支持显式账号参数，
+    // 定向恢复携带 X-GitHub-Account-Id 请求同一 /sync/auth 路由。
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      github_token: 'ghp_b',
+      active_account_id: '2',
+      accounts: [],
+    }), { status: 200 }));
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example', { accountId: '2' }))
+      .resolves.toMatchObject({ status: 'connected', githubToken: 'ghp_b' });
+
+    // restoreAuth 未被调用：定向重试走显式账号请求
+    expect(mocks.backend.restoreAuth).not.toHaveBeenCalled();
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    const [requestUrl, requestInit] = mocks.fetch.mock.calls[0] as [string, RequestInit];
+    // 测试桩的 init 不做 /api 归一化（真实适配器会归一）——URL 断言与桩语义一致
+    expect(requestUrl).toBe('https://backend.example/sync/auth');
+    expect(requestInit.method).toBe('POST');
+    const headers = requestInit.headers as Record<string, string>;
+    expect(headers['X-GitHub-Account-Id']).toBe('2');
+    expect(headers.Authorization).toBe('Bearer test-secret');
+    // 单账号无歧义恢复沿用现有流程：身份校验用定向恢复返回的 Token
+    //（Token 经 GitHubApiService 构造函数传入，调用参数记录见 apiTokens）
+    expect(mocks.apiTokens).toContain('ghp_b');
+    expect(mocks.getCurrentUser).toHaveBeenCalledTimes(1);
   });
 
   it('defers URL persistence when the caller asks for it (R2-B12)', async () => {

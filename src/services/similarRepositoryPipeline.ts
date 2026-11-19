@@ -96,6 +96,12 @@ export interface SimilarRepositoryPipelineResult {
     fallback: 'none' | 'cross-encoder' | 'fusion' | 'empty-guard';
     /** C15：稠密召回因账号隔离范围未就绪被跳过（索引不可用/需重建）。 */
     denseIndexUnavailable: boolean;
+    /**
+     * 审计修复：索引不可用的具体原因文本（与空结果错误路径同一组消息），
+     * 随结果返回供调用方在非空结果时展示降级提示（结果可能不完整 + 恢复
+     * 步骤），不再只保留在日志中。denseIndexUnavailable 为 false 时为 null。
+     */
+    denseIndexUnavailableReason: string | null;
     timingsMs: Record<string, number>;
   };
 }
@@ -569,6 +575,15 @@ export async function runSimilarRepositoryPipeline(
   });
   Object.assign(timingsMs, finished.diagnostics.timingsMs);
 
+  // 审计修复：稠密召回被跳过的具体原因随结果返回（跳过路径的 DenseOutcome.error
+  // 即 DENSE_INDEX_* 消息），供调用方在非空结果时提示「结果可能不完整」。
+  const denseIndexUnavailable = !!(exactOutcome.indexUnavailable || profileOutcome.indexUnavailable);
+  const denseIndexUnavailableReason = denseIndexUnavailable
+    ? ((exactOutcome.indexUnavailable ? exactOutcome.error : null)
+      ?? (profileOutcome.indexUnavailable ? profileOutcome.error : null)
+      ?? DENSE_INDEX_UNAVAILABLE_ERROR)
+    : null;
+
   return {
     repositories: finished.candidates.map(item => item.repo),
     diagnostics: {
@@ -585,7 +600,8 @@ export async function runSimilarRepositoryPipeline(
       profileSource: profileSource as 'ai' | 'local',
       llmStatus: finished.diagnostics.llmStatus,
       fallback: finished.diagnostics.fallback,
-      denseIndexUnavailable: !!(exactOutcome.indexUnavailable || profileOutcome.indexUnavailable),
+      denseIndexUnavailable,
+      denseIndexUnavailableReason,
       timingsMs,
     },
   };

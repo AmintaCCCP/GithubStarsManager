@@ -62,6 +62,8 @@
     "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend (salvo que actives \"Incluir claves en copia de seguridad/exportación\" para copias WebDAV o de archivos); nunca en los servidores de la app.",
     "saved-accounts": "Cuentas guardadas",
     "click-to-sign-in": "Haz clic para iniciar sesión",
-    "token-required": "Se requiere token"
+    "token-required": "Se requiere token",
+    "select-account-to-restore": "Selecciona la cuenta que quieres restaurar",
+    "multiple-accounts-exist-on-this-backend-select-th": "Existen varias cuentas en este backend; selecciona la cuenta que quieres restaurar."
   }
 }

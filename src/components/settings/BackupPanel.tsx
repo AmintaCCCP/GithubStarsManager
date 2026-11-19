@@ -36,7 +36,17 @@ const getCurrentActiveWebDAVConfig = (): WebDAVConfig | null => {
 
 const getWebDAVConfigFingerprint = (config: WebDAVConfig | null | undefined): string => (
   config
-    ? JSON.stringify([config.id, config.url, config.path, config.username, config.password, config.isActive])
+    ? JSON.stringify([
+        config.id,
+        config.url,
+        config.path,
+        config.username,
+        config.password,
+        config.isActive,
+        // 审计修复：customUserAgent 影响实际请求头——仅修改该字段也必须使旧
+        // 备份列表失效并要求重新列举，否则确认恢复仍会以旧配置下载。
+        config.customUserAgent,
+      ])
     : ''
 );
 
@@ -45,6 +55,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   const { activeConfig, isBackingUp, isRestoring, backup, restore, listBackups } = useBackupActions();
   const { toast } = useDialog();
   const activeConfigFingerprint = getWebDAVConfigFingerprint(activeConfig);
+  // 当前活跃账号标识（响应式）：列表打开期间账号切换时用于关闭列表
+  const currentAccountId = useAppStore((state) => accountIdKey(state.user));
   const [isListingBackups, setIsListingBackups] = useState(false);
   const [backupSelection, setBackupSelection] = useState<{
     open: boolean;
@@ -76,6 +88,19 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     ));
   }, [activeConfigFingerprint]);
 
+  // 审计修复：备份列表打开后账号切换/会话代次变化时关闭列表——推荐文件可能
+  // 按新会话计算，而恢复仍绑定旧会话（要等 restore 的最终校验拒绝）。会话
+  // 代次不是响应式状态，但每次代次递增都伴随 user 变化触发本 effect 重查。
+  useEffect(() => {
+    setBackupSelection((current) => (
+      current.open
+      && (current.listedAccountId !== currentAccountId
+        || getAccountSessionGeneration() !== current.listedGeneration)
+        ? { ...current, open: false, selected: null }
+        : current
+    ));
+  }, [currentAccountId]);
+
   const handleRestoreClick = async () => {
     const listedConfig = activeConfig ?? null;
     const listedFingerprint = getWebDAVConfigFingerprint(listedConfig);
@@ -87,6 +112,12 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       const { files, recommended } = await listBackups();
       // 列举期间活跃 WebDAV 配置被切换或修改（含 URL/路径编辑）：丢弃过期响应
       if (getWebDAVConfigFingerprint(getCurrentActiveWebDAVConfig()) !== listedFingerprint) {
+        return;
+      }
+      // 审计修复：列举期间账号切换/会话代次变化——结果属于旧会话，丢弃，
+      // 绝不打开列表或显示旧会话的列举错误
+      if (accountIdKey(useAppStore.getState().user) !== listedAccountId
+        || getAccountSessionGeneration() !== listedGeneration) {
         return;
       }
       if (files.length === 0) {
@@ -105,6 +136,11 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       });
     } catch (error) {
       if (getWebDAVConfigFingerprint(getCurrentActiveWebDAVConfig()) !== listedFingerprint) {
+        return;
+      }
+      // 同上：会话已变化时丢弃列举错误，不显示给已切换后的新会话
+      if (accountIdKey(useAppStore.getState().user) !== listedAccountId
+        || getAccountSessionGeneration() !== listedGeneration) {
         return;
       }
       setListError(error instanceof Error ? error.message : String(error));

@@ -21,6 +21,8 @@ const BACKEND_ERROR_KEYS: Record<string, string> = {
   'restore-failed': 'loginScreen.failed-to-read-login-data-from-the-backend',
   'github-token-required': 'loginScreen.no-token-is-configured-on-this-backend-complete',
   'restored-token-invalid': 'loginScreen.the-github-token-stored-on-the-backend-is-not-wo',
+  // 后端恢复遇到账号歧义时弹窗无法承载账号选择流程，提示用户走登录页选择恢复。
+  'account-selection-required': 'loginScreen.multiple-accounts-exist-on-this-backend-select-th',
 };
 
 /**

@@ -310,25 +310,39 @@ describe('MCP provider discovery', () => {
     expect(result).toEqual({ available: false, reason: 'worker_query_failed' });
   });
 
-  it('returns only the active account record when two accounts hold the same repository id (A37)', () => {
-    // 两个账号分区各自持有 id=1 / acme/alpha 的仓库，内容不同：
-    // get mock 按第一个绑定参数校验 accountId，查询只命中活跃账号（222）的记录
-    configureDb({
-      activeAccountId: '222',
-      repos: [
-        repoRow({ id: 1, name: 'default-alpha', full_name: 'acme/alpha' }),
-        repoRow({ id: 1, name: 'beta-alpha', full_name: 'acme/alpha', account_id: '222' }),
-      ],
-    });
-    const byId = provider.getRepository(1);
-    expect(byId).not.toBeNull();
-    expect(byId?.name).toBe('beta-alpha');
-    const byName = provider.getRepository('acme/alpha');
-    expect(byName).not.toBeNull();
-    expect(byName?.name).toBe('beta-alpha');
-    const batch = provider.getRepositories(['acme/alpha']);
-    expect(batch.items[0]).toMatchObject({ status: 'found' });
-    expect((batch.items[0] as { repository: { name: string } | null }).repository?.name).toBe('beta-alpha');
+  it('returns only the active account record when two accounts hold the same repository id (A37)', async () => {
+    // 审计修订：改用真实双分区 SQLite 夹具执行实际 SQL——按 ID、全名与批量
+    // 查询的 account_id 谓词由 SQLite 亲自过滤，不依赖 configureDb 按绑定参数
+    // 模拟筛选（那种夹具即使生产 SQL 写错比较符也会通过）。结果必须只含
+    // 活跃账号（222）的仓库。
+    const Database = (await import('better-sqlite3')).default;
+    const { initializeSchema } = await import('../../src/db/schema.js');
+    const db = new Database(':memory:');
+    try {
+      initializeSchema(db);
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+      const insertRepo = db.prepare(
+        'INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      );
+      insertRepo.run('default', 1, 'default-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+      insertRepo.run('222', 1, 'beta-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+
+      getDbMock.mockReturnValue(db);
+      const byId = provider.getRepository(1);
+      expect(byId).not.toBeNull();
+      expect(byId?.name).toBe('beta-alpha');
+      const byName = provider.getRepository('acme/alpha');
+      expect(byName).not.toBeNull();
+      expect(byName?.name).toBe('beta-alpha');
+      const batch = provider.getRepositories(['acme/alpha']);
+      expect(batch.items[0]).toMatchObject({ status: 'found' });
+      expect((batch.items[0] as { repository: { name: string } | null }).repository?.name).toBe('beta-alpha');
+      // 列表查询同样只含活跃账号分区
+      const all = provider.loadAllRepositories();
+      expect(all.map((repo) => repo.name)).toEqual(['beta-alpha']);
+    } finally {
+      db.close();
+    }
   });
 
   it('falls back to the default partition when no active account is set (A37)', () => {
@@ -406,18 +420,18 @@ describe('MCP provider discovery', () => {
       const db = await setupVectorDb();
       try {
         getDbMock.mockReturnValue(db);
-        // 诊断探测的 topK/threshold 不复用用户查询；/status 报告的向量数超出
-        // 探测窗口 → 无法完整确认归属 → 明确安排一次全量重建。
+        // 诊断探测的 topK/threshold 不复用用户查询；探测结果无法证明索引归属
+        // （无同快照证据）→ 明确安排一次全量重建，且不再有无范围兼容重试。
         const fetchMockLocal = vi.fn()
           .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
           .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
-          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }))
-          .mockResolvedValueOnce(jsonResponse({ vectorCount: 400 }))
-          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }));
         vi.stubGlobal('fetch', fetchMockLocal);
 
         const result = await provider.vectorSearch('retrieval', {});
-        expect(result).toMatchObject({ available: true });
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
+        // 无范围兼容重试已移除：探测之外不得再发起任何 Worker 请求
+        expect(fetchMockLocal).toHaveBeenCalledTimes(3);
 
         // 探测请求独立于用户查询：topK=50、threshold=0
         const probeBody = JSON.parse(fetchMockLocal.mock.calls[2][1].body as string);
@@ -435,50 +449,48 @@ describe('MCP provider discovery', () => {
       }
     });
 
-    it('marks the probe complete without clearing markers when full confirmation finds no legacy vectors', async () => {
+    it('schedules a rebuild even when probe counts match with no legacy vectors (count equality is not snapshot evidence)', async () => {
       const db = await setupVectorDb();
       try {
         getDbMock.mockReturnValue(db);
-        // /status 报告向量数在探测窗口内且与 /query 返回数一致，且候选都带
-        // 账号前缀（无 legacy 向量）→ 仅标记完成，不清除重建标记。
+        // 审计修订（381-384）：/query 与 /status 是两次独立请求，数量相等不构成
+        // 同一索引快照的证据——即使候选全部带账号前缀（无 legacy 向量），归属
+        // 仍按未确认处理：清除重建标记并安排全量重建，绝不记录「探测完成」。
         const fetchMockLocal = vi.fn()
           .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
           .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
-          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }))
-          .mockResolvedValueOnce(jsonResponse({ vectorCount: 1 }))
-          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }));
         vi.stubGlobal('fetch', fetchMockLocal);
 
         const result = await provider.vectorSearch('retrieval', {});
-        expect(result).toMatchObject({ available: true });
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
 
         const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
-        expect(row.vector_indexed_at).toBe('2025-01-01T00:00:00Z');
+        expect(row.vector_indexed_at).toBeNull();
         expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
           .toMatchObject({ value: 'https://worker.example' });
-        // 未清除标记 → 不推进快照版本（R2-A14）
+        // 清除了索引标记 → 推进快照版本（R2-A14）
         expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
-          .toBeUndefined();
+          .toMatchObject({ value: '1' });
       } finally {
         db.close();
       }
     });
 
-    it('schedules rebuild when /status fails or vectorCount mismatches /query count', async () => {
+    it('schedules rebuild when probe detects legacy vectors or /status is unavailable', async () => {
       const db = await setupVectorDb();
       try {
         getDbMock.mockReturnValue(db);
-        // /query 找到旧向量，/status 网络失败 → 仍保留探测结果并安排重建
+        // /query 找到旧向量（无前缀 id 命中本账号仓库）→ 保留探测结果并安排重建
         const fetchMockLocal = vi.fn()
           .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
           .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
           .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }))
-          .mockRejectedValueOnce(new TypeError('status failed'))
-          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+          .mockRejectedValueOnce(new TypeError('status failed'));
         vi.stubGlobal('fetch', fetchMockLocal);
 
         const result = await provider.vectorSearch('retrieval', {});
-        expect(result).toMatchObject({ available: true });
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
         const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
         expect(row.vector_indexed_at).toBeNull();
       } finally {
@@ -488,17 +500,15 @@ describe('MCP provider discovery', () => {
       const db2 = await setupVectorDb();
       try {
         getDbMock.mockReturnValue(db2);
-        // /query 返回 1 条，但 /status 报告总数 2（数量不一致）→ 视为无法确认并安排重建
+        // 探测候选全部带账号前缀（未检出 legacy 向量）→ 归属仍按未确认处理并安排重建
         const fetchMockMismatch = vi.fn()
           .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
           .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
-          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }))
-          .mockResolvedValueOnce(jsonResponse({ vectorCount: 2 }))
-          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }));
         vi.stubGlobal('fetch', fetchMockMismatch);
 
         const result = await provider.vectorSearch('retrieval', {});
-        expect(result).toMatchObject({ available: true });
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
         const row = db2.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
         expect(row.vector_indexed_at).toBeNull();
       } finally {

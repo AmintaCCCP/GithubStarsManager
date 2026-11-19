@@ -160,6 +160,61 @@ describe('backendAdapter settings hydration', () => {
   });
 });
 
+describe('syncSettings token 更新标志（server configs.ts 契约，审计修复）', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+  });
+
+  it('puts settings and surfaces token_update_skipped / token_update_superseded flags', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      token_update_skipped: true,
+      token_update_superseded: false,
+    }));
+
+    await expect(backend.syncSettings({ collapsedSidebarCategoryCount: 34 })).resolves.toEqual({
+      tokenUpdateSkipped: true,
+      tokenUpdateSuperseded: false,
+    });
+  });
+
+  it('defaults missing flags to false (fully written)', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({}));
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+    });
+  });
+
+  it('tolerates an unparseable response body as no flags', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => { throw new SyntaxError('no body'); },
+      headers: { forEach: () => {} },
+    } as unknown as Response);
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+    });
+  });
+
+  it('passes the accountId header through for explicit partition writes', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    const fetchMock = vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({}));
+    await backend.syncSettings({ github_token: 'tok' }, undefined, '42');
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(headers['X-GitHub-Account-Id']).toBe('42');
+  });
+});
+
 describe('backendAdapter 后端 URL 安全策略', () => {
   const adapter = backend as unknown as BackendAdapterLike;
   const STORAGE_KEY = 'github-stars-manager-backend-url';

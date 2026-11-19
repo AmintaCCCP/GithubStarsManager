@@ -2,10 +2,12 @@ import { useCallback, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import {
   getAccountSessionGeneration,
+  isCurrentAccount,
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
-import { forceSyncToBackend } from '../../../services/autoSync';
+import { forceSyncToBackend, markPendingAccountSync, withAccountSwitchGuardSync } from '../../../services/autoSync';
+import { backend } from '../../../services/backendAdapter';
 import { translateBatch } from '../../../services/translateService';
 import { GitHubTokenPermissionError, type GitHubRepoDetailRead } from '../../../services/githubApi';
 import { makeT } from '../../../i18n/useT';
@@ -17,6 +19,36 @@ import { isLikelySameLanguage } from '../../../utils/textLanguage';
 
 const MAX_CANDIDATES = 50;
 const RESOLVE_BATCH_SIZE = 5;
+
+/**
+ * 审计修复：星标请求已在 GitHub 成功（不可撤销）而会话恰好切换时，该星标
+ * 必须记录到发起账号的工作区——发起账号已重新激活（A→B→A，切号簿记已把
+ * 归档换入实时）则写入实时列表；仍停放则更新其归档快照（快照不存在时绝不
+ * 创建/覆盖）。与 useRepositoryCardActions.unstar 的 C29 模式一致：切回后
+ * 由待同步标记驱动的补推/拉取把远端已接受的星标收敛进该账号的同步状态。
+ */
+const recordStarToOwnerSession = (ownerAccountId: string | null, repository: Repository): void => {
+  if (!ownerAccountId || typeof useAppStore.setState !== 'function') return;
+  if (isCurrentAccount(ownerAccountId)) {
+    withAccountSwitchGuardSync(() => {
+      useAppStore.getState().addRepository(repository);
+    });
+    return;
+  }
+  withAccountSwitchGuardSync(() => {
+    useAppStore.setState((state) => {
+      const parked = state.accountWorkspaces?.[ownerAccountId];
+      if (!parked) return state;
+      if (parked.repositories.some((repo) => repo.id === repository.id)) return state;
+      return {
+        accountWorkspaces: {
+          ...state.accountWorkspaces,
+          [ownerAccountId]: { ...parked, repositories: [...parked.repositories, repository] },
+        },
+      };
+    });
+  });
+};
 
 export interface BatchStarRow {
   candidate: ImportedRepositoryCandidate;
@@ -239,6 +271,9 @@ export function useBatchStarImport() {
     // 辅助防线（Issue #611）：批量导入可达分钟级；切号后中止队列并停止写入
     const jobAccountId = peekCurrentAccountId();
     const jobGeneration = getAccountSessionGeneration();
+    // 审计修复（C29 同款）：发起时保存目标后端地址，供切号后登记 (账号, 后端)
+    // 待同步标记——切号流程可能更换后端连接，调用时读取会拿到新地址。
+    const startedBackendUrl = backend.backendUrl ?? '';
     try {
       for (const { row, index } of selected) {
         const detail = row.detail!;
@@ -249,7 +284,14 @@ export function useBatchStarImport() {
         }
         try {
           await api.starRepository(detail.owner.login, detail.name);
-          if (!isCurrentAccountSession(jobAccountId, jobGeneration)) break;
+          if (!isCurrentAccountSession(jobAccountId, jobGeneration)) {
+            // 审计修复：星标已按发起账号在 GitHub 完成（不可撤销）——会话切换
+            // 后仍必须记录到发起账号的工作区（实时或归档），并登记待同步标记，
+            // 切回 A 后由补推/拉取收敛；绝不静默丢失已成功的远端星标。
+            recordStarToOwnerSession(jobAccountId, { ...detail, starred_at: new Date().toISOString() } as Repository);
+            if (jobAccountId) markPendingAccountSync(jobAccountId, startedBackendUrl);
+            break;
+          }
           addRepository({ ...detail, starred_at: new Date().toISOString() } as Repository);
           starredCount += 1;
           setRows(current => current.map((item, itemIndex) =>
@@ -267,8 +309,9 @@ export function useBatchStarImport() {
       }
       // 审计修复（C28）：会话不匹配时直接退出整个导入任务——尾部同步绝不能
       // 在切号后执行：forceSyncToBackend 会清除共享防抖计时器/待推标志，并以
-      // 新账号请求头推送新账号工作区。已完成的 A 远端操作保留（远端不可撤销）；
-      // A 的剩余工作只能在 A 的同步上下文中处理（切回后由补推/星标同步收敛）。
+      // 新账号请求头推送新账号工作区。已完成的星标由上方分支逐条记录进发起
+      // 账号的工作区与待同步状态（切回后先补推再拉取收敛）；剩余候选不再尝试，
+      // 只能在 A 的同步上下文中重新发起。
       if (!isCurrentAccountSession(jobAccountId, jobGeneration)) {
         return;
       }

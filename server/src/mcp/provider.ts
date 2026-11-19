@@ -6,7 +6,6 @@ import {
   resolveActiveAccountScope,
   getLegacyDefaultClaimedBy,
   hasAnyNonDefaultPartition,
-  hasMultipleAccountPartitions,
   getPartitionMeta,
   bumpAccountRevision,
 } from '../db/accountScope.js';
@@ -287,18 +286,17 @@ const VECTOR_BACKFILL_CHECKED_KEY = 'vector_account_backfill_checked';
 const VECTOR_PROBE_TOPK = 50;
 
 /**
- * Issue #612 A25（R2-A11/A12/A13/A14 修订）：旧索引标记（v4 迁移 / 无冲突认领
- * 保留的 legacy 向量）触发账号元数据回填。服务端无法对存量向量增量补写元数据
- * （向量由客户端生成上传），恢复路径是全量重建。
+ * Issue #612 A25（R2-A11/A12/A13/A14 修订 + 审计 381 修订）：旧索引标记（v4 迁移 /
+ * 无冲突认领保留的 legacy 向量）触发账号元数据回填。服务端无法对存量向量增量
+ * 补写元数据（向量由客户端生成上传），恢复路径是全量重建。
  *
- * 探测流程（R2-A11）：
+ * 探测流程：
  * - 使用独立于用户查询参数的诊断请求（topK=探针上限、threshold=0），不复用
  *   用户查询的有限 topK/threshold；
- * - 仅当 Worker /status 报告的向量数不超过单次探测窗口时，一次探测才能完整
- *   确认索引归属——确认无 legacy 向量时只标记完成；
- * - 无法完整确认（/status 不可用或向量数超出窗口）或探测到 legacy 向量时，
+ * - 审计修订：探测无法取得「/query 结果来自当前索引快照」的证据（Worker API
+ *   无快照 ID，两次独立请求之间的数量相等只是巧合），一律按归属未确认处理——
  *   明确安排一次全量重建（清除该分区 vector_indexed_at，客户端下次同步携带
- *   accountId 元数据重新上传）后再标记完成。
+ *   accountId 元数据重新上传）后再标记完成，绝不记录「探测完整确认」。
  *
  * 写入流程（R2-A13/A14）：
  * - 完成标记的重查、索引标记清除与版本推进在同一写事务内执行；迟到的并发
@@ -318,8 +316,7 @@ async function ensureAccountVectorMetadataBackfill(
   const workerIdentity = workerUrl.replace(/\/$/, '');
   if (getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) === workerIdentity) return;
 
-  // ── 探测阶段（网络）：/query 失败直接返回并允许重试；/status 失败单独捕获，保留 /query 结果 ──
-  let probeMatches: Array<{ id: string; metadata?: Record<string, unknown> }>;
+  // ── 探测阶段（网络）：诊断 /query 失败直接返回并允许重试 ──
   try {
     const probeResult = await fetchWithBodyTimeout(
       `${workerIdentity}/query`,
@@ -339,7 +336,6 @@ async function ensureAccountVectorMetadataBackfill(
     if (!probeResult.ok || !probeResult.payload || !Array.isArray(probeResult.payload.matches)) {
       return; // Worker 不可用 / 被拒：不置位，下次重试
     }
-    probeMatches = probeResult.payload.matches;
   } catch (err) {
     logger.warn('mcp.vector', 'Account metadata backfill probe failed', {
       error: err instanceof Error ? err.message : String(err),
@@ -347,44 +343,13 @@ async function ensureAccountVectorMetadataBackfill(
     return;
   }
 
-  let vectorCount: number | null = null;
-  try {
-    const statusResult = await fetchWithBodyTimeout(
-      `${workerIdentity}/status`,
-      { headers: queryHeaders },
-      async (res) => {
-        if (!res.ok) return null;
-        return (await res.json().catch(() => null)) as { vectorCount?: unknown } | null;
-      },
-    );
-    if (statusResult && typeof statusResult.vectorCount === 'number' && Number.isFinite(statusResult.vectorCount)) {
-      vectorCount = statusResult.vectorCount;
-    }
-  } catch (err) {
-    // /status 失败时将总数保留为未知，同时保留 /query 已取得的旧向量探测结果以安排重建
-    logger.warn('mcp.vector', 'Account metadata backfill status check failed', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-
-  const repos = loadAllRepositories(accountId);
-  const byId = new Map(repos.map((r) => [String(r.id), r]));
-  const hasLegacyVectors = probeMatches.some((m) => {
-    const rawId = String(m.id);
-    if (!/^\d+$/.test(rawId)) return false; // 带账号前缀的向量已带元数据
-    const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
-    if (metaAccountId && metaAccountId !== accountId) return false;
-    return byId.has(rawId);
-  });
-  // 完整确认条件：索引规模不超出单次探测窗口，且 /query 返回数量与 /status 报告总数一致。
-  // 若两者不一致（如期间并发写入或负分向量被过滤），视为无法确认并走重建路径。
-  const canFullyConfirm =
-    vectorCount !== null &&
-    vectorCount <= VECTOR_PROBE_TOPK &&
-    probeMatches.length === vectorCount;
-  // 无法可靠确认归属（窗口不足 / /status 不可用 / 数量不一致）或确认存在 legacy 向量时，
-  // 明确安排一次全量重建；完整确认无 legacy 向量时仅标记完成。
-  const scheduleRebuild = hasLegacyVectors || !canFullyConfirm;
+  // Issue #612 审计（381-384）：/query 与 /status 是两次独立请求，Worker API
+  // 未提供把两个响应绑定到同一索引快照的证据（无快照 ID / 版本号）。两次请求
+  // 之间并发客户端可能删除向量并重传不同格式的新向量，「数量相等」只反映巧合
+  // 而非同一快照。无法取得同快照证据时一律按「归属未确认」处理：明确安排一次
+  // 全量重建（清除该分区 vector_indexed_at，客户端携带 accountId 元数据重新
+  // 上传），绝不仅凭数量相等记录探测完成。探测响应本身不再参与归属判定
+  // （上方校验仅作为 Worker 可达性与响应合法性门槛），失败时不标记、下次重试。
 
   // ── 写入阶段（R2-A13/A14）：单事务，提交前核对当前 Worker 标识，失败回滚并向上传播 ──
   const applyBackfillDecision = db.transaction((): boolean => {
@@ -401,16 +366,16 @@ async function ensureAccountVectorMetadataBackfill(
       .prepare('SELECT value FROM partition_meta WHERE account_id = ? AND key = ?')
       .get(accountId, VECTOR_BACKFILL_CHECKED_KEY) as { value: string | null } | undefined;
     if (claimedRow && claimedRow.value === workerIdentity) return false;
-    if (scheduleRebuild) {
-      const cleared = db.prepare(
-        'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
-      ).run(accountId).changes;
-      // 仅当确实清除了索引标记才推进对应账号快照版本。
-      if (cleared > 0) bumpAccountRevision(db, accountId);
-    }
+    // 归属未确认（无同快照证据）或探测到 legacy 向量：清除索引标记，明确安排
+    // 一次全量重建（客户端下次同步携带 accountId 元数据重新上传）。
+    const cleared = db.prepare(
+      'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
+    ).run(accountId).changes;
+    // 仅当确实清除了索引标记才推进对应账号快照版本。
+    if (cleared > 0) bumpAccountRevision(db, accountId);
     db.prepare('INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES (?, ?, ?)')
       .run(accountId, VECTOR_BACKFILL_CHECKED_KEY, workerIdentity);
-    return scheduleRebuild;
+    return true;
   });
 
   const rebuilt = applyBackfillDecision();
@@ -663,24 +628,13 @@ export async function vectorSearch(
         });
         return { available: false, reason: 'vector_backfill_failed' };
       }
-      // Issue #612 A26：无范围兼容查询仅当能确认 Worker 候选集属于单账号部署
-      // 时才允许——单账号判定纳入 accounts 与全部分区表，不再只看 repositories。
-      const isSingleAccount = !hasMultipleAccountPartitions(db);
-      if (isSingleAccount) {
-        try {
-          queryResult = await sendWorkerQuery(undefined);
-        } catch {
-          return { available: false, reason: 'worker_query_failed' };
-        }
-        if (!queryResult.ok) {
-          return {
-            available: false,
-            reason: `worker_query_failed: ${queryResult.status} ${queryResult.text.slice(0, 120)}`,
-          };
-        }
-      } else {
-        return { available: false, reason: 'account_metadata_not_indexed' };
-      }
+      // Issue #612 A26（审计修订 668）：本地 SQLite 的账号分区数量不能证明远程
+      // 共享索引中的无前缀旧向量只属于当前账号——共享 Worker 上其他部署遗留的
+      // 无前缀向量同样存在，无范围兼容查询会把其他账号的相似度用于本账号的
+      // 仓库。当前 Worker API 未提供无前缀索引归属的独立证据，兼容重试路径
+      // 已移除：一律按归属未确认返回；恢复路径是回填探测安排的全量重建
+      // （客户端携带 accountId 元数据重新上传后，带范围的查询正常工作）。
+      return { available: false, reason: 'account_metadata_not_indexed' };
     } else if (isMetadataNotIndexed) {
       // R2-A12：default 范围查询在元数据索引未就绪时同样声明语义化原因。
       return { available: false, reason: 'account_metadata_not_indexed' };
@@ -695,12 +649,15 @@ export async function vectorSearch(
     return { available: false, reason: 'worker_query_failed' };
   }
   const matches = data.matches;
-  // 若元数据索引已启用（过滤查询返回 200 空结果），但账号分区仍有非空 vector_indexed_at
-  // （如备份恢复或单账号升级保留的旧向量标记）且尚未针对当前 Worker 完成回填探测，
-  // 触发一次回填探测以在存在旧向量时清除索引标记并安排重建。
+  // 若元数据索引已启用，但账号分区仍有非空 vector_indexed_at（如备份恢复或
+  // 单账号升级保留的旧向量标记）且尚未针对当前 Worker 完成回填探测，触发一次
+  // 回填探测以在存在旧向量时清除索引标记并安排重建。
+  // Issue #612 审计（702/867）：检查不依赖过滤查询结果是否为空——范围查询按
+  // accountId 元数据过滤，缺元数据的旧向量本就不会出现在结果中；只要该账号
+  // 存在已索引仓库且当前 Worker 尚未完成检查，就执行探测（失败被下方
+  // try/catch 包裹，不阻断当前查询）。
   if (
-    matches.length === 0
-    && accountId !== 'default'
+    accountId !== 'default'
     && getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) !== workerUrl
   ) {
     let hasIndexedRepos = false;

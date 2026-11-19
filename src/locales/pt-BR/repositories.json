@@ -246,7 +246,8 @@
     "unstar-confirmation": "Cancelar confirmação de estrela",
     "unstar": "CancelStar",
     "successfully-unstarred": "Estrela cancelada com sucesso",
-    "failed-to-unstar-repository-please-check-your-ne": "Falha ao cancelar o Star, verifique a conexão de rede ou faça login novamente."
+    "failed-to-unstar-repository-please-check-your-ne": "Falha ao cancelar o Star, verifique a conexão de rede ou faça login novamente.",
+    "similar-results-may-be-incomplete-the-dens": "Os repositórios similares podem estar incompletos: o índice de vetores denso está indisponível. ({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Configure primeiro o GitHub Token nas configurações ou conecte-se ao serviço de back-end.",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "Falha na sincronização. Verifique sua conexão de rede ou tente novamente mais tarde.",
     "list-sync-new-categories_one": " ({{count}} nova categoria criada)",
     "list-sync-new-categories_other": " ({{count}} novas categorias criadas)",
-    "list-sync-complete": "{{lists}} listas sincronizadas ({{newCount}} novas categorias criadas)."
+    "list-sync-complete": "{{lists}} listas sincronizadas ({{newCount}} novas categorias criadas).",
+    "vector-worker-does-not-support-account-scoped-recall": "O worker de vetores não suporta recuperação por conta; reimplante o cloudflare-worker incluído e reconstrua o índice.",
+    "account-metadata-index-is-not-ready-create-the-accountid": "O índice de metadados de conta não está pronto; crie o índice de metadados accountId, preencha os vetores e ative o ACCOUNT_METADATA_INDEXED.",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "Não foi possível verificar o estado do worker de vetores; a busca local foi usada como alternativa.",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "A busca multicontas exige reconstruir o índice de vetores; a busca local foi usada como alternativa."
   },
   "repositoryHealthPanel": {
     "activity": "Atividade",

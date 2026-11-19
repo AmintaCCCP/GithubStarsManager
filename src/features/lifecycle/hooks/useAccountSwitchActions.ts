@@ -161,16 +161,26 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
    */
   const alignTargetAccountOnBackend = useCallback(async (accountId: string, token: string, user: GitHubUser): Promise<boolean> => {
     if (!backend.isAvailable) return true;
-    // R2-C11：凭据写入失败必须回报调用方（addAccountWithToken）——静默吞错会让
-    // 代理继续使用旧 PAT，用户看到「添加成功」但后续 GitHub 请求持续失败。
+    // R2-C11 + 转交 1（server/src/routes/configs.ts 契约）：凭据写入失败必须
+    // 回报调用方——syncSettings 在 PAT 校验超时或凭据被并发请求覆盖时仍返回
+    // 200，响应体携带 token_update_skipped / token_update_superseded 标志。
+    // 任一标志为 true 即视为凭据未对齐成功：保留 pendingBackendCredentialAlign
+    // 待对齐标记（允许同账号路径与菜单重试）并返回 false；两个标志都为 false
+    //（或缺省，兼容旧响应/测试桩）才维持原成功路径。静默吞错会让代理继续
+    // 使用旧 PAT，用户看到「添加成功」但后续 GitHub 请求持续失败。
     let credentialsAligned = true;
     try {
-      await backend.syncSettings({
+      const syncResult = await backend.syncSettings({
         github_token: token,
         active_account_id: accountId,
         user_profile: user,
       });
-      pendingBackendCredentialAlignAccounts.delete(accountId);
+      if (syncResult?.tokenUpdateSkipped === true || syncResult?.tokenUpdateSuperseded === true) {
+        credentialsAligned = false;
+        pendingBackendCredentialAlignAccounts.add(accountId);
+      } else {
+        pendingBackendCredentialAlignAccounts.delete(accountId);
+      }
     } catch (error) {
       credentialsAligned = false;
       pendingBackendCredentialAlignAccounts.add(accountId);
@@ -402,6 +412,12 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         if (result.status === 'backend-unavailable') return { ok: false, error: 'backend-unavailable' };
         if (result.status === 'unauthorized') return { ok: false, error: 'unauthorized' };
         if (result.status === 'restore-failed') return { ok: false, error: 'restore-failed' };
+        if (result.status === 'account-selection-required') {
+          // 转交 2：恢复歧义需要用户显式选择账号（登录页提供选择 UI）；添加
+          // 账号弹窗不支持选择流程，返回明确错误码，绝不误判为
+          // github-token-required（B 的有效凭证仍可从登录页恢复）。
+          return { ok: false, error: 'account-selection-required' };
+        }
         if (result.status === 'restored-token-invalid' || result.status === 'github-token-required') {
           return { ok: false, error: result.status };
         }
@@ -446,9 +462,16 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       committedAccountId = targetAccountId;
 
       // 后端保存的有效账号已在上面的冻结窗口内（身份提交前）登记完毕。
-      await alignTargetAccountOnBackend(targetAccountId, result.githubToken, result.user);
+      // 审计修复（CodeRabbit）：本地恢复已提交（候选账号已验证并落位）与
+      // 后端凭据对齐成功是两件事——对齐失败时保留已提交的本地账号与待对齐
+      // 标记（succeeded=true 不触发 finally 的完整回滚），仅返回
+      // backend-credential-sync-failed，用户可像 PAT 添加入口一样重试对齐。
+      const aligned = await alignTargetAccountOnBackend(targetAccountId, result.githubToken, result.user);
       refreshMcpBridgeSafely();
       succeeded = true;
+      if (!aligned) {
+        return { ok: false, error: 'backend-credential-sync-failed' };
+      }
       return { ok: true, user: result.user };
     } catch (error) {
       console.error('Restore account from backend failed:', error);

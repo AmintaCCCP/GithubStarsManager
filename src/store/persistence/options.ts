@@ -36,6 +36,16 @@ import { debouncedPersistStorage } from './storage';
 let pendingMigrationTokenSave: Promise<{ ok: boolean; tokens: GhAccountTokenMap; error?: unknown }> | null = null;
 
 /**
+ * v19 凭据迁移的落盘确认标记（审计修复）：partialize 仅在该标记为 true 时才
+ * 提交剥除 PAT 的 savedAccounts——加密保存成功（或本次启动无需迁移：Web 构建
+ * 剥除即设计、桌面无 Token 可迁移）后才提交干净快照；保存失败或尚未落盘确认
+ * 时保留原快照中的 Token，配合 onRehydrateStorage 的迁移重试，保证未成功
+ * 保存的凭据跨重启仍可重试迁入 safeStorage，而不是被首次持久化永久清除。
+ * Web 构建（无桥）恒为确认态：PAT 本就不持久化，剥除即 B7/CWE-922 设计。
+ */
+let v19TokenSaveConfirmed = !hasGhAccountsBridge();
+
+/**
  * 审计修复（B7/CWE-922）：持久化分片只保留 savedAccounts 的非敏感元数据
  * （accountId、user、addedAt、lastUsedAt），githubToken 一律剥除（置空串）。
  * PAT 仅存桌面端 safeStorage 加密文件（经 ghAccounts IPC），Web 构建不持久化
@@ -57,6 +67,42 @@ const stripSavedAccountTokens = (
   return changed ? next : savedAccounts;
 };
 
+/**
+ * v19 凭据迁移的落盘确认重试（审计修复）：迁移保存失败时持久化快照仍携带
+ * 旧 PAT（partialize 在确认前不剥除），否则未成功保存的凭据会在下一次持久化
+ * 后永久丢失且迁移不会重跑。每次桌面端水化收尾时检查内存中尚存的账号凭据：
+ * - 无残留 Token：迁移早已完成（或无需迁移），置确认标记恢复剥除语义；
+ * - 有残留 Token：重试迁入 safeStorage，成功后置确认标记，下一次持久化
+ *   提交干净快照；失败则保留快照与内存中的 Token，下次启动再次重试。
+ */
+const retryUnconfirmedV19TokenSave = async (): Promise<void> => {
+  if (v19TokenSaveConfirmed || !hasGhAccountsBridge()) return;
+  const store = useAppStore.getState();
+  const tokens: GhAccountTokenMap = {};
+  for (const [accountId, account] of Object.entries(store.savedAccounts ?? {})) {
+    if (account?.githubToken?.trim()) tokens[accountId] = account.githubToken;
+  }
+  const currentAccountId = accountIdKey(store.user);
+  const currentToken = typeof store.githubToken === 'string' ? store.githubToken.trim() : '';
+  if (currentAccountId && currentToken && !tokens[currentAccountId]) {
+    tokens[currentAccountId] = currentToken;
+  }
+  if (Object.keys(tokens).length === 0) {
+    v19TokenSaveConfirmed = true;
+    return;
+  }
+  try {
+    // R2-B1 合并写入语义同样适用于重试：只补写确认映射中缺失/最新的条目，
+    // 不覆写磁盘上其他账号的 Token。
+    await saveGhAccountTokens(tokens);
+    v19TokenSaveConfirmed = true;
+  } catch (err) {
+    logger.warn('store.hydrate', 'v19 gh-accounts migration retry failed; legacy tokens kept in persisted snapshot', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
 export const appPersistenceOptions: PersistOptions<AppStoreState, PersistedAppState> = {
   name: 'github-stars-manager',
   version: 19,
@@ -69,7 +115,11 @@ partialize: (state) => ({
   user: state.user,
   isAuthenticated: state.isAuthenticated,
   accountWorkspaces: state.accountWorkspaces,
-  savedAccounts: stripSavedAccountTokens(state.savedAccounts),
+  // 审计修复：savedAccounts 的 PAT 剥除仅在 v19 迁移落盘确认后提交——加密保存
+  // 失败/未确认时保留原快照中的 Token（可重试状态），否则首次持久化会写出不含
+  // PAT 的 v19 快照，重启后迁移不再重跑，未成功迁入 safeStorage 的凭据全部丢失。
+  // 确认后恢复 B7/CWE-922 语义：持久化分片不含任何明文 PAT。
+  savedAccounts: v19TokenSaveConfirmed ? stripSavedAccountTokens(state.savedAccounts) : state.savedAccounts,
 
   // 持久化仓库数据
   repositories: state.repositories,
@@ -512,12 +562,28 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
     let migratedFromMirror: { user: GitHubUser | null; backendApiSecret: string | null } | null = null;
     if (hasGhAccountsBridge()) {
       const legacyMirror = readLegacyAuthMirrorForDesktopMigration();
-      const mirrorAccountId = accountIdKey(legacyMirror?.user);
-      if (legacyMirror?.githubToken && mirrorAccountId
+      const mirrorUser = legacyMirror?.user ?? null;
+      const mirrorAccountId = accountIdKey(mirrorUser);
+      if (legacyMirror?.githubToken && mirrorAccountId && mirrorUser
         && (!legacyTopAccountId || mirrorAccountId === legacyTopAccountId)
         && !tokens[mirrorAccountId]) {
         tokens[mirrorAccountId] = legacyMirror.githubToken;
-        migratedFromMirror = { user: legacyMirror.user, backendApiSecret: legacyMirror.backendApiSecret };
+        migratedFromMirror = { user: mirrorUser, backendApiSecret: legacyMirror.backendApiSecret };
+        // 审计修复：迁入镜像凭据时同时补录账号记录——旧快照只有 user 而缺
+        // githubToken/savedAccounts 时，仅迁 Token 不建条目会让后续归一化看到
+        // 顶层 PAT 已为 null 而无法补录，savedAccounts 为空导致 switchAccount
+        // 无法选择该账号。用已核对身份的 mirror user 补录缺失条目（已有条目
+        // 保持不变），随后按现有流程剥除账号 PAT。
+        if (!legacySaved[mirrorAccountId]) {
+          const now = new Date().toISOString();
+          legacySaved[mirrorAccountId] = {
+            accountId: mirrorAccountId,
+            user: mirrorUser,
+            githubToken: legacyMirror.githubToken,
+            addedAt: now,
+            lastUsedAt: now,
+          };
+        }
       }
     }
     if (Object.keys(tokens).length > 0 && hasGhAccountsBridge()) {
@@ -528,6 +594,8 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
       const mirrorToClear = migratedFromMirror;
       pendingMigrationTokenSave = saveGhAccountTokens(tokensSnapshot)
         .then(() => {
+          // 加密保存成功：此后持久化分片才允许提交剥除 PAT 的干净快照。
+          v19TokenSaveConfirmed = true;
           if (mirrorToClear) {
             writeAuthMirror({
               user: mirrorToClear.user,
@@ -538,6 +606,10 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
           return { ok: true as const, tokens: tokensSnapshot };
         })
         .catch((err) => ({ ok: false as const, tokens: tokensSnapshot, error: err }));
+    } else {
+      // 无需迁移落盘：Web 构建不持久化 PAT（剥除即设计），桌面无 Token 时
+      // 剥除为空操作——直接确认，保持既有剥除语义。
+      v19TokenSaveConfirmed = true;
     }
     stateRecord.githubToken = null;
     stateRecord.savedAccounts = stripSavedAccountTokens(legacySaved);
@@ -608,6 +680,9 @@ pendingMigrationTokenSave = null;
         const { restorePersistedAccountTokens } = useAppStore.getState();
         restorePersistedAccountTokens(migrationResult.tokens);
       }
+      // 迁移保存失败后立即重试一次：瞬时故障可自愈；仍失败则保留可重试状态
+      //（持久化快照继续携带旧 Token，下次启动再次重试，见 retry 函数注释）。
+      await retryUnconfirmedV19TokenSave();
       return;
     }
     const result = await loadGhAccountTokens();
@@ -622,6 +697,9 @@ pendingMigrationTokenSave = null;
       const { restorePersistedAccountTokens } = useAppStore.getState();
       restorePersistedAccountTokens(result.tokens);
     }
+    // 迁移成功路径的确认标记已在保存成功的 then 中置位；本次启动无需迁移时
+    // 由 retry 检查收敛（快照无 Token 即确认，仍有残留 Token 则重试迁入）。
+    await retryUnconfirmedV19TokenSave();
   })
   .catch(() => undefined)
   .finally(() => finishHydration());

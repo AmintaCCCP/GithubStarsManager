@@ -142,8 +142,13 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         // 仅当被测地址与当前配置一致时更新连接状态与维度并保留已有账号计数。
         const currentStore = useAppStore.getState();
         const normalizeUrl = (url: string | undefined): string => (url ?? '').trim().replace(/\/+$/, '');
+        // 审计修复：URL 相同还不足以代表已保存配置可用——若已保存令牌失效而
+        // 用户用尚未保存的新令牌测试成功，仅凭 URL 匹配会把仍使用旧令牌的配置
+        // 标成 connected（实际搜索继续用旧令牌并失败）。被测令牌与已保存令牌
+        // 一致时才更新已保存配置的连接状态；草稿测试结果仍独立显示。
         const sameWorkerIndex = normalizeUrl(draft.workerUrl) !== ''
-          && normalizeUrl(draft.workerUrl) === normalizeUrl(currentStore.vectorSearchConfig?.workerUrl);
+          && normalizeUrl(draft.workerUrl) === normalizeUrl(currentStore.vectorSearchConfig?.workerUrl)
+          && (draft.authToken ?? '') === (currentStore.vectorSearchConfig?.authToken ?? '');
         if (sameWorkerIndex) {
           const previousVectorCount = currentStore.vectorSearchStatus?.vectorCount ?? 0;
           state.setVectorSearchStatus({ connected: true, vectorCount: previousVectorCount, dimensions: result.dimensions });
@@ -325,8 +330,14 @@ export const useVectorSearchActions = (): VectorSearchActions => {
               ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
               ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
             ])];
-            let authoritativeSnapshotMatches = workspaceUnchanged;
-            if (authoritativeSnapshotMatches && backend.isAvailable) {
+            // R5（CodeRabbit Major）：删除授权必须来自当前账号的权威加星列表。
+            // 两台设备可以在不启用后端同步的情况下共享同一 GitHub 账号与 Worker
+            // ——本地「起止快照一致 + lastSync」无法证明列表完整（设备 B 可能在
+            // 设备 A 上次同步后加星并索引了新仓库，清理请求会把它误删）。因此
+            // 权威快照只能来自后端：backend.isAvailable 为 false 或核对失败时
+            // 一律跳过删除并保留已上传向量，冗余向量由后续重建收敛。
+            let authoritativeSnapshotMatches = false;
+            if (workspaceUnchanged && backend.isAvailable) {
               // 多设备共享后端时，清理前核对后端权威快照；返回后再重读实时列表与同步状态，
               // 仅当起止本地快照与后端快照三者完全一致且无同步在途时才执行删除。
               try {

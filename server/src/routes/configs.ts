@@ -8,6 +8,9 @@ import { logger } from '../services/logger.js';
 import {
   resolveAccountScope,
   resolveWritableAccountScope,
+  extractRequestedAccountId,
+  hasInvalidAccountHeader,
+  hasPendingDefaultPartitionData,
   getLegacyDefaultClaimedBy,
   getLegacyDefaultVerifiedToken,
   snapshotLegacyDefaultTokenBeforeOverwrite,
@@ -542,10 +545,24 @@ router.delete('/api/configs/webdav/:id', (req, res) => {
 // 全局表中的账号级键（ACCOUNT_SCOPED_SETTING_KEYS）只归属 default 分区或
 // 已认领存量数据的 legacy owner（legacy_default_claimed_by）账号；其他真实账号
 // 缺失账号级键时保持缺失，绝不继承其他账号留在全局表中的旧值（防串号）。
+// Issue #612 审计（548）：无账号头请求的分区解析必须与 GET /api/categories
+// 完全一致——default 分区仍有待认领数据时，无头请求可能属于存量 default
+// 数据（无头 GET 读 default）；否则同一无头会话的分类与设置会来自不同分区
+// （分类读 default、设置读活跃账号），customCategories 与 categoryOrder 等
+// 账号级键随之错配。
 router.get('/api/settings', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    if (hasInvalidAccountHeader(req)) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const headerAccountId = extractRequestedAccountId(req);
+    const accountId = headerAccountId
+      ?? (hasPendingDefaultPartitionData(db) ? 'default' : resolveAccountScope(req, db));
     const inheritLegacyScopedSettings = accountId === 'default'
       || getLegacyDefaultClaimedBy(db) === accountId;
     const verifiedLegacyToken = accountId !== 'default' && inheritLegacyScopedSettings
@@ -648,6 +665,10 @@ router.put('/api/settings', async (req, res) => {
     } else {
       accountId = resolveAccountScope(req, db);
     }
+    // Issue #612 审计（798）：无账号头的账号级写入在 GitHub 校验等待期间（最长
+    // 8s）可能因另一设备添加/移除账号分区而失去唯一范围——写入事务内需要重新
+    // 确认。显式账号头请求始终使用其指定分区，不受此重新确认影响。
+    const headerlessScopedWrite = hasScopedWrite && !extractRequestedAccountId(req);
     const isRealAccount = accountId !== 'default';
 
     // Issue #612 A21：ai_result_sharing_enabled 必须是显式布尔值（zod 校验，
@@ -696,12 +717,29 @@ router.put('/api/settings', async (req, res) => {
       if (normalizedUserProfile && typeof normalizedUserProfile === 'object' && 'id' in normalizedUserProfile) {
         const profileObj = normalizedUserProfile as Record<string, unknown>;
         const profileId = profileObj.id;
-        if (isRealAccount && profileId !== undefined && profileId !== null && String(profileId) !== accountId) {
-          res.status(400).json({
-            error: 'user_profile.id does not match target account',
-            code: 'INVALID_USER_PROFILE',
-          });
-          return;
+        // Issue #612 审计（699）：先校验 id 类型再比较账号——数组等非数字形态
+        // 会骗过字符串比较（String([111]) === '111'）并被原样写进 accounts.user_json，
+        // 客户端的 accountIdKey 无法接受。仅接受数字或数字字符串；合法数字字符
+        // 串先归一化为数字再核对（'0111' 与 111 同一账号）。profileId 为 null 或
+        // 空字符串时保留现有语义（null 跳过核对；'' 走账号不匹配的 400）。
+        if (isRealAccount && profileId !== undefined && profileId !== null) {
+          const isNumericProfileId = (typeof profileId === 'number' && Number.isInteger(profileId))
+            || (typeof profileId === 'string' && /^\d+$/.test(profileId));
+          if (!isNumericProfileId) {
+            res.status(400).json({
+              error: 'user_profile.id does not match target account',
+              code: 'INVALID_USER_PROFILE',
+            });
+            return;
+          }
+          const comparableProfileId = typeof profileId === 'string' ? Number(profileId) : profileId;
+          if (String(comparableProfileId) !== accountId) {
+            res.status(400).json({
+              error: 'user_profile.id does not match target account',
+              code: 'INVALID_USER_PROFILE',
+            });
+            return;
+          }
         }
         // 统一将数字字符串 id 规范化为 number，与备份导出/恢复校验规则一致
         if (typeof profileId === 'string' && /^\d+$/.test(profileId)) {
@@ -778,7 +816,20 @@ router.put('/api/settings', async (req, res) => {
       tokenCleared: false,
     };
 
+    let scopeChangedDuringWait = false;
+
     const upsert = db.transaction(() => {
+      // Issue #612 审计（798）：无账号头请求在事务写入任何设置前重新确认写入
+      // 范围仍唯一且等于最初解析的账号——范围新增、消失或变为其他账号时返回
+      // ACCOUNT_SCOPE_REQUIRED，不保存 PAT 或账号级设置（与校验等待结束后发起
+      // 的相同请求同一结果）。显式账号头请求不受影响。
+      if (headerlessScopedWrite) {
+        const rechecked = resolveWritableAccountScope(req, db);
+        if (!rechecked.ok || rechecked.accountId !== accountId) {
+          scopeChangedDuringWait = true;
+          return;
+        }
+      }
       for (const [key, rawValue] of Object.entries(updates)) {
         let value = rawValue as string | null;
 
@@ -815,10 +866,17 @@ router.put('/api/settings', async (req, res) => {
         }
 
         if (key === 'user_profile') {
-          // user_profile 是 accounts.user_json 的唯一写入路径（客户端登录/切号时
-          // 携带）；归一化结果已在事务前完成校验，此处只记录载荷。
-          accountPayload.userProfile = normalizedUserProfile;
-          continue;
+          if (isRealAccount) {
+            // user_profile 是 accounts.user_json 的唯一写入路径（客户端登录/切号时
+            // 携带）；归一化结果已在事务前完成校验，此处只记录载荷。
+            accountPayload.userProfile = normalizedUserProfile;
+            continue;
+          }
+          // Issue #612 审计（821）：default 分区（无真实账号分区）保持 v4 之前的
+          // 全局 settings.user_profile 写入语义——归一化后的资料序列化进全局表，
+          // 显式清空（null / ''）原样落库；跳过会让客户端拿到 updated: true 却
+          // 读回旧资料。
+          value = normalizedUserProfile as string | null;
         }
 
         // better-sqlite3 interprets objects/arrays as named parameter maps,
@@ -868,6 +926,15 @@ router.put('/api/settings', async (req, res) => {
     });
 
     upsert();
+    // Issue #612 审计（798）：校验等待期间账号范围变化的无头请求未写入任何
+    // 设置，按范围歧义拒绝。
+    if (scopeChangedDuringWait) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
     // Issue #612 A11：Token 验证失败时其余设置照常保存，但凭据写入被跳过。
     // Issue #612 R2-A1：校验等待期间凭据被并发变更时，本次 PAT 写回被放弃。
     res.json({

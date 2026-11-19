@@ -246,7 +246,8 @@
     "unstar-confirmation": "Star-Bestätigung abbrechen",
     "unstar": "AbbrechenStar",
     "successfully-unstarred": "Star hat erfolgreich abgesagt",
-    "failed-to-unstar-repository-please-check-your-ne": "Star konnte nicht abgebrochen werden. Bitte überprüfen Sie die Netzwerkverbindung oder melden Sie sich erneut an."
+    "failed-to-unstar-repository-please-check-your-ne": "Star konnte nicht abgebrochen werden. Bitte überprüfen Sie die Netzwerkverbindung oder melden Sie sich erneut an.",
+    "similar-results-may-be-incomplete-the-dens": "Ähnliche Repositorys sind möglicherweise unvollständig: Der dichte Vektorindex ist nicht verfügbar. ({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Bitte konfigurieren Sie zuerst GitHub Token in den Einstellungen oder stellen Sie eine Verbindung zum Backend-Dienst her.",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "Die Synchronisierung ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung oder versuchen Sie es später erneut.",
     "list-sync-new-categories_one": " ({{count}} neue Kategorie erstellt)",
     "list-sync-new-categories_other": " ({{count}} neue Kategorien erstellt)",
-    "list-sync-complete": "{{lists}} Listen synchronisiert ({{newCount}} neue Kategorien erstellt)."
+    "list-sync-complete": "{{lists}} Listen synchronisiert ({{newCount}} neue Kategorien erstellt).",
+    "vector-worker-does-not-support-account-scoped-recall": "Der Vector-Worker unterstützt kein kontobezogenes Abrufen; stelle den mitgelieferten cloudflare-worker erneut bereit und baue den Index neu auf.",
+    "account-metadata-index-is-not-ready-create-the-accountid": "Der Konto-Metadaten-Index ist nicht bereit; erstelle den accountId-Metadaten-Index, fülle die Vektoren nach und aktiviere ACCOUNT_METADATA_INDEXED.",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "Der Status des Vector-Workers konnte nicht überprüft werden; es wurde auf die lokale Suche zurückgegriffen.",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "Für die Suche mit mehreren Konten muss der Vektorindex neu aufgebaut werden; es wurde auf die lokale Suche zurückgegriffen."
   },
   "repositoryHealthPanel": {
     "activity": "Aktivität",

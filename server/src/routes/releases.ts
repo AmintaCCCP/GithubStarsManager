@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope, resolveWritableAccountScope, bumpAccountRevision } from '../db/accountScope.js';
+import { resolveAccountScope, resolveWritableAccountScope, hasInvalidAccountHeader, bumpAccountRevision } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -35,6 +35,15 @@ function transformRelease(row: Record<string, unknown>) {
 router.get('/api/releases', (req, res) => {
   try {
     const db = getDb();
+    // Issue #612 审计（143）：显式携带但格式无效的账号头（空白 / 非数字）按无效
+    // 请求处理，绝不当作缺失回退到活跃账号 / default 分区读取他人数据。
+    if (hasInvalidAccountHeader(req)) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
     const accountId = resolveAccountScope(req, db);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 50));

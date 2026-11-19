@@ -12,14 +12,40 @@ const mocks = vi.hoisted(() => ({
   starRepository: vi.fn(),
   forceSyncToBackend: vi.fn(),
   translateBatch: vi.fn(),
+  // 审计修复：切号后已成功的星标写回发起账号工作区并登记待同步——测试桩
+  // 提供最小 getState/setState 驱动账号代次校验与归档写回。
+  storeUser: null as { id: number } | null,
+  storeAccountWorkspaces: {} as Record<string, unknown>,
+  markPendingAccountSync: vi.fn(),
 }));
-vi.mock('../../../store/useAppStore', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) => selector({
+vi.mock('../../../store/useAppStore', () => {
+  const store = (selector: (state: unknown) => unknown) => selector({
     githubToken: mocks.token, language: mocks.language, addRepository: mocks.addRepository,
-  }),
-}));
+  });
+  (store as unknown as { getState: () => unknown }).getState = () => ({
+    user: mocks.storeUser,
+    githubToken: mocks.token,
+    language: mocks.language,
+    addRepository: mocks.addRepository,
+    accountWorkspaces: mocks.storeAccountWorkspaces,
+  });
+  (store as unknown as { setState: (patch: unknown) => void }).setState = (patch: unknown) => {
+    const partial = typeof patch === 'function'
+      ? (patch as (state: unknown) => Record<string, unknown>)((store as unknown as { getState: () => unknown }).getState())
+      : (patch as Record<string, unknown>);
+    if (partial && typeof partial === 'object' && 'accountWorkspaces' in partial) {
+      mocks.storeAccountWorkspaces = partial.accountWorkspaces as Record<string, unknown>;
+    }
+  };
+  return { useAppStore: store };
+});
 vi.mock('../../../services/githubApiFactory', () => ({ createGitHubApiService: () => mocks }));
-vi.mock('../../../services/autoSync', () => ({ forceSyncToBackend: mocks.forceSyncToBackend }));
+vi.mock('../../../services/autoSync', () => ({
+  forceSyncToBackend: mocks.forceSyncToBackend,
+  markPendingAccountSync: mocks.markPendingAccountSync,
+  // 审计修复：切号后的星标写回经簿记守卫——测试桩直通执行。
+  withAccountSwitchGuardSync: (fn: () => void) => fn(),
+}));
 vi.mock('../../../services/translateService', () => ({ translateBatch: mocks.translateBatch }));
 
 const detail = (owner: string, name: string) => ({
@@ -35,6 +61,8 @@ describe('useBatchStarImport', () => {
     vi.clearAllMocks();
     mocks.token = 'token';
     mocks.language = 'zh';
+    mocks.storeUser = null;
+    mocks.storeAccountWorkspaces = {};
     mocks.getRepositoryDetails.mockImplementation(async (owner, name) => detail(owner, name));
     mocks.isRepositoryStarred.mockResolvedValue(false);
     mocks.starRepository.mockResolvedValue(undefined);
@@ -194,5 +222,29 @@ describe('useBatchStarImport', () => {
     act(() => result.current.clearPreview());
     expect(result.current.translations).toEqual({});
     expect(result.current.translationsVisible).toBe(false);
+  });
+
+  it('records a successful star to the starting account workspace when the session switched mid-import', async () => {
+    // 审计修复：星标请求已在 GitHub 成功（不可撤销）而会话恰好切换时，
+    // 该星标必须记录到发起账号的工作区并登记待同步，绝不静默丢失；
+    // 尾部同步（forceSyncToBackend）绝不能在切号后执行。
+    mocks.storeUser = { id: 1 };
+    mocks.storeAccountWorkspaces = { '1': { repositories: [] } };
+    mocks.starRepository.mockImplementation(async () => {
+      // 星标请求期间切换到账号 2
+      mocks.storeUser = { id: 2 };
+    });
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+    await act(() => result.current.starSelected());
+
+    expect(mocks.starRepository).toHaveBeenCalledTimes(1);
+    expect(mocks.addRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    // 星标记录进发起账号（id=1）的归档快照，并登记 (账号, 发起时后端) 待同步标记
+    const parked = mocks.storeAccountWorkspaces['1'] as { repositories: Array<{ id: number }> };
+    expect(parked.repositories).toHaveLength(1);
+    expect(parked.repositories[0].id).toBe(1);
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', '');
   });
 });

@@ -117,4 +117,51 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
       if (fs.existsSync(tempConfig)) fs.unlinkSync(tempConfig);
     }
   });
+
+  it('deploy.mjs overrides ACCOUNT_METADATA_INDEXED via --var on both enable and rollback deploys', () => {
+    // R2 review：deployWorker 必须在 true/false 两个方向都显式传 --var 覆盖，
+    // 回滚部署不得继承本地 wrangler.toml 中可能被手动改成的 "true"。
+    const src = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
+    assert.match(
+      src,
+      /deployArgs = \['deploy', '--var', `ACCOUNT_METADATA_INDEXED:\$\{accountMetadataIndexed \? 'true' : 'false'\}`\]/,
+      'deployWorker must build an explicit --var override for both directions'
+    );
+    assert.ok(!src.includes("['deploy'];"), 'rollback must not deploy without the explicit override');
+  });
+
+  it('deploy.mjs keeps --quick non-interactive on verification failure and gates unverified flags', () => {
+    const src = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
+    // --quick 验证失败时按部署模式自动回滚，绝不等待输入。
+    assert.ok(
+      src.includes('{ interactive: false })'),
+      '--quick must call verification with interactive:false'
+    );
+    // 快速部署只复用「上次验证通过」的启用标记（强制保留 ≠ 已就绪）。
+    assert.ok(
+      src.includes('savedConfig.accountMetadataIndexVerified === true'),
+      'quick deploy must gate reuse of the enable flag on the verified marker'
+    );
+  });
+
+  it('worker implementations do not call the unavailable Vectorize binding list()', () => {
+    // 生产 Vectorize binding 不提供 list()（完整枚举只有 REST API / wrangler CLI），
+    // 分页列举分支是不可达代码；清理只能采样并如实标注「未验证」。
+    for (const f of ['worker.js', path.join('src', 'index.ts')]) {
+      const src = fs.readFileSync(path.resolve(WORKER_DIR, f), 'utf-8');
+      assert.ok(!src.includes('.list('), `${f} must not call the unavailable binding list()`);
+      assert.ok(src.includes('partial: true, verified: false'), `${f} must keep the honest unverified cleanup response`);
+      // 分页分支的「可验证完成」返回（partial: false）必须随分支一并移除。
+      assert.ok(!src.includes('listedAll'), `${f} must not keep the dead pagination branch`);
+      assert.ok(
+        !/\bpartial: false \}\);/.test(src),
+        `${f} must never return cleanup as verified-complete`
+      );
+    }
+  });
+
+  it('wrangler.toml keeps ACCOUNT_METADATA_INDEXED default "false"', () => {
+    const toml = fs.readFileSync(path.resolve(WORKER_DIR, 'wrangler.toml'), 'utf-8');
+    assert.match(toml, /^ACCOUNT_METADATA_INDEXED = "false"$/m, 'deployment default must stay false');
+  });
 });

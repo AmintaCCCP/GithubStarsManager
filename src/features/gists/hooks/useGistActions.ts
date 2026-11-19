@@ -1,14 +1,16 @@
 import { makeT, useT } from "../../../i18n/useT";
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Gist } from '../../../types';
 import type { GistCreateInput, GistUpdateInput } from '../../../services/githubApi';
 import { useAppStore } from '../../../store/useAppStore';
 import {
   getAccountSessionGeneration,
+  isCurrentAccount,
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
+import { withAccountSwitchGuardSync } from '../../../services/autoSync';
 import { selectGistViewState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { AIService } from '../../../services/aiService';
@@ -46,6 +48,69 @@ export class GistDetailSessionSwitchedError extends Error {
   }
 }
 
+/**
+ * 审计修复：切号期间远端操作已成功的 Gist 变更（删除/取消星标/编辑）必须
+ * 反映到发起账号的工作区，否则切回该账号时归档快照会把旧状态换入实时列表，
+ * 与 GitHub 不一致。沿用账号工作区生命周期的安全更新路径（与
+ * useRepositoryCardActions.unstar 的 C29 模式一致）：
+ * - 发起账号已重新激活（A→B→A）→ 写入其当前实时工作区（簿记守卫内）；
+ * - 仍停放 → 只更新其归档快照；快照不存在时绝不创建/覆盖（不触碰当前账号）。
+ * 远端操作不可撤销，本地补写只是让列表与远端一致；提示与回调仍按原会话
+ * 检查丢弃（不属于本函数职责）。
+ */
+const applyRemoteGistChangeToOwnerSession = (
+  ownerAccountId: string | null,
+  change: { type: 'update'; gist: Gist } | { type: 'delete'; gistId: string },
+): void => {
+  if (!ownerAccountId || typeof useAppStore.setState !== 'function') return;
+  if (isCurrentAccount(ownerAccountId)) {
+    withAccountSwitchGuardSync(() => {
+      if (change.type === 'delete') {
+        useAppStore.getState().deleteGist(change.gistId);
+      } else {
+        useAppStore.getState().updateGist(change.gist);
+      }
+    });
+    return;
+  }
+  withAccountSwitchGuardSync(() => {
+    useAppStore.setState((state) => {
+      const parked = state.accountWorkspaces?.[ownerAccountId];
+      if (!parked) return state;
+      if (change.type === 'delete') {
+        return {
+          accountWorkspaces: {
+            ...state.accountWorkspaces,
+            [ownerAccountId]: {
+              ...parked,
+              gists: parked.gists.filter((gist) => gist.id !== change.gistId),
+              starredGists: parked.starredGists.filter((gist) => gist.id !== change.gistId),
+            },
+          },
+        };
+      }
+      // 编辑/取消星标：按 ID 原位替换；条目不在快照中时跳过（绝不无中生有，
+      // 也绝不把更新条目前置插入——那是「新增」语义，不属于本路径）。
+      const replaceById = (gists: Gist[]): Gist[] => {
+        const index = gists.findIndex((gist) => gist.id === change.gist.id);
+        if (index === -1) return gists;
+        const next = [...gists];
+        next[index] = change.gist;
+        return next;
+      };
+      const gists = replaceById(parked.gists);
+      const starredGists = replaceById(parked.starredGists);
+      if (gists === parked.gists && starredGists === parked.starredGists) return state;
+      return {
+        accountWorkspaces: {
+          ...state.accountWorkspaces,
+          [ownerAccountId]: { ...parked, gists, starredGists },
+        },
+      };
+    });
+  });
+};
+
 export const useGistActions = () => {
   const state = useAppStore(useShallow(selectGistViewState));
   const { toast, confirm } = useDialog();
@@ -53,6 +118,10 @@ export const useGistActions = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
+  // 刷新状态按请求归属（审计修复）：同账号会话代次递增（换凭据）后 currentUserId
+  // 不变、下方 effect 不执行，而 finally 的会话检查又会跳过清理——没有请求身份
+  // 记录时同步按钮会永久禁用。每次刷新登记唯一身份，仅最新请求可复位状态。
+  const refreshRunRef = useRef(0);
   const currentUserId = useAppStore((s) => s.user?.id ?? null);
   // 切换账号时立即清除旧会话残留的刷新状态，避免新账号的刷新按钮被禁用
   useEffect(() => {
@@ -74,6 +143,7 @@ export const useGistActions = () => {
       return;
     }
     setIsRefreshing(true);
+    const refreshRunId = ++refreshRunRef.current;
     // 账号代次校验（Issue #611）：Gist 全量刷新耗时期间切号后丢弃结果
     const startedAccountId = peekCurrentAccountId();
     const startedGeneration = getAccountSessionGeneration();
@@ -96,7 +166,10 @@ export const useGistActions = () => {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       toast(error instanceof Error ? error.message : t('useGistActions.failed-to-sync-gists'), 'error');
     } finally {
-      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+      // 审计修复：复位按请求身份而非会话校验——旧请求结束时若仍是最新一次
+      // 刷新（含同账号换凭据后无新请求的场景），必须复位禁用的同步按钮；
+      // 新会话已发起自己的刷新（身份已让位）时绝不覆盖其状态。
+      if (refreshRunRef.current === refreshRunId) {
         setIsRefreshing(false);
       }
     }
@@ -261,7 +334,15 @@ export const useGistActions = () => {
     try {
       if (editingGist) {
         const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);
-        if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+        if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+          // 审计修复：远端编辑已按发起账号完成（不可撤销）——发起账号的
+          // 工作区（实时或归档）必须同步该结果。
+          applyRemoteGistChangeToOwnerSession(
+            startedAccountId,
+            { type: 'update', gist: { ...updated, last_edited: new Date().toISOString() } },
+          );
+          return;
+        }
         state.updateGist({ ...updated, last_edited: new Date().toISOString() });
         toast(t('useGistActions.gist-updated'), 'success');
         return;
@@ -359,7 +440,12 @@ export const useGistActions = () => {
     setIsMutating(true);
     try {
       await api.unstarGist(gist.id);
-      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        // 审计修复：远端取消星标已按发起账号完成（不可撤销）——发起账号的
+        // 工作区（实时或归档）必须同步该结果，切回后列表才与 GitHub 一致。
+        applyRemoteGistChangeToOwnerSession(startedAccountId, { type: 'update', gist: { ...gist, starred: false } });
+        return;
+      }
       onUnstarred?.(gist.id);
       state.updateGist({ ...gist, starred: false });
       toast(t('useGistActions.unstarred'), 'success');
@@ -392,7 +478,12 @@ export const useGistActions = () => {
     setIsMutating(true);
     try {
       await api.deleteGist(gist.id);
-      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        // 审计修复：远端删除已按发起账号完成（不可撤销）——发起账号的
+        // 工作区（实时或归档）必须同步该结果，切回后已删除的 Gist 不得复活。
+        applyRemoteGistChangeToOwnerSession(startedAccountId, { type: 'delete', gistId: gist.id });
+        return;
+      }
       state.deleteGist(gist.id);
       onDeleted?.(gist.id);
       toast(t('useGistActions.gist-deleted'), 'success');

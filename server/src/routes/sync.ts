@@ -24,11 +24,34 @@ function isDeclaredAccountId(value: unknown): value is string {
 }
 
 /**
+ * Issue #612 审计（56）：encodeURIComponent 在字符串含孤立代理码元（如 JSON
+ * 转义的 "\uD800"）时抛 URIError——导入事务内抛出会回滚同一事务中已执行的
+ * 合法仓库写入并返回 500。改用确定性 UTF-8 百分号编码：合法码位与
+ * encodeURIComponent 的输出逐字符一致（普通分类名的 ID 稳定不变），孤立代理
+ * 按其码位的 UTF-8 字节形态（WTF-8）转义，保证任意输入都能生成稳定 ID。
+ */
+function encodeCategoryIdPart(raw: string): string {
+  let encoded = '';
+  // Array.from 按码点切分：合法代理对是长度 2 的字符串，孤立代理是长度 1。
+  for (const ch of Array.from(raw)) {
+    const code = ch.codePointAt(0) ?? 0;
+    const isLoneSurrogate = ch.length === 1 && code >= 0xd800 && code <= 0xdfff;
+    if (!isLoneSurrogate) {
+      encoded += encodeURIComponent(ch);
+    } else {
+      const bytes = [0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f)];
+      encoded += bytes.map((b) => `%${b.toString(16).toUpperCase()}`).join('');
+    }
+  }
+  return encoded;
+}
+
+/**
  * Issue #612 R2-A19：导入分类的 id 归一化（顶层与工作区路径共用）。
  * 旧版备份的分类条目可能缺失 id（旧 POST /api/categories 不写 id），直接入库
  * 会撞 categories.id 的 NOT NULL 约束并回滚整个导入事务。
  * - 显式 ID（含数字形态）原样保留并预先占位；
- * - 缺失时使用 `legacy-category-${encodeURIComponent(rawName)}` 保留原始名称区分
+ * - 缺失时使用 `legacy-category-${encodeCategoryIdPart(rawName)}` 保留原始名称区分
  *   （避免 `Build Tools` 与 `Build-Tools` 碰撞）；
  * - 同名条目或与显式 ID 冲突时追加稳定的 `#2` / `#3` 序号后缀，保证重复导入
  *   同一备份生成同一组 ID（配合 INSERT OR REPLACE 幂等更新而非创建副本）。
@@ -53,7 +76,7 @@ function buildImportedCategoryIds(categories: Record<string, unknown>[]): Array<
     const c = categories[i];
     if (!c || typeof c !== 'object' || Array.isArray(c)) continue;
     const rawName = typeof c.name === 'string' && c.name.trim() ? c.name.trim() : 'unnamed';
-    const baseId = `legacy-category-${encodeURIComponent(rawName)}`;
+    const baseId = `legacy-category-${encodeCategoryIdPart(rawName)}`;
     let candidate = baseId;
     let suffix = 2;
     while (usedIds.has(candidate)) {
@@ -577,13 +600,22 @@ router.post('/api/sync/import', async (req, res) => {
     // Issue #612 A3：验证未通过而未恢复的工作区凭据报告（在响应中返回）。
     const skippedCredentials: Array<{ account_id: string; restored: boolean; reason?: string }> = [];
 
-    const importAll = db.transaction((): { scopeError: boolean } => {
+    const importAll = db.transaction((): { scopeError: boolean; skippedPendingClaim: string[] } => {
       // 事务首次写入前重新解析无账号头请求的范围：若异步 PAT 验证期间账号状态变化
       // 导致范围变得歧义或目标改变，直接拒绝导入，绝不将已验证载荷改投到新目标。
       const currentScope = resolveWritableAccountScope(req, db);
       if (!currentScope.ok || currentScope.accountId !== accountId) {
-        return { scopeError: true };
+        return { scopeError: true, skippedPendingClaim: [] };
       }
+
+      // Issue #612 审计（597）：记录因 default 分区待认领保护而跳过的恢复分区——
+      // 保留归属保护不变，但绝不静默丢弃：没有数据被应用时返回可操作的冲突
+      // 响应，仍有其他数据提交时在响应中列出被跳过的分区与待认领这一原因。
+      const skippedPendingClaim: string[] = [];
+      const backupHasNonEmptyArray = (key: string): boolean => {
+        const value = (data as Record<string, unknown>)[key];
+        return Array.isArray(value) && value.length > 0;
+      };
 
       // Issue #612 A10：workspaceEntries 非空时顶层 repositories/releases/
       // categories 不再静默丢弃——按已选定策略把顶层数据写入当前请求账号分区
@@ -595,6 +627,11 @@ router.post('/api/sync/import', async (req, res) => {
       // 刚写入的顶层仓库误判为待认领数据。
       const pendingDefaultAtTxStart = hasPendingDefaultPartitionData(db);
       const topLevelDefaultBlocked = accountId === 'default' && pendingDefaultAtTxStart;
+      if (topLevelDefaultBlocked) {
+        if (backupHasNonEmptyArray('repositories')) skippedPendingClaim.push('repositories');
+        if (backupHasNonEmptyArray('releases')) skippedPendingClaim.push('releases');
+        if (backupHasNonEmptyArray('categories')) skippedPendingClaim.push('categories');
+      }
 
       // 在首次写入前记录事务开始时的凭据版本差异：若异步验证期间目标账号凭据已被
       // 清除或轮换，事务内绝不用旧的已验证 PAT 覆盖较新状态。
@@ -892,6 +929,7 @@ router.post('/api/sync/import', async (req, res) => {
           // Issue #612 R2-A15：目标 default 分区仍有待认领数据时，无论是否包含工作区
           // （包括不含工作区的 v1 备份），所有账号级设置均跳过，仅继续恢复真正的全局设置。
           if (topLevelDefaultBlocked && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
+            if (!skippedPendingClaim.includes('account_settings')) skippedPendingClaim.push('account_settings');
             continue;
           }
           if (hasAccountWorkspaces && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
@@ -924,6 +962,17 @@ router.post('/api/sync/import', async (req, res) => {
               globalSettingsStmt.run(key, encrypt(value, config.encryptionKey));
               bumpAccountCredentialVersion(db, accountId);
             } else {
+              // Issue #612 审计（962）：顶层 default 的 github_token 显式空值
+              // （null / '' / undefined）同样受凭据版本保护——版本在校验等待期间
+              // 已变化时保留新凭据并在 skipped_credentials 中报告。
+              if (key === 'github_token' && topLevelCredChanged) {
+                skippedCredentials.push({
+                  account_id: accountId,
+                  restored: false,
+                  reason: 'Account credential changed during verification',
+                });
+                continue;
+              }
               globalSettingsStmt.run(key, serializeSettingValue(value));
               if (key === 'github_token') {
                 bumpAccountCredentialVersion(db, accountId);
@@ -960,6 +1009,18 @@ router.post('/api/sync/import', async (req, res) => {
             }
             bumpAccountCredentialVersion(db, accountId);
           } else if (key === 'github_token' && (value === null || value === undefined || value === '')) {
+            // Issue #612 审计（962）：显式清空分支与真实 PAT 写入共用凭据版本检查
+            // ——导入等待另一工作区校验期间凭据可能被轮换，版本已变化时保留新
+            // 凭据并在 skipped_credentials 中报告，绝不覆盖；版本未变化时按备份
+            // 执行显式清空。
+            if (topLevelCredChanged) {
+              skippedCredentials.push({
+                account_id: accountId,
+                restored: false,
+                reason: 'Account credential changed during verification',
+              });
+              continue;
+            }
             // 显式空 Token（null / ''；掩码 '***' 已在上方跳过）：除写入空值占位
             // 外，必须同步清空 accounts 的加密凭据副本，避免旧 Token 回退复活。
             if (accountId !== 'default') {
@@ -1067,8 +1128,15 @@ router.post('/api/sync/import', async (req, res) => {
         for (const { accountId: wsAccountId, workspace, unverifiedOwner, tokenVerification: entryTokenVerification } of workspaceEntries) {
           // Issue #612 R2-A18：复用事务开始前（首次写入前）采集的 pendingDefaultAtTxStart，
           // 既拦截验证期间的外部写入，又避免把本事务刚写入的顶层仓库误判为待认领数据。
-          if (unverifiedOwner || (wsAccountId === 'default'
-            && (accountId !== 'default' || pendingDefaultAtTxStart))) continue;
+          const skipDefaultWorkspace = unverifiedOwner || (wsAccountId === 'default'
+            && (accountId !== 'default' || pendingDefaultAtTxStart));
+          if (skipDefaultWorkspace) {
+            if (topLevelDefaultBlocked && wsAccountId === 'default'
+              && !skippedPendingClaim.includes('account_workspaces.default')) {
+              skippedPendingClaim.push('account_workspaces.default');
+            }
+            continue;
+          }
           const wsRepos = workspace.repositories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsRepos)) {
             for (const r of wsRepos) {
@@ -1215,6 +1283,16 @@ router.post('/api/sync/import', async (req, res) => {
                 serialized = encrypt(value, config.encryptionKey);
                 credentialUpdated = true;
               } else if (key === 'github_token' && (value === null || value === undefined || value === '')) {
+                // Issue #612 审计（962）：显式清空前同样检查凭据版本——验证等待
+                // 期间被并发轮换时保留新凭据并在 skipped_credentials 中报告。
+                if (wsCredChangedByAccount.get(wsAccountId)) {
+                  skippedCredentials.push({
+                    account_id: wsAccountId,
+                    restored: false,
+                    reason: 'Account credential changed during verification',
+                  });
+                  continue;
+                }
                 // 显式空 Token（null / ''）：同步清空 accounts 的加密凭据副本，
                 // 避免已清空的 Token 经 accounts 回退复活。
                 wsClearAccountTokenStmt.run(wsAccountId);
@@ -1314,7 +1392,7 @@ router.post('/api/sync/import', async (req, res) => {
           clearBackfillChecked(wsAccountId);
         }
       }
-      return { scopeError: false };
+      return { scopeError: false, skippedPendingClaim };
     });
 
     const importResult = typeof importAll.immediate === 'function' ? importAll.immediate() : importAll();
@@ -1325,8 +1403,30 @@ router.post('/api/sync/import', async (req, res) => {
       });
       return;
     }
+    // Issue #612 审计（597）：待认领保护跳过的分区必须在响应中说明——完全没有
+    // 数据被应用时返回可操作的冲突响应（而不是看似成功、实际什么都没写的 200）；
+    // 仍有其他数据提交时在响应中列出被跳过的分区与「default 待认领」这一原因。
+    const skippedPendingClaim = importResult.skippedPendingClaim;
+    const appliedTotal = Object.values(counts).reduce(
+      (sum, value) => sum + (typeof value === 'number' ? value : 0),
+      0,
+    );
+    if (appliedTotal === 0 && skippedPendingClaim.length > 0) {
+      res.status(409).json({
+        error: 'Nothing was imported: the target default partition still has unclaimed legacy data, so the backup\'s repositories, releases, categories and account-level settings were skipped. Complete the legacy claim first (or re-send with an explicit X-GitHub-Account-Id after claiming) and retry the import.',
+        code: 'LEGACY_DEFAULT_CLAIM_PENDING',
+        skipped_partitions: skippedPendingClaim,
+      });
+      return;
+    }
     // Issue #612 A3：验证未通过的工作区凭据在响应中报告（目标账号现有凭据保留）。
-    res.json({ imported: counts, skipped_credentials: skippedCredentials });
+    res.json({
+      imported: counts,
+      skipped_credentials: skippedCredentials,
+      ...(skippedPendingClaim.length > 0
+        ? { skipped_pending_claim: { partitions: skippedPendingClaim, reason: 'legacy_default_claim_pending' } }
+        : {}),
+    });
   } catch (err) {
     console.error('POST /api/sync/import error:', err);
     res.status(500).json({ error: 'Failed to import data', code: 'IMPORT_DATA_FAILED' });
@@ -1344,8 +1444,24 @@ router.post('/api/sync/legacy-claim', (req, res) => {
     const db = getDb();
     const body = (req.body ?? {}) as Record<string, unknown>;
     const accountId = typeof body.account_id === 'string' ? body.account_id.trim() : '';
-    const result = claimLegacyDefaultWithAdminConfirmation(db, accountId);
+    // Issue #612 审计（847）：同名歧义行阻断认领时，管理员可携带
+    // resolve_conflicts: 'rename' 把无法自动归并的 default 仓库行改名后按独立
+    // 行迁移续办（防误合并条件保留，绝不合并进已按 ID 配对的目标行）。
+    const renameConflicts = body.resolve_conflicts === 'rename';
+    const result = claimLegacyDefaultWithAdminConfirmation(
+      db,
+      accountId,
+      renameConflicts ? { renameConflicts: true } : {},
+    );
     if (!result.ok) {
+      if (result.code === 'LEGACY_CLAIM_CONFLICT') {
+        res.status(409).json({
+          error: 'Legacy default claim blocked by unmigrated default rows; resolve the listed conflicts (rename or remove the ambiguous default rows) and retry, or re-send with resolve_conflicts: "rename" to keep them as standalone renamed rows in the target partition',
+          code: result.code,
+          conflicts: result.conflicts ?? [],
+        });
+        return;
+      }
       const status = result.code === 'INVALID_ACCOUNT_ID' ? 400 : 409;
       res.status(status).json({ error: `Legacy default claim rejected: ${result.code}`, code: result.code });
       return;

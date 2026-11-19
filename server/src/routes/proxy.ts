@@ -7,8 +7,10 @@ import { logger } from '../services/logger.js';
 import {
   resolveWritableAccountScope,
   extractRequestedAccountId,
+  hasInvalidAccountHeader,
   getLegacyDefaultClaimedBy,
   getLegacyDefaultVerifiedToken,
+  getLegacyDefaultVerifiedOwnerBinding,
 } from '../db/accountScope.js';
 
 function resolveGitHubTokenForRequest(
@@ -71,6 +73,13 @@ function resolveGitHubTokenForRequest(
     if (!boundToken || tokenRow?.value !== boundToken) {
       return { token: null, decryptFailed: false };
     }
+    // Issue #612 审计（594）：全局密文回退还须确认密文绑定的已验证所有者等于
+    // 解析出的账号 ID——归属校验是异步的，迟到结果可能在他人认领后写坏绑定；
+    // 仅凭「密文与校验时一致」会让 A 的凭据在 B 的分区上下文中被复用。正常由
+    // A 认领且密文未变时绑定所有者即 A，回退不受影响。
+    if (getLegacyDefaultVerifiedOwnerBinding(db) !== accountId) {
+      return { token: null, decryptFailed: false };
+    }
   }
 
   if (!tokenRow?.value) {
@@ -90,8 +99,12 @@ function requireGitHubTokenForProxy(
   const tokenResult = resolveGitHubTokenForRequest(req);
   if (tokenResult.token) return tokenResult.token;
   if (tokenResult.scopeRequired) {
+    // Issue #612 审计（94）：区分「缺少账号头」与「账号头格式无效」，并说明
+    // 修正方式——缺少时明确本请求必须显式指定账号；无效时说明合法格式。
     res.status(409).json({
-      error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+      error: hasInvalidAccountHeader(req)
+        ? 'X-GitHub-Account-Id must be a numeric GitHub account ID (digits only); fix the header value and retry'
+        : 'X-GitHub-Account-Id header is required: this request must explicitly specify the target account because the account scope is ambiguous',
       code: 'ACCOUNT_SCOPE_REQUIRED',
     });
   } else if (tokenResult.decryptFailed) {

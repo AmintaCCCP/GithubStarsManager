@@ -247,7 +247,13 @@ export const applyAccountWorkspaceForTypes = (
     }
     if (rawHas('starredGists')) patch.starredGists = workspace.starredGists;
     if (rawHas('selectedGistCategory')) patch.selectedGistCategory = workspace.selectedGistCategory;
-    if (rawHas('forks')) patch.forks = workspace.forks;
+    // 与归档补丁共用字段校验（审计修复）：forks: null 会被归一化成 []，
+    // 仅凭字段存在就写入会把无效字段当成清空指令，清空当前账号的 Fork 列表；
+    // null/非数组按「未提供」忽略，显式 [] 才清空。未提供 rawFields 时保持
+    // 旧行为（调用方保证 workspace 已按备份字段填充，如 merge 分支）。
+    if (rawHas('forks') && (!rawFields || rawFieldIsArray(rawFields, 'forks'))) {
+      patch.forks = workspace.forks;
+    }
     if (rawHas('readForks')) patch.readForks = new Set(workspace.readForks);
     if (rawHas('syncMode')) patch.syncMode = workspace.syncMode;
     if (rawHas('syncModeConfigured')) patch.syncModeConfigured = workspace.syncModeConfigured;
@@ -285,6 +291,21 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 );
 
+/**
+ * 备份字段级校验（实时补丁与归档补丁共用，审计修复）：字段存在且为真数组
+ * 才视为备份提供的有效值——null/缺失/非数组一律按「未提供」处理（保留本机
+ * 值），仅显式 [] 才是清空指令。归一化会把 null 变成空默认值，只凭字段存在
+ * 就写入会把无效字段误当清空指令。
+ */
+const rawFieldIsArray = (
+  fields: Record<string, unknown> | undefined,
+  key: string,
+): boolean => (
+  !!fields
+  && Object.prototype.hasOwnProperty.call(fields, key)
+  && Array.isArray(fields[key])
+);
+
 const applyValidatedWorkspaceFields = (
   local: AccountWorkspace,
   rawAccount: Record<string, unknown>,
@@ -292,7 +313,7 @@ const applyValidatedWorkspaceFields = (
   selectedTypes: string[],
 ): AccountWorkspace => {
   const rawHas = (key: string): boolean => Object.prototype.hasOwnProperty.call(rawAccount, key);
-  const rawIsArray = (key: string): boolean => rawHas(key) && Array.isArray(rawAccount[key]);
+  const rawIsArray = (key: string): boolean => rawFieldIsArray(rawAccount, key);
   const rawIsObject = (key: string): boolean => rawHas(key) && isPlainObject(rawAccount[key]);
   const includeRepos = selectedTypes.includes('repositories');
   const includeReleases = selectedTypes.includes('releases');
@@ -391,6 +412,16 @@ export const mergeBackupWorkspaces = (
   return merged;
 };
 
+/**
+ * 掩码检测可能作用于未经校验的导入数据（备份 JSON 可以是任意形状）：
+ * 条目可能为 null/非对象，属性访问必须可选，否则导入预览会因
+ * `config.apiKey` 之类的读取抛错（审计修复），用户看不到正常的文件错误提示。
+ */
+const entryHasMaskedSecret = (entry: unknown, key: string): boolean => (
+  typeof entry === 'object' && entry !== null
+  && (entry as Record<string, unknown>)[key] === BACKUP_MASKED_SECRET
+);
+
 /** 检测备份载荷中是否存在脱敏掩码（提示用户部分密钥未包含）。 */
 export const hasMaskedBackupSecrets = (
   data: {
@@ -403,11 +434,13 @@ export const hasMaskedBackupSecrets = (
   },
 ): boolean => (
   !!(
-    data.aiConfigs?.some(config => config.apiKey === BACKUP_MASKED_SECRET)
-    || data.webdavConfigs?.some(config => config.password === BACKUP_MASKED_SECRET)
-    || data.proxyConfig?.password === BACKUP_MASKED_SECRET
-    || data.rpcDownloadConfig?.secret === BACKUP_MASKED_SECRET
+    (Array.isArray(data.aiConfigs) && data.aiConfigs.some(config => entryHasMaskedSecret(config, 'apiKey')))
+    || (Array.isArray(data.webdavConfigs) && data.webdavConfigs.some(config => entryHasMaskedSecret(config, 'password')))
+    || entryHasMaskedSecret(data.proxyConfig, 'password')
+    || entryHasMaskedSecret(data.rpcDownloadConfig, 'secret')
     || data.backendApiSecret === BACKUP_MASKED_SECRET
-    || Object.values(data.savedAccounts ?? {}).some(account => account?.githubToken === BACKUP_MASKED_SECRET)
+    || (data.savedAccounts !== null
+      && typeof data.savedAccounts === 'object'
+      && Object.values(data.savedAccounts).some(account => entryHasMaskedSecret(account, 'githubToken')))
   )
 );

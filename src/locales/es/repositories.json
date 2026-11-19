@@ -246,7 +246,8 @@
     "unstar-confirmation": "Cancelar confirmación de estrella",
     "unstar": "CancelarEstrella",
     "successfully-unstarred": "Estrella cancelada exitosamente",
-    "failed-to-unstar-repository-please-check-your-ne": "No se pudo cancelar Star. Verifique la conexión de red o inicie sesión nuevamente."
+    "failed-to-unstar-repository-please-check-your-ne": "No se pudo cancelar Star. Verifique la conexión de red o inicie sesión nuevamente.",
+    "similar-results-may-be-incomplete-the-dens": "Los repositorios similares pueden estar incompletos: el índice de vectores denso no está disponible. ({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Primero configure el token de GitHub en la configuración o conéctese al servicio backend.",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "Error de sincronización. Verifique su conexión de red o vuelva a intentarlo más tarde.",
     "list-sync-new-categories_one": " ({{count}} categoría nueva creada)",
     "list-sync-new-categories_other": " ({{count}} categorías nuevas creadas)",
-    "list-sync-complete": "Se sincronizaron {{lists}} listas ({{newCount}} categorías nuevas creadas)."
+    "list-sync-complete": "Se sincronizaron {{lists}} listas ({{newCount}} categorías nuevas creadas).",
+    "vector-worker-does-not-support-account-scoped-recall": "El worker de vectores no admite la recuperación por cuenta; vuelve a desplegar el cloudflare-worker incluido y reconstruye el índice.",
+    "account-metadata-index-is-not-ready-create-the-accountid": "El índice de metadatos de cuenta no está listo; crea el índice de metadatos accountId, rellena los vectores y activa ACCOUNT_METADATA_INDEXED.",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "No se pudo verificar el estado del worker de vectores; se usó la búsqueda local.",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "La búsqueda multicuenta requiere reconstruir el índice de vectores; se usó la búsqueda local."
   },
   "repositoryHealthPanel": {
     "activity": "Actividad",

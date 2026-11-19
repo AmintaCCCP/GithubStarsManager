@@ -246,7 +246,8 @@
     "unstar-confirmation": "Unstar Confirmation",
     "unstar": "Unstar",
     "successfully-unstarred": "Successfully unstarred",
-    "failed-to-unstar-repository-please-check-your-ne": "Failed to unstar repository. Please check your network connection or login again."
+    "failed-to-unstar-repository-please-check-your-ne": "Failed to unstar repository. Please check your network connection or login again.",
+    "similar-results-may-be-incomplete-the-dens": "Similar repositories may be incomplete: the dense vector index is unavailable. ({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Configure a GitHub token in Settings or connect the backend service first.",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "Sync failed. Please check your network connection or try again later.",
     "list-sync-new-categories_one": " ({{count}} new category created)",
     "list-sync-new-categories_other": " ({{count}} new categories created)",
-    "list-sync-complete": "Synced {{lists}} lists ({{newCount}} new categories created)."
+    "list-sync-complete": "Synced {{lists}} lists ({{newCount}} new categories created).",
+    "vector-worker-does-not-support-account-scoped-recall": "Vector worker does not support account-scoped recall; redeploy the bundled cloudflare-worker and rebuild the index.",
+    "account-metadata-index-is-not-ready-create-the-accountid": "Account metadata index is not ready; create the accountId metadata index, backfill vectors, and enable ACCOUNT_METADATA_INDEXED.",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "Failed to verify vector worker status; fell back to local search.",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "Vector index needs rebuild for multi-account search; fell back to local search."
   },
   "repositoryHealthPanel": {
     "activity": "Activity",

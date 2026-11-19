@@ -404,7 +404,7 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     vi.mocked(backend.syncWebDAVConfigs).mockReset().mockResolvedValue(undefined);
     vi.mocked(backend.syncEmbeddingConfigs).mockReset().mockResolvedValue(undefined);
     vi.mocked(backend.syncVectorSearchConfig).mockReset().mockResolvedValue(undefined);
-    vi.mocked(backend.syncSettings).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncSettings).mockReset().mockResolvedValue({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
     vi.mocked(backend.fetchRepositories).mockReset().mockResolvedValue({ repositories: [], total: 0 });
     vi.mocked(backend.fetchReleases).mockReset().mockResolvedValue({ releases: [], total: 0 });
     vi.mocked(backend.fetchAIConfigs).mockReset().mockResolvedValue([]);
@@ -491,7 +491,7 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     vi.mocked(backend.syncWebDAVConfigs).mockResolvedValue(undefined);
     vi.mocked(backend.syncEmbeddingConfigs).mockResolvedValue(undefined);
     vi.mocked(backend.syncVectorSearchConfig).mockResolvedValue(undefined);
-    vi.mocked(backend.syncSettings).mockResolvedValue(undefined);
+    vi.mocked(backend.syncSettings).mockResolvedValue({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
     useAppStore.getState().addRepository(createRepository(97, { full_name: 'owner/repo-97' }));
     await prepareForAccountSwitch('1');
     expect(hasPendingAccountSync('1')).toBe(false);
@@ -573,7 +573,7 @@ describe('vacuum account sessions never push an empty full-sync snapshot before 
     vi.mocked(backend.syncWebDAVConfigs).mockReset().mockResolvedValue(undefined);
     vi.mocked(backend.syncEmbeddingConfigs).mockReset().mockResolvedValue(undefined);
     vi.mocked(backend.syncVectorSearchConfig).mockReset().mockResolvedValue(undefined);
-    vi.mocked(backend.syncSettings).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncSettings).mockReset().mockResolvedValue({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
     vi.mocked(backend.fetchRepositories).mockReset().mockResolvedValue({ repositories: [], total: 0 });
     vi.mocked(backend.fetchReleases).mockReset().mockResolvedValue({ releases: [], total: 0 });
     vi.mocked(backend.fetchAIConfigs).mockReset().mockResolvedValue([]);

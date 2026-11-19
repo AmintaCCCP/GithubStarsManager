@@ -62,6 +62,8 @@
     "token-permissions-local-storage": "Token 仅保存在本机与你配置的后端（除非你在 WebDAV/文件备份中启用「备份/导出时包含密钥」），不会上传到应用方服务器。",
     "saved-accounts": "已保存的账号",
     "click-to-sign-in": "点击登录",
-    "token-required": "需补充 Token"
+    "token-required": "需补充 Token",
+    "select-account-to-restore": "选择要恢复的账号",
+    "multiple-accounts-exist-on-this-backend-select-th": "此后端存在多个账号，请选择要恢复的账号。"
   }
 }

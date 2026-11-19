@@ -2,7 +2,14 @@ import { useCallback } from 'react';
 import { GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
 import { useAppStore } from '../../../store/useAppStore';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
-import { backend, isValidBackendRestoreAccount, normalizeBackendRestoreAccount, type BackendAuthRestoreAccount } from '../../../services/backendAdapter';
+import {
+  backend,
+  getBackendAuthHeaders,
+  isValidBackendRestoreAccount,
+  normalizeBackendRestoreAccount,
+  type BackendAuthRestore,
+  type BackendAuthRestoreAccount,
+} from '../../../services/backendAdapter';
 import { drainInFlightBackendPulls as drainInFlightBackendPullsImpl, syncFromBackend, withAccountSwitchFrozen } from '../../../services/autoSync';
 import { accountIdKey } from '../../../store/helpers/accountWorkspace';
 import type { GitHubUser } from '../../../types';
@@ -10,8 +17,11 @@ import type { GitHubUser } from '../../../types';
 // 视图组件（LoginScreen）不得直接 import 业务服务（ADR 0001 分层守则）：
 // 后端账号条目的共享过滤规则经本 hook 模块转出口，供登录页与
 // tryRestoreAuthFromBackend / addAccountFromBackend 使用同一规则。
-// R2-C12：user:null 条目的异步归一化（用分区 PAT 核对 /user）同样经此处出口。
+// R2-C12：user:null 条目的异步归一化（用分区 PAT 核对 /user）同样经此处出口；
+// 转交 2：恢复歧义（account_selection_required）的账号条目类型也经此处出口，
+// 登录页的账号选择列表使用同一形状。
 export { isValidBackendRestoreAccount, normalizeBackendRestoreAccount };
+export type { BackendAuthRestoreAccount };
 
 export type BackendLoginResult =
   | { status: 'connected'; githubToken: string; user: GitHubUser; accounts: BackendAuthRestoreAccount[] }
@@ -19,6 +29,11 @@ export type BackendLoginResult =
   | { status: 'unauthorized' }
   | { status: 'restore-failed' }
   | { status: 'restored-token-invalid' }
+  // 转交 2（server/src/routes/authRestore.ts A19 契约）：无账号头恢复请求无法
+  // 唯一确定目标分区时，服务端返回 account_selection_required: true + 完整
+  // accounts 列表 + 空 github_token。不得误报 github-token-required——由登录页
+  // 展示账号选择，用户选定后携带账号 ID 重试恢复。
+  | { status: 'account-selection-required'; accounts: BackendAuthRestoreAccount[] }
   | { status: 'github-token-required' };
 
 export interface LoginActions {
@@ -36,8 +51,11 @@ export interface LoginActions {
    * options.deferPersist（R2-B12）：为 true 时候选后端完成身份验证也不持久化
    * URL；调用方接受恢复结果并提交登录后调用 rememberActiveBackendUrl 再保存，
    * 严格仓库拉取失败时保留原持久化 URL。
+   * options.accountId（转交 2）：显式账号恢复——服务端对无账号头恢复返回
+   * account_selection_required 时，用户选定账号后携带该账号 ID（经
+   * X-GitHub-Account-Id 头）重试恢复。
    */
-  restoreBackendSession: (url: string, options?: { omitAccountHeader?: boolean; apiSecret?: string; deferPersist?: boolean }) => Promise<BackendLoginResult>;
+  restoreBackendSession: (url: string, options?: { omitAccountHeader?: boolean; apiSecret?: string; deferPersist?: boolean; accountId?: string }) => Promise<BackendLoginResult>;
   setupBackendGitHubToken: (token: string) => Promise<GitHubUser>;
   /**
    * 拉取后端数据。options.targetAccountId 为审计修复 B13 的显式账号恢复：
@@ -74,6 +92,34 @@ export interface LoginActions {
   drainInFlightBackendPulls: (accountId: string | null) => Promise<void>;
 }
 
+// 转交 2：显式账号的定向恢复请求。backendAdapter.restoreAuth 只支持省略账号头
+//（omitAccountHeader）或读取 Store 当前账号两种形态，不支持显式账号参数（services
+// 域接口，本域不可改动）；恢复歧义重试需要携带用户选定的账号 ID。这里复用
+// 适配器导出的 getBackendAuthHeaders(accountId)（Bearer 密钥 + 显式
+// X-GitHub-Account-Id）与同一 /sync/auth 路由——server/src/routes/authRestore.ts
+// 接受请求头 x-github-account-id 或 body account_id 指定恢复目标，此处沿用请求头
+// 形态。8s 截止与「非 200/网络失败返回 null」的语义与 restoreAuth 保持一致。
+const RESTORE_AUTH_TIMEOUT_MS = 8000;
+const restoreAuthWithExplicitAccount = async (accountId: string): Promise<BackendAuthRestore | null> => {
+  if (!backend.backendUrl) return null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), RESTORE_AUTH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${backend.backendUrl}/sync/auth`, {
+      method: 'POST',
+      headers: getBackendAuthHeaders(accountId),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return await res.json() as BackendAuthRestore;
+  } catch {
+    // 超时/网络失败统一返回 null：调用方按 restore-failed 处理，流程可重试。
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 export const useLoginActions = (): LoginActions => {
   const authenticateWithGitHub = useCallback(async (token: string) => {
     // 必须直连校验调用方传入的 token：走后端代理时服务端用的是库里存的
@@ -101,7 +147,7 @@ export const useLoginActions = (): LoginActions => {
   }, []);
   const restoreBackendSession = useCallback(async (
     url: string,
-    options?: { omitAccountHeader?: boolean; apiSecret?: string; deferPersist?: boolean },
+    options?: { omitAccountHeader?: boolean; apiSecret?: string; deferPersist?: boolean; accountId?: string },
   ): Promise<BackendLoginResult> => {
     const previousUrl = backend.backendUrl;
     await backend.init(url);
@@ -118,10 +164,24 @@ export const useLoginActions = (): LoginActions => {
       return { status: 'unauthorized' };
     }
 
-    const restored = await backend.restoreAuth(options);
+    // 转交 2：显式账号重试（恢复歧义后用户选定账号）走定向恢复请求；其余
+    // 恢复沿用适配器实现（省略账号头/读取 Store 账号）。
+    const restored = options?.accountId
+      ? await restoreAuthWithExplicitAccount(options.accountId)
+      : await backend.restoreAuth(options);
     if (!restored) {
       await backend.init(previousUrl ?? undefined);
       return { status: 'restore-failed' };
+    }
+    // 转交 2（server/src/routes/authRestore.ts A19 契约）：无账号头恢复歧义时
+    // 服务端返回 account_selection_required: true + accounts 列表 + 空
+    // github_token——在把空 token 判为 github-token-required 之前先检查该标志，
+    // 把可选账号列表暴露给登录页的账号选择 UI；单账号无歧义恢复沿用现有流程。
+    if (restored.account_selection_required === true) {
+      return {
+        status: 'account-selection-required',
+        accounts: Array.isArray(restored.accounts) ? restored.accounts : [],
+      };
     }
     if (!restored.github_token) return { status: 'github-token-required' };
 

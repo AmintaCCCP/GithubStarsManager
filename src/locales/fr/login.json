@@ -62,6 +62,8 @@
     "token-permissions-local-storage": "Votre jeton est stocké uniquement sur cet appareil et votre propre backend (sauf si vous activez « Inclure les clés dans la sauvegarde/exportation » pour les sauvegardes WebDAV ou fichier) — jamais sur les serveurs de l'application.",
     "saved-accounts": "Comptes enregistrés",
     "click-to-sign-in": "Cliquez pour vous connecter",
-    "token-required": "Jeton requis"
+    "token-required": "Jeton requis",
+    "select-account-to-restore": "Sélectionnez le compte à restaurer",
+    "multiple-accounts-exist-on-this-backend-select-th": "Plusieurs comptes existent sur ce backend ; sélectionnez le compte à restaurer."
   }
 }

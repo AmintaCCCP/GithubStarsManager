@@ -822,12 +822,136 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     });
     fireEvent.click(screen.getByRole('button', { name: 'dataManagementPanel.confirm-delete' }));
 
+    // 审计修复（测试覆盖）：不能仅凭令牌清理函数已被调用且成功提示尚未出现
+    // 就继续断言——此时拒绝处理（catch）可能仍未完成。先等待删除失败提示
+    // 出现，确认失败处理已完成，再断言成功提示未出现。
     await waitFor(() => {
       expect(ghAccountSecretsMocks.clearGhAccountTokens).toHaveBeenCalledOnce();
-      expect(screen.queryByText(/dataManagementPanel\.all-data-deleted-reloading-page/)).not.toBeInTheDocument();
     });
-    // 清理失败时不清空内存态（等待用户重试）
+    await screen.findByText('dataManagementPanel.delete-failed-please-try-again');
+    expect(screen.queryByText(/dataManagementPanel\.all-data-deleted-reloading-page/)).not.toBeInTheDocument();
+    // 清理失败时不清空内存态：用户、凭据记录与工作区仍保留（等待用户重试）
     expect(useAppStore.getState().user?.login).toBe('alice');
     expect(Object.keys(useAppStore.getState().savedAccounts)).toEqual(['1']);
+    expect(useAppStore.getState().accountWorkspaces['2']).toBeDefined();
+  });
+
+  it('derives import types from raw workspace fields for partial backups (activeAccountId + nested repositories only)', async () => {
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '2',
+      includeKeysInBackup: true,
+      accountWorkspaces: {
+        '2': { repositories: [repo(21, 'bob-partial')] },
+      },
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    // 部分备份的账号仓库按工作区字段推导出 repositories 类型并恢复（此前
+    // resolveImportTypes 返回空数组，仓库被过滤却报告成功）
+    expect(state.accountWorkspaces['2']?.repositories.map((r: Repository) => r.ai_summary))
+      .toEqual(['bob-ai', 'bob-partial']);
+    // 恢复者顶层实时数据不动
+    expect(state.repositories[0].ai_summary).toBe('alice-live');
+  });
+
+  it('same-account merge import restores top-level gists when backup has no accountWorkspaces', async () => {
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '1',
+      includeKeysInBackup: true,
+      repositories: [],
+      gists: [gist('gist-top-level-new', 'legacy gist')],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    // 旧版单账号备份的顶层 Gist 按 id 并入实时状态（此前只合并仓库，收尾
+    // 快照把未恢复的 Gist 丢弃却报告成功）
+    expect(state.gists.map((g: Gist) => g.id)).toContain('gist-top-level-new');
+    expect(state.gistSearchResults.map((g: Gist) => g.id)).toContain('gist-top-level-new');
+    expect(state.accountWorkspaces['1']?.gists.map((g: Gist) => g.id)).toContain('gist-top-level-new');
+    // repositories: [] 不清空本机仓库（合并语义保留已有条目）
+    expect(state.repositories[0].ai_summary).toBe('alice-live');
+  });
+
+  it('imports backups containing channel-grouped discovery and subscription caches', async () => {
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      includeKeysInBackup: true,
+      discoveryRepos: {
+        trending: [{
+          id: 9001,
+          name: 'trend-repo',
+          full_name: 'x/trend-repo',
+          html_url: 'https://github.com/x/trend-repo',
+          description: null,
+          stargazers_count: 1,
+          owner: { login: 'x', avatar_url: '' },
+        }],
+      },
+      subscriptionRepos: {
+        'most-stars': [{
+          id: 8001,
+          name: 'sub-repo',
+          full_name: 'x/sub-repo',
+          html_url: 'https://github.com/x/sub-repo',
+          owner: { login: 'x', avatar_url: '' },
+        }],
+      },
+    }, 'dataManagementPanel.merge-import');
+
+    // 频道映射对象此前被当数组校验整体拒绝——现在按映射对象与其中的仓库
+    // 数组分别校验，含缓存的备份（含默认全选导出）可正常导入
+    expect(useAppStore.getState().discoveryRepos.trending.some((r) => r.id === 9001)).toBe(true);
+    expect(useAppStore.getState().subscriptionRepos['most-stars'].some((r) => r.id === 8001)).toBe(true);
+  });
+
+  it('rejects an imported backup PAT whose GitHub identity does not match the target account', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 999, login: 'mallory' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const user = userEvent.setup();
+      await importBackupAndClick(user, {
+        includeKeysInBackup: true,
+        savedAccounts: {
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_token'),
+        },
+      }, 'dataManagementPanel.merge-import');
+
+      // 身份不匹配：凭据被拒绝（不写入 savedAccounts），条目保留为需重新授权的元数据
+      expect(fetchMock).toHaveBeenCalled();
+      expect(useAppStore.getState().savedAccounts['3']?.githubToken).toBe('');
+      expect(useAppStore.getState().savedAccounts['3']?.user.login).toBe('carol');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('adopts an imported backup PAT after GitHub identity verification matches the account', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 3, login: 'carol' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const user = userEvent.setup();
+      await importBackupAndClick(user, {
+        includeKeysInBackup: true,
+        savedAccounts: {
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_token'),
+        },
+      }, 'dataManagementPanel.merge-import');
+
+      expect(fetchMock).toHaveBeenCalled();
+      expect(useAppStore.getState().savedAccounts['3']?.githubToken).toBe('ghp_carol_token');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

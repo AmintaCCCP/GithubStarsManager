@@ -2113,6 +2113,9 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       await reqA;
     } finally {
       releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      // 失败清理也要等待已启动的请求结束：避免请求在后续用例重置共享数据库 /
+      // fetchMock 后仍继续写入（与 R2-A1 用例的清理路径一致，吞掉二次错误）。
+      await reqA.then(() => undefined, () => undefined);
     }
 
     expect(db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'").get())
@@ -2218,6 +2221,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       res = await importReq;
     } finally {
       releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      // 失败清理也要等待已启动的请求结束（吞掉二次错误，保留原始断言错误）
+      await importReq.then(() => undefined, () => undefined);
     }
 
     expect(res.status).toBe(409);
@@ -2253,6 +2258,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       res = await importReq;
     } finally {
       releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      // 失败清理也要等待已启动的请求结束（吞掉二次错误，保留原始断言错误）
+      await importReq.then(() => undefined, () => undefined);
     }
 
     expect(res.body.skipped_credentials).toEqual(
@@ -2263,5 +2270,366 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(
       db.prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'").get(ACCOUNT_A),
     ).toEqual({ value: '' });
+  });
+
+  it('rejects invalid account headers on repository and release reads instead of falling back (R2-A3 audit)', async () => {
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ isFullSync: true, repositories: [repoRow(1, 'owner/one')] })
+      .expect(200);
+
+    // 非数字账号头：按无效请求处理，不回退到活跃账号 / default 分区
+    await request(app)
+      .get('/api/repositories')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}`, 'X-GitHub-Account-Id': 'abc' })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+    await request(app)
+      .get('/api/releases')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}`, 'X-GitHub-Account-Id': 'abc' })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+    // 空白账号头同样判为无效（审计修订：不再与缺失混同）
+    await request(app)
+      .get('/api/repositories')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}`, 'X-GitHub-Account-Id': '  ' })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+    // 合法账号头照常
+    await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
+    // 未发送账号头保留旧客户端回退规则
+    await request(app)
+      .get('/api/repositories')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .expect(200);
+  });
+
+  it('keeps headless settings reads on the pending default partition so settings share categories resolution (548)', async () => {
+    const db = getDb();
+    // default 分区有待认领数据 + 活跃账号 B：无头请求可能属于存量 default 数据
+    db.prepare("INSERT INTO categories (account_id, id, name, icon) VALUES ('default', 'cat-a', 'Legacy Cat', '📁')").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('customCategories', ?)").run('["legacy"]');
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', ?)").run(ACCOUNT_B);
+    db.prepare("INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, 'categoryOrder', ?)").run(ACCOUNT_B, '["b-order"]');
+
+    const headless = await request(app)
+      .get('/api/settings')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .expect(200);
+    // 设置读取与 GET /api/categories（headless 读 default，见既有用例）同分区：
+    // 返回 default 分区数据，绝不把活跃账号 B 的账号级键混进同一无头会话。
+    expect(headless.body.active_account_id).toBe('default');
+    expect(JSON.parse(headless.body.customCategories)).toEqual(['legacy']);
+    expect(headless.body.categoryOrder).toBeUndefined();
+
+    // 显式账号头不受影响
+    const explicitB = await request(app).get('/api/settings').set(authHeaders(ACCOUNT_B)).expect(200);
+    expect(explicitB.body.active_account_id).toBe(ACCOUNT_B);
+    expect(explicitB.body.categoryOrder).toBe('["b-order"]');
+  });
+
+  it('advances the claimed revision above both pre-claim partitions and migrates default account_settings rows (874/852)', async () => {
+    const db = getDb();
+    // 存量 default 仓库 + 旧版 account_settings('default') 行 + default 分区已有的快照版本
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 1, 'legacy', 'owner/legacy', 'https://github.com/owner/legacy', 'owner', '[]')
+    `).run();
+    db.prepare("INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES ('default', 'categoryOrder', ?)").run('["legacy-order"]');
+    db.prepare("INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES ('default', 'repo_revision', '5')").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('legacy-token', encryptionKey));
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+
+    await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
+
+    // 874：认领后目标版本高于 default（5）与目标分区（0）的最大值——认领前从
+    // 任一分区读取的 expectedRevision 都无法通过认领后的版本检查。
+    const revision = db
+      .prepare("SELECT value FROM partition_meta WHERE account_id = ? AND key = 'repo_revision'").get(ACCOUNT_A) as { value: string };
+    expect(Number(revision.value)).toBeGreaterThan(5);
+    // 852：旧版 account_settings('default') 行已迁移（目标账号此前无该键）且
+    // default 设置行已处理完毕，认领完成不再阻止重试。
+    const scopedOrder = db
+      .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'categoryOrder'").get(ACCOUNT_A) as { value: string };
+    expect(JSON.parse(scopedOrder.value)).toEqual(['legacy-order']);
+    expect(db.prepare("SELECT key FROM account_settings WHERE account_id = 'default'").all()).toEqual([]);
+    const claimedBy = db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string };
+    expect(claimedBy.value).toBe(ACCOUNT_A);
+  });
+
+  it('reports claim conflicts with actionable details and completes after rename resolution (847)', async () => {
+    const db = getDb();
+    // 目标账号 111 已有仓库 id=1（owner/shared）；default 有两条旧记录：id=1
+    // （旧名 owner/old-name，按 ID 配对吸收）与 id=2（现名 owner/shared，仅与
+    // 已被 ID 配对的目标行同名）——A16 防误合并条件正确保留该歧义行，无法自动归并。
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('111', 1, 'target', 'owner/shared', 'https://github.com/owner/shared', 'owner', '[]')
+    `).run();
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 1, 'legacy-one', 'owner/old-name', 'https://github.com/owner/old-name', 'owner', '[]')
+    `).run();
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 2, 'legacy-two', 'owner/shared', 'https://github.com/owner/shared', 'owner', '[]')
+    `).run();
+
+    // 管理员确认认领：返回可处理的冲突明细（不再只是无信息的失败）
+    const conflictRes = await request(app)
+      .post('/api/sync/legacy-claim')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .send({ account_id: ACCOUNT_A })
+      .expect(409);
+    expect(conflictRes.body.code).toBe('LEGACY_CLAIM_CONFLICT');
+    expect(conflictRes.body.conflicts).toEqual([
+      expect.objectContaining({ table: 'repositories', id: 2, label: 'owner/shared' }),
+    ]);
+    // 冲突行原样保留在 default（可重试状态），认领标记未写入
+    expect(db.prepare("SELECT COUNT(*) AS total FROM repositories WHERE account_id = 'default'").get())
+      .toMatchObject({ total: 2 });
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get()).toBeUndefined();
+
+    // resolve_conflicts: 'rename' 续办：歧义行改名后按独立行迁移，认领完成
+    await request(app)
+      .post('/api/sync/legacy-claim')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .send({ account_id: ACCOUNT_A, resolve_conflicts: 'rename' })
+      .expect(200)
+      .expect((res) => expect(res.body.claimed).toBe(true));
+    const rows = db
+      .prepare('SELECT id, full_name FROM repositories WHERE account_id = ? ORDER BY id').all(ACCOUNT_A) as Array<{ id: number; full_name: string }>;
+    expect(rows.map((r) => r.id)).toEqual([1, 2]);
+    const renamed = rows.find((r) => r.id === 2);
+    expect(renamed?.full_name).not.toBe('owner/shared');
+    expect(renamed?.full_name).toContain('legacy-2');
+    expect(db.prepare("SELECT COUNT(*) AS total FROM repositories WHERE account_id = 'default'").get())
+      .toMatchObject({ total: 0 });
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get())
+      .toEqual({ value: ACCOUNT_A });
+  });
+
+  it('reports partitions skipped by the pending default claim and conflicts when nothing applied (597)', async () => {
+    const db = getDb();
+    // 目标 default 分区已有待认领数据
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 7, 'legacy', 'owner/legacy', 'https://github.com/owner/legacy', 'owner', '[]')
+    `).run();
+
+    // 仅含会被跳过的分区数据：没有任何数据被应用 → 可操作的冲突响应而非成功
+    const conflictRes = await request(app)
+      .post('/api/sync/import')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .send({
+        repositories: [repoRow(9, 'owner/nine')],
+        settings: { customCategories: '["blocked"]' },
+      })
+      .expect(409);
+    expect(conflictRes.body.code).toBe('LEGACY_DEFAULT_CLAIM_PENDING');
+    expect(conflictRes.body.skipped_partitions).toEqual(['repositories', 'account_settings']);
+    expect(db.prepare("SELECT id FROM repositories WHERE account_id = 'default' AND id = 9").get()).toBeUndefined();
+
+    // 仍提交了其他数据（全局设置）→ 200 并列出被跳过的分区与待认领原因
+    const partialRes = await request(app)
+      .post('/api/sync/import')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .send({
+        repositories: [repoRow(10, 'owner/ten')],
+        settings: { customCategories: '["blocked"]', activeAIConfig: 'global-ai' },
+      })
+      .expect(200);
+    expect(partialRes.body.skipped_pending_claim).toMatchObject({
+      partitions: ['repositories', 'account_settings'],
+      reason: 'legacy_default_claim_pending',
+    });
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'activeAIConfig'").get() as { value: string }).value)
+      .toBe('global-ai');
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'customCategories'").get()).toBeUndefined();
+    // 归属保护不变：待认领 default 分区不写入任何顶层仓库
+    expect(db.prepare("SELECT id FROM repositories WHERE account_id = 'default' AND id = 10").get()).toBeUndefined();
+  });
+
+  it('does not apply an explicit empty backup token after the credential version changed during verification (962)', async () => {
+    const db = getDb();
+    // 目标账号 A 已有凭据（另一设备写入）
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ github_token: 'fresh-pat-a' })
+      .expect(200);
+
+    let releaseVerification!: (value: unknown) => void;
+    // 账号 B 工作区真实 PAT 的身份校验保持挂起（导入等待窗口）
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { releaseVerification = resolve; }));
+    // 后续轮换请求的身份校验
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+
+    // 导入：A 工作区显式空 Token（清空分支）；B 工作区真实 PAT 触发身份校验
+    const importReq = request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_A))
+      .send({
+        account_workspaces: [
+          { account_id: ACCOUNT_A, repositories: [], releases: [], categories: [], account_settings: { github_token: '' } },
+          { account_id: ACCOUNT_B, repositories: [], releases: [], categories: [], account_settings: { github_token: 'pat-b-import' } },
+        ],
+      });
+    void importReq.then(() => undefined, () => undefined);
+
+    let res: Awaited<typeof importReq>;
+    try {
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      // 校验等待期间另一设备轮换账号 A 的凭据（推进凭据版本）
+      await request(app)
+        .put('/api/settings')
+        .set(authHeaders(ACCOUNT_A))
+        .send({ github_token: 'rotated-pat-a' })
+        .expect(200);
+
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      res = await importReq;
+    } finally {
+      releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      await importReq.then(() => undefined, () => undefined);
+    }
+
+    // A 的显式清空被放弃（版本已变化）：保留轮换后的新凭据并在响应中报告；
+    // B 的真实 PAT 校验通过后照常写入。
+    expect(res.body.skipped_credentials).toEqual([
+      expect.objectContaining({
+        account_id: ACCOUNT_A,
+        restored: false,
+        reason: 'Account credential changed during verification',
+      }),
+    ]);
+    const scoped = db
+      .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'").get(ACCOUNT_A) as { value: string };
+    expect(decrypt(scoped.value, encryptionKey)).toBe('rotated-pat-a');
+    const accountRow = db
+      .prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?').get(ACCOUNT_A) as { github_token_encrypted: string | null };
+    expect(decrypt(accountRow.github_token_encrypted!, encryptionKey)).toBe('rotated-pat-a');
+    const bScoped = db
+      .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'").get(ACCOUNT_B) as { value: string };
+    expect(decrypt(bScoped.value, encryptionKey)).toBe('pat-b-import');
+  });
+
+  it('does not advance the snapshot revision for an empty incremental batch (588)', async () => {
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ repositories: [repoRow(1, 'owner/one')] })
+      .expect(200);
+    const before = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
+    expect(before.body.revision).toBe(1);
+
+    // 空增量批次：不写不删 → 版本保持不变（其他客户端的 expectedRevision 不失配）
+    const emptyRes = await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ repositories: [] })
+      .expect(200);
+    expect(emptyRes.body.revision).toBe(1);
+    const after = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
+    expect(after.body.revision).toBe(1);
+
+    // 显式空全量同步保留清空与版本递增
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ isFullSync: true, repositories: [] })
+      .expect(200);
+    const cleared = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
+    expect(cleared.body.revision).toBe(2);
+    expect(cleared.body.repositories).toEqual([]);
+  });
+
+  it('authorizes AI sharing by the stored value: invalid string ai_tags store as [] without authorization (679)', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ ai_result_sharing_enabled: true })
+      .expect(200);
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ repositories: [repoRow(1, 'owner/one')] })
+      .expect(200);
+
+    // PATCH 提交字符串形式的 ai_tags：存储为 []，共享授权不得按「非空内容」置位
+    await request(app)
+      .patch('/api/repositories/1')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ ai_tags: 'not-an-array' })
+      .expect(200);
+    const row = db
+      .prepare('SELECT ai_tags, ai_tags_shared, ai_shared FROM repositories WHERE account_id = ? AND id = 1')
+      .get(ACCOUNT_B) as { ai_tags: string; ai_tags_shared: number; ai_shared: number };
+    expect(JSON.parse(row.ai_tags)).toEqual([]);
+    expect(row.ai_tags_shared).toBe(0);
+    expect(row.ai_shared).toBe(0);
+
+    // 批量插入同规则：字符串 ai_tags 存 [] 且不授权
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ repositories: [repoRow(2, 'owner/two', { ai_tags: 'also-invalid' })] })
+      .expect(200);
+    const bulkRow = db
+      .prepare('SELECT ai_tags, ai_tags_shared, ai_shared FROM repositories WHERE account_id = ? AND id = 2')
+      .get(ACCOUNT_B) as { ai_tags: string; ai_tags_shared: number; ai_shared: number };
+    expect(JSON.parse(bulkRow.ai_tags)).toEqual([]);
+    expect(bulkRow.ai_tags_shared).toBe(0);
+    expect(bulkRow.ai_shared).toBe(0);
+  });
+
+  it('rejects non-numeric user_profile.id shapes before comparing accounts (699)', async () => {
+    const db = getDb();
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+    // 数组形态的 id 会骗过 String(profileId) === accountId 的字符串比较
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ user_profile: { id: [111], login: 'alice' } })
+      .expect(400)
+      .expect((res) => expect(res.body.code).toBe('INVALID_USER_PROFILE'));
+    // 非数字字符串同样拒绝
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ user_profile: { id: 'abc', login: 'alice' } })
+      .expect(400)
+      .expect((res) => expect(res.body.code).toBe('INVALID_USER_PROFILE'));
+    // 合法数字字符串 id 归一化为数字后正常保存
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ user_profile: { id: '111', login: 'alice' } })
+      .expect(200);
+    const accountRow = db.prepare('SELECT user_json FROM accounts WHERE account_id = ?').get(ACCOUNT_A) as { user_json: string };
+    expect(JSON.parse(accountRow.user_json)).toMatchObject({ id: 111, login: 'alice' });
+  });
+
+  it('refuses the proxy global-token fallback when the verified binding owner differs from the resolved account (594)', async () => {
+    const db = getDb();
+    // 已认领账号 B；密文绑定的已验证所有者是 A（迟到的校验结果写坏绑定的形态）
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', ?)").run(ACCOUNT_B);
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_owner_id', ?)")
+      .run(JSON.stringify({ ownerId: ACCOUNT_A, token: encrypt('bound-token-a', encryptionKey) }));
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('bound-token-a', encryptionKey));
+    db.prepare("INSERT INTO accounts (account_id, user_json) VALUES (?, ?)").run(ACCOUNT_B, JSON.stringify({ id: 222 }));
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', ?)").run(ACCOUNT_B);
+
+    // 「全局密文与校验时绑定一致」单独成立不再放行：绑定所有者（A）与解析
+    // 分区（B）不一致时必须拒绝回退。
+    await request(app)
+      .post('/api/proxy/github/user')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .send({ method: 'GET' })
+      .expect(400)
+      .expect((r) => expect(r.body.code).toBe('GITHUB_TOKEN_NOT_CONFIGURED'));
   });
 });

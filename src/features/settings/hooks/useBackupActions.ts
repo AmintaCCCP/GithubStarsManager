@@ -29,6 +29,19 @@ import {
   syncGhAccountTokensFromState,
 } from '../../../store/persistence/ghAccountSecrets';
 
+/**
+ * 审计修复（CodeRabbit）：恢复写入实时状态前校验 Gist 数组的每个条目——
+ * null/非对象条目会在渲染 Gist 视图时抛 TypeError（gistUtils 直接读取条目
+ * 属性），且持久化读取同样不过滤空条目，重启后问题仍会出现。gists 与
+ * starredGists 共用同一结构校验。
+ * 返回值：true = 全部条目均为非空对象；false = 含 null/非对象条目（调用方
+ * 拒绝该字段，绝不写入实时状态）。
+ */
+const backupGistEntriesAreValid = (value: unknown): boolean => {
+  if (!Array.isArray(value)) return false;
+  return value.every((entry) => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry));
+};
+
 export interface RestoreBackupOptions {
   /** 列举备份时绑定的账号 ID（用于检测 listBackups 期间切号）。 */
   expectedAccountId?: string | null;
@@ -302,6 +315,9 @@ export const useBackupActions = (): BackupActions => {
       const normalizedBackupWorkspaces = backupData.accountWorkspaces
         ? normalizeAccountWorkspaces(backupData.accountWorkspaces)
         : {};
+      // 审计修复（CodeRabbit）：Gist 数据含 null/非对象条目时拒绝该字段并在
+      // 结果提示中警示（顶层与工作区两条路径共用该标记）。
+      let gistPayloadRejected = false;
       // R2-C8：登记账号/写入工作区前逐份校验各账号工作区的仓库数据（与顶层
       // 恢复和本地 JSON 导入共用 validateBackupRepositories）。非数组或含无效
       // 条目时整体拒绝恢复，绝不用损坏/部分数据覆盖本机工作区；显式 [] 的
@@ -322,17 +338,35 @@ export const useBackupActions = (): BackupActions => {
           const normalizedWorkspace = normalizedBackupWorkspaces[workspaceAccountId];
           if (normalizedWorkspace) normalizedWorkspace.repositories = validatedWorkspaceRepositories;
         }
+        // 审计修复（CodeRabbit）：工作区携带的 Gist 数据同样逐条校验——
+        // applyPartialLiveWorkspace 会把工作区字段写入实时状态。含 null/非对象
+        // 条目时拒绝该字段（从原始工作区移除，按「未提供」处理并保留本机值），
+        // 绝不让无效条目进入实时状态；结果提示中统一警示。
+        for (const gistField of ['gists', 'starredGists'] as const) {
+          const rawGists = (rawWorkspace as Record<string, unknown>)[gistField];
+          if (rawGists !== undefined && !backupGistEntriesAreValid(rawGists)) {
+            delete (rawWorkspace as Record<string, unknown>)[gistField];
+            gistPayloadRejected = true;
+          }
+        }
       }
-      // 防御性复制：备份未携带工作区时避免归档写原地改写当前 state 字典
-      const mergedWorkspaces = backupData.accountWorkspaces
-        ? mergeAccountWorkspacesForBackup(
-            useAppStore.getState().accountWorkspaces,
-            backupData.accountWorkspaces as Record<string, unknown>,
-            liveAccountId,
-            null,
-            false,
-          )
-        : { ...useAppStore.getState().accountWorkspaces };
+      // 审计修复（CodeRabbit Major）：工作区合并必须推迟到最终同步提交时基于
+      // 最新的 accountWorkspaces 状态执行——若在此处提前构造，先启动的恢复在
+      // PAT 校验/桥接等待期间，同一活跃账号下完成的另一笔恢复会先写入其工作区，
+      // 等待后的提交会用陈旧合并结果覆盖它。提交时只替换本备份涉及的工作区，
+      // 不重叠的恢复保留彼此的结果。防御性复制：备份未携带工作区时避免归档写
+      // 原地改写当前 state 字典。
+      const buildMergedWorkspaces = (): Record<string, import('../../../types').AccountWorkspace> => (
+        backupData.accountWorkspaces
+          ? mergeAccountWorkspacesForBackup(
+              useAppStore.getState().accountWorkspaces,
+              backupData.accountWorkspaces as Record<string, unknown>,
+              liveAccountId,
+              null,
+              false,
+            )
+          : { ...useAppStore.getState().accountWorkspaces }
+      );
 
       // 恢复 savedAccounts：仅当备份包含真实密钥且通过 GitHub 身份归属校验时恢复 Token，
       // 否则保留本地已有 Token 或置空要求重新授权（避免跨账号 PAT 冒用）。
@@ -380,6 +414,10 @@ export const useBackupActions = (): BackupActions => {
           } catch {
             ghTokenPersistFailed = true;
           }
+          // 审计修复（CodeRabbit Major）：桥接调用等待期间可能切号——返回后、
+          // 继续任何恢复写入/归档前重新校验发起账号与会话代次，两者均未变化
+          // 才继续；桥接失败仍按既有行为记录持久化失败（不吞掉会话切换）。
+          if (!ensureSameAccount()) return;
         }
       }
 
@@ -402,6 +440,8 @@ export const useBackupActions = (): BackupActions => {
       if (restoreTargetsOtherAccount) {
         // 备份顶层归档进其归属账号工作区。归档基座绝不借用当前登录账号的
         // 实时数据（跨账号串号防线）：本机无该账号快照时以空工作区为基座。
+        // 提交时基于最新状态合并（见 buildMergedWorkspaces）。
+        const mergedWorkspaces = buildMergedWorkspaces();
         const previous = mergedWorkspaces[backupAccountId!];
         mergedWorkspaces[backupAccountId!] = {
           ...(previous ?? emptyAccountWorkspace()),
@@ -424,10 +464,12 @@ export const useBackupActions = (): BackupActions => {
             ? (backupData.categoryOrder as string[])
             : (previous?.categoryOrder ?? []),
           // 备份实际提供的其余工作区字段：缺失时才沿用该账号原快照。
-          ...(Array.isArray(backupData.gists)
+          // 审计修复（CodeRabbit）：Gist 字段逐条校验通过才随归档写入，
+          // 含 null/非对象条目时按「未提供」处理（沿用原快照）并警示。
+          ...(Array.isArray(backupData.gists) && backupGistEntriesAreValid(backupData.gists)
             ? { gists: backupData.gists as import('../../../types').Gist[] }
             : {}),
-          ...(Array.isArray(backupData.starredGists)
+          ...(Array.isArray(backupData.starredGists) && backupGistEntriesAreValid(backupData.starredGists)
             ? { starredGists: backupData.starredGists as import('../../../types').Gist[] }
             : {}),
           ...(Array.isArray(backupData.forks)
@@ -462,7 +504,9 @@ export const useBackupActions = (): BackupActions => {
           applyPartialLiveWorkspace(liveAccountId);
         }
       } else if (backupData.accountWorkspaces) {
-        useAppStore.setState({ accountWorkspaces: mergedWorkspaces });
+        // 审计修复（CodeRabbit Major）：提交时基于最新 accountWorkspaces 合并，
+        // 仅替换本备份涉及的工作区（等待期间其他恢复写入的不重叠工作区保留）。
+        useAppStore.setState({ accountWorkspaces: buildMergedWorkspaces() });
         // 同账号恢复：以当前实时工作区为基座，只覆盖备份中实际提供且通过校验的
         // 工作区字段（含 categoryOrder、defaultCategoryOverrides、selectedGistCategory、
         // lastSync 等），随后的旧格式顶层兼容字段按需覆盖，最后统一更新工作区快照。
@@ -475,14 +519,43 @@ export const useBackupActions = (): BackupActions => {
         if (backupRepositories !== undefined) state.setRepositories(backupRepositories, { allowEmpty: true });
         if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases, { allowEmpty: true });
         // 工作区级数据（Gist / Fork / 同步范围）随 1.3 备份恢复
-        if (Array.isArray(backupData.gists)) useAppStore.setState({ gists: backupData.gists as import('../../../types').Gist[] });
-        if (Array.isArray(backupData.starredGists)) useAppStore.setState({ starredGists: backupData.starredGists as import('../../../types').Gist[] });
+        // 审计修复（CodeRabbit）：写入实时状态前逐条校验 Gist 条目——含
+        // null/非对象条目时拒绝该字段（保留本机现有值），绝不让无效条目
+        // 进入实时状态；结果提示中统一警示。
+        if (Array.isArray(backupData.gists)) {
+          if (backupGistEntriesAreValid(backupData.gists)) {
+            useAppStore.setState({ gists: backupData.gists as import('../../../types').Gist[] });
+          } else {
+            gistPayloadRejected = true;
+          }
+        }
+        if (Array.isArray(backupData.starredGists)) {
+          if (backupGistEntriesAreValid(backupData.starredGists)) {
+            useAppStore.setState({ starredGists: backupData.starredGists as import('../../../types').Gist[] });
+          } else {
+            gistPayloadRejected = true;
+          }
+        }
         if (Array.isArray(backupData.forks)) useAppStore.setState({ forks: backupData.forks as import('../../../types').ForkRepo[] });
         if (Array.isArray(backupData.readForks)) {
           useAppStore.setState({ readForks: new Set(backupData.readForks.filter((id): id is number => typeof id === 'number')) });
         }
         if (typeof backupData.categoryListIdMap === 'object' && backupData.categoryListIdMap !== null) {
           useAppStore.setState({ categoryListIdMap: backupData.categoryListIdMap as Record<string, string> });
+        }
+        // 审计修复（CodeRabbit）：未登录时导出的 1.3 备份把分类顺序与覆盖项
+        // 保存在顶层，而顶层分支此前不读取这两个字段——恢复成功后分类顺序/
+        // 覆盖项仍是恢复前的值。允许应用顶层数据时一并恢复；字段缺失时保留
+        // 现有值。跨账号备份走归档分支，不进入本分支。
+        if (Array.isArray(backupData.categoryOrder)) {
+          useAppStore.setState({
+            categoryOrder: backupData.categoryOrder.filter((id): id is string => typeof id === 'string'),
+          });
+        }
+        if (backupData.defaultCategoryOverrides && typeof backupData.defaultCategoryOverrides === 'object' && !Array.isArray(backupData.defaultCategoryOverrides)) {
+          useAppStore.setState({
+            defaultCategoryOverrides: backupData.defaultCategoryOverrides as import('../../../types').AccountWorkspace['defaultCategoryOverrides'],
+          });
         }
         if (backupData.syncMode === 'stars' || backupData.syncMode === 'stars-and-lists') {
           useAppStore.setState({ syncMode: backupData.syncMode });
@@ -659,16 +732,26 @@ export const useBackupActions = (): BackupActions => {
           },
         });
       }
-      const workspaceList = Object.values(normalizedBackupWorkspaces);
-      const restoredRepoCount = skipUnboundTopLevelApply
-        ? workspaceList.reduce((sum, ws) => sum + ws.repositories.length, 0)
-        : (backupRepositories?.length ?? 0);
-      const restoredReleaseCount = skipUnboundTopLevelApply
-        ? workspaceList.reduce((sum, ws) => sum + ws.releases.length, 0)
-        : ((backupData.releases as unknown[] | undefined)?.length ?? 0);
-      const restoredCategoryCount = skipUnboundTopLevelApply
-        ? workspaceList.reduce((sum, ws) => sum + ws.customCategories.length, 0)
-        : ((backupData.customCategories as unknown[] | undefined)?.length ?? 0);
+      // 审计修复（CodeRabbit）：成功提示按实际应用的数据计数——同账号备份
+      // 只在 accountWorkspaces 中提供数据时，applyPartialLiveWorkspace 恢复的
+      // 仓库/发行版/分类此前显示为 0。顶层字段实际应用时优先按顶层计数
+      //（同账号同时携带工作区与顶层字段时顶层覆盖工作区，不重复计数）；
+      // 仅工作区应用（跨账号归档 / 未绑定顶层跳过）时按发起账号的工作区计数。
+      const topLevelApplied = !restoreTargetsOtherAccount && !skipUnboundTopLevelApply;
+      const appliedLiveWorkspace = liveAccountId
+        && backupData.accountWorkspaces
+        && normalizedBackupWorkspaces[liveAccountId]
+        ? normalizedBackupWorkspaces[liveAccountId]
+        : undefined;
+      const restoredRepoCount = topLevelApplied
+        ? (backupRepositories?.length ?? appliedLiveWorkspace?.repositories.length ?? 0)
+        : (appliedLiveWorkspace?.repositories.length ?? 0);
+      const restoredReleaseCount = topLevelApplied
+        ? ((backupData.releases as unknown[] | undefined)?.length ?? appliedLiveWorkspace?.releases.length ?? 0)
+        : (appliedLiveWorkspace?.releases.length ?? 0);
+      const restoredCategoryCount = topLevelApplied
+        ? ((backupData.customCategories as unknown[] | undefined)?.length ?? appliedLiveWorkspace?.customCategories.length ?? 0)
+        : (appliedLiveWorkspace?.customCategories.length ?? 0);
       const hasNonEmptyArray = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
       const hasNonEmptyObject = (value: unknown): boolean => (
         Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0
@@ -710,7 +793,12 @@ export const useBackupActions = (): BackupActions => {
       if (hasSkippedUnboundTopLevelData) {
         warnings.push('skipped unbound top-level backup data with activeAccountId=null');
       }
-      if (ghTokenPersistFailed || rejectedBackupTokenCount > 0) {
+      // 审计修复（CodeRabbit）：Gist 数据含无效条目被拒绝时必须告知用户
+      // （对应字段保留恢复前的值）。
+      if (gistPayloadRejected) {
+        warnings.push(t('useBackupActions.gist-data-in-the-backup-contained-invalid-entries-th'));
+      }
+      if (ghTokenPersistFailed || rejectedBackupTokenCount > 0 || gistPayloadRejected) {
         toast(`${summaryMessage} (${warnings.join('; ')})`, 'warning');
       } else if (hasSkippedUnboundTopLevelData) {
         toast(`${summaryMessage} (${warnings.join('; ')})`, 'info');

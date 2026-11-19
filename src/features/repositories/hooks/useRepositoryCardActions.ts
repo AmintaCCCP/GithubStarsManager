@@ -373,8 +373,11 @@ export const useRepositoryCardActions = ({
               accountIdScope: {
                 accountId: requestAccountId,
                 multiAccount: isMultiAccount,
-                // 单账号老用户免重建索引，直接兼容存量旧向量；多账号时启用严格隔离。
-                allowLegacyUnscoped: !isMultiAccount,
+                // 审计修复（R5）：本机保存的账号数量无法证明共享索引中无前缀
+                // legacy 向量的归属（与 useSearchActions 同一约束）。归属未经
+                // 独立确认时一律拒绝无归属 legacy 向量，保留严格范围与本地
+                // 召回；单账号兼容由格式版本升级触发的完整重建收敛。
+                allowLegacyUnscoped: false,
               },
             };
           })()
@@ -392,6 +395,14 @@ export const useRepositoryCardActions = ({
 
       if (result.repositories.length === 0) {
         toast(t('useRepositoryCardActions.no-similar-repositories-found'), 'info');
+      } else if (result.diagnostics.denseIndexUnavailableReason) {
+        // 转交 3（CodeRabbit，similarRepositoryPipeline）：稠密索引不可用时
+        // 管道仍会返回词法/结构化召回的非空结果——但结果可能不完整，必须
+        // 明确提示用户，而不是静默降级。
+        toast(
+          t('useRepositoryCardActions.similar-results-may-be-incomplete-the-dens', { v1: result.diagnostics.denseIndexUnavailableReason }),
+          'warning',
+        );
       }
     } catch (error) {
       if (isAbortError(error) || controller.signal.aborted) return;
@@ -476,6 +487,9 @@ export const useRepositoryCardActions = ({
             withAccountSwitchGuardSync(() => {
               useAppStore.setState((state) => ({
                 repositories: state.repositories.filter((r) => r.id !== unstarredRepoId),
+                // 审计修复：搜索激活时视图直接渲染 searchResults——取消星标的
+                // 仓库必须与正常 deleteRepository 路径一样从结果中过滤掉。
+                searchResults: state.searchResults.filter((r) => r.id !== unstarredRepoId),
                 releases: state.releases.filter((rel) => rel.repository.id !== unstarredRepoId),
               }));
             });

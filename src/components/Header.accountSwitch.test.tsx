@@ -99,14 +99,31 @@ beforeEach(() => {
 });
 
 describe('Header account switcher', () => {
-  it('renders the dropdown trigger with avatar and username', async () => {
+  it('keeps the plain profile area and a standalone add-account entry for a single account (Issue #611)', async () => {
     baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    const { unmount } = render(<Header />);
+
+    // 单账号：资料区不是切换入口——没有带箭头的 trigger 按钮
+    expect(screen.queryByRole('button', { name: 'header.switch-account' })).not.toBeInTheDocument();
+    // 原头像与用户名展示保留
+    expect(screen.getByAltText('Alice')).toBeTruthy();
+    expect(screen.getByText('Alice')).toBeTruthy();
+    // 独立的「添加账号」图标入口
+    expect(screen.getByRole('button', { name: 'header.add-account' })).toBeTruthy();
+    unmount();
+  });
+
+  it('renders the dropdown trigger with avatar and username when multiple accounts exist', async () => {
+    baseState.savedAccounts = {
+      '1': savedAccount('1', userA, 'ghp_a'),
+      '2': savedAccount('2', userB, 'ghp_b'),
+    };
     const { unmount } = render(<Header />);
 
     const trigger = screen.getByRole('button', { name: 'header.switch-account' });
     expect(trigger).toBeTruthy();
     // 触发器包含头像与用户名
-    expect(screen.getByAltText('Alice')).toBeTruthy();
+    expect(screen.getAllByAltText('Alice').length).toBeGreaterThan(0);
 
     await userEvent.click(trigger);
     expect(screen.getByText('header.switch-account')).toBeTruthy();
@@ -152,12 +169,11 @@ describe('Header account switcher', () => {
     unmount();
   });
 
-  it('opens AddAccountModal from the add-account item without logging out', async () => {
+  it('opens AddAccountModal from the standalone add-account entry without logging out (single account)', async () => {
     baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
     const { unmount } = render(<Header />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
-    fireEvent.click(screen.getByText('header.add-account'));
+    fireEvent.click(screen.getByRole('button', { name: 'header.add-account' }));
 
     // 弹窗标题出现，且未触发登出
     expect(screen.getByText(/accountModal\.title/)).toBeTruthy();
@@ -224,20 +240,34 @@ describe('Header account switcher', () => {
     unmount();
   });
 
+  it('localizes backend-credential-sync-failed switch failures via the accountModal translation', async () => {
+    baseState.savedAccounts = {
+      '1': savedAccount('1', userA, 'ghp_a'),
+      '2': savedAccount('2', userB, 'ghp_b'),
+    };
+    mocks.switchToAccount.mockResolvedValueOnce({ ok: false, error: 'backend-credential-sync-failed' });
+    const { unmount } = render(<Header />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
+    fireEvent.click(await screen.findByText(/@bob . header\.account-repo-count/));
+
+    // 审计修复：错误码不再原样显示——复用 AddAccountModal 的本地化提示
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith(
+        'header.switch-account: accountModal.backend-credential-sync-failed',
+        'error',
+      );
+    });
+    unmount();
+  });
+
   it('logs out via the standalone icon button when only one account exists (B21)', async () => {
     baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
     const { unmount } = render(<Header />);
 
-    // 单账号：退出登录保留原独立图标入口
+    // 单账号：退出登录保留原独立图标入口，资料区不是下拉触发器
     expect(screen.getByRole('button', { name: 'header.logout' })).toBeInTheDocument();
-    // 菜单内不再出现退出项（多账号才菜单化）
-    await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
-    expect(screen.queryByText('header.logout')).not.toBeInTheDocument();
-    await userEvent.keyboard('{Escape}');
-    // 菜单关闭后（aria-hidden 解除）独立退出按钮可触发确认与登出
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'header.logout' })).toBeInTheDocument();
-    });
+    expect(screen.queryByRole('button', { name: 'header.switch-account' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'header.logout' }));
 
     await waitFor(() => {
@@ -313,8 +343,7 @@ describe('Header account switcher', () => {
     mocks.addAccountWithToken.mockResolvedValue({ ok: true });
     const { unmount } = render(<Header />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
-    fireEvent.click(screen.getByText('header.add-account'));
+    fireEvent.click(screen.getByRole('button', { name: 'header.add-account' }));
 
     const confirmButton = await screen.findByRole('button', { name: 'app:accountModal.confirm' });
     expect(screen.getByRole('button', { name: 'app:accountModal.cancel' })).toBeTruthy();

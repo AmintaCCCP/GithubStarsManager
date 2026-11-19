@@ -260,6 +260,45 @@ const IMPORT_KEY_ALIASES: Record<string, string> = {
   categoryOrder: 'customCategories',
   releaseSourceSettings: 'releaseSubscriptions',
   readReleases: 'releaseSubscriptions',
+  // 审计修复：仓库类型随导出还会写出 Gist/Fork/同步范围（exportData 的
+  // repositories 分支），仅含这些顶层字段的备份同样要解析出 repositories 类型
+  gists: 'repositories',
+  starredGists: 'repositories',
+  forks: 'repositories',
+  readForks: 'repositories',
+  syncMode: 'repositories',
+  syncModeConfigured: 'repositories',
+};
+
+// 工作区字段 → 导入类型映射：与导出端 trimWorkspacesForSelectedTypes 的
+// 裁剪分组一一对应，用于从部分备份的 accountWorkspaces 推导导入类型。
+const WORKSPACE_FIELD_IMPORT_TYPES: Array<[string, string]> = [
+  ['repositories', 'repositories'],
+  ['gists', 'repositories'],
+  ['starredGists', 'repositories'],
+  ['forks', 'repositories'],
+  ['readForks', 'repositories'],
+  ['releases', 'releases'],
+  ['releaseSubscriptions', 'releaseSubscriptions'],
+  ['readReleases', 'releaseSubscriptions'],
+  ['releaseSourceSettings', 'releaseSubscriptions'],
+  ['customCategories', 'customCategories'],
+  ['hiddenDefaultCategoryIds', 'customCategories'],
+  ['defaultCategoryOverrides', 'customCategories'],
+  ['categoryOrder', 'customCategories'],
+  ['categoryListIdMap', 'customCategories'],
+];
+
+// 原始工作区字段是否携带实际数据：空数组/空对象是导出端裁剪与规范化补出的
+// 默认占位，绝不据此判定类型（否则裁剪备份会被误判为全类型导入）。
+const workspaceFieldCarriesData = (field: string, value: unknown): boolean => {
+  if (field === 'releaseSourceSettings') {
+    return JSON.stringify(normalizeReleaseSourceSettings(value ?? null))
+      !== JSON.stringify(normalizeReleaseSourceSettings(null));
+  }
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === 'object') return Object.keys(value).length > 0;
+  return false;
 };
 
 const resolveImportTypes = (data: ExportData['data']): string[] => {
@@ -268,10 +307,36 @@ const resolveImportTypes = (data: ExportData['data']): string[] => {
       .filter((key) => data[key] !== undefined)
       .map((key) => IMPORT_KEY_ALIASES[key] ?? key)
   ));
+  // 审计修复：部分备份只有 activeAccountId + accountWorkspaces 内嵌字段（顶层
+  // 键全缺）——此前返回空类型集合，合并路径会过滤掉该账号仓库却仍报告导入
+  // 成功，替换路径同样拿不到类型。按原始（规范化前）工作区对象实际携带数据
+  // 的字段补充导入类型；normalizeAccountWorkspaces 会补默认空数组，不得以其
+  // 规范化结果为判定依据。
+  const rawWorkspaces = data.accountWorkspaces;
+  if (rawWorkspaces && typeof rawWorkspaces === 'object' && !Array.isArray(rawWorkspaces)) {
+    for (const workspace of Object.values(rawWorkspaces)) {
+      if (!workspace || typeof workspace !== 'object' || Array.isArray(workspace)) continue;
+      const record = workspace as unknown as Record<string, unknown>;
+      for (const [field, importType] of WORKSPACE_FIELD_IMPORT_TYPES) {
+        if (Object.prototype.hasOwnProperty.call(record, field)
+          && workspaceFieldCarriesData(field, record[field])) {
+          present.push(importType);
+        }
+      }
+    }
+  }
   if (UI_SETTINGS_DATA_KEYS.some((key) => data[key] !== undefined)) {
     present.push('uiSettings');
   }
-  return present;
+  return Array.from(new Set(present));
+};
+
+// 按条目 id 去重合并（与 mergeWorkspacesById 的 mergeList 同一语义：本机已有
+// 条目保留，仅追加本地没有的新条目）。同账号 merge 顶层 Gist/Fork 合并使用。
+const mergeListById = <T extends { id: unknown }>(localList: T[], incomingList: T[]): T[] => {
+  const existingIds = new Set(localList.map(item => String(item?.id)));
+  const added = incomingList.filter(item => !existingIds.has(String(item?.id)));
+  return [...localList, ...added];
 };
 
 export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) => {
@@ -876,13 +941,53 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'aiConfigs',
         'webdavConfigs',
         'assetFilters',
-        'discoveryRepos',
-        'subscriptionRepos',
+        'subscriptionChannels',
       ];
       for (const field of arrayImportFields) {
         const value = importedData[field];
         if (value !== undefined && !Array.isArray(value)) {
           addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)}`);
+          showError(t('dataManagementPanel.invalid-backup-file-format'));
+          return;
+        }
+      }
+      // 审计修复：discoveryRepos / subscriptionRepos 由导出器写成按频道分组的
+      // 映射对象（Record<channel, repos[]>）——按数组校验会把含这两个缓存的
+      // 备份（含默认全选导出）整体拒绝。改为分别校验映射对象与其中的仓库数组；
+      // 真正的数组字段仍走上面的检查。
+      const channelMapImportFields: Array<keyof ExportData['data']> = [
+        'discoveryRepos',
+        'subscriptionRepos',
+      ];
+      for (const field of channelMapImportFields) {
+        const value = importedData[field];
+        if (value === undefined) continue;
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+          addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)}`);
+          showError(t('dataManagementPanel.invalid-backup-file-format'));
+          return;
+        }
+        for (const channelRepos of Object.values(value as Record<string, unknown>)) {
+          if (!Array.isArray(channelRepos)) {
+            addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)} channel entry`);
+            showError(t('dataManagementPanel.invalid-backup-file-format'));
+            return;
+          }
+        }
+      }
+      // 审计修复：aiConfigs/webdavConfigs 的条目会在替换/合并路径被逐个读取
+      //（cfg.apiKey / cfg.password）——含 null 条目的数组此前能通过数组校验，
+      // 替换模式先写仓库再在读取时抛错，界面报告失败但原仓库已被替换。
+      // 在首次写入前逐项校验条目结构。
+      const configArrayImportFields: Array<keyof ExportData['data']> = [
+        'aiConfigs',
+        'webdavConfigs',
+      ];
+      for (const field of configArrayImportFields) {
+        const value = importedData[field];
+        if (value === undefined) continue;
+        if ((value as unknown[]).some((item) => !item || typeof item !== 'object' || Array.isArray(item))) {
+          addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)} entry`);
           showError(t('dataManagementPanel.invalid-backup-file-format'));
           return;
         }
@@ -1079,10 +1184,40 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         });
       };
 
+      // 审计修复（R2 安全审计）：备份中的账号键与 user 信息都来自备份文件，
+      // 未与 GitHub 身份对照。本机没有该账号凭证时拟采用的备份 PAT 必须先
+      // 直连 /user 核对真实身份与目标账号一致后才可写入 savedAccounts——
+      // 不一致（或网络失败无法确认）时拒绝该凭据，条目保留为「需重新授权」
+      // 的元数据，绝不写入未经验证的 PAT，更不能让它成为活动会话凭据。
+      const verifyBackupPATIdentity = async (token: string, expectedAccountId: string): Promise<boolean> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        try {
+          const res = await fetch('https://api.github.com/user', {
+            headers: {
+              Authorization: `token ${token}`,
+              Accept: 'application/vnd.github+json',
+            },
+            signal: controller.signal,
+          });
+          if (!res.ok) return false;
+          const user = await res.json() as { id?: unknown };
+          return typeof user?.id === 'number'
+            && Number.isFinite(user.id)
+            && String(user.id) === expectedAccountId;
+        } catch {
+          return false;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
       // savedAccounts 合并：仅当本机无凭证且备份包含非空白真实密钥时采用导入 Token，
       // 绝不用未验证或空白的备份 PAT 覆盖本机已有的有效凭证；先计算并校验工作区后再提交。
-      const pendingSavedAccounts = importedData.savedAccounts && typeof importedData.savedAccounts === 'object'
-        ? (() => {
+      const hasImportedSavedAccounts = !!importedData.savedAccounts
+        && typeof importedData.savedAccounts === 'object';
+      const pendingSavedAccounts = hasImportedSavedAccounts
+        ? await (async () => {
             const normalizedSaved = normalizeSavedAccounts(importedData.savedAccounts);
             const mergedSaved = { ...useAppStore.getState().savedAccounts };
             for (const [id, account] of Object.entries(normalizedSaved)) {
@@ -1090,9 +1225,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               const hasRealBackupToken = wasIncluded
                 && isRealSecret(account.githubToken)
                 && account.githubToken.trim().length > 0;
-              const token = local?.githubToken
-                ? local.githubToken
-                : (hasRealBackupToken ? account.githubToken : '');
+              let token = local?.githubToken ?? '';
+              if (!local?.githubToken && hasRealBackupToken) {
+                const identityVerified = await verifyBackupPATIdentity(account.githubToken, id);
+                if (identityVerified) {
+                  token = account.githubToken;
+                }
+              }
               mergedSaved[id] = {
                 ...(local ?? account),
                 ...account,
@@ -1102,6 +1241,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             return mergedSaved;
           })()
         : null;
+      if (hasImportedSavedAccounts
+        && accountIdKey(useAppStore.getState().user) !== currentAccountIdAtImport) {
+        // 核对备份 PAT 身份期间账号已切换：放弃本次导入，避免把备份凭据与
+        // 数据写进新会话上下文。
+        addLog(t('dataManagementPanel.import-data'), false, 'account changed during import');
+        showError(t('useBackupActions.account-changed-during-restore'));
+        setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
+        return;
+      }
 
       if (mode === 'replace') {
         // 工作区字典合并（replace）：逐账号按所选类型只替换已选字段，保留
@@ -1384,10 +1532,31 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           if (backupTargetsOtherAccount) {
             // merge：备份顶层按 id 并入备份账号工作区，保留已合并的本机条目（每个目标账号仅合并一次）
             archiveTopLevelToBackupAccountOnce('merge');
-          } else if (validatedImportRepositories !== undefined) {
-            const existingIds = new Set(store.repositories.map(r => r.id));
-            const newRepos = validatedImportRepositories.filter(r => !existingIds.has(r.id));
-            store.setRepositories([...store.repositories, ...newRepos]);
+          } else {
+            if (validatedImportRepositories !== undefined) {
+              const existingIds = new Set(store.repositories.map(r => r.id));
+              const newRepos = validatedImportRepositories.filter(r => !existingIds.has(r.id));
+              store.setRepositories([...store.repositories, ...newRepos]);
+            }
+            // 审计修复：旧版单账号备份没有 accountWorkspaces，Gist/Fork 等只
+            // 存在于顶层——此前同账号 merge 分支只合并仓库，收尾只保存实时
+            // 快照，备份新增 Gist/Fork 未恢复却报告导入成功。按各记录 ID 与
+            // 本机数据合并；仅处理备份实际提供的字段，缺失字段保留本机值。
+            if ((importedData.gists?.length ?? 0) > 0 || (importedData.starredGists?.length ?? 0) > 0) {
+              const live = useAppStore.getState();
+              useAppStore.setState({
+                gists: mergeListById(live.gists, importedData.gists ?? []),
+                gistSearchResults: mergeListById(live.gistSearchResults, importedData.gists ?? []),
+                starredGists: mergeListById(live.starredGists, importedData.starredGists ?? []),
+              });
+            }
+            if ((importedData.forks?.length ?? 0) > 0 || (importedData.readForks?.length ?? 0) > 0) {
+              const live = useAppStore.getState();
+              useAppStore.setState({
+                forks: mergeListById(live.forks, importedData.forks ?? []),
+                readForks: new Set([...Array.from(live.readForks), ...(importedData.readForks ?? [])]),
+              });
+            }
           }
         }
         if (selectedTypes.includes('releases') && importedData.releases) {

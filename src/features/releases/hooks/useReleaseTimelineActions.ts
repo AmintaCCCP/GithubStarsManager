@@ -326,6 +326,16 @@ export const useReleaseTimelineActions = () => {
     const removedReleasesSnapshot = !stillActive
       ? useAppStore.getState().releases.filter(item => normalizeRepoKey(item.repository.full_name) === repoKey)
       : [];
+    // 审计修复：removeReleasesByRepoFullName 会同时删除被移除 Release 的已读
+    // 记录与被删除仓库的展开状态——回滚前记录两者，回滚时只把仍缺失的 ID
+    // 写回对应集合（与现有 Release 去重逻辑一致，不重复、不覆盖已有状态）。
+    const removedReleaseIds = new Set(removedReleasesSnapshot.map(item => item.id));
+    const removedReadReleaseIds = new Set(
+      Array.from(useAppStore.getState().readReleases).filter(id => removedReleaseIds.has(id)),
+    );
+    const removedExpandedRepoIds = new Set(
+      removedReleasesSnapshot.map(item => item.repository.id),
+    );
     if (!stillActive) state.removeReleasesByRepoFullName(releaseRepo.full_name);
     try {
       await forceSyncToBackend({ reportFailures: true });
@@ -358,6 +368,8 @@ export const useReleaseTimelineActions = () => {
             releaseSubscriptions?: typeof current.releaseSubscriptions;
             releaseSourceSettings?: typeof current.releaseSourceSettings;
             releases?: typeof current.releases;
+            readReleases?: typeof current.readReleases;
+            releaseExpandedRepositories?: typeof current.releaseExpandedRepositories;
           } = {};
           // 仅撤销未确认提交的变更 1/3：恢复 starredRepo 的订阅标记与订阅集合
           if (shouldRollbackStarred && starredRepo) {
@@ -408,6 +420,19 @@ export const useReleaseTimelineActions = () => {
             if (restoredReleases.length > 0) {
               next.releases = [...current.releases, ...restoredReleases];
             }
+            // 审计修复：回滚同时恢复被删除 Release 的已读记录与被删除仓库的
+            // 展开状态——只写回当前仍缺失的 ID（等待期间其他操作可能已独立
+            // 写入同名记录），与 releases 的去重逻辑一致。
+            const missingReadIds = Array.from(removedReadReleaseIds)
+              .filter(id => !current.readReleases.has(id));
+            if (missingReadIds.length > 0) {
+              next.readReleases = new Set([...current.readReleases, ...missingReadIds]);
+            }
+            const missingExpandedRepoIds = Array.from(removedExpandedRepoIds)
+              .filter(id => !current.releaseExpandedRepositories.has(id));
+            if (missingExpandedRepoIds.length > 0) {
+              next.releaseExpandedRepositories = new Set([...current.releaseExpandedRepositories, ...missingExpandedRepoIds]);
+            }
           }
           return next;
         });
@@ -415,7 +440,11 @@ export const useReleaseTimelineActions = () => {
       toast(t('useReleaseTimelineActions.failed-to-unsubscribe-please-check-backend-conne'), 'error');
       return;
     }
-    toast(t('useReleaseTimelineActions.unsubscribed-from-repository-releases'), 'success');
+    // 审计修复：forceSyncToBackend 等待期间可能切号——B 不应看到 A 的退订
+    // 成功提示，成功路径与失败/回滚路径一样复用发起会话校验。
+    if (isCurrentAccountSession(accountIdBeforeConfirm, generationBeforeConfirm)) {
+      toast(t('useReleaseTimelineActions.unsubscribed-from-repository-releases'), 'success');
+    }
   }, [state, t, toast, confirm]);
 
   return {

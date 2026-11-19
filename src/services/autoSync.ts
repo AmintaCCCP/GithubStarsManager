@@ -400,6 +400,16 @@ function markSettingsUnavailable(accountId: string | null | undefined, backendUr
   _settingsUnavailableKeys.add(key);
   _settingsLoadedKeys.delete(key);
 }
+
+// 审计修复（PR #612）：AI 配置分片的「已对齐」标记，键格式与设置一致但集合独立。
+// 当前 (账号, 后端) 尚未成功读取过 AI 配置时，本地空数组不代表「无配置」——
+// 此时推送 syncAIConfigs([]) 会触发服务端 bulk PUT 先清空后插入，物理删除该
+// 分区的全部 AI 配置。未对齐时空列表必须跳过写入，等待拉取对齐后按真实状态推送。
+const _aiConfigsLoadedKeys = new Set<string>();
+function markAIConfigsLoaded(accountId: string | null | undefined, backendUrl: string): void {
+  if (!accountId) return;
+  _aiConfigsLoadedKeys.add(settingsLoadedKey(accountId, backendUrl));
+}
 const PUSH_RETRY_MAX_DELAY = 60_000;
 
 // 推送分片名（审计修复 C41）：按 Promise.allSettled 的分片顺序命名，失败分片
@@ -561,6 +571,60 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
             ...(dirtySettingKeys.length > 0 ? { dirtySettingKeys } : {}),
           },
         );
+      }
+    }
+    // 旧版待推记录迁移（审计修复）：旧格式 [accountId] 加载为 backendUrl ''
+    // 的记录，复合键查找永远匹配不到已连接后端——重新连接原后端后普通拉取
+    // 不会先补推，后端旧值可能覆盖未推修改。迁移前只存在单一后端连接，其
+    // 持久化 URL（登录页预填与 init 探测共用）即原后端：能确认时把记录一次性
+    // 绑定到该 URL 并立即写回持久化（避免之后切换后端时被重复绑定到新连接）。
+    // 无法确认时保留原样：空 URL 记录不会被 hasPendingAccountSync 关联到任何
+    // 新后端，也绝不会自动补推到新后端（restorePendingSettingDirtyKeys 仍按
+    // 原有迁移语义恢复其脏键保护，只影响拉取合并的保留方向，不产生写入）。
+    let migrationBackendUrl: string | null = null;
+    try {
+      const persisted = backend.persistedUrl;
+      migrationBackendUrl = typeof persisted === 'string' && persisted ? persisted : null;
+    } catch {
+      migrationBackendUrl = null;
+    }
+    let rebound = false;
+    if (migrationBackendUrl) {
+      for (const [key, entry] of [...entries]) {
+        if (entry.backendUrl !== '') continue;
+        entries.delete(key);
+        // 审计员补充（Round 11）：目标复合键上可能已有同账号的新格式记录——
+        // 旧格式记录尚未迁移的会话里，同一账号在同一后端又产生了失败补推记录。
+        // 直接覆盖会丢掉已有记录的 dirtySettingKeys（拉取合并的本地编辑保护），
+        // 必须按并集合并后再写回。
+        const targetKey = pendingSyncCompositeKey(entry.accountId, migrationBackendUrl);
+        const existingAtTarget = entries.get(targetKey);
+        const mergedDirtyKeys = Array.from(new Set([
+          ...(existingAtTarget?.dirtySettingKeys ?? []),
+          ...(entry.dirtySettingKeys ?? []),
+        ]));
+        entries.set(targetKey, {
+          accountId: entry.accountId,
+          backendUrl: migrationBackendUrl,
+          ...(mergedDirtyKeys.length > 0 ? { dirtySettingKeys: mergedDirtyKeys } : {}),
+        });
+        rebound = true;
+      }
+      if (rebound) {
+        try {
+          localStorage.setItem(
+            PENDING_SYNC_ACCOUNTS_KEY,
+            JSON.stringify([...entries.values()].map(
+              ({ accountId, backendUrl, dirtySettingKeys }) => (
+                dirtySettingKeys && dirtySettingKeys.length > 0
+                  ? [accountId, backendUrl, dirtySettingKeys]
+                  : [accountId, backendUrl]
+              ),
+            )),
+          );
+        } catch {
+          // 存储不可用时忽略：本次会话内绑定仍然生效，下次启动重试迁移
+        }
       }
     }
     return entries;
@@ -864,6 +928,7 @@ export function clearPendingSyncState(): void {
   _dirtySettingKeyVersions.clear();
   _settingsUnavailableKeys.clear();
   _settingsLoadedKeys.clear();
+  _aiConfigsLoadedKeys.clear();
   try {
     localStorage.removeItem(PUSHED_REPO_IDS_KEY);
     localStorage.removeItem(LEGACY_PUSHED_REPO_IDS_KEY);
@@ -931,6 +996,8 @@ export function resetSyncHashes(): void {
   // R2-C6：新对齐会话必须重新从后端读取设置，旧会话的「已加载」结论不继承。
   _settingsUnavailableKeys.clear();
   _settingsLoadedKeys.clear();
+  // AI 配置分片同理：新对齐会话必须重新读取后端 AI 配置后才能推送空列表。
+  _aiConfigsLoadedKeys.clear();
   _accountsSeenNonEmptyRepos.clear();
   _accountsObservedBackendRepos.clear();
   if (_pushRetryTimer) {
@@ -1403,6 +1470,11 @@ export async function syncFromBackend(options: {
         // R2-C6：设置读取失败——后续推送只允许携带明确编辑过的键。
         markSettingsUnavailable(fetchedAccountId, fetchedBackendUrl);
       }
+      // 待推分支同样记录 AI 配置的读取结论：读取成功后该 (账号, 后端) 的
+      // 空列表推送才被允许（未读取成功时空列表不得清空后端 AI 配置）。
+      if (aiResult.status === 'fulfilled') {
+        markAIConfigsLoaded(fetchedAccountId, fetchedBackendUrl);
+      }
       return;
     }
 
@@ -1471,6 +1543,11 @@ export async function syncFromBackend(options: {
     } else {
       // R2-C6：设置读取失败——后续推送只允许携带明确编辑过的键。
       markSettingsUnavailable(fetchedAccountId, fetchedBackendUrl);
+    }
+    // AI 配置读取成功即视为该 (账号, 后端) 已对齐：之后的推送允许按本地
+    // 真实状态（含空列表）写入；读取失败/未读取时空列表推送被跳过。
+    if (aiResult.status === 'fulfilled') {
+      markAIConfigsLoaded(fetchedAccountId, fetchedBackendUrl);
     }
 
     // Only update store if backend data actually changed
@@ -1651,7 +1728,9 @@ export async function syncToBackend(options: { forceVerify?: boolean } = {}): Pr
     if (id) _frozenWindowEditAccounts.add(id);
     return false;
   }
-  if (!backend.isAvailable) return true;
+  // 后端不可用时本次写入从未发生：显式校验推送（forceVerify）不得报告成功，
+  // 必须作为「未尝试写入」返回失败；普通后台同步保持静默跳过（返回 true）。
+  if (!backend.isAvailable) return !options.forceVerify;
   if (options.forceVerify) {
     _pendingForceVerify = true;
   }
@@ -1724,6 +1803,10 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
   const pushSessionGeneration = getAccountSessionGeneration();
   const pushResetGeneration = _resetGeneration;
   for (let attempt = 1; attempt <= SNAPSHOT_CONFLICT_MAX_ATTEMPTS; attempt += 1) {
+    // 审计修复：每次 GET 之前固定目标后端地址，GET 与 PUT 校验使用同一值。
+    // 若 GET 期间连接从 X 切到 Y，PUT 携带固定的 X——syncRepositories 发现
+    // 与当前连接不一致会在写入前抛错，绝不让 X 的合并快照覆盖 Y 的分区。
+    const targetBackendUrl = backend.backendUrl ?? '';
     const remote = await backend.fetchRepositories();
     // 分页截断/不完整的响应不是完整快照：据此推送会物理删除未读到的远端仓库。
     if (remote.repositories.length < (remote.total ?? remote.repositories.length)) {
@@ -1746,7 +1829,10 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
     const pendingDeleted = pendingDeletedRepoIds(accountId);
     // 快照本次 PUT 实际处理的删除集合，成功后仅清除这批已确认删除，保留请求在途新增的删除记录
     const confirmedSessionDeleted = sessionDeleted ? new Set(sessionDeleted) : null;
-    const confirmedPendingDeleted = pendingDeleted ? new Set(pendingDeleted) : null;
+    // 本次 PUT 没有待删项时必须传空集合而不是 null/undefined：null 会让
+    // clearPendingRepositoryDeletions 清空整个待删集合，把 PUT 发出后新增的
+    // 删除记录一并抹掉（补推前应用重启会让后端快照复活已删仓库）。
+    const confirmedPendingDeleted = new Set(pendingDeleted ?? []);
     const remoteById = new Map(remote.repositories.map((repo) => [repo.id, repo]));
     // 合并同一仓库时保留远端更新更晚的用户编辑字段，避免未编辑的旧本地副本覆盖另一设备的更新
     const mergedLocalRepos = localRepos.map((localRepo) => {
@@ -1773,7 +1859,6 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
       && !pendingDeleted?.has(repo.id)
     ));
     const payload = [...mergedLocalRepos, ...serverKept];
-    const targetBackendUrl = backend.backendUrl ?? '';
     try {
       await backend.syncRepositories(payload, {
         expectedRevision: remote.revision ?? null,
@@ -1899,8 +1984,6 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
     const currentReposHashKey = `${pushBackendUrl}|${pushAccountId}`;
     const reposUnchanged = !forceVerify && reposHash === _lastHash.repos && currentReposHashKey === _lastReposHashKey;
     const skipped = Symbol('skipped');
-    // R2-C2：在构造设置请求的同一时刻记录脏键版本快照。
-    const dirtySettingVersionsAtPush = snapshotDirtySettingVersions();
 
     const fullSettingsPayload = {
       activeAIConfig: state.activeAIConfig,
@@ -1919,15 +2002,33 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
     if (pushAccountId && hasPendingAccountSync(pushAccountId)) {
       restorePendingSettingDirtyKeys(pushAccountId);
     }
+    // R2-C2：在构造设置请求的同一时刻记录脏键版本快照——必须先恢复持久化脏键
+    //（恢复会为这些键分配新版本）再捕获版本，否则恢复键与快照版本不匹配，
+    // 本次 PUT 已确认的值会被保留为待推，重试可能把旧值重新发送到后端。
+    const dirtySettingVersionsAtPush = snapshotDirtySettingVersions();
     const targetSettingsKey = settingsLoadedKey(pushAccountId, pushBackendUrl);
+    // 当前 (账号, 后端) 尚未成功读取过设置（含读取失败）时一律按不可用处理：
+    // 只发送显式编辑过的脏键，没有脏键就跳过设置写入——从未读取成功的本地
+    // 默认值（如空 customCategories）绝不能作为完整快照推送覆盖后端配置。
     const settingsUnavailable = _settingsUnavailableKeys.has(targetSettingsKey)
-      || (!_settingsLoadedKeys.has(targetSettingsKey) && (_dirtySettingKeys.size > 0 || hasPendingAccountSync(pushAccountId)));
+      || !_settingsLoadedKeys.has(targetSettingsKey);
     const settingsPayload = settingsUnavailable
       ? Object.fromEntries(
           Object.entries(fullSettingsPayload).filter(([key]) => _dirtySettingKeys.has(key)),
         )
       : fullSettingsPayload;
     const settingsSkipped = settingsUnavailable && Object.keys(settingsPayload).length === 0;
+    // 审计修复（PR #612）：当前 (账号, 后端) 尚未成功读取过 AI 配置时，本地空
+    // 数组不代表「无配置」——跳过写入，防止 bulk PUT 清空该分区的全部 AI 配置。
+    // 列表非空或已对齐时按原语义推送。
+    const aiConfigsAligned = _aiConfigsLoadedKeys.has(settingsLoadedKey(pushAccountId, pushBackendUrl));
+    const aiSkipped = !aiConfigsAligned && state.aiConfigs.length === 0;
+    if (aiSkipped) {
+      logger.warn('sync.pushToBackend', 'Skipped AI configs push: local list is empty and backend configs have not been read yet', {
+        accountId: pushAccountId,
+        backendUrl: pushBackendUrl,
+      });
+    }
 
     // 从这里开始本次推送确实发出了写入尝试（R2-C5）。
     _lastPushAttempted = true;
@@ -1937,7 +2038,7 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
       // 409 有界重试），绝不再以「本会话曾观察过远端」授权全量删除。
       reposUnchanged ? Promise.resolve(skipped) : syncRepositoriesWithServerMerge(state.repositories, pushAccountId),
       backend.syncReleases(state.releases),
-      backend.syncAIConfigs(state.aiConfigs),
+      aiSkipped ? Promise.resolve(skipped) : backend.syncAIConfigs(state.aiConfigs),
       backend.syncWebDAVConfigs(state.webdavConfigs),
       backend.syncEmbeddingConfigs(state.embeddingConfigs),
       backend.syncVectorSearchConfig(state.vectorSearchConfig),
@@ -1981,7 +2082,9 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
       _lastReposHashKey = currentReposHashKey;
     }
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
-    if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
+    // 跳过的 AI 分片未发生写入：不得把本地（空）哈希记为已同步基线，否则
+    // 下次拉取的对账会误判「后端已与本地一致」。
+    if (aiSync.status === 'fulfilled' && aiSync.value !== skipped) _lastHash.ai = quickHash(state.aiConfigs);
     if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
     if (embeddingSync.status === 'fulfilled') _lastHash.embedding = quickHash(state.embeddingConfigs);
     if (vectorSearchSync.status === 'fulfilled') _lastHash.vectorSearch = vectorSearchFingerprint(state.vectorSearchConfig);

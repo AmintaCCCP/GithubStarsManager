@@ -19,7 +19,31 @@ const mocks = vi.hoisted(() => ({
   rememberActiveBackendUrl: vi.fn(),
   rollbackBackendConnection: vi.fn().mockResolvedValue(undefined),
   drainInFlightBackendPulls: vi.fn().mockResolvedValue(undefined),
+  // 审计修复（测试覆盖）：可控的冻结窗口事件流——集成用例必须走与生产一致的
+  // runWithBackendRestoreFrozen 路径，并断言拉取完成前冻结不释放
+  freezeWindowEvents: [] as string[],
+  // 持久化调用时刻的登录态快照（R2-B12 回归：持久化必须发生在候选账号提交后）
+  persistenceSnapshots: [] as Array<{ isAuthenticated: boolean; userId: number | null }>,
 }));
+
+// 快捷登录测试只替换 switchToAccount，其余动作（归档等）保持真实实现
+const switchActionMocks = vi.hoisted(() => ({
+  switchToAccount: vi.fn(),
+}));
+
+vi.mock('../features/lifecycle/hooks/useAccountSwitchActions', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/lifecycle/hooks/useAccountSwitchActions')>();
+  return {
+    ...actual,
+    useAccountSwitchActions: () => {
+      const actions = actual.useAccountSwitchActions();
+      return {
+        ...actions,
+        switchToAccount: switchActionMocks.switchToAccount as unknown as typeof actions.switchToAccount,
+      };
+    },
+  };
+});
 
 vi.mock('../utils/clipboardUtils', () => ({ safeReadText: mocks.safeReadText }));
 vi.mock('../features/lifecycle/hooks/useLoginActions', async (importOriginal) => {
@@ -38,6 +62,16 @@ vi.mock('../features/lifecycle/hooks/useLoginActions', async (importOriginal) =>
       persistUrl: mocks.persistUrl,
       rememberActiveBackendUrl: mocks.rememberActiveBackendUrl,
       rollbackBackendConnection: mocks.rollbackBackendConnection,
+      // 审计修复（测试覆盖）：可控的冻结包装——记录冻结窗口的开关事件，
+      // 确保集成用例走冻结路径且拉取完成前冻结不释放
+      runWithBackendRestoreFrozen: async <T,>(fn: () => Promise<T>): Promise<T> => {
+        mocks.freezeWindowEvents.push('frozen-open');
+        try {
+          return await fn();
+        } finally {
+          mocks.freezeWindowEvents.push('frozen-close');
+        }
+      },
       drainInFlightBackendPulls: mocks.drainInFlightBackendPulls,
     }),
   };
@@ -138,7 +172,15 @@ describe('LoginScreen 后端登录', () => {
     mocks.getBackendUrl.mockReset().mockReturnValue(null);
     mocks.getPersistedUrl.mockReset().mockReturnValue(null);
     mocks.persistUrl.mockReset();
-    mocks.rememberActiveBackendUrl.mockReset();
+    mocks.freezeWindowEvents.length = 0;
+    mocks.persistenceSnapshots.length = 0;
+    mocks.rememberActiveBackendUrl.mockReset().mockImplementation(() => {
+      const state = useAppStore.getState();
+      mocks.persistenceSnapshots.push({
+        isAuthenticated: state.isAuthenticated,
+        userId: state.user?.id ?? null,
+      });
+    });
     mocks.rollbackBackendConnection.mockReset().mockResolvedValue(undefined);
     mocks.configuredBackendUrl = null;
     // 真实 Store 跨用例共享：重置与本文件相关的账号/工作区/偏好字段
@@ -226,6 +268,81 @@ describe('LoginScreen 后端登录', () => {
     // 审计修复（B13）：拉取期间登录态尚未提交（请求头由显式账号 ID 提供），
     // 拉取完成后凭证与用户身份才一起落地。
     expect(loginAtPull).toBeNull();
+  });
+
+  it('恢复歧义（account_selection_required）时展示账号选择列表，不进入令牌配置流程', async () => {
+    // 转交 2（server/src/routes/authRestore.ts A19）：无账号头恢复无法唯一确定
+    // 目标分区时，服务端返回 account_selection_required: true + accounts +
+    // 空 github_token——不得误报 github-token-required（不进入令牌配置步骤）。
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'account-selection-required',
+      accounts: [
+        { accountId: '2', user: { id: 2, login: 'bob', name: 'Bob', avatar_url: 'https://x/b.png', email: null }, githubToken: 'ghp_b' },
+        { accountId: '3', user: null, githubToken: null },
+      ],
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    // 账号选择列表出现（风格与已保存账号列表一致），标题与提示可见
+    expect(await screen.findByTestId('restore-account-selection')).toBeVisible();
+    expect(screen.getByText('选择要恢复的账号')).toBeVisible();
+    expect(screen.getByText(/此后端存在多个账号/)).toBeVisible();
+    expect(screen.getByText(/@bob/)).toBeVisible();
+    // Token 缺失的账号同样列出并标注（定向重试后可进入该账号的令牌配置）
+    expect(screen.getByTestId('restore-account-option-3')).toHaveTextContent('需补充 Token');
+    // 无账号 ID 的条目不渲染（账户行以 accountId 为键）
+    expect(screen.queryByTestId('restore-account-option-1')).not.toBeInTheDocument();
+    // 主按钮/令牌输入隐藏：动作在账号行上
+    expect(screen.queryByRole('button', { name: '连接并恢复数据' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('GitHub Personal Access Token')).not.toBeInTheDocument();
+  });
+
+  it('选定账号后携带账号 ID 定向重试恢复，登录态在拉取成功后提交', async () => {
+    // 转交 2：首次恢复歧义 → 用户选定账号 → 携带 X-GitHub-Account-Id（由
+    // useLoginActions 的 accountId 选项承载）重试 → 走既有 connected 流程。
+    mocks.restoreBackendSession.mockImplementation(async (
+      _url: string,
+      options?: { omitAccountHeader?: boolean; apiSecret?: string; deferPersist?: boolean; accountId?: string },
+    ) => {
+      if (options?.accountId === '2') {
+        return {
+          status: 'connected',
+          githubToken: 'ghp_b',
+          user: { id: 2, login: 'bob', name: 'Bob', avatar_url: '', email: null },
+          accounts: [],
+        };
+      }
+      return {
+        status: 'account-selection-required',
+        accounts: [
+          { accountId: '2', user: { id: 2, login: 'bob', name: 'Bob', avatar_url: '', email: null }, githubToken: 'ghp_b' },
+        ],
+      };
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+    fireEvent.click(await screen.findByTestId('restore-account-option-2'));
+
+    await waitFor(() => expect(useAppStore.getState().user?.login).toBe('bob'));
+    expect(mocks.restoreBackendSession).toHaveBeenCalledTimes(2);
+    // 重试请求携带选定账号 ID，恢复选项（省略账号头/候选密钥/延迟持久化）保持不变
+    expect(mocks.restoreBackendSession).toHaveBeenLastCalledWith('https://backend.example.com', {
+      omitAccountHeader: true,
+      apiSecret: 'secret',
+      deferPersist: true,
+      accountId: '2',
+    });
+    expect(mocks.syncBackendData).toHaveBeenCalledWith({ targetAccountId: '2' });
+    expect(useAppStore.getState().githubToken).toBe('ghp_b');
+    // 恢复成功后账号选择状态清除
+    await waitFor(() => expect(screen.queryByTestId('restore-account-selection')).not.toBeInTheDocument());
   });
 
   it('后端数据同步失败时回滚登录状态并清空顶层工作区', async () => {
@@ -331,11 +448,53 @@ describe('LoginScreen 后端登录', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '使用后端数据' }));
 
+
     await waitFor(() => expect(useAppStore.getState().user?.login).toBe('octocat'));
     expect(mocks.syncBackendData).toHaveBeenCalledOnce();
     expect(useAppStore.getState().githubToken).toBe('ghp_restored');
     // 覆盖确认后后端返回空快照：提交登录态时不得回退到目标账号旧归档
     expect(useAppStore.getState().customCategories).toEqual([]);
+  });
+
+  // 审计修复：仅含发行版订阅的归档工作区此前被判为「空」，两个恢复入口会跳过
+  // 覆盖确认，后端拉取会无声替换旧归档——订阅/来源/已读状态也要触发确认。
+  it('仅含发行版订阅的归档工作区同样弹出覆盖确认对话框', async () => {
+    useAppStore.setState({
+      accountWorkspaces: {
+        '1': {
+          repositories: [],
+          lastSync: null,
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [111, 222],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
+      },
+    });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_restored',
+      user: { id: 1, login: 'octocat' },
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    expect(await screen.findByText('本地数据冲突')).toBeInTheDocument();
   });
 
   // 审计修复（R2-B9）：候选 API Key 在候选 URL 提交后才写入 Store
@@ -368,6 +527,9 @@ describe('LoginScreen 后端登录', () => {
     expect(secretAtRestoreCall).toEqual(['secret']);
     // R2-B12：登录提交完成后才持久化候选 URL。
     expect(mocks.rememberActiveBackendUrl).toHaveBeenCalledOnce();
+    // 审计修复（测试覆盖）：持久化调用时刻登录态已提交为候选账号——候选
+    // URL 绝不在拉取前/身份提交前写入持久化。
+    expect(mocks.persistenceSnapshots).toEqual([{ isAuthenticated: true, userId: 3 }]);
   });
 
   // 审计修复（R2-B5/B11）：取消候选后端设置时成对恢复原 URL 与原 API Key。
@@ -591,6 +753,47 @@ describe('LoginScreen 后端登录', () => {
   });
 });
 
+// 审计修复：快捷登录的后端凭据对齐失败发生在 switchToAccount 提交登录态之后
+//（App 卸载登录页）——失败必须经全局 toast 提示，而不是只写进已卸载组件的
+// 本地 error state。
+describe('LoginScreen 已保存账号快捷登录', () => {
+  const savedBob: import('../types').SavedAccount = {
+    accountId: '2',
+    user: { id: 2, login: 'bob', name: 'Bob', avatar_url: 'https://x/b.png', email: null },
+    githubToken: 'ghp_b',
+    addedAt: '2026-01-01T00:00:00.000Z',
+    lastUsedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    switchActionMocks.switchToAccount.mockReset();
+  });
+
+  it('快捷登录后端凭据同步失败时经全局 toast 提示失败', async () => {
+    useAppStore.setState({
+      savedAccounts: { '2': savedBob },
+      isAuthenticated: false,
+    });
+    switchActionMocks.switchToAccount.mockResolvedValue({
+      ok: false,
+      error: 'backend-credential-sync-failed',
+    });
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <LoginScreen />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    fireEvent.click(await screen.findByText(/@bob/));
+
+    // 复用 accountModal 的本地化提示（全局 DialogProvider 常驻，登录页卸载后仍可见）
+    expect(await screen.findByText('账号已添加，但后端凭据未能更新。请稍后重试。')).toBeInTheDocument();
+    expect(switchActionMocks.switchToAccount).toHaveBeenCalledWith('2');
+  });
+});
+
 describe('LoginScreen 后端 URL 预填', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -676,7 +879,15 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
     mocks.getBackendUrl.mockReset().mockReturnValue(null);
     mocks.getPersistedUrl.mockReset().mockReturnValue(null);
     mocks.persistUrl.mockReset();
-    mocks.rememberActiveBackendUrl.mockReset();
+    mocks.freezeWindowEvents.length = 0;
+    mocks.persistenceSnapshots.length = 0;
+    mocks.rememberActiveBackendUrl.mockReset().mockImplementation(() => {
+      const state = useAppStore.getState();
+      mocks.persistenceSnapshots.push({
+        isAuthenticated: state.isAuthenticated,
+        userId: state.user?.id ?? null,
+      });
+    });
     mocks.rollbackBackendConnection.mockReset().mockResolvedValue(undefined);
     mocks.configuredBackendUrl = null;
   });
@@ -701,6 +912,9 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
     expect(useAppStore.getState().user).toBeNull();
     expect(useAppStore.getState().isAuthenticated).toBe(false);
     expect(screen.getByRole('button', { name: '连接中…' })).toBeInTheDocument();
+    // 审计修复（测试覆盖）：恢复流程走生产一致的冻结路径——拉取完成前
+    // 冻结窗口保持打开
+    expect(mocks.freezeWindowEvents).toEqual(['frozen-open']);
 
     // 拉取成功 → 工作区与登录态一起提交 → LoginScreen 卸载（主界面接管）
     await act(async () => {
@@ -709,6 +923,9 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
     await waitFor(() => expect(useAppStore.getState().isAuthenticated).toBe(true));
     expect(useAppStore.getState().user?.login).toBe('octo-app');
     expect(useAppStore.getState().githubToken).toBe('ghp_restored');
+    // 冻结窗口在恢复流程结束后才释放；URL 持久化发生在登录提交与窗口关闭之后
+    await waitFor(() => expect(mocks.freezeWindowEvents).toEqual(['frozen-open', 'frozen-close']));
+    expect(mocks.persistenceSnapshots).toEqual([{ isAuthenticated: true, userId: 9 }]);
     // Radix 模态（首次登录的「选择同步范围」）会把主界面标记为 aria-hidden，
     // 角色查询会忽略被遮罩内容——这里用文本断言验证装载边界。
     // 审计修复（R2-B16）：卸载断言检查后端登录表单的 API Key 输入框已从 DOM
@@ -737,6 +954,11 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
     expect(useAppStore.getState().user).toBeNull();
     expect(useAppStore.getState().githubToken).toBeNull();
     expect(useAppStore.getState().isAuthenticated).toBe(false);
+    // 审计修复（测试覆盖）：失败用例的冻结窗口已释放，且连接回滚在错误提示
+    // 出现前已完成——回滚完成后才允许后续操作（如重新发起连接）
+    expect(mocks.freezeWindowEvents).toEqual(['frozen-open', 'frozen-close']);
+    expect(mocks.rollbackBackendConnection).toHaveBeenCalledOnce();
+    expect(mocks.rememberActiveBackendUrl).not.toHaveBeenCalled();
     // 审计修复（B13）：拉取写入顶层的部分同步结果必须一并丢弃（不归档）
     expect(useAppStore.getState().repositories).toEqual([]);
     expect(useAppStore.getState().accountWorkspaces['9']?.repositories ?? []).toEqual([]);

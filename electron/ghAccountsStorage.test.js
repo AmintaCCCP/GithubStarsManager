@@ -145,16 +145,80 @@ describe('ghAccountsStorage save, load, clear', () => {
   });
 
   it('handles corrupted file gracefully returning a structured error (R2-B1)', () => {
+    // Audit fix: this case must actually exercise the JSON parse. Reuse the
+    // working encrypt/decrypt stub from the neighbouring cases and make
+    // decryption return invalid JSON — `safeStorage: null` short-circuits
+    // before decryption and only re-proves the keyring-unavailable path that
+    // the previous test already covers.
     const storage = new Map();
-    storage.set(path.join('/test/data', GH_ACCOUNTS_FILENAME), Buffer.from('not-json-garbage', 'utf-8'));
+    storage.set(path.join('/test/data', GH_ACCOUNTS_FILENAME), Buffer.from('tampered-ciphertext', 'utf-8'));
     const fakeFs = {
       existsSync: (p) => storage.has(p),
       readFileSync: (p) => storage.get(p),
     };
-    const ctx = { fs: fakeFs, pathModule: path, userDataPath: '/test/data', safeStorage: null };
-    // With safeStorage unavailable the file cannot be read: error, not "missing".
+    const ctx = {
+      fs: fakeFs,
+      pathModule: path,
+      userDataPath: '/test/data',
+      safeStorage: {
+        isEncryptionAvailable: () => true,
+        encryptString: (str) => Buffer.from(`ENC:${str}`, 'utf-8'),
+        decryptString: () => 'not-json-garbage',
+      },
+    };
     const loadRes = loadEncryptedGhAccounts(ctx);
     assert.equal(loadRes.status, 'error');
+    // Fixed, content-free error text: a raw SyntaxError message may contain
+    // fragments of the decrypted payload and must never reach failure logs.
+    assert.equal(loadRes.error, 'gh-accounts.enc does not contain valid JSON');
+  });
+
+  it('removes the interrupted-write temp file when clearing credentials (audit fix)', () => {
+    const { ctx, storage } = makeCtx();
+    const filePath = path.join('/test/data', GH_ACCOUNTS_FILENAME);
+    const tempPath = `${filePath}.tmp`;
+    storage.set(filePath, Buffer.from('ENC:existing', 'utf-8'));
+    // A process crash between writeFileSync and renameSync leaves the full
+    // encrypted token table in the temp file: explicit clear must remove it too.
+    storage.set(tempPath, Buffer.from('ENC:interrupted-write', 'utf-8'));
+
+    assert.deepEqual(clearEncryptedGhAccounts(ctx), { success: true });
+    assert.equal(storage.has(filePath), false);
+    assert.equal(storage.has(tempPath), false);
+    assert.equal(storage.size, 0);
+  });
+
+  it('removes the leftover temp file when saving an empty map (audit fix)', () => {
+    const { ctx, storage } = makeCtx();
+    const filePath = path.join('/test/data', GH_ACCOUNTS_FILENAME);
+    storage.set(`${filePath}.tmp`, Buffer.from('ENC:interrupted-write', 'utf-8'));
+
+    assert.deepEqual(saveEncryptedGhAccounts(ctx, {}), { success: true });
+    assert.equal(storage.size, 0);
+  });
+
+  it('reports failure when the temp file cannot be removed during clear (audit fix)', () => {
+    const { ctx, storage } = makeCtx();
+    const filePath = path.join('/test/data', GH_ACCOUNTS_FILENAME);
+    const tempPath = `${filePath}.tmp`;
+    storage.set(tempPath, Buffer.from('ENC:interrupted-write', 'utf-8'));
+    const lockedCtx = {
+      ...ctx,
+      fs: {
+        ...ctx.fs,
+        unlinkSync: (p) => {
+          if (p === tempPath) throw new Error('EACCES: temp file locked');
+          storage.delete(p);
+        },
+      },
+    };
+
+    const res = clearEncryptedGhAccounts(lockedCtx);
+    assert.equal(res.success, false);
+    assert.match(res.error, /EACCES/);
+    // The temp file holding the encrypted token table survives: the caller
+    // knows the wipe did not fully happen.
+    assert.equal(storage.has(tempPath), true);
   });
 
   it('treats a zero-byte file as missing so the next save can rewrite it', () => {

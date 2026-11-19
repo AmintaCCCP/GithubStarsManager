@@ -31,6 +31,9 @@ vi.mock('../../../hooks/useDialog', () => ({
 
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
+  // 审计修复：切号后远端已成功的 Gist 变更经簿记守卫写回发起账号工作区——
+  // 测试桩直通执行（真实实现只静音订阅簿记）。
+  withAccountSwitchGuardSync: (fn: () => void) => fn(),
 }));
 
 vi.mock('../../../services/githubApiFactory', () => ({
@@ -54,10 +57,13 @@ vi.mock('../../../services/aiService', () => ({
 }));
 
 const createStoreState = () => ({
-  user: { login: 'me', avatar_url: 'https://example.com/me.png' },
+  // 审计修复：账号 ID 必须是数值——peekCurrentAccountId 以 id 归一账号键，
+  // 切号期间远端已成功的 Gist 变更按发起账号 ID 写回其归档工作区。
+  user: { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' },
   githubToken: 'github-token' as string | null,
   gists: [],
   starredGists: [],
+  accountWorkspaces: {} as Record<string, unknown>,
   gistSearchFilters: {
     query: '',
     sortBy: 'updated' as const,
@@ -91,6 +97,15 @@ const mockUseAppStore = vi.mocked(mocks.useAppStore);
 mockUseAppStore.mockImplementation((selector?: (state: typeof storeState) => unknown) =>
   selector ? selector(storeState) : storeState);
 (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
+// 审计修复：切号后远端已成功的 Gist 变更经 useAppStore.setState 写回发起账号
+// 的归档工作区——选择器桩补齐 setState（对象或 updater 两种形态）。
+(mockUseAppStore as unknown as { setState: (patch: unknown) => void }).setState = (patch: unknown) => {
+  if (typeof patch === 'function') {
+    Object.assign(storeState, (patch as (state: typeof storeState) => Partial<typeof storeState>)(storeState));
+  } else {
+    Object.assign(storeState, patch as Partial<typeof storeState>);
+  }
+};
 
 const gist: Gist = {
   id: 'gist-1',
@@ -473,6 +488,10 @@ describe('useGistActions account switch guards', () => {
       switchToB();
       return undefined;
     });
+    // 审计修复：发起账号 A 仍停放时，远端已完成的取消星标写回其归档快照
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [{ ...gist, starred: true }], starredGists: [{ ...gist, starred: true }] },
+    };
     const { result } = renderHook(() => useGistActions());
     const onUnstarred = vi.fn();
     await act(async () => { await result.current.unstarGist(gist, onUnstarred); });
@@ -482,6 +501,10 @@ describe('useGistActions account switch guards', () => {
     expect(onUnstarred).not.toHaveBeenCalled();
     expect(storeState.updateGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
+    // 切回 A 时归档快照换入实时列表——归档必须已反映 GitHub 的取消星标结果
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string; starred?: boolean }>; starredGists: Array<{ id: string; starred?: boolean }> }> }).accountWorkspaces['1'];
+    expect(parked.gists[0].starred).toBe(false);
+    expect(parked.starredGists[0].starred).toBe(false);
   });
 
   it('deleteGist skips local deletion and the onDeleted callback after a switch', async () => {
@@ -490,6 +513,11 @@ describe('useGistActions account switch guards', () => {
       switchToB();
       return undefined;
     });
+    // 审计修复：发起账号 A 仍停放时，远端已完成的删除写回其归档快照
+    //（切回 A 后已删除的 Gist 不得复活）
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [gist], starredGists: [gist] },
+    };
     const { result } = renderHook(() => useGistActions());
     const onDeleted = vi.fn();
     await act(async () => { await result.current.deleteGist(gist, onDeleted); });
@@ -499,6 +527,9 @@ describe('useGistActions account switch guards', () => {
     expect(onDeleted).not.toHaveBeenCalled();
     expect(storeState.deleteGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string }>; starredGists: Array<{ id: string }> }> }).accountWorkspaces['1'];
+    expect(parked.gists).toHaveLength(0);
+    expect(parked.starredGists).toHaveLength(0);
   });
 
   it('submitGist skips the local update and success toast after a switch', async () => {
@@ -506,6 +537,10 @@ describe('useGistActions account switch guards', () => {
       switchToB();
       return gistDetail;
     });
+    // 审计修复：发起账号 A 仍停放时，远端已完成的编辑写回其归档快照
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [gist], starredGists: [] },
+    };
     const { result } = renderHook(() => useGistActions());
     await act(async () => { await result.current.submitGist({ description: 'x' } as never, gist); });
 
@@ -513,6 +548,9 @@ describe('useGistActions account switch guards', () => {
     expect(mocks.updateGist).toHaveBeenCalledWith(gist.id, expect.anything(), expect.anything());
     expect(storeState.updateGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string; files: Record<string, { size: number }> }> }> }).accountWorkspaces['1'];
+    expect(parked.gists[0].id).toBe('gist-1');
+    expect(parked.gists[0].files['a.ts'].size).toBe(gistDetail.files['a.ts'].size);
   });
 });
 

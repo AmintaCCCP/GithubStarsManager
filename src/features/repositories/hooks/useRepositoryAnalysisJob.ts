@@ -138,8 +138,13 @@ export const useRepositoryAnalysisJob = ({
       stopRequestedRef.current = false;
       if (mountedRef.current) {
         setIsPaused(false);
+        // 审计修复：切号时立即复位 hook 返回的运行状态与进度——否则新账号
+        // 在旧任务退出并执行 finally 之前会短暂看到 A 的 isRunning/progress。
+        // finally 的会话检查保持不变：旧任务仍不得清掉 B 随后启动的任务状态。
+        setIsRunning(false);
         setLoading(false);
         setAnalysisProgress({ current: 0, total: 0 });
+        setProgress({ current: 0, total: 0 });
       }
     });
   }, [setAnalysisProgress, setLoading]);

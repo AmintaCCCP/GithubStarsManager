@@ -426,9 +426,13 @@ export const useSearchActions = (): SearchActions => {
             ? {
               accountId: scopeAccountId,
               multiAccount: isMultiAccount,
-              // 单账号老用户免重建索引，直接兼容存量无前缀/无 accountId 向量；
-              // 添加多账号后再启用严格账号元数据过滤隔离。
-              allowLegacyUnscoped: !isMultiAccount,
+              // 审计修复（R5）：本机保存的账号数量无法证明共享索引中无前缀
+              // legacy 向量的归属（其他设备/旧客户端/已移除账号都可能写入）。
+              // vectorSearchPipeline 明确禁止该推断：allowLegacyUnscoped 只在
+              // 索引归属被独立确认时才为 true——当前没有这样的确认机制，
+              // 一律拒绝无归属 legacy 向量（索引未就绪时跳过稠密召回，走
+              // 本地词法召回）；单账号兼容由格式版本升级触发的完整重建收敛。
+              allowLegacyUnscoped: false,
             }
             : undefined;
           const result = await runVectorSearchPipeline({
@@ -444,13 +448,16 @@ export const useSearchActions = (): SearchActions => {
             accountIdScope,
             onDenseSkipped: (reason) => {
               if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+              // 审计修复：降级提示按原因本地化（原文为英文硬编码，非英语界面
+              // 下用户仍看到英文）。reason 枚举见 vectorSearchPipeline 的
+              // DenseQueryScopeResolution；needs-backfill 走默认分支。
               const notice = reason === 'worker-unsupported'
-                ? 'Vector worker does not support multi-account recall; redeploy cloudflare-worker and rebuild the index.'
+                ? t('useSearchActions.vector-worker-does-not-support-account-scoped-recall')
                 : reason === 'metadata-index-not-ready'
-                  ? 'Account metadata index is not ready; create the accountId metadata index, backfill vectors, and enable ACCOUNT_METADATA_INDEXED.'
+                  ? t('useSearchActions.account-metadata-index-is-not-ready-create-the-accountid')
                   : reason === 'status-failed'
-                    ? 'Failed to verify vector worker status; fell back to local search.'
-                    : 'Vector index needs rebuild for multi-account search; fell back to local search.';
+                    ? t('useSearchActions.failed-to-verify-vector-worker-status-fell-back-to-loca')
+                    : t('useSearchActions.vector-index-needs-rebuild-for-multi-account-search-fe');
               toast(notice, 'info');
             },
             onPhase: (phase) => {

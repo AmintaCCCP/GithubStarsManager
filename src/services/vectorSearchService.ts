@@ -440,6 +440,60 @@ export class VectorSearchService {
  */
 export const EMBEDDING_FORMAT_VERSION = 3;
 
+// ============================================================
+// 账号范围迁移状态（审计修复：与 v3 版本、vector_indexed_at 分开记录）
+// ============================================================
+
+const ACCOUNT_SCOPE_MIGRATION_KEY = 'gsm.vectorAccountScopeMigrationDone';
+
+/**
+ * 单账号老用户升级到多账号后的账号范围迁移：
+ * 升级前的存量 v3 向量使用无归属的纯数字 ID，多账号共享索引下严格账号查询
+ * （按 accountId 过滤）找不到它们；这些仓库的 vector_indexed_at 与嵌入格式
+ * 版本均未变化，增量索引不会补写带账号前缀的新向量，旧仓库会从语义搜索中
+ * 消失，只能靠用户手动全量重建恢复。
+ *
+ * 这里按账号单独记录迁移状态：该账号尚未完成一次成功的账号范围（带前缀）
+ * 上传时，增量索引强制按全量候选补写当前账号的向量；补写成功后才标记完成，
+ * 之后恢复既有增量路径，已迁移向量不重复生成嵌入。Worker 绑定不提供向量
+ * 列举（无法远端探测 legacy 数字 ID），因此以「该账号是否已完成过一次成功的
+ * 范围上传」为迁移判据——保守方向是多写一次，不会漏迁。
+ */
+const readMigrationDoneAccounts = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_SCOPE_MIGRATION_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((id): id is string => typeof id === 'string' && id.length > 0)
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+};
+
+const persistMigrationDoneAccounts = (accounts: Set<string>): void => {
+  try {
+    localStorage.setItem(ACCOUNT_SCOPE_MIGRATION_KEY, JSON.stringify(Array.from(accounts)));
+  } catch {
+    // 存储不可用（隐私模式/配额）时退化为会话内标记
+  }
+};
+
+/** 该账号是否已完成账号范围迁移（增量索引可沿用既有路径）。 */
+export function isAccountScopeMigrationDone(accountId: string | null | undefined): boolean {
+  if (!accountId) return true;
+  return readMigrationDoneAccounts().has(accountId);
+}
+
+function markAccountScopeMigrationDone(accountId: string): void {
+  const accounts = readMigrationDoneAccounts();
+  if (accounts.has(accountId)) return;
+  accounts.add(accountId);
+  persistMigrationDoneAccounts(accounts);
+}
+
 /**
  * 拼接仓库文本用于 embedding
  * @param repo 仓库数据
@@ -681,7 +735,17 @@ export async function indexAllRepos(
     throw new Error('batchSize must be a positive integer');
   }
 
-  const indexable = selectIndexableRepos(repos, { incremental, formatVersion: options.formatVersion, currentFormatVersion: options.currentFormatVersion });
+  // 账号范围迁移（审计修复）：增量模式下该账号尚未完成迁移时，强制按全量
+  // 候选补写带账号前缀的向量（升级前的存量 v3 向量可能是无归属数字 ID，
+  // 账号过滤后不可召回）；上传成功后才标记完成，恢复既有增量路径。
+  const accountScopeMigrationPending = incremental === true
+    && !!accountId
+    && !isAccountScopeMigrationDone(accountId);
+  const indexable = selectIndexableRepos(repos, {
+    incremental: incremental === true && !accountScopeMigrationPending,
+    formatVersion: options.formatVersion,
+    currentFormatVersion: options.currentFormatVersion,
+  });
   let indexed = 0;
   let errors = 0;
   let lastError = '';
@@ -806,6 +870,20 @@ export async function indexAllRepos(
 
     const currentBatch = Math.floor(i / batchSize) + 1;
     onProgress?.({ phase: 'embedding', done: currentBatch, total: totalBatches });
+  }
+
+  // 迁移完成的判定（审计修复）：所有升级前已索引（vector_indexed_at 存在，
+  // 即可能带有 legacy 无归属向量）的候选仓库都必须在本轮补写成功。失败项里
+  // 存在这类仓库时保持迁移待完成——下次增量运行继续按全量补写；失败项全部
+  // 是「从未索引」的仓库时，它们没有可丢失的 legacy 向量（且后续增量路径会
+  // 以带前缀 ID 首次写入），可安全标记完成，避免永久失败项把每次增量运行
+  // 都退化为全量重复嵌入。
+  if (accountScopeMigrationPending && accountId) {
+    const indexedIdSet = new Set(indexedRepoIds);
+    const failedLegacyIndexed = indexable.some((repo) => !indexedIdSet.has(repo.id) && !!repo.vector_indexed_at);
+    if (!failedLegacyIndexed) {
+      markAccountScopeMigrationDone(accountId);
+    }
   }
 
   return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined, indexedRepoIds };

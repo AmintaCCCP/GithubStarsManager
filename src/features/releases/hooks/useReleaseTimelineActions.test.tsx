@@ -273,5 +273,8 @@ describe('useReleaseTimelineActions account switch guards', () => {
 
     expect(mocks.confirm).toHaveBeenCalled();
     expect(mocks.forceSyncToBackend).toHaveBeenCalled();
+    // 审计回归守护：来源已清空时必须实际删除该仓库的时间线 Release
+    //（R11 修复曾误删此调用，导致退订后 Release 残留）。
+    expect(storeState.removeReleasesByRepoFullName).toHaveBeenCalledWith('owner/repo');
   });
 });

@@ -4,8 +4,9 @@ import { AlertCircle, ArrowLeft, ArrowRight, Database, Key, Link, Loader2, Moon,
 import { Github } from './ui/brand-icons';
 import { useAppStore } from '../store/useAppStore';
 import { resolveTheme } from '../store/selectors';
+import { useOptionalDialog } from '../hooks/useDialog';
 import { useShallow } from 'zustand/react/shallow';
-import { normalizeBackendRestoreAccount, useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
+import { normalizeBackendRestoreAccount, useLoginActions, type BackendAuthRestoreAccount } from '../features/lifecycle/hooks/useLoginActions';
 import { useAccountSwitchActions } from '../features/lifecycle/hooks/useAccountSwitchActions';
 import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
@@ -15,7 +16,9 @@ import {
   getAccountSessionGeneration,
   workspaceHasData,
   type AccountWorkspace,
+  type WorkspaceDataCandidate,
 } from '../store/helpers/accountWorkspace';
+import { normalizeReleaseSourceSettings } from '../utils/releaseSources';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { ConfirmDialog } from './ui/ConfirmDialog';
@@ -62,6 +65,24 @@ const HEATMAP_CELLS = (() => {
   return cells;
 })();
 
+// 审计修复：workspaceHasData 只覆盖列表类内容（仓库/Gist/发布/复刻/分类）。
+// 仅含发行版订阅、自定义发行版来源或已读状态（readReleases/readForks）的
+// 工作区此前被判为「空」，两个恢复入口会跳过覆盖确认，后端拉取会无声替换
+// 这些本地归档。完整快照判定补充订阅、来源与已读状态；默认来源设置与空
+// 集合仍视为空工作区。
+const workspaceSnapshotHasData = (workspace: WorkspaceDataCandidate | null | undefined): boolean => {
+  if (!workspace) return false;
+  if (workspaceHasData(workspace)) return true;
+  const countOf = (value: Set<number> | number[] | undefined): number => (
+    value instanceof Set ? value.size : value?.length ?? 0
+  );
+  if (countOf(workspace.releaseSubscriptions) > 0) return true;
+  if (countOf(workspace.readReleases) > 0) return true;
+  if (countOf(workspace.readForks) > 0) return true;
+  const settings = normalizeReleaseSourceSettings(workspace.releaseSourceSettings ?? null);
+  return JSON.stringify(settings) !== JSON.stringify(normalizeReleaseSourceSettings(null));
+};
+
 function LoginCardPattern() {
   return (
     <svg
@@ -92,9 +113,16 @@ export const LoginScreen: React.FC = () => {
     drainInFlightBackendPulls,
   } = useLoginActions();
   const { switchToAccount, parkCurrentAccountForRestore } = useAccountSwitchActions();
+  // 审计修复：快捷登录的后端凭据对齐失败发生在登录页卸载之后——全局
+  // DialogProvider 常驻，其 toast 在组件卸载后仍可见。useOptionalDialog 在
+  // 无 Provider 的测试环境返回 null（降级为仅 setError）。
+  const dialog = useOptionalDialog();
   const githubTokenInputRef = useRef<HTMLInputElement | null>(null);
   const [loginMode, setLoginMode] = useState<'github' | 'backend'>('github');
-  const [backendStep, setBackendStep] = useState<'credentials' | 'githubToken'>('credentials');
+  // 转交 2（Issue #612 A19）：accountSelection 为候选后端恢复歧义步骤——服务端
+  // 返回 account_selection_required: true 时展示账号选择列表，选定后携带账号 ID
+  // 重试恢复。
+  const [backendStep, setBackendStep] = useState<'credentials' | 'accountSelection' | 'githubToken'>('credentials');
   const [tokenSetupReason, setTokenSetupReason] = useState<'missing' | 'invalid'>('missing');
   const [reauthAccountId, setReauthAccountId] = useState<string | null>(null);
   const [pendingFocusGithubToken, setPendingFocusGithubToken] = useState(false);
@@ -116,6 +144,11 @@ export const LoginScreen: React.FC = () => {
   // undefined 表示当前没有活跃的候选连接；null 表示候选之前的连接为本地/自动探测。
   const candidatePreviousUrlRef = useRef<string | null | undefined>(undefined);
   const candidatePreviousSecretRef = useRef<string | null | undefined>(undefined);
+  // 转交 2：候选连接之前的持久化后端 URL——账号选择/重试路径的失败回滚需要
+  // 成对还原（R2-B7），重试时不能把已提交的候选 URL 当回滚目标。
+  const candidatePreviousPersistedUrlRef = useRef<string | null | undefined>(undefined);
+  // 转交 2：恢复歧义时服务端返回的可选账号列表；null 表示当前无账号选择状态。
+  const [restoreAccountCandidates, setRestoreAccountCandidates] = useState<BackendAuthRestoreAccount[] | null>(null);
   const [isRestoringPreviousBackend, setIsRestoringPreviousBackend] = useState(false);
   // Data conflict dialog state for backend login
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
@@ -165,7 +198,8 @@ export const LoginScreen: React.FC = () => {
   }, [pendingFocusGithubToken, loginMode]);
 
   const handleQuickSignIn = async (accountId: string, hasToken: boolean) => {
-    if (backendStep === 'githubToken') return;
+    // 转交 2：账号选择步骤同样封闭快捷登录（候选连接仍活跃，B12 同款约束）。
+    if (backendStep === 'githubToken' || backendStep === 'accountSelection') return;
     // B12：候选后端连接复原完成前不得开放快捷登录（避免把已保存账号的
     // PAT 发给候选后端）。
     if (isRestoringPreviousBackend) return;
@@ -197,6 +231,14 @@ export const LoginScreen: React.FC = () => {
           setError(t('loginScreen.token-required'));
           setPendingFocusGithubToken(true);
         } else {
+          // 审计修复：switchToAccount 先提交 isAuthenticated（App 卸载登录页）
+          // 再做后端凭据对齐——对齐失败返回 backend-credential-sync-failed 时
+          // setError 作用于已卸载组件，用户看不到任何提示。改经全局 toast
+          // 显示失败（DialogProvider 常驻，卸载后仍可见）；会话保持在目标
+          // 账号，后端凭据对齐标记允许用户稍后重试对齐。
+          if (result.error === 'backend-credential-sync-failed') {
+            dialog?.toast(t('app:accountModal.backend-credential-sync-failed'), 'error');
+          }
           setError(result.error ?? t('loginScreen.sign-in-failed-please-try-again'));
         }
         return;
@@ -208,22 +250,26 @@ export const LoginScreen: React.FC = () => {
   };
 
   const switchLoginMode = (mode: 'github' | 'backend') => {
-    // 审计修复（B12 / R2-B5）：离开候选后端令牌配置步骤返回 GitHub 模式时，
-    // 先成对恢复候选连接之前的原后端连接与原 API Key（Store 仍留候选 Key，
-    // 只恢复 URL 会把候选 Key 发给原后端），再开放已保存账号快捷登录；
-    // 继续停留在设置步骤（未离开 backend 模式）时保留候选连接与候选密钥。
-    if (mode === 'github' && loginMode === 'backend' && backendStep === 'githubToken'
+    // 审计修复（B12 / R2-B5）：离开候选后端令牌配置/账号选择步骤返回 GitHub
+    // 模式时，先成对恢复候选连接之前的原后端连接与原 API Key（Store 仍留
+    // 候选 Key，只恢复 URL 会把候选 Key 发给原后端），再开放已保存账号快捷
+    // 登录；继续停留在设置步骤（未离开 backend 模式）时保留候选连接与候选密钥。
+    if (mode === 'github' && loginMode === 'backend'
+      && (backendStep === 'githubToken' || backendStep === 'accountSelection')
       && candidatePreviousUrlRef.current !== undefined) {
       const restoreUrl = candidatePreviousUrlRef.current;
       const restoreSecret = candidatePreviousSecretRef.current;
       candidatePreviousUrlRef.current = undefined;
       candidatePreviousSecretRef.current = undefined;
+      candidatePreviousPersistedUrlRef.current = undefined;
       setIsRestoringPreviousBackend(true);
       void rollbackBackendConnection(restoreUrl, restoreSecret).finally(() => {
         setIsRestoringPreviousBackend(false);
       });
     }
     setReauthAccountId(null);
+    // 转交 2：离开账号选择步骤时清除候选账号列表。
+    setRestoreAccountCandidates(null);
     setLoginMode(mode);
     setBackendStep('credentials');
     setTokenSetupReason('missing');
@@ -288,7 +334,11 @@ export const LoginScreen: React.FC = () => {
     parkCurrentAccountForRestore();
   };
 
-  const handleBackendConnect = async () => {
+  // 转交 2：retryAccountId 为用户在恢复歧义（account_selection_required）中选定
+  // 的账号 ID——携带该 ID 重试定向恢复。重试沿用首次连接记录的回滚上下文：
+  // 候选连接此刻已处于活跃状态，实时读取到的 URL/密钥/持久化 URL 都是候选值，
+  // 绝不能当作回滚目标（R2-B5/B11/R2-B7 语义保持）。
+  const handleBackendConnect = async (retryAccountId?: string) => {
     const url = backendUrl.trim();
     const apiKey = backendApiKey.trim();
     if (!url || !apiKey) {
@@ -302,6 +352,8 @@ export const LoginScreen: React.FC = () => {
     // 审计修复（R2-B8）：候选连接回滚完成前不得发起连接（活动连接可能仍是
     // 候选后端 B）。
     if (isRestoringPreviousBackend) return;
+    // onClick 直传的事件对象不是账号 ID：仅接受字符串形参作为重试账号。
+    const selectedAccountId = typeof retryAccountId === 'string' ? retryAccountId : undefined;
 
     setIsLoading(true);
     setError('');
@@ -309,11 +361,18 @@ export const LoginScreen: React.FC = () => {
     // restoreBackendSession 的 apiSecret 选项在候选 URL 提交后才对请求可见；
     // /health 探测阶段的请求仍读原密钥。失败回滚时 URL 与密钥必须成对恢复
     //（R2-B5/B11），否则原密钥会被发往候选后端（轮询/诊断请求仍在运行）。
-    const previousApiSecret = useAppStore.getState().backendApiSecret;
-    const previousBackendUrl = getBackendUrl();
+    const isFirstAttempt = selectedAccountId === undefined;
+    const previousApiSecret = isFirstAttempt
+      ? useAppStore.getState().backendApiSecret
+      : candidatePreviousSecretRef.current;
+    const previousBackendUrl = isFirstAttempt
+      ? getBackendUrl()
+      : candidatePreviousUrlRef.current ?? null;
     // 审计修复（R2-B7）：候选认证前记录持久化的后端 URL——失败回滚时还原；
     // 绝不能用 backend.backendUrl 作为恢复值（探测失败时内存值可能为 null）。
-    const previousPersistedUrl = getPersistedUrl();
+    const previousPersistedUrl = isFirstAttempt
+      ? getPersistedUrl()
+      : candidatePreviousPersistedUrlRef.current ?? null;
     // 审计修复（B13）：恢复流程重构——恢复拉取以显式账号 ID 固定请求头，
     // 登录态（凭证 + 工作区归属）在拉取成功后统一提交；恢复完成前
     // LoginScreen 保持挂载（isAuthenticated 不提前置 true），失败时错误
@@ -330,8 +389,14 @@ export const LoginScreen: React.FC = () => {
     const runConnect = async () => {
       // 登录页可能残留上一会话的账号头：候选后端必须按自身 active_account_id
       // 恢复，绝不能携带本机旧账号分区。候选密钥经 apiSecret 选项传入
-      //（R2-B9）；deferPersist（R2-B12）让候选完成身份验证也不持久化 URL。
-      const result = await restoreBackendSession(url, { omitAccountHeader: true, apiSecret: apiKey, deferPersist: true });
+      //（R2-B9）；deferPersist（R2-B12）让候选完成身份验证也不持久化 URL；
+      // 转交 2：恢复歧义重试时携带用户选定账号 ID 定向恢复。
+      const result = await restoreBackendSession(url, {
+        omitAccountHeader: true,
+        apiSecret: apiKey,
+        deferPersist: true,
+        ...(selectedAccountId ? { accountId: selectedAccountId } : {}),
+      });
       if (result.status === 'backend-unavailable') {
         throw new Error(t('loginScreen.unable-to-connect-to-this-backend-url'));
       }
@@ -341,6 +406,20 @@ export const LoginScreen: React.FC = () => {
       if (result.status === 'restore-failed') {
         throw new Error(t('loginScreen.failed-to-read-login-data-from-the-backend'));
       }
+      if (result.status === 'account-selection-required') {
+        // 转交 2（server/src/routes/authRestore.ts A19 契约）：无账号头恢复歧义
+        // ——服务端已返回 accounts 列表 + 空 github_token。不得进入
+        // github-token-required 流程：记录候选之前的回滚上下文，展示账号选择
+        // 列表；候选连接与候选密钥保留供选定账号后的定向重试。
+        candidatePreviousUrlRef.current = previousBackendUrl;
+        candidatePreviousSecretRef.current = previousApiSecret;
+        candidatePreviousPersistedUrlRef.current = previousPersistedUrl;
+        setRestoreAccountCandidates(result.accounts);
+        setBackendStep('accountSelection');
+        return;
+      }
+      // 恢复继续推进（成功/令牌配置）：离开账号选择状态。
+      setRestoreAccountCandidates(null);
       if (result.status === 'restored-token-invalid' || result.status === 'github-token-required') {
         // 进入令牌配置步骤：候选后端连接与候选密钥保留供设置使用（B12），
         // 记录候选之前的连接与密钥以便离开设置步骤时成对复原（R2-B5）。
@@ -367,6 +446,12 @@ export const LoginScreen: React.FC = () => {
         starredGists: liveState.starredGists,
         releases: liveState.releases,
         forks: liveState.forks,
+        // 审计修复：订阅/来源设置/已读状态也属于工作区数据——仅含发行版订阅
+        // 或自定义来源的实时工作区同样要触发覆盖确认（workspaceSnapshotHasData）。
+        releaseSubscriptions: liveState.releaseSubscriptions,
+        releaseSourceSettings: liveState.releaseSourceSettings,
+        readReleases: liveState.readReleases,
+        readForks: liveState.readForks,
         customCategories: liveState.customCategories,
         categoryOrder: liveState.categoryOrder,
         hiddenDefaultCategoryIds: liveState.hiddenDefaultCategoryIds,
@@ -376,8 +461,8 @@ export const LoginScreen: React.FC = () => {
       const parkedWorkspace = nextAccountId ? liveState.accountWorkspaces[nextAccountId] : undefined;
       const liveBelongsToTarget = !!nextAccountId
         && accountIdKey(liveState.user) === nextAccountId
-        && workspaceHasData(liveWorkspace);
-      const targetHasParkedData = workspaceHasData(parkedWorkspace);
+        && workspaceSnapshotHasData(liveWorkspace);
+      const targetHasParkedData = workspaceSnapshotHasData(parkedWorkspace);
 
       const startPull = async () => {
         prePullWorkspace = captureAccountWorkspace(useAppStore.getState());
@@ -477,6 +562,12 @@ export const LoginScreen: React.FC = () => {
       if (pullStarted) {
         discardPartialLoginWorkspace(prePullWorkspace);
       }
+      // 转交 2：候选连接已回滚——账号选择状态一并清除并回到凭据步骤，
+      // 避免留下指向已回滚连接的失效选择列表。
+      setRestoreAccountCandidates(null);
+      if (backendStep === 'accountSelection') {
+        setBackendStep('credentials');
+      }
       setError(error instanceof Error ? error.message : t('loginScreen.sign-in-failed-please-try-again'));
     } finally {
       setIsLoading(false);
@@ -522,6 +613,11 @@ export const LoginScreen: React.FC = () => {
         starredGists: liveState.starredGists,
         releases: liveState.releases,
         forks: liveState.forks,
+        // 审计修复：订阅/来源设置/已读状态也属于工作区数据（同 handleBackendConnect）。
+        releaseSubscriptions: liveState.releaseSubscriptions,
+        releaseSourceSettings: liveState.releaseSourceSettings,
+        readReleases: liveState.readReleases,
+        readForks: liveState.readForks,
         customCategories: liveState.customCategories,
         categoryOrder: liveState.categoryOrder,
         hiddenDefaultCategoryIds: liveState.hiddenDefaultCategoryIds,
@@ -530,8 +626,8 @@ export const LoginScreen: React.FC = () => {
       };
       const liveBelongsToTarget = !!nextAccountId
         && accountIdKey(liveState.user) === nextAccountId
-        && workspaceHasData(currentWorkspace);
-      const targetHasParkedData = workspaceHasData(parkedWorkspace);
+        && workspaceSnapshotHasData(currentWorkspace);
+      const targetHasParkedData = workspaceSnapshotHasData(parkedWorkspace);
       const localHasData = liveBelongsToTarget || targetHasParkedData;
       let overwrite = true;
       if (localHasData) {
@@ -701,7 +797,7 @@ export const LoginScreen: React.FC = () => {
                 <button
                   key={account.accountId}
                   type="button"
-                  disabled={isLoading || backendStep === 'githubToken' || isRestoringPreviousBackend}
+                  disabled={isLoading || backendStep === 'githubToken' || backendStep === 'accountSelection' || isRestoringPreviousBackend}
                   onClick={() => void handleQuickSignIn(account.accountId, !!account.githubToken.trim())}
                   className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 >
@@ -745,16 +841,20 @@ export const LoginScreen: React.FC = () => {
                     ? t('loginScreen.connect-with-github')
                     : backendStep === 'credentials'
                       ? t('loginScreen.connect-to-your-backend')
-                      : t('loginScreen.set-up-github-access-token')}
+                      : backendStep === 'accountSelection'
+                        ? t('loginScreen.select-account-to-restore')
+                        : t('loginScreen.set-up-github-access-token')}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {loginMode === 'github'
                     ? t('loginScreen.enter-your-github-personal-access-token-to-get-s')
                     : backendStep === 'credentials'
                       ? t('loginScreen.enter-the-backend-url-and-api-key-to-restore-you')
-                      : tokenSetupReason === 'invalid'
-                        ? t('loginScreen.the-github-token-stored-on-the-backend-is-not-wo')
-                        : t('loginScreen.no-token-is-configured-on-this-backend-complete')}
+                      : backendStep === 'accountSelection'
+                        ? t('loginScreen.multiple-accounts-exist-on-this-backend-select-th')
+                        : tokenSetupReason === 'invalid'
+                          ? t('loginScreen.the-github-token-stored-on-the-backend-is-not-wo')
+                          : t('loginScreen.no-token-is-configured-on-this-backend-complete')}
                 </p>
               </div>
 
@@ -792,6 +892,56 @@ export const LoginScreen: React.FC = () => {
                   </div>
                 )}
 
+                {/* 转交 2（Issue #612 A19）：候选后端恢复歧义——展示账号选择列表，
+                    风格与「已保存账号」快捷列表一致；选定后携带账号 ID 重试恢复。
+                    Token 缺失的账号同样可选：定向重试会返回空 github_token 并进入
+                    令牌配置步骤为该账号补全。 */}
+                {loginMode === 'backend' && backendStep === 'accountSelection' && restoreAccountCandidates !== null && (
+                  <div className="space-y-2" data-testid="restore-account-selection">
+                    <div className="space-y-1">
+                      {restoreAccountCandidates
+                        .filter((account) => account && typeof account.accountId === 'string')
+                        .map((account) => (
+                          <button
+                            key={account.accountId}
+                            type="button"
+                            data-testid={`restore-account-option-${account.accountId}`}
+                            disabled={isLoading || isRestoringPreviousBackend}
+                            onClick={() => void handleBackendConnect(account.accountId)}
+                            className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                          >
+                            {account.user?.avatar_url ? (
+                              <img
+                                src={account.user.avatar_url}
+                                alt={account.user.name || account.user.login}
+                                className="h-8 w-8 shrink-0 rounded-full"
+                              />
+                            ) : (
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">
+                                {account.accountId}
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-foreground">
+                                {account.user?.name || account.user?.login || account.accountId}
+                              </span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {account.user?.login ? `@${account.user.login} · ` : ''}#{account.accountId}
+                              </span>
+                            </span>
+                            {!account.githubToken && (
+                              <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
+                                {t('loginScreen.token-required')}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 转交 2：账号选择步骤没有待输入的表单——隐藏令牌/API Key 输入。 */}
+                {!(loginMode === 'backend' && backendStep === 'accountSelection') && (
                 <div className="space-y-2">
                   <Label htmlFor={loginMode === 'github' ? 'github-token' : backendStep === 'credentials' ? 'backend-api-key' : 'backend-github-token'}>
                     {loginMode === 'github' || backendStep === 'githubToken' ? 'GitHub Personal Access Token' : 'API Key'}
@@ -821,6 +971,7 @@ export const LoginScreen: React.FC = () => {
                     />
                   </div>
                 </div>
+                )}
 
                 {error && (
                   <div role="alert" className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
@@ -829,9 +980,15 @@ export const LoginScreen: React.FC = () => {
                   </div>
                 )}
 
+                {/* 转交 2：账号选择步骤的动作在账号行上（点击即定向重试），主按钮隐藏。 */}
+                {!(loginMode === 'backend' && backendStep === 'accountSelection') && (
                 <Button
                   type="button"
-                  onClick={loginMode === 'github' ? handleConnect : backendStep === 'credentials' ? handleBackendConnect : handleBackendTokenSetup}
+                  onClick={loginMode === 'github'
+                    ? handleConnect
+                    : backendStep === 'credentials'
+                      ? () => void handleBackendConnect()
+                      : handleBackendTokenSetup}
                   disabled={
                     isLoading
                     || isRestoringPreviousBackend
@@ -858,6 +1015,7 @@ export const LoginScreen: React.FC = () => {
                     </>
                   )}
                 </Button>
+                )}
               </div>
 
               <Button

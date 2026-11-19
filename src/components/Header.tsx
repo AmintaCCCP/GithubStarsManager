@@ -95,6 +95,12 @@ export const Header: React.FC = () => {
   // 消息）显示原始文本。'switch-account-failed' 暂无对应翻译键，保留原文回退。
   const switchErrorText = (error: string): string => {
     if (error === 'switch-in-progress') return t('header.switch-in-progress');
+    // 审计修复：后端凭据对齐失败时本地已切换到目标账号——原样显示错误码
+    // 无法告诉用户「本地已切换、后端尚未更新」，复用 AddAccountModal 的
+    // 本地化提示。
+    if (error === 'backend-credential-sync-failed') {
+      return t('accountModal.backend-credential-sync-failed');
+    }
     return error;
   };
 
@@ -273,8 +279,42 @@ export const Header: React.FC = () => {
               <TooltipContent>{t('header.toggle-theme')}</TooltipContent>
             </Tooltip>
 
-            {/* Account switcher: avatar + username + chevron dropdown (Issue #611) */}
-            {user && (
+            {/* Account switcher: avatar + username + chevron dropdown (Issue #611)。
+                审计修复（Issue #611 单账号保留原界面）：仅配置一个账号时不把
+                资料区渲染成带箭头的切换入口——保留原头像/用户名展示，并提供
+                独立的「添加账号」图标入口；配置多个账号后才显示切换菜单。 */}
+            {user && !hasMultipleAccounts && (
+              <>
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name || user.login}
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <div className="min-w-0 hidden sm:block">
+                    <p className="app-header-user-name truncate">
+                      {user.name || user.login}
+                    </p>
+                  </div>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={openAddAccount}
+                      disabled={isSwitchingMenu}
+                      aria-label={t('header.add-account')}
+                    >
+                      <UserPlus className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('header.add-account')}</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+            {user && hasMultipleAccounts && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -358,7 +398,8 @@ export const Header: React.FC = () => {
               </DropdownMenu>
             )}
             {/* 审计修复（B21）：单账号时保留原独立退出入口（仅多账号才把退出
-                登录菜单化）；「添加新账号」始终经下拉菜单提供独立入口。 */}
+                登录菜单化）；单账号的「添加账号」经上方独立图标入口提供，
+                多账号经下拉菜单提供。 */}
             {user && !hasMultipleAccounts && (
               <Tooltip>
                 <TooltipTrigger asChild>

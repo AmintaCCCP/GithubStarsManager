@@ -19,6 +19,9 @@ import { syncGhAccountTokensFromState } from '../persistence/ghAccountSecrets';
 
 const nowIso = (): string => new Date().toISOString();
 
+/** listsPush 的空闲快照：会话拆除/切换时重置旧会话的推送标记（形状与 resetListsPush 一致）。 */
+const listsPushIdle = { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null };
+
 /** 从 savedAccounts 中剔除指定账号，保持其余条目引用不变。 */
 const excludeSavedAccount = (
   savedAccounts: Record<string, import('../../types').SavedAccount>,
@@ -49,6 +52,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
             user,
             isAuthenticated: true,
             accountWorkspaces: switched.accountWorkspaces,
+            // 会话代次递增后旧会话的 Lists 推送已失效：其 isRunning 标记不得
+            // 残留到新账号（否则 pushCategoriesToLists 的重入保护会永久阻止
+            // 新账号发起推送）；此刻新会话尚不可能已开始推送。
+            ...(nextAccountId !== previousAccountId ? { listsPush: listsPushIdle } : {}),
             ...(switched.workspace ?? {}),
           });
         } else {
@@ -130,6 +137,8 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         const accountWorkspaces = accountId
           ? { ...current.accountWorkspaces, [accountId]: captureAccountWorkspace(current) }
           : current.accountWorkspaces;
+        // 旧会话的 Lists 推送随会话拆除失效：清除其 isRunning 标记，避免残留
+        // 标记通过重入保护阻止下一次登录后的推送（同 B4 的会话级重置语义）。
         clearAuthMirror();
         writeSessionBackendSecret(null);
         // Issue #611：登出后推送通道失去账号上下文（无 X-GitHub-Account-Id，
@@ -148,6 +157,8 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           accountWorkspaces,
           // 会话级刷新状态随会话拆除重置（B4）
           releaseIsRefreshing: false,
+          // 旧会话的 Lists 推送标记随会话拆除重置（同 B4 语义）
+          listsPush: listsPushIdle,
           // 退出即清除当前账号已保存的 PAT：登录页不能凭旧记录一键恢复会话。
           savedAccounts: accountId && current.savedAccounts[accountId]
             ? {
@@ -211,6 +222,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
               githubToken: target.githubToken,
               isAuthenticated: true,
               releaseIsRefreshing: false,
+              // 会话代次已递增：旧会话的 Lists 推送标记一并重置，防止
+              // isRunning 残留阻止后续推送（同下方跨账号切换的语义）。
+              listsPush: listsPushIdle,
             }),
           });
           if (!sessionUsesTargetCredentials) {
@@ -273,6 +287,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           // 不得禁用新账号的刷新入口；其 finally 清理由
           // setReleaseIsRefreshing(false) 的归属会话校验拦截（preferenceSlice）。
           releaseIsRefreshing: false,
+          // 旧会话的 Lists 推送随会话切换失效：其 isRunning 标记不得残留到新
+          // 账号（否则 pushCategoriesToLists 的重入保护会永久阻止新账号发起
+          // 推送）；此刻新会话尚不可能已开始推送，重置不会误清新会话状态。
+          listsPush: listsPushIdle,
           analysisProgress: { current: 0, total: 0 },
           vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
           similarView: null,

@@ -499,6 +499,10 @@ describe('useAccountSwitchActions audit fixes', () => {
       // 审计修复（C64）：候选 URL 提交前 Store 仍是原密钥——候选密钥经
       // apiSecret 选项传递，由 restoreBackendSession 在 URL 提交后写入。
       secretsSeenDuringRestore.push(useAppStore.getState().backendApiSecret);
+      // CodeRabbit 审计修复：模拟真实 restoreBackendSession 的行为——候选 URL
+      // 提交后把候选密钥写入 Store（失败分支会保留候选密钥，靠调用方回滚还原）。
+      // 不写入的话，即使删掉生产代码的密钥回滚，末尾的 old-key 断言仍会通过。
+      useAppStore.getState().setBackendApiSecret(options?.apiSecret ?? 'candidate-key');
       return { status: 'unauthorized' };
     });
 
@@ -673,14 +677,18 @@ describe('useAccountSwitchActions audit fixes', () => {
     });
     mocks.backend.isAvailable = true;
     const pushesAtSync: Array<{ login: string | null; categoryOrder: string[] }> = [];
-    mocks.syncToBackend.mockImplementation(async () => {
+    // CodeRabbit 审计修复：让补推返回可手动完成的 Promise——invocationCallOrder
+    // 只比较调用「开始」顺序，实现若启动补推后不等待结果就直接拉取，旧断言
+    // 仍会通过。补推未完成时拉取必须尚未发起。
+    let releasePush: (() => void) | null = null;
+    mocks.syncToBackend.mockImplementation(() => new Promise<boolean>((resolve) => {
       const s = useAppStore.getState();
       pushesAtSync.push({
         login: s.user?.login ?? null,
         categoryOrder: [...s.categoryOrder],
       });
-      return true;
-    });
+      releasePush = () => resolve(true);
+    }));
     mocks.restoreBackendSession.mockImplementation(async () => {
       // 恢复等待期间的真实编辑（尚未归档，归属发起账号 A）
       useAppStore.setState({ categoryOrder: ['edited-during-restore'] });
@@ -701,17 +709,27 @@ describe('useAccountSwitchActions audit fixes', () => {
       expect(mocks.syncToBackend).not.toHaveBeenCalled();
       expect(hasPendingAccountSync('1')).toBe(true);
       expect(hasPendingAccountSync('2')).toBe(false);
+      // 恢复阶段的对齐本身会拉取一次；切换阶段的新增拉取在补推完成前必须为 0
+      const pullsAfterRestore = mocks.syncFromBackend.mock.calls.length;
 
       // 切回账号 A（同一后端）：真实待推记录驱动先补推再拉取
+      let pendingSwitch!: Promise<{ ok: boolean; error?: string }>;
       await act(async () => {
-        await result.current.switchToAccount('1');
+        pendingSwitch = result.current.switchToAccount('1');
       });
+      await act(async () => { await Promise.resolve(); });
+      // 补推已启动（归属发起账号 A）；补推完成前拉取绝不能开始
       expect(mocks.syncToBackend).toHaveBeenCalledTimes(1);
       expect(pushesAtSync[0]?.login).toBe('alice');
       expect(pushesAtSync[0]?.categoryOrder).toContain('edited-during-restore');
-      const pushOrder = mocks.syncToBackend.mock.invocationCallOrder[0];
-      const pullOrder = mocks.syncFromBackend.mock.invocationCallOrder.at(-1)!;
-      expect(pushOrder).toBeLessThan(pullOrder);
+      expect(mocks.syncFromBackend).toHaveBeenCalledTimes(pullsAfterRestore);
+
+      // 补推完成后：当前切换阶段恰好发起一次拉取
+      await act(async () => {
+        releasePush?.();
+        await pendingSwitch;
+      });
+      expect(mocks.syncFromBackend).toHaveBeenCalledTimes(pullsAfterRestore + 1);
     } finally {
       stopAutoSync(unsubscribe);
     }
@@ -784,6 +802,69 @@ describe('useAccountSwitchActions audit fixes', () => {
     expect(state.savedAccounts['3']?.githubToken).toBe('tok-c');
     expect(state.savedAccounts['4']).toBeUndefined();
     expect(state.savedAccounts['5']).toBeUndefined();
+  });
+
+  it('reports backend-credential-sync-failed from account restore while keeping the committed local account', async () => {
+    // 审计修复（CodeRabbit）：本地恢复提交与后端凭据对齐是两件事——对齐失败
+    // 必须返回 backend-credential-sync-failed，但不得触发 finally 的完整回滚
+    //（已验证的本地账号与待对齐标记保留）。
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't0', lastUsedAt: 't' } },
+    });
+    mocks.backend.isAvailable = true;
+    // Once 变体：beforeEach 仅 clearAllMocks（不清实现），持久实现会泄漏给后续用例
+    mocks.backend.syncSettings.mockRejectedValueOnce(new Error('sync failed'));
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_b',
+      user: userB,
+      accounts: [{ accountId: '2', user: userB, githubToken: 'ghp_b' }],
+    });
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.addAccountFromBackend('https://backend.example', 'candidate-key');
+    });
+
+    expect(outcome).toEqual({ ok: false, error: 'backend-credential-sync-failed' });
+    const state = useAppStore.getState();
+    // 本地账号已提交，未回滚
+    expect(state.user?.login).toBe('bob');
+    expect(state.githubToken).toBe('ghp_b');
+    expect(state.savedAccounts['2']?.githubToken).toBe('ghp_b');
+  });
+
+  it('treats token_update_skipped/superseded syncSettings responses as misaligned credentials', async () => {
+    // 转交 1（server/src/routes/configs.ts 契约）：syncSettings 在 PAT 校验超时
+    // 或凭据被并发请求覆盖时仍返回 200——响应携带 tokenUpdateSkipped /
+    // tokenUpdateSuperseded 时必须视为凭据未对齐，与对齐失败同一处理。
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't0', lastUsedAt: 't' } },
+    });
+    mocks.backend.isAvailable = true;
+    mocks.backend.syncSettings.mockResolvedValueOnce({ tokenUpdateSkipped: true, tokenUpdateSuperseded: false });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_b',
+      user: userB,
+      accounts: [{ accountId: '2', user: userB, githubToken: 'ghp_b' }],
+    });
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.addAccountFromBackend('https://backend.example', 'candidate-key');
+    });
+
+    expect(outcome).toEqual({ ok: false, error: 'backend-credential-sync-failed' });
+    expect(useAppStore.getState().user?.login).toBe('bob');
   });
 
   it('flushes the current account before removing it (even when target === current)', async () => {

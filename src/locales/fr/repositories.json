@@ -246,7 +246,8 @@
     "unstar-confirmation": "Annuler la confirmation d'étoile",
     "unstar": "AnnulerStar",
     "successfully-unstarred": "Étoile annulée avec succès",
-    "failed-to-unstar-repository-please-check-your-ne": "Échec de l'annulation de Star, veuillez vérifier la connexion réseau ou vous reconnecter."
+    "failed-to-unstar-repository-please-check-your-ne": "Échec de l'annulation de Star, veuillez vérifier la connexion réseau ou vous reconnecter.",
+    "similar-results-may-be-incomplete-the-dens": "Les dépôts similaires peuvent être incomplets : l’index de vecteurs dense est indisponible. ({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Veuillez d'abord configurer le jeton GitHub dans les paramètres ou vous connecter au service backend.",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "La synchronisation a échoué, veuillez vérifier votre connexion réseau ou réessayer plus tard.",
     "list-sync-new-categories_one": " ({{count}} nouvelle catégorie créée)",
     "list-sync-new-categories_other": " ({{count}} nouvelles catégories créées)",
-    "list-sync-complete": "{{lists}} listes synchronisées ({{newCount}} nouvelles catégories créées)."
+    "list-sync-complete": "{{lists}} listes synchronisées ({{newCount}} nouvelles catégories créées).",
+    "vector-worker-does-not-support-account-scoped-recall": "Le worker de vecteurs ne prend pas en charge le rappel par compte ; redéployez le cloudflare-worker fourni et reconstruisez l’index.",
+    "account-metadata-index-is-not-ready-create-the-accountid": "L’index de métadonnées de compte n’est pas prêt ; créez l’index de métadonnées accountId, complétez les vecteurs et activez ACCOUNT_METADATA_INDEXED.",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "Impossible de vérifier l’état du worker de vecteurs ; retour à la recherche locale.",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "La recherche multi-comptes nécessite une reconstruction de l’index de vecteurs ; retour à la recherche locale."
   },
   "repositoryHealthPanel": {
     "activity": "Activité",

@@ -3,6 +3,7 @@ import { getDb } from '../db/connection.js';
 import {
   resolveAccountScope,
   resolveWritableAccountScope,
+  hasInvalidAccountHeader,
   getAccountRevision,
   bumpAccountRevision,
 } from '../db/accountScope.js';
@@ -78,15 +79,14 @@ function hasNonEmptyJsonListField(value: unknown): boolean {
     : typeof value === 'string' ? value !== '' && value !== '[]' : value != null;
 }
 
-/** 该仓库载荷是否携带非空 AI 分析内容（ai_summary / ai_tags / ai_platforms 任一非空）。 */
-function hasAiContent(row: {
-  ai_summary?: unknown;
-  ai_tags?: unknown;
-  ai_platforms?: unknown;
-}): boolean {
-  return hasNonEmptyTextField(row.ai_summary)
-    || hasNonEmptyJsonListField(row.ai_tags)
-    || hasNonEmptyJsonListField(row.ai_platforms);
+/**
+ * Issue #612 审计（679）：PATCH / 批量同步载荷的 ai_tags / ai_platforms 统一
+ * 归一化。存储逻辑只接受数组（其他类型一律序列化为 '[]'），共享授权判断必须
+ * 复用同一归一化结果——否则无效字符串会被存为 [] 却仍按「非空内容」授权共享，
+ * 第三账号可经跨账号回填取得从未真实提交的标签。
+ */
+function toStoredAiListPayload(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 /** Transform a database row into the API response shape, parsing JSON columns. */
@@ -130,6 +130,15 @@ function transformRepo(row: Record<string, unknown>) {
 router.get('/api/repositories', (req, res) => {
   try {
     const db = getDb();
+    // Issue #612 审计（143）：显式携带但格式无效的账号头（空白 / 非数字）按无效
+    // 请求处理，绝不当作缺失回退到活跃账号 / default 分区读取他人数据。
+    if (hasInvalidAccountHeader(req)) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
     const accountId = resolveAccountScope(req, db);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 100));
@@ -368,22 +377,30 @@ router.put('/api/repositories', (req, res) => {
         END,
         -- R2-A10：按字段授权——仅当载荷携带了新增/修改后的非空字段时按 @aiShared 置位，
         -- 原样写回服务端返回的继承内容时保持原有授权（避免把他人回填的总结转为接收方共享）。
+        -- Issue #612 审计（679）：最终值来自跨账号回填（excluded 未提供、本账号
+        -- 原值为空）时，接收行的字段共享标记必须清零——绝不继承目标字段原有的
+        -- 授权去共享他人回填的内容（否则第三个账号可经接收账号取得原来源关闭
+        -- 共享后的标签）。空字段上的授权位本无实际效果（回填查询要求字段非空），
+        -- 清零无副作用。
         ai_summary_shared = CASE
           WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != ''
             AND excluded.ai_summary != COALESCE(repositories.ai_summary, '')
           THEN @aiShared
+          WHEN repositories.ai_summary IS NULL OR repositories.ai_summary = '' THEN 0
           ELSE repositories.ai_summary_shared
         END,
         ai_tags_shared = CASE
           WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]'
             AND excluded.ai_tags != COALESCE(repositories.ai_tags, '[]')
           THEN @aiShared
+          WHEN repositories.ai_tags IS NULL OR repositories.ai_tags = '[]' THEN 0
           ELSE repositories.ai_tags_shared
         END,
         ai_platforms_shared = CASE
           WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]'
             AND excluded.ai_platforms != COALESCE(repositories.ai_platforms, '[]')
           THEN @aiShared
+          WHEN repositories.ai_platforms IS NULL OR repositories.ai_platforms = '[]' THEN 0
           ELSE repositories.ai_platforms_shared
         END,
         analysis_failed = excluded.analysis_failed,
@@ -491,7 +508,20 @@ router.put('/api/repositories', (req, res) => {
               AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
             LIMIT 1
           ), analyzed_at)
-          ELSE analyzed_at END
+          ELSE analyzed_at END,
+        -- Issue #612 审计（679）：被回填字段的共享标记清零（UPDATE 的右侧表达式
+        -- 看到的是旧行值：字段此前为空即视为「本批次可能被他人成果回填」）——
+        -- 绝不沿用目标字段原有的授权去共享其他账号的内容；字段仍为空时清零
+        -- 亦无副作用（空字段授权位无实际效果）。
+        ai_summary_shared = CASE
+          WHEN ai_summary IS NULL OR ai_summary = '' THEN 0
+          ELSE ai_summary_shared END,
+        ai_tags_shared = CASE
+          WHEN ai_tags IS NULL OR ai_tags = '[]' THEN 0
+          ELSE ai_tags_shared END,
+        ai_platforms_shared = CASE
+          WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN 0
+          ELSE ai_platforms_shared END
       WHERE account_id = ? AND account_id != 'default'
         ${idPlaceholders ? `AND id IN (${idPlaceholders})` : ''}
         AND (
@@ -535,7 +565,12 @@ router.put('/api/repositories', (req, res) => {
         // 仅当 payload 显式提供 license 字段时才覆盖已存储值；省略（旧客户端/旧备份）则保留。
         const licenseProvided = Object.prototype.hasOwnProperty.call(repo, 'license') ? 1 : 0;
         // Issue #612 A21：仅当载荷携带非空 AI 内容时按账号共享设置置位 ai_shared。
-        const aiSharedValue = hasAiContent(repo) ? aiSharedFlag : 0;
+        // Issue #612 审计（679）：授权判断复用与存储一致的归一化值（批量插入同规则）。
+        const storedTagsPayload = toStoredAiListPayload(repo.ai_tags);
+        const storedPlatformsPayload = toStoredAiListPayload(repo.ai_platforms);
+        const aiSharedValue = (hasNonEmptyTextField(repo.ai_summary)
+          || hasNonEmptyJsonListField(storedTagsPayload)
+          || hasNonEmptyJsonListField(storedPlatformsPayload)) ? aiSharedFlag : 0;
         stmt.run(
           repo.id, repo.name, repo.full_name, repo.description ?? null,
           repo.html_url, repo.stargazers_count ?? 0, repo.language ?? null,
@@ -561,9 +596,10 @@ router.put('/api/repositories', (req, res) => {
           aiSharedValue,
           // Issue #612 R2-A10：首次 INSERT 的按字段授权只覆盖本载荷携带的
           // 非空 AI 字段（更新路径由 ON CONFLICT 的 CASE 表达式按字段处理）。
+          // Issue #612 审计（679）：授权判断复用与存储一致的归一化值。
           hasNonEmptyTextField(repo.ai_summary) ? aiSharedFlag : 0,
-          hasNonEmptyJsonListField(repo.ai_tags) ? aiSharedFlag : 0,
-          hasNonEmptyJsonListField(repo.ai_platforms) ? aiSharedFlag : 0,
+          hasNonEmptyJsonListField(storedTagsPayload) ? aiSharedFlag : 0,
+          hasNonEmptyJsonListField(storedPlatformsPayload) ? aiSharedFlag : 0,
           accountId,
           { licenseProvided, aiShared: aiSharedFlag }
         );
@@ -585,7 +621,12 @@ router.put('/api/repositories', (req, res) => {
       }
 
       // Issue #612 A20x：仓库写入成功后递增快照版本。
-      newRevision = bumpAccountRevision(db, accountId);
+      // Issue #612 审计（588）：仅在批次实际写入时递增——空增量批次不写不删，
+      // 推进版本只会让其他客户端的 expectedRevision 失配并触发无意义的全量重取。
+      // 显式空全量同步（isFullSync 且空数组）保留清空与版本递增行为（上方分支）。
+      if (count > 0) {
+        newRevision = bumpAccountRevision(db, accountId);
+      }
       return { conflict: false, count };
     });
 
@@ -673,14 +714,16 @@ router.patch('/api/repositories/:id', (req, res) => {
     // 置位），先前未授权的字段绝不因本次更新被标记共享；整行 ai_shared 仅为
     // 兼容标记，回填查询按字段授权过滤。
     const aiSharedFlag = isAiResultSharingEnabled(db, accountId) ? 1 : 0;
+    // Issue #612 审计（679）：授权判断复用与存储一致的归一化值——无效字符串
+    // 被存为 [] 时不得按「非空内容」授权共享。
     const summarySharedValue = 'ai_summary' in updates
       ? (hasNonEmptyTextField(updates.ai_summary) ? aiSharedFlag : 0)
       : null;
     const tagsSharedValue = 'ai_tags' in updates
-      ? (hasNonEmptyJsonListField(updates.ai_tags) ? aiSharedFlag : 0)
+      ? (hasNonEmptyJsonListField(toStoredAiListPayload(updates.ai_tags)) ? aiSharedFlag : 0)
       : null;
     const platformsSharedValue = 'ai_platforms' in updates
-      ? (hasNonEmptyJsonListField(updates.ai_platforms) ? aiSharedFlag : 0)
+      ? (hasNonEmptyJsonListField(toStoredAiListPayload(updates.ai_platforms)) ? aiSharedFlag : 0)
       : null;
     if (summarySharedValue !== null) {
       setClauses.push('ai_summary_shared = ?');

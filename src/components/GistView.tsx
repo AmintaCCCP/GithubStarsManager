@@ -71,6 +71,17 @@ export const GistView: React.FC = () => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const detailRequestSeqRef = useRef(0);
 
+  // 审计修复：详情状态是组件本地状态——若账号 A 的详情请求已完成，切换到
+  // 账号 B 后不会有在途请求抛出 GistDetailSessionSwitchedError，openDetail 的
+  // 错误分支不会执行，旧账号的 detailGist 会残留并继续展示。当前账号标识
+  // 变化时清除详情状态并递增请求序号，使未完成的详情请求失效。
+  const sessionAccountId = user?.id ?? null;
+  useEffect(() => {
+    detailRequestSeqRef.current += 1;
+    setDetailGist(null);
+    setIsDetailOpen(false);
+  }, [sessionAccountId]);
+
   const categoryItems = useMemo(() => ({
     all: getGistCategoryItems('all', gists, starredGists, user?.login),
     starred: getGistCategoryItems('starred', gists, starredGists, user?.login),

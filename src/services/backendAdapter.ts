@@ -141,6 +141,14 @@ export interface BackendAuthRestore {
   github_token: string | null;
   active_account_id?: string;
   accounts?: BackendAuthRestoreAccount[];
+  /**
+   * 无账号头恢复请求的歧义响应（server/src/routes/authRestore.ts 契约，审计修复）：
+   * 服务端无法唯一确定目标分区时返回 true + 完整 accounts 列表 + 空 github_token，
+   * 由用户显式选择账号后携带 X-GitHub-Account-Id 重试。缺省 false；
+   * restoreAuth 原样透传 JSON，isValidBackendRestoreAccount /
+   * normalizeBackendRestoreAccount 只校验 accounts 条目本身，不受该标志影响。
+   */
+  account_selection_required?: boolean;
 }
 
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
@@ -1190,13 +1198,19 @@ class BackendAdapter {
    *
    * An optional signal lets startup-only synchronization stop without delaying
    * the rest of application initialization when the backend is unreachable.
+   *
+   * 返回值（server/src/routes/configs.ts 契约，审计修复）：服务端在 PAT 校验
+   * 超时或凭据被并发请求覆盖时仍返回 200，响应体携带
+   * token_update_skipped / token_update_superseded 两个布尔标志——调用方据此
+   * 区分「设置已写入但 GitHub Token 未更新」与完全成功，给出用户提示或重试。
+   * 标志缺省（或响应体不可解析）时按 false（已写入）处理。
    */
   async syncSettings(
     settings: Record<string, unknown>,
     signal?: AbortSignal,
     accountId?: string | null,
-  ): Promise<void> {
-    if (!this._backendUrl) return;
+  ): Promise<{ tokenUpdateSkipped: boolean; tokenUpdateSuperseded: boolean }> {
+    if (!this._backendUrl) return { tokenUpdateSkipped: false, tokenUpdateSuperseded: false };
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
       method: 'PUT',
@@ -1208,6 +1222,20 @@ class BackendAdapter {
       signal,
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Sync settings error');
+    let payload: unknown = null;
+    try {
+      payload = await res.json();
+    } catch {
+      // 响应体缺失/非法时按「无标志」处理（旧行为：写入成功）
+      payload = null;
+    }
+    const body = payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+    return {
+      tokenUpdateSkipped: body.token_update_skipped === true,
+      tokenUpdateSuperseded: body.token_update_superseded === true,
+    };
   }
 
   /**

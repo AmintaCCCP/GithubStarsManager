@@ -330,6 +330,10 @@ describe('sync defaultCategoryOverrides with backend settings', () => {
 
   it('pushes defaultCategoryOverrides with the rest of settings', async () => {
     const defaultCategoryOverrides = { ai: { name: 'AI Tools', icon: 'sparkles' } };
+    // 完整设置快照仅在该 (账号, 后端) 成功读取过设置后才允许发送（R2-C6/
+    // 审计修复）：未读取成功时本地默认值不得整包推送覆盖后端配置。先完成
+    // 一次成功拉取对齐，再验证完整载荷携带本次修改的设置。
+    await syncFromBackend();
     useAppStore.setState({ defaultCategoryOverrides });
 
     await syncToBackend();
@@ -403,6 +407,12 @@ describe('explicit backend push error reporting', () => {
     try {
       // 无后端即无待推送：按成功返回（与 syncToBackend 的 no-op 语义一致）
       await expect(forceSyncToBackend()).resolves.toBe(true);
+      // 显式校验推送（forceVerify）在后端不可用时必须报告「未尝试写入」，
+      // 不得把静默跳过报告为成功（审计修复：手动同步调用方要能看到失败）。
+      await expect(forceSyncToBackend({ forceVerify: true })).resolves.toBe(false);
+      await expect(
+        forceSyncToBackend({ forceVerify: true, reportFailures: true }),
+      ).rejects.toThrow('Failed to sync to backend');
     } finally {
       available.mockRestore();
     }
@@ -457,6 +467,12 @@ describe('destructive push safeguards (Issue #611)', () => {
 
     await forceSyncToBackend();
 
+    expect(vi.mocked(backend.syncRepositories)).not.toHaveBeenCalled();
+
+    // 严格调用方（reportFailures）必须收到失败：推送被推迟时绝不能静默报告成功。
+    await expect(
+      forceSyncToBackend({ reportFailures: true, forceVerify: true }),
+    ).rejects.toThrow('Failed to sync to backend');
     expect(vi.mocked(backend.syncRepositories)).not.toHaveBeenCalled();
   });
 

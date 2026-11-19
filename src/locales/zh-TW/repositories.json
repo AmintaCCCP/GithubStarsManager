@@ -246,7 +246,8 @@
     "unstar-confirmation": "取消Star確認",
     "unstar": "取消Star",
     "successfully-unstarred": "已成功取消 Star",
-    "failed-to-unstar-repository-please-check-your-ne": "取消 Star 失敗，請檢查網路連線或重新登入。"
+    "failed-to-unstar-repository-please-check-your-ne": "取消 Star 失敗，請檢查網路連線或重新登入。",
+    "similar-results-may-be-incomplete-the-dens": "相似倉庫結果可能不完整：稠密向量索引不可用。({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "請先在設定中設定 GitHub Token，或連線後端服務。",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "同步失敗，請檢查網路連線或稍後重試。",
     "list-sync-new-categories_one": "（新建 {{count}} 個分類）",
     "list-sync-new-categories_other": "（新建 {{count}} 個分類）",
-    "list-sync-complete": "已同步 {{lists}} 個 list（新建 {{newCount}} 個分類）。"
+    "list-sync-complete": "已同步 {{lists}} 個 list（新建 {{newCount}} 個分類）。",
+    "vector-worker-does-not-support-account-scoped-recall": "向量 Worker 不支援按帳號召回；請重新部署倉庫自帶的 cloudflare-worker 並重建索引。",
+    "account-metadata-index-is-not-ready-create-the-accountid": "帳號中繼資料索引尚未就緒；請建立 accountId 中繼資料索引、回填向量並啟用 ACCOUNT_METADATA_INDEXED。",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "無法驗證向量 Worker 狀態；已回退到本地搜尋。",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "多帳號搜尋需要重建向量索引；已回退到本地搜尋。"
   },
   "repositoryHealthPanel": {
     "activity": "活躍度",

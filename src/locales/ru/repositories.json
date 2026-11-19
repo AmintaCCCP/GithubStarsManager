@@ -246,7 +246,8 @@
     "unstar-confirmation": "Отменить звездное подтверждение",
     "unstar": "ОтменаЗвезда",
     "successfully-unstarred": "Звезда успешно отменена",
-    "failed-to-unstar-repository-please-check-your-ne": "Не удалось отменить Star. Проверьте сетевое соединение или войдите в систему еще раз."
+    "failed-to-unstar-repository-please-check-your-ne": "Не удалось отменить Star. Проверьте сетевое соединение или войдите в систему еще раз.",
+    "similar-results-may-be-incomplete-the-dens": "Результаты похожих репозиториев могут быть неполными: плотный векторный индекс недоступен. ({{v1}})"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Сначала настройте токен GitHub в настройках или подключитесь к серверной службе.",
@@ -270,7 +271,11 @@
     "sync-failed-please-check-your-network-connection": "Не удалось синхронизировать. Проверьте сетевое подключение или повторите попытку позже.",
     "list-sync-new-categories_one": " (создана {{count}} новая категория)",
     "list-sync-new-categories_other": " (создано {{count}} новых категорий)",
-    "list-sync-complete": "Синхронизировано списков: {{lists}} (создано категорий: {{newCount}})."
+    "list-sync-complete": "Синхронизировано списков: {{lists}} (создано категорий: {{newCount}}).",
+    "vector-worker-does-not-support-account-scoped-recall": "Векторный Worker не поддерживает поиск по аккаунтам; повторно разверните входящий в комплект cloudflare-worker и перестройте индекс.",
+    "account-metadata-index-is-not-ready-create-the-accountid": "Индекс метаданных аккаунтов не готов; создайте индекс метаданных accountId, заполните векторы задним числом и включите ACCOUNT_METADATA_INDEXED.",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "Не удалось проверить состояние векторного Worker; выполнен откат к локальному поиску.",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "Для поиска по нескольким аккаунтам требуется перестроить векторный индекс; выполнен откат к локальному поиску."
   },
   "repositoryHealthPanel": {
     "activity": "Активность",

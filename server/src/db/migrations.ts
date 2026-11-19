@@ -178,7 +178,10 @@ const migrations: Record<number, (db: Database.Database) => void> = {
         -- v3 的 id 是可空 TEXT PRIMARY KEY（旧 POST /api/categories 不写 id）：
         -- NULL 原样复制会撞 v4 的 NOT NULL 并让整个迁移回滚、后端无法启动；
         -- 追加随机后缀避免与已有 legacy-category-* 冲突。
-        SELECT 'default', COALESCE(id, 'legacy-category-' || rowid || '-' || lower(hex(randomblob(8)))), name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
+        -- Issue #612 审计：空字符串 / 仅含空白的 id 与 NULL 同样处理——否则旧
+        -- 备份（基线导入原样写 ''）留下的空 id 分类在 v4 无法被
+        -- PUT/DELETE /api/categories/:id 匹配（空路径段），既不能编辑也不能删除。
+        SELECT 'default', CASE WHEN TRIM(COALESCE(id, '')) = '' THEN 'legacy-category-' || rowid || '-' || lower(hex(randomblob(8))) ELSE id END, name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
         FROM categories;
 
         DROP TABLE categories;
