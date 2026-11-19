@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
     isAvailable: true,
     syncSettings: vi.fn(),
     backendUrl: null as string | null,
-    init: vi.fn(async () => undefined),
+    init: vi.fn(async (_url?: string) => undefined),
   },
   restoreBackendSession: vi.fn(),
   authenticateWithGitHub: vi.fn(),
@@ -564,10 +564,9 @@ describe('useAccountSwitchActions audit fixes', () => {
     });
     mocks.backend.isAvailable = true;
     mocks.backend.backendUrl = 'https://old.example/api';
-    mocks.backend.init.mockImplementation(async (url: string) => {
-      mocks.backend.backendUrl = url;
+    mocks.backend.init.mockImplementation(async (url?: string) => {
+      mocks.backend.backendUrl = url ?? null;
       mocks.backend.isAvailable = true;
-      return true;
     });
     const pushes: Array<{ login: string | null; url: string | null }> = [];
     mocks.syncToBackend.mockImplementation(async () => {

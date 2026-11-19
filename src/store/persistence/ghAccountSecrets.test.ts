@@ -247,9 +247,9 @@ describe('syncGhAccountTokensFromState (R2-B1)', () => {
   });
 
   it('serializes concurrent saves so a second sync never resurrects a deleted PAT', async () => {
-    let releaseFirstSave: ((value: { success: boolean }) => void) | null = null;
+    let releaseFirstSave!: (value: { success: boolean }) => void;
     const saveMock = vi.fn()
-      .mockImplementationOnce(() => new Promise((resolve) => { releaseFirstSave = resolve; }))
+      .mockImplementationOnce(() => new Promise<{ success: boolean }>((resolve) => { releaseFirstSave = resolve; }))
       .mockResolvedValue({ success: true });
     setBridge({
       get: vi.fn().mockResolvedValue({
@@ -278,7 +278,7 @@ describe('syncGhAccountTokensFromState (R2-B1)', () => {
     await vi.waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     expect(saveMock).toHaveBeenNthCalledWith(1, { '7': 'ghp_7' });
 
-    releaseFirstSave?.({ success: true });
+    releaseFirstSave({ success: true });
     await expect(first).resolves.toBe(true);
     await expect(second).resolves.toBe(true);
 
