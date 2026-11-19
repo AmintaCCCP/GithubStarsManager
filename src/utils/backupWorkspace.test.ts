@@ -223,16 +223,92 @@ describe('multi-account backup helpers (Issue #611)', () => {
   });
 
   it('replace-restores all fields when every type is selected (full backup equivalence)', () => {
-    const backup = { '2': workspaceOf([repo(2, 'backup-full')]) };
-    const local = { '2': workspaceOf([repo(2, 'local-old')]) };
+    const backupWorkspace: AccountWorkspace = {
+      ...workspaceOf([repo(2, 'backup-full')]),
+      lastSync: '2026-04-01T00:00:00.000Z',
+      gists: [{ id: 'gist-backup' } as never],
+      starredGists: [{ id: 'starred-backup' } as never],
+      selectedGistCategory: 'starred',
+      releases: [{ id: 201, repository: { id: 2 } } as never],
+      releaseSubscriptions: [200],
+      releaseSourceSettings: {
+        enabledSourceIds: ['custom-release'],
+        watchCustomReleaseRepos: [],
+        customReleaseRepos: [],
+      },
+      readReleases: [201],
+      forks: [{ id: 301 } as never],
+      readForks: [301],
+      customCategories: [{ id: 'cat-backup', name: 'Backup Cat', icon: 'folder', keywords: ['b'], isCustom: true }],
+      hiddenDefaultCategoryIds: ['hidden-backup'],
+      categoryOrder: ['cat-backup'],
+      defaultCategoryOverrides: { all: { name: 'All Backup' } },
+      categoryListIdMap: { 'cat-backup': 'list-backup' },
+      syncMode: 'stars-and-lists',
+      syncModeConfigured: true,
+    };
+    const localWorkspace: AccountWorkspace = {
+      ...workspaceOf([repo(2, 'local-old')]),
+      lastSync: '2026-01-15T00:00:00.000Z',
+      gists: [{ id: 'gist-local' } as never],
+      starredGists: [{ id: 'starred-local' } as never],
+      selectedGistCategory: 'all',
+      releases: [{ id: 101, repository: { id: 2 } } as never],
+      releaseSubscriptions: [100],
+      releaseSourceSettings: {
+        enabledSourceIds: ['starred-release-subscription'],
+        watchCustomReleaseRepos: [],
+        customReleaseRepos: [],
+      },
+      readReleases: [101],
+      forks: [{ id: 151 } as never],
+      readForks: [151],
+      customCategories: [{ id: 'cat-local', name: 'Local Cat', icon: 'star', keywords: ['l'], isCustom: true }],
+      hiddenDefaultCategoryIds: ['hidden-local'],
+      categoryOrder: ['cat-local'],
+      defaultCategoryOverrides: { all: { name: 'All Local' } },
+      categoryListIdMap: { 'cat-local': 'list-local' },
+      syncMode: 'stars',
+      syncModeConfigured: false,
+    };
 
     const restored = replaceWorkspacesForSelectedTypes(
-      local,
-      backup,
+      { '2': localWorkspace },
+      { '2': backupWorkspace },
       ['repositories', 'releases', 'releaseSubscriptions', 'customCategories'],
     );
-    expect(restored['2'].repositories.map((r: Repository) => r.ai_summary)).toEqual(['backup-full']);
-    expect(restored['2'].lastSync).toBe('2026-02-01T00:00:00.000Z');
+    expect(restored['2']).toEqual(backupWorkspace);
+  });
+
+  it('rejects workspace replacement when repositories fail validation and ignores null repositories in applyAccountWorkspaceForTypes', () => {
+    const local = {
+      '2': {
+        ...workspaceOf([repo(2, 'local-precious')]),
+        gists: [{ id: 'gist-1' } as never],
+      },
+    };
+    expect(() => replaceWorkspacesForSelectedTypes(
+      local,
+      { '2': { repositories: [null], gists: [] } },
+      ['repositories'],
+    )).toThrow();
+
+    const patchWithNull = applyAccountWorkspaceForTypes(
+      { ...workspaceOf([]), lastSync: '2026-04-02T00:00:00.000Z' },
+      ['repositories'],
+      { repositories: null, lastSync: '2026-04-02T00:00:00.000Z' },
+    );
+    expect(patchWithNull.repositories).toBeUndefined();
+    expect(patchWithNull.searchResults).toBeUndefined();
+    expect(patchWithNull.lastSync).toBe('2026-04-02T00:00:00.000Z');
+
+    const patchWithEmpty = applyAccountWorkspaceForTypes(
+      workspaceOf([]),
+      ['repositories'],
+      { repositories: [] },
+    );
+    expect(patchWithEmpty.repositories).toEqual([]);
+    expect(patchWithEmpty.searchResults).toEqual([]);
   });
 
   it('applies only workspace fields for the selected import types', () => {

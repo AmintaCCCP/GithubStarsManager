@@ -138,14 +138,16 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       setWorkerTestResult(result);
       if (result.success && isCurrentAccountSession(startedAccountId, startedGeneration)) {
         // 审计修复（C50）：连接测试不把 Worker 全局总向量数写入 vectorSearchStatus.vectorCount；
-        // 仅当被测 Worker 与当前已配置的 Worker 地址一致（同一账号且同一索引）时沿用已有计数，
-        // 否则清空计数（0）避免把旧 Worker 的向量计数带入新 Worker 的连接状态。
+        // 测试未保存的新 Worker 地址时只写 workerTestResult，绝不覆盖当前已配置 Worker 的共享状态；
+        // 仅当被测地址与当前配置一致时更新连接状态与维度并保留已有账号计数。
         const currentStore = useAppStore.getState();
         const normalizeUrl = (url: string | undefined): string => (url ?? '').trim().replace(/\/+$/, '');
         const sameWorkerIndex = normalizeUrl(draft.workerUrl) !== ''
           && normalizeUrl(draft.workerUrl) === normalizeUrl(currentStore.vectorSearchConfig?.workerUrl);
-        const previousVectorCount = sameWorkerIndex ? (currentStore.vectorSearchStatus?.vectorCount ?? 0) : 0;
-        state.setVectorSearchStatus({ connected: true, vectorCount: previousVectorCount, dimensions: result.dimensions });
+        if (sameWorkerIndex) {
+          const previousVectorCount = currentStore.vectorSearchStatus?.vectorCount ?? 0;
+          state.setVectorSearchStatus({ connected: true, vectorCount: previousVectorCount, dimensions: result.dimensions });
+        }
       }
     } catch (reason) {
       if (workerTestRunRef.current !== runId) return;
@@ -325,15 +327,24 @@ export const useVectorSearchActions = (): VectorSearchActions => {
             ])];
             let authoritativeSnapshotMatches = workspaceUnchanged;
             if (authoritativeSnapshotMatches && backend.isAvailable) {
-              // 多设备共享后端时，本地列表未变不能证明另一设备未新增仓库：
-              // 清理前必须核对后端当前账号的权威快照，核对失败或不一致则仅保留上传、跳过删除。
+              // 多设备共享后端时，清理前核对后端权威快照；返回后再重读实时列表与同步状态，
+              // 仅当起止本地快照与后端快照三者完全一致且无同步在途时才执行删除。
               try {
                 const remote = await backend.fetchRepositories(jobAccountId);
+                const postFetchState = useAppStore.getState();
+                const postFetchBasisValid = !postFetchState.isLoading
+                  && !postFetchState.isSyncingStars
+                  && !!postFetchState.lastSync
+                  && postFetchState.repositories.length > 0;
+                const postFetchLiveIds = new Set(postFetchState.repositories.map((repository) => String(repository.id)));
                 const remoteComplete = remote.repositories.length >= (remote.total ?? remote.repositories.length);
                 const remoteIds = new Set(remote.repositories.map((repository) => String(repository.id)));
-                authoritativeSnapshotMatches = remoteComplete
-                  && remoteIds.size === liveRepoIds.size
-                  && [...remoteIds].every((id) => liveRepoIds.has(id));
+                authoritativeSnapshotMatches = postFetchBasisValid
+                  && remoteComplete
+                  && postFetchLiveIds.size === startRepoIds.size
+                  && [...startRepoIds].every((id) => postFetchLiveIds.has(id))
+                  && remoteIds.size === postFetchLiveIds.size
+                  && [...remoteIds].every((id) => postFetchLiveIds.has(id));
               } catch {
                 authoritativeSnapshotMatches = false;
               }

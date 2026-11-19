@@ -17,11 +17,13 @@ import {
   isRealBackupSecret,
   maskSavedAccountsForBackup,
   mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
+  replaceWorkspacesForSelectedTypes,
   validateBackupRepositories,
 } from '../../../utils/backupWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { normalizeReleaseSourceSettings } from '../../../utils/releaseSources';
 import { WebDAVService } from '../../../services/webdavService';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import {
   hasGhAccountsBridge,
   syncGhAccountTokensFromState,
@@ -287,6 +289,13 @@ export const useBackupActions = (): BackupActions => {
         && rawActiveAccountId === null
         && !!liveAccountId;
 
+      const rawBackupWorkspaces = (
+        backupData.accountWorkspaces
+        && typeof backupData.accountWorkspaces === 'object'
+        && !Array.isArray(backupData.accountWorkspaces)
+      )
+        ? (backupData.accountWorkspaces as Record<string, unknown>)
+        : {};
       // 备份实际携带的工作区（规整化后）：判断是否应用当前账号工作区必须以它
       // 为准，不能用合并结果——合并结果含本机旧快照，备份不含当前账号时会
       // 误把旧快照应用回顶层，回滚实时数据。
@@ -297,26 +306,21 @@ export const useBackupActions = (): BackupActions => {
       // 恢复和本地 JSON 导入共用 validateBackupRepositories）。非数组或含无效
       // 条目时整体拒绝恢复，绝不用损坏/部分数据覆盖本机工作区；显式 [] 的
       // 清空语义保留（validated === [] 仍会写入）。
-      if (backupData.accountWorkspaces && typeof backupData.accountWorkspaces === 'object'
-        && !Array.isArray(backupData.accountWorkspaces)) {
-        for (const [workspaceAccountId, rawWorkspace] of Object.entries(
-          backupData.accountWorkspaces as Record<string, unknown>,
-        )) {
-          if (!rawWorkspace || typeof rawWorkspace !== 'object' || Array.isArray(rawWorkspace)) continue;
-          const validatedWorkspaceRepositories = validateBackupRepositories(
-            (rawWorkspace as Record<string, unknown>).repositories,
+      for (const [workspaceAccountId, rawWorkspace] of Object.entries(rawBackupWorkspaces)) {
+        if (!rawWorkspace || typeof rawWorkspace !== 'object' || Array.isArray(rawWorkspace)) continue;
+        const validatedWorkspaceRepositories = validateBackupRepositories(
+          (rawWorkspace as Record<string, unknown>).repositories,
+        );
+        if (validatedWorkspaceRepositories === null) {
+          toast(
+            `${t('useBackupActions.restore-failed')}: invalid repositories payload for account ${workspaceAccountId}`,
+            'error',
           );
-          if (validatedWorkspaceRepositories === null) {
-            toast(
-              `${t('useBackupActions.restore-failed')}: invalid repositories payload for account ${workspaceAccountId}`,
-              'error',
-            );
-            return;
-          }
-          if (validatedWorkspaceRepositories !== undefined) {
-            const normalizedWorkspace = normalizedBackupWorkspaces[workspaceAccountId];
-            if (normalizedWorkspace) normalizedWorkspace.repositories = validatedWorkspaceRepositories;
-          }
+          return;
+        }
+        if (validatedWorkspaceRepositories !== undefined) {
+          const normalizedWorkspace = normalizedBackupWorkspaces[workspaceAccountId];
+          if (normalizedWorkspace) normalizedWorkspace.repositories = validatedWorkspaceRepositories;
         }
       }
       // 防御性复制：备份未携带工作区时避免归档写原地改写当前 state 字典
@@ -330,10 +334,31 @@ export const useBackupActions = (): BackupActions => {
           )
         : { ...useAppStore.getState().accountWorkspaces };
 
-      // 恢复 savedAccounts：仅当备份包含真实密钥时恢复 Token，否则保留本地已有 Token
+      // 恢复 savedAccounts：仅当备份包含真实密钥且通过 GitHub 身份归属校验时恢复 Token，
+      // 否则保留本地已有 Token 或置空要求重新授权（避免跨账号 PAT 冒用）。
+      let ghTokenPersistFailed = false;
+      let rejectedBackupTokenCount = 0;
       if (backupData.savedAccounts && typeof backupData.savedAccounts === 'object') {
-        // 仅当备份包含真实密钥时恢复 Token，否则保留本地已有 Token
         const backupAccounts = normalizeSavedAccounts(backupData.savedAccounts);
+        const stateBeforeVerify = useAppStore.getState();
+        const verifiedBackupTokens = new Map<string, string>();
+        for (const [id, account] of Object.entries(backupAccounts)) {
+          const local = stateBeforeVerify.savedAccounts[id];
+          if (local?.githubToken) continue;
+          if (!backupIncludedKeys || !isRealBackupSecret(account.githubToken)) continue;
+          try {
+            const verifiedUser = await createGitHubApiService(account.githubToken, { direct: true }).getCurrentUser();
+            if (accountIdKey(verifiedUser) === id) {
+              verifiedBackupTokens.set(id, account.githubToken);
+            } else {
+              rejectedBackupTokenCount += 1;
+            }
+          } catch {
+            rejectedBackupTokenCount += 1;
+          }
+        }
+        // 异步 PAT 校验期间可能发生账号切换，写回前再次核对会话
+        if (!ensureSameAccount()) return;
         const stateNow = useAppStore.getState();
         const mergedSaved = { ...stateNow.savedAccounts };
         for (const [id, account] of Object.entries(backupAccounts)) {
@@ -343,15 +368,36 @@ export const useBackupActions = (): BackupActions => {
             ...account,
             githubToken: local?.githubToken
               ? local.githubToken
-              : (backupIncludedKeys && isRealBackupSecret(account.githubToken) ? account.githubToken : ''),
+              : (verifiedBackupTokens.get(id) ?? ''),
           };
         }
         useAppStore.setState({ savedAccounts: mergedSaved });
         // 桌面端将备份恢复出的真实 GitHub Token 立即持久化到 safeStorage，避免仅留内存重启丢失
         if (hasGhAccountsBridge()) {
-          void syncGhAccountTokensFromState(useAppStore.getState());
+          try {
+            const persisted = await syncGhAccountTokensFromState(useAppStore.getState());
+            if (!persisted) ghTokenPersistFailed = true;
+          } catch {
+            ghTokenPersistFailed = true;
+          }
         }
       }
+
+      const ALL_WORKSPACE_TYPES = ['repositories', 'releases', 'releaseSubscriptions', 'customCategories'];
+      const applyPartialLiveWorkspace = (accountId: string): void => {
+        if (!normalizedBackupWorkspaces[accountId]) return;
+        const rawLive = rawBackupWorkspaces[accountId];
+        if (!rawLive || typeof rawLive !== 'object' || Array.isArray(rawLive)) return;
+        const liveBase = captureAccountWorkspace(useAppStore.getState());
+        const mergedLive = replaceWorkspacesForSelectedTypes(
+          { [accountId]: liveBase },
+          { [accountId]: rawLive },
+          ALL_WORKSPACE_TYPES,
+        )[accountId];
+        if (mergedLive) {
+          useAppStore.setState(applyAccountWorkspace(mergedLive));
+        }
+      };
 
       if (restoreTargetsOtherAccount) {
         // 备份顶层归档进其归属账号工作区。归档基座绝不借用当前登录账号的
@@ -409,22 +455,19 @@ export const useBackupActions = (): BackupActions => {
             ? { syncModeConfigured: backupData.syncModeConfigured }
             : {}),
         };
-        // 不覆盖当前登录账号的顶层状态；仅当备份实际包含当前账号工作区时应用，
-        // 否则保留实时状态（不用本机旧快照回滚）
+        // 不覆盖当前登录账号的顶层状态；仅当备份实际包含当前账号工作区时按
+        // 备份实际提供的字段部分应用（保留本机实时值，避免规整默认值清空仓库）
         useAppStore.setState({ accountWorkspaces: mergedWorkspaces });
-        const liveBackup = liveAccountId ? normalizedBackupWorkspaces[liveAccountId] : undefined;
-        if (liveBackup) {
-          useAppStore.setState(applyAccountWorkspace(liveBackup));
+        if (liveAccountId) {
+          applyPartialLiveWorkspace(liveAccountId);
         }
       } else if (backupData.accountWorkspaces) {
         useAppStore.setState({ accountWorkspaces: mergedWorkspaces });
-        // 同账号恢复：先应用备份中当前账号的完整工作区（含 categoryOrder、
-        // defaultCategoryOverrides、selectedGistCategory、lastSync 等仅存在于
-        // 工作区的字段），随后的旧格式顶层兼容字段按需覆盖，最后统一更新
-        // 工作区快照——避免未完整恢复的实时状态覆盖导入数据。
-        const liveBackup = liveAccountId ? normalizedBackupWorkspaces[liveAccountId] : undefined;
-        if (liveBackup) {
-          useAppStore.setState(applyAccountWorkspace(liveBackup));
+        // 同账号恢复：以当前实时工作区为基座，只覆盖备份中实际提供且通过校验的
+        // 工作区字段（含 categoryOrder、defaultCategoryOverrides、selectedGistCategory、
+        // lastSync 等），随后的旧格式顶层兼容字段按需覆盖，最后统一更新工作区快照。
+        if (liveAccountId) {
+          applyPartialLiveWorkspace(liveAccountId);
         }
       }
 
@@ -529,7 +572,12 @@ export const useBackupActions = (): BackupActions => {
           for (const config of backupConfigs) {
             if (!config?.id) continue;
             const existing = currentMap.get(config.id);
-            const password = backupIncludedKeys && isRealBackupSecret(config.password) ? config.password : existing?.password ?? '';
+            const sameWebDAVService = Boolean(existing)
+              && (config.url ?? '').trim() === (existing!.url ?? '').trim()
+              && (config.username ?? '') === (existing!.username ?? '');
+            const password = backupIncludedKeys && isRealBackupSecret(config.password)
+              ? config.password
+              : (sameWebDAVService ? existing?.password ?? '' : '');
             if (existing) {
               state.updateWebDAVConfig(config.id, { ...config, password, isActive: existing.isActive });
             } else {
@@ -566,9 +614,14 @@ export const useBackupActions = (): BackupActions => {
       try {
         if (backupData.rpcDownloadConfig && typeof backupData.rpcDownloadConfig === 'object') {
           const backupConfig = backupData.rpcDownloadConfig as typeof state.rpcDownloadConfig;
+          const currentRpc = useAppStore.getState().rpcDownloadConfig;
+          const sameRpcEndpoint = (backupConfig.host ?? '').trim() === (currentRpc.host ?? '').trim()
+            && backupConfig.port === currentRpc.port;
           state.setRpcDownloadConfig({
             ...backupConfig,
-            secret: backupIncludedKeys && isRealBackupSecret(backupConfig.secret) ? backupConfig.secret : useAppStore.getState().rpcDownloadConfig.secret,
+            secret: backupIncludedKeys && isRealBackupSecret(backupConfig.secret)
+              ? backupConfig.secret
+              : (sameRpcEndpoint ? currentRpc.secret : ''),
           });
         }
       } catch (error) {
@@ -616,21 +669,51 @@ export const useBackupActions = (): BackupActions => {
       const restoredCategoryCount = skipUnboundTopLevelApply
         ? workspaceList.reduce((sum, ws) => sum + ws.customCategories.length, 0)
         : ((backupData.customCategories as unknown[] | undefined)?.length ?? 0);
-      const skippedUnboundTopLevelCount = skipUnboundTopLevelApply
-        ? (backupRepositories?.length ?? 0)
-          + ((backupData.releases as unknown[] | undefined)?.length ?? 0)
-          + ((backupData.customCategories as unknown[] | undefined)?.length ?? 0)
-        : 0;
+      const hasNonEmptyArray = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+      const hasNonEmptyObject = (value: unknown): boolean => (
+        Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0
+      );
+      const releaseSourceObj = backupData.releaseSourceSettings && typeof backupData.releaseSourceSettings === 'object'
+        ? (backupData.releaseSourceSettings as Record<string, unknown>)
+        : null;
+      const hasSkippedUnboundTopLevelData = skipUnboundTopLevelApply && (
+        (backupRepositories?.length ?? 0) > 0
+        || hasNonEmptyArray(backupData.releases)
+        || hasNonEmptyArray(backupData.gists)
+        || hasNonEmptyArray(backupData.starredGists)
+        || hasNonEmptyArray(backupData.forks)
+        || hasNonEmptyArray(backupData.readForks)
+        || hasNonEmptyArray(backupData.releaseSubscriptions)
+        || hasNonEmptyArray(backupData.readReleases)
+        || hasNonEmptyArray(backupData.customCategories)
+        || hasNonEmptyArray(backupData.hiddenDefaultCategoryIds)
+        || hasNonEmptyObject(backupData.categoryListIdMap)
+        || (Boolean(releaseSourceObj) && (
+          hasNonEmptyArray(releaseSourceObj!.enabledSourceIds)
+          || hasNonEmptyArray(releaseSourceObj!.watchCustomReleaseRepos)
+          || hasNonEmptyArray(releaseSourceObj!.customReleaseRepos)
+        ))
+        || backupData.syncModeConfigured === true
+      );
       const summaryMessage = t('useBackupActions.data-restored-from-backup-repositories-v1-releas', {
         v1: restoredRepoCount,
         v2: restoredReleaseCount,
         v3: restoredCategoryCount,
       });
-      if (skippedUnboundTopLevelCount > 0) {
-        toast(
-          `${summaryMessage} (skipped unbound top-level backup data with activeAccountId=null)`,
-          'info',
-        );
+      const warnings: string[] = [];
+      if (ghTokenPersistFailed) {
+        warnings.push('GitHub PAT could not be saved to secure storage; please retry or re-authorize');
+      }
+      if (rejectedBackupTokenCount > 0) {
+        warnings.push(`${rejectedBackupTokenCount} backup GitHub PAT(s) could not be verified for their account and require re-authorization`);
+      }
+      if (hasSkippedUnboundTopLevelData) {
+        warnings.push('skipped unbound top-level backup data with activeAccountId=null');
+      }
+      if (ghTokenPersistFailed || rejectedBackupTokenCount > 0) {
+        toast(`${summaryMessage} (${warnings.join('; ')})`, 'warning');
+      } else if (hasSkippedUnboundTopLevelData) {
+        toast(`${summaryMessage} (${warnings.join('; ')})`, 'info');
       } else {
         toast(summaryMessage, 'success');
       }

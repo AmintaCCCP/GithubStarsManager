@@ -255,9 +255,17 @@ class BackendAdapter {
     return () => this._availabilityListeners.delete(listener);
   }
 
+  private _connectionGeneration = 0;
+
+  /** 后端连接代次：每次后端地址变化时递增，用于识别 X→Y→X 切出再切回同 URL 的连接变化。 */
+  get connectionGeneration(): number {
+    return this._connectionGeneration;
+  }
+
   private commitBackendUrl(url: string | null): void {
     if (this._backendUrl === url) return;
     this._backendUrl = url;
+    this._connectionGeneration += 1;
     setBackendAvailability(url !== null);
   }
 
@@ -911,15 +919,24 @@ class BackendAdapter {
 
   // === Data Sync ===
 
-  async syncRepositories(repos: Repository[], options?: { expectedRevision?: number | null }): Promise<void> {
-    if (!this._backendUrl) return;
+  async syncRepositories(
+    repos: Repository[],
+    options?: { expectedRevision?: number | null; backendUrl?: string | null; accountId?: string | null },
+  ): Promise<void> {
+    const targetUrl = options?.backendUrl ?? this._backendUrl;
+    if (!targetUrl) return;
+    if (options?.backendUrl !== undefined && this._backendUrl !== options.backendUrl) {
+      throw new Error('Backend target changed before repository PUT');
+    }
 
     // 跨端契约 A20x（Issue #612）：全量推送可携带 expectedRevision（来自
     // GET /repositories 响应的 revision）。服务端校验失败时返回 409
     // SNAPSHOT_CONFLICT，调用方（autoSync）负责重新拉取合并后重试。
-    const res = await this.fetchWithRetry(`${this._backendUrl}/repositories`, {
+    const res = await this.fetchWithRetry(`${targetUrl}/repositories`, {
       method: 'PUT',
-      headers: this.getAuthHeaders(),
+      headers: options?.accountId !== undefined
+        ? getBackendAuthHeaders(options.accountId)
+        : this.getAuthHeaders(),
       body: JSON.stringify({
         repositories: repos,
         isFullSync: true,
@@ -948,12 +965,22 @@ class BackendAdapter {
     let total = 0;
     let revision: number | null = null;
     const PAGE_SIZE = 10000;
+    const PAGE_DEADLINE_MS = 120000;
     for (let page = 1; ; page += 1) {
-      const res = await this.fetchWithRetry(`${backendUrl}/repositories?page=${page}&limit=${PAGE_SIZE}`, {
-        headers,
-      }, 120000, 3);
-      if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
-      const data = await res.json() as { repositories?: Repository[]; total?: number; revision?: unknown };
+      // 每页请求与 res.json() 正文读取共享同一截止时间，防止响应头返回后正文挂起
+      const pageController = new AbortController();
+      const pageTimer = setTimeout(() => pageController.abort(), PAGE_DEADLINE_MS);
+      let data: { repositories?: Repository[]; total?: number; revision?: unknown };
+      try {
+        const res = await this.fetchWithRetry(`${backendUrl}/repositories?page=${page}&limit=${PAGE_SIZE}`, {
+          headers,
+          signal: pageController.signal,
+        }, PAGE_DEADLINE_MS, 3);
+        if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
+        data = await res.json() as { repositories?: Repository[]; total?: number; revision?: unknown };
+      } finally {
+        clearTimeout(pageTimer);
+      }
       // R2-C13：分页累计前必须验证响应形状——缺失/非数组的 repositories 拒绝，
       // 绝不默认成 []（会被上游当作「完整空分区」授权破坏性推送/恢复）。
       // 显式 `repositories: []` + `total: 0` 仍是有效空分区。

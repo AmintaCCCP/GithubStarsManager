@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../store/useAppStore', () => ({
-  EMBEDDING_FORMAT_VERSION: 4,
+  EMBEDDING_FORMAT_VERSION: 3,
   LEGACY_EMBEDDING_FORMAT_VERSION: 1,
   isKnownEmbeddingFormatVersion: (value: unknown) => value === 1 || value === 2 || value === 3 || value === 4,
   useAppStore: mocks.useAppStore,
@@ -28,7 +28,7 @@ vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
   return {
     // 保留真实的账号隔离向量 ID 编解码工具（runIndex 的 cleanup keepIds 依赖）
     ...actual,
-    EMBEDDING_FORMAT_VERSION: 4,
+    EMBEDDING_FORMAT_VERSION: 3,
     EmbeddingClient: class {},
     VectorSearchService: class {
       cleanup = mocks.cleanup;
@@ -441,24 +441,24 @@ describe('useVectorSearchActions account switch guards', () => {
     await act(async () => { await Promise.resolve(); });
     let second!: Promise<void>;
     await act(async () => { second = result.current.rebuildIndex(draft); });
-    // 放行两个任务：旧任务已被取代，新任务是当前任务
+    const writesBeforeOldResolves = mocks.setVectorIndexingState.mock.calls.length;
+    // 先放行旧任务（新任务仍保持挂起），验证旧任务不得写入任何 isIndexing: false 或结果
     await act(async () => {
       resolvers[0]?.({ indexed: 9, skipped: 0, errors: 0, indexedRepoIds: [1] });
-      resolvers[1]?.({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
       await first;
+    });
+    expect(mocks.setVectorIndexingState.mock.calls.slice(writesBeforeOldResolves)).toEqual([]);
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
+
+    // 再放行新任务，验证最终结果与索引状态均来自新任务
+    await act(async () => {
+      resolvers[1]?.({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
       await second;
     });
 
-    // 旧任务的收尾写入全部跳过：result 只由新任务写入一次
-    const resultWrites = mocks.setVectorIndexingState.mock.calls.filter(
-      (call) => {
-        const payload = call[0] as { result?: unknown };
-        return payload.result !== undefined && payload.result !== null;
-      },
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isIndexing: false, result: expect.objectContaining({ indexed: 1 }) }),
     );
-    expect(resultWrites).toHaveLength(1);
-    expect((resultWrites[0][0] as { result: { indexed: number } }).result.indexed).toBe(1);
-    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({ isIndexing: false }));
     expect(mocks.setVectorSearchStatus).toHaveBeenCalledTimes(1);
     expect(mocks.setVectorSearchConfig).toHaveBeenCalledTimes(1);
   });
@@ -499,10 +499,10 @@ describe('useVectorSearchActions account switch guards', () => {
     expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 3, dimensions: 1536 });
     expect(mocks.setVectorSearchStatus).not.toHaveBeenCalledWith({ connected: true, vectorCount: 5, dimensions: 1536 });
 
-    // 测试不同 Worker 地址时不得沿用旧 Worker 的向量计数
+    // 测试未保存的不同 Worker 地址时只写 workerTestResult，不覆盖共享 vectorSearchStatus
     mocks.setVectorSearchStatus.mockClear();
     await act(async () => { await result.current.testWorker({ workerUrl: 'https://other-worker.example.com', authToken: 'worker-token' }); });
-    expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 0, dimensions: 1536 });
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
   });
 
   it('skips the connection status write when the account switched during the worker test', async () => {

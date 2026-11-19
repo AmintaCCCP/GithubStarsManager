@@ -206,12 +206,13 @@ const migrations: Record<number, (db: Database.Database) => void> = {
          )
     `).get();
     if (hasLegacyDefaultData) {
-      db.exec(`
-        INSERT OR IGNORE INTO settings (key, value)
-        SELECT 'legacy_default_github_token', value
-        FROM settings
-        WHERE key = 'github_token' AND value IS NOT NULL AND value != '';
-      `);
+      const legacyTokenRow = db.prepare(
+        "SELECT value FROM settings WHERE key = 'github_token' AND value IS NOT NULL AND value != ''"
+      ).get() as { value: string } | undefined;
+      // 无旧 PAT 时写入空哨兵，避免后续自动认领把后来写入的全局 PAT 当作旧数据归属依据。
+      db.prepare(
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('legacy_default_github_token', ?)"
+      ).run(legacyTokenRow?.value ?? '');
     }
   },
   5: (db) => {

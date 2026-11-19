@@ -86,7 +86,10 @@ export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T
  *   立即补推到原后端的正确分区。
  * 无真实编辑时缓冲为空、零标记，整个窗口保持零推送。
  */
-export async function withAccountSwitchFrozen<T>(fn: () => Promise<T>): Promise<T> {
+export async function withAccountSwitchFrozen<T>(
+  fn: () => Promise<T>,
+  originBackendUrl: string = backend.backendUrl ?? '',
+): Promise<T> {
   const previousSwitching = _isSwitchingAccount;
   const previousBookkeeping = _isAccountSwitchBookkeeping;
   const previousFrozen = _isAccountSwitchFrozen;
@@ -94,7 +97,6 @@ export async function withAccountSwitchFrozen<T>(fn: () => Promise<T>): Promise<
   const previousDirtyBuffer = _frozenWindowDirtySettingKeys;
   // 嵌套窗口共享最外层缓冲：只有最外层窗口退出时做缓冲分流
   const isOutermostWindow = !previousFrozen;
-  const originBackendUrl = backend.backendUrl ?? '';
   _isSwitchingAccount = true;
   _isAccountSwitchFrozen = true;
   // 冻结窗口内不再全程置簿记标记：guardSync 覆盖的簿记写入自带标记并自行
@@ -177,6 +179,7 @@ export function cancelPendingAccountSwitchPush(): void {
   }
   _hasPendingLocalChanges = false;
   _hasPendingPush = false;
+  _pendingForceVerify = false;
 }
 
 // Track store subscription for cleanup on restart
@@ -187,6 +190,8 @@ let _isPushingToBackend = false;
 let _pushPromise: Promise<boolean> | null = null;
 // Queue a push if one is requested while a pull is in-flight
 let _hasPendingPush = false;
+// Force-verify repository and settings shards on manual "Sync to backend"
+let _pendingForceVerify = false;
 // Track unsynced local edits so backend polling does not overwrite them.
 let _hasPendingLocalChanges = false;
 
@@ -321,10 +326,28 @@ function pendingDeletedRepoIds(accountId: string | null | undefined): Set<number
   return key ? _pendingRepoDeletions.get(key) : undefined;
 }
 
-function clearPendingRepositoryDeletions(accountId: string, backendUrl: string): void {
+function clearPendingRepositoryDeletions(
+  accountId: string,
+  backendUrl: string,
+  confirmedIds?: ReadonlySet<number> | null,
+): void {
   const key = `${backendUrl}|${accountId}`;
-  if (!_pendingRepoDeletions.delete(key)) return;
-  persistPendingRepoDeletions();
+  const existing = _pendingRepoDeletions.get(key);
+  if (!existing) return;
+  if (!confirmedIds) {
+    _pendingRepoDeletions.delete(key);
+    persistPendingRepoDeletions();
+    return;
+  }
+  let changed = false;
+  for (const id of confirmedIds) {
+    if (existing.delete(id)) changed = true;
+  }
+  if (existing.size === 0) {
+    _pendingRepoDeletions.delete(key);
+    changed = true;
+  }
+  if (changed) persistPendingRepoDeletions();
 }
 
 // 推送失败后的退避重试（只在账号仍匹配时重试一次链）。
@@ -361,16 +384,21 @@ function snapshotDirtySettingVersions(): Map<string, number> {
 // 集合。读取失败后推送绝不能发送未加载的本地字段（新建工作区的空
 // customCategories 等会覆盖后端已有分类）；此时只发送本次明确编辑过的脏键。
 const _settingsUnavailableKeys = new Set<string>();
+const _settingsLoadedKeys = new Set<string>();
 function settingsLoadedKey(accountId: string, backendUrl: string): string {
   return `${backendUrl}|${accountId}`;
 }
 function markSettingsLoaded(accountId: string | null | undefined, backendUrl: string): void {
   if (!accountId) return;
-  _settingsUnavailableKeys.delete(settingsLoadedKey(accountId, backendUrl));
+  const key = settingsLoadedKey(accountId, backendUrl);
+  _settingsUnavailableKeys.delete(key);
+  _settingsLoadedKeys.add(key);
 }
 function markSettingsUnavailable(accountId: string | null | undefined, backendUrl: string): void {
   if (!accountId) return;
-  _settingsUnavailableKeys.add(settingsLoadedKey(accountId, backendUrl));
+  const key = settingsLoadedKey(accountId, backendUrl);
+  _settingsUnavailableKeys.add(key);
+  _settingsLoadedKeys.delete(key);
 }
 const PUSH_RETRY_MAX_DELAY = 60_000;
 
@@ -835,6 +863,7 @@ export function clearPendingSyncState(): void {
   _dirtySettingKeys.clear();
   _dirtySettingKeyVersions.clear();
   _settingsUnavailableKeys.clear();
+  _settingsLoadedKeys.clear();
   try {
     localStorage.removeItem(PUSHED_REPO_IDS_KEY);
     localStorage.removeItem(LEGACY_PUSHED_REPO_IDS_KEY);
@@ -901,6 +930,7 @@ export function resetSyncHashes(): void {
   _dirtySettingKeyVersions.clear();
   // R2-C6：新对齐会话必须重新从后端读取设置，旧会话的「已加载」结论不继承。
   _settingsUnavailableKeys.clear();
+  _settingsLoadedKeys.clear();
   _accountsSeenNonEmptyRepos.clear();
   _accountsObservedBackendRepos.clear();
   if (_pushRetryTimer) {
@@ -1050,9 +1080,20 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
     // 让登录页/下拉菜单能直接列出并一键切换。R2-C12：user:null 的条目用其分区
     // PAT 向 GitHub /user 核对归属后补齐完整身份，核对失败/不一致则拒绝。
     if (Array.isArray(restored.accounts)) {
+      // 记录恢复任务发起时的会话代次与重置代次：等待 GitHub 身份查询期间若用户登出、
+      // 切号或清空数据，立即中止登记，避免重新保存已删除的账号和 PAT。
+      const restoreSessionGen = getAccountSessionGeneration();
+      const restoreResetGen = _resetGeneration;
       const { upsertSavedAccount } = useAppStore.getState();
       for (const account of restored.accounts) {
         const normalizedAccount = await normalizeBackendRestoreAccount(account);
+        if (
+          _resetGeneration !== restoreResetGen
+          || getAccountSessionGeneration() !== restoreSessionGen
+          || !useAppStore.getState().isAuthenticated
+        ) {
+          break;
+        }
         if (!normalizedAccount) continue;
         upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
       }
@@ -1111,9 +1152,12 @@ export async function syncLocalGitHubTokenToBackend(
  */
 function applyBackendSettings(settings: Record<string, unknown>, protectLocal = false): void {
   const state = useAppStore.getState();
+  const hasKey = (key: string): boolean => Object.prototype.hasOwnProperty.call(settings, key);
   const isDirty = (key: string): boolean => protectLocal && _dirtySettingKeys.has(key);
+  // 脏字段继续保留本地值；未编辑字段遇到后端显式返回的 null / [] 时应用后端值，
+  // 仅当字段缺失（未提供/undefined）时不推断为清空。
   const keepLocal = (key: string, backendValue: unknown, localValue: unknown): boolean => (
-    isDirty(key) || (protectLocal && (backendValue === null || backendValue === undefined) && localValue != null)
+    isDirty(key) || (protectLocal && (!hasKey(key) || backendValue === undefined) && localValue != null)
   );
   if (!isDirty('activeAIConfig')
     && (typeof settings.activeAIConfig === 'string' || settings.activeAIConfig === null)
@@ -1131,38 +1175,27 @@ function applyBackendSettings(settings: Record<string, unknown>, protectLocal = 
     state.setActiveEmbeddingConfig(settings.activeEmbeddingConfig as string | null);
   }
   if (!isDirty('hiddenDefaultCategoryIds') && Array.isArray(settings.hiddenDefaultCategoryIds)) {
-    const skipEmpty = protectLocal
-      && settings.hiddenDefaultCategoryIds.length === 0
-      && (state.hiddenDefaultCategoryIds ?? []).length > 0;
-    if (!skipEmpty) {
-      const nextHiddenIds = settings.hiddenDefaultCategoryIds.filter((id): id is string => typeof id === 'string');
-      const currentHiddenIds = state.hiddenDefaultCategoryIds || [];
-      for (const id of currentHiddenIds) {
-        if (!nextHiddenIds.includes(id)) {
-          state.showDefaultCategory(id);
-        }
+    const nextHiddenIds = settings.hiddenDefaultCategoryIds.filter((id): id is string => typeof id === 'string');
+    const currentHiddenIds = state.hiddenDefaultCategoryIds || [];
+    for (const id of currentHiddenIds) {
+      if (!nextHiddenIds.includes(id)) {
+        state.showDefaultCategory(id);
       }
-      for (const id of nextHiddenIds) {
-        if (!currentHiddenIds.includes(id)) {
-          state.hideDefaultCategory(id);
-        }
+    }
+    for (const id of nextHiddenIds) {
+      if (!currentHiddenIds.includes(id)) {
+        state.hideDefaultCategory(id);
       }
     }
   }
   if (!isDirty('categoryOrder') && Array.isArray(settings.categoryOrder)) {
-    if (!(protectLocal && settings.categoryOrder.length === 0 && state.categoryOrder.length > 0)) {
-      useAppStore.setState({ categoryOrder: settings.categoryOrder.filter((id): id is string => typeof id === 'string') });
-    }
+    useAppStore.setState({ categoryOrder: settings.categoryOrder.filter((id): id is string => typeof id === 'string') });
   }
   if (!isDirty('customCategories') && Array.isArray(settings.customCategories)) {
-    if (!(protectLocal && settings.customCategories.length === 0 && state.customCategories.length > 0)) {
-      useAppStore.setState({ customCategories: settings.customCategories });
-    }
+    useAppStore.setState({ customCategories: settings.customCategories });
   }
   if (!isDirty('assetFilters') && Array.isArray(settings.assetFilters)) {
-    if (!(protectLocal && settings.assetFilters.length === 0 && Object.keys(state.assetFilters ?? {}).length > 0)) {
-      useAppStore.setState({ assetFilters: normalizeAssetFilters(settings.assetFilters) });
-    }
+    useAppStore.setState({ assetFilters: normalizeAssetFilters(settings.assetFilters) });
   }
   if (
     !isDirty('defaultCategoryOverrides')
@@ -1170,18 +1203,12 @@ function applyBackendSettings(settings: Record<string, unknown>, protectLocal = 
     && typeof settings.defaultCategoryOverrides === 'object'
     && !Array.isArray(settings.defaultCategoryOverrides)
   ) {
-    const backendOverrides = settings.defaultCategoryOverrides as Record<string, unknown>;
-    if (!(protectLocal && Object.keys(backendOverrides).length === 0 && Object.keys(state.defaultCategoryOverrides ?? {}).length > 0)) {
-      useAppStore.setState({
-        defaultCategoryOverrides: settings.defaultCategoryOverrides as typeof state.defaultCategoryOverrides,
-      });
-    }
+    useAppStore.setState({
+      defaultCategoryOverrides: settings.defaultCategoryOverrides as typeof state.defaultCategoryOverrides,
+    });
   }
   if (!isDirty('releaseSourceSettings')
-    && settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object'
-    && !(protectLocal
-      && Object.keys(settings.releaseSourceSettings as object).length === 0
-      && Object.keys(state.releaseSourceSettings ?? {}).length > 0)) {
+    && settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object') {
     state.setReleaseSourceSettings(settings.releaseSourceSettings as typeof state.releaseSourceSettings);
   }
   if (!isDirty('collapsedSidebarCategoryCount')
@@ -1280,7 +1307,8 @@ export async function syncFromBackend(options: {
 
     if ((backend.backendUrl ?? '') !== fetchedBackendUrl) {
       if (options.throwOnRepoFailure) {
-        throw new Error('Backend connection changed during pull');
+        repoFetchFailure = new Error('Backend connection changed during pull');
+        throw repoFetchFailure;
       }
       return;
     }
@@ -1288,14 +1316,15 @@ export async function syncFromBackend(options: {
     // 审计修复（C8）：提交结果（更新 Store、同步哈希、待推状态）前同时校验
     // 账号 ID、会话代次与后端 URL；任一不匹配丢弃结果。显式账号恢复按
     // (targetAccountId, 代次) 校验；当调用方要求严格结果（throwOnRepoFailure）
-    // 时必须显式抛错，防止登录恢复流程在拉取被丢弃后继续提交目标账号身份与 PAT。
+    // 时必须显式抛错并写入 repoFetchFailure，防止登录恢复流程在拉取被丢弃后继续提交目标账号身份与 PAT。
     if (options.targetAccountId) {
       if (getAccountSessionGeneration() !== startedGeneration) {
         logger.warn('sync.pullFromBackend', 'Discarded target-account pull: session generation changed during fetch', {
           targetAccountId: options.targetAccountId,
         });
         if (options.throwOnRepoFailure) {
-          throw new Error('Target-account pull discarded: session changed during fetch');
+          repoFetchFailure = new Error('Target-account pull discarded: session changed during fetch');
+          throw repoFetchFailure;
         }
         return;
       }
@@ -1307,7 +1336,8 @@ export async function syncFromBackend(options: {
           currentAccountId: currentAccountId ?? null,
         });
         if (options.throwOnRepoFailure) {
-          throw new Error('Pull discarded: session changed during fetch');
+          repoFetchFailure = new Error('Pull discarded: session changed during fetch');
+          throw repoFetchFailure;
         }
         return;
       }
@@ -1615,17 +1645,20 @@ export async function syncFromBackend(options: {
  * Silent: errors are logged and reported as false, not thrown.
  * Queued callers wait for a push containing the latest local state.
  */
-export async function syncToBackend(): Promise<boolean> {
+export async function syncToBackend(options: { forceVerify?: boolean } = {}): Promise<boolean> {
   if (_isAccountSwitchFrozen) {
     const id = accountIdKey(useAppStore.getState().user);
     if (id) _frozenWindowEditAccounts.add(id);
     return false;
   }
   if (!backend.isAvailable) return true;
+  if (options.forceVerify) {
+    _pendingForceVerify = true;
+  }
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
     await waitForInFlightSync();
-    return syncToBackend();
+    return syncToBackend(options);
   }
   if (_pushPromise) {
     _hasPendingPush = true;
@@ -1637,12 +1670,16 @@ export async function syncToBackend(): Promise<boolean> {
     // 不能误清其他目标的待推状态。
     const pushAccountId = accountIdKey(useAppStore.getState().user);
     const pushBackendUrl = backend.backendUrl ?? '';
-    let succeeded = await pushToBackend();
+    let forceVerify = _pendingForceVerify;
+    _pendingForceVerify = false;
+    let succeeded = await pushToBackend({ forceVerify });
     // Requests and edits arriving after the snapshot need a fresh push.
     // Failed writes stay pending for retry without an automatic retry loop.
     while (_hasPendingPush || (succeeded && _hasPendingLocalChanges)) {
       if (_isAccountSwitchFrozen) break;
-      succeeded = await pushToBackend();
+      forceVerify = _pendingForceVerify;
+      _pendingForceVerify = false;
+      succeeded = await pushToBackend({ forceVerify });
     }
     // 只有确认最新状态已全部落盘且未切换目标才清除账号级待推标记：推送期间的
     // 新编辑会在循环里再推一次，最后一轮失败时标记必须保留。
@@ -1707,15 +1744,42 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
     // R2-C3：后端确认前的显式删除记录同样从服务端保留集合中排除——即使
     // 发起账号没有任何推送基线（切号期间确认的 unstar）。
     const pendingDeleted = pendingDeletedRepoIds(accountId);
+    // 快照本次 PUT 实际处理的删除集合，成功后仅清除这批已确认删除，保留请求在途新增的删除记录
+    const confirmedSessionDeleted = sessionDeleted ? new Set(sessionDeleted) : null;
+    const confirmedPendingDeleted = pendingDeleted ? new Set(pendingDeleted) : null;
+    const remoteById = new Map(remote.repositories.map((repo) => [repo.id, repo]));
+    // 合并同一仓库时保留远端更新更晚的用户编辑字段，避免未编辑的旧本地副本覆盖另一设备的更新
+    const mergedLocalRepos = localRepos.map((localRepo) => {
+      const remoteRepo = remoteById.get(localRepo.id);
+      if (!remoteRepo) return localRepo;
+      const remoteEditedNewer = Boolean(remoteRepo.last_edited)
+        && (!localRepo.last_edited || remoteRepo.last_edited! > localRepo.last_edited);
+      if (!remoteEditedNewer) return localRepo;
+      return {
+        ...localRepo,
+        custom_description: remoteRepo.custom_description,
+        custom_tags: remoteRepo.custom_tags,
+        custom_category: remoteRepo.custom_category,
+        category_locked: remoteRepo.category_locked,
+        description_display: remoteRepo.description_display,
+        tags_display: remoteRepo.tags_display,
+        last_edited: remoteRepo.last_edited,
+      };
+    });
     const serverKept = remote.repositories.filter((repo) => (
       !localIds.has(repo.id)
       && !deletedBaseline?.has(repo.id)
       && !sessionDeleted?.has(repo.id)
       && !pendingDeleted?.has(repo.id)
     ));
-    const payload = [...localRepos, ...serverKept];
+    const payload = [...mergedLocalRepos, ...serverKept];
+    const targetBackendUrl = backend.backendUrl ?? '';
     try {
-      await backend.syncRepositories(payload, { expectedRevision: remote.revision ?? null });
+      await backend.syncRepositories(payload, {
+        expectedRevision: remote.revision ?? null,
+        ...(targetBackendUrl ? { backendUrl: targetBackendUrl } : {}),
+        ...(accountId ? { accountId } : {}),
+      });
       // 推送成功：写入已推送基线前校验会话代次与重置代次——若期间发生清空全部数据
       // 或切换账号，绝不用旧 localIds 重建 gsm.pushedRepoIdsV2。
       const sessionStillValid = _resetGeneration === pushResetGeneration
@@ -1724,10 +1788,14 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
       if (sessionStillValid) {
         if (baselineKey) {
           _lastPushedRepoIds.set(baselineKey, new Set(localIds));
-          _sessionDeletedRepoIds.delete(baselineKey);
+          const liveSessionDeleted = _sessionDeletedRepoIds.get(baselineKey);
+          if (liveSessionDeleted && confirmedSessionDeleted) {
+            for (const id of confirmedSessionDeleted) liveSessionDeleted.delete(id);
+            if (liveSessionDeleted.size === 0) _sessionDeletedRepoIds.delete(baselineKey);
+          }
           persistPushedRepoIds();
         }
-        clearPendingRepositoryDeletions(accountId, backend.backendUrl ?? '');
+        clearPendingRepositoryDeletions(accountId, targetBackendUrl, confirmedPendingDeleted);
       }
       return;
     } catch (err) {
@@ -1774,7 +1842,7 @@ export function schedulePendingAccountSyncRetry(accountId: string): void {
  * throwing; local edits made while the snapshot is in flight stay pending
  * for the next push.
  */
-async function pushToBackend(): Promise<boolean> {
+async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<boolean> {
   // R2-C5：失败分片信息始终归属于本次推送。任何提前返回（空工作区未对齐、
   // 无活跃账号、后端已切换）都表示「未尝试写入」，必须清掉上一次推送残留的
   // 分片列表，forceSyncToBackend 不得把它复制给未执行的推送。
@@ -1823,11 +1891,13 @@ async function pushToBackend(): Promise<boolean> {
       return false;
     }
     const state = useAppStore.getState();
+    const forceVerify = options.forceVerify === true;
     // 仓库分片未变化（例如只改了设置）时不要发送 isFullSync 全量快照：
     // 陈旧快照会删除其他设备在该分区新增的仓库。
+    // 手动「同步到后端」(forceVerify) 必须强制对账推送，防止后端重置后误报成功。
     const reposHash = repositoryPayloadHash(state.repositories);
     const currentReposHashKey = `${pushBackendUrl}|${pushAccountId}`;
-    const reposUnchanged = reposHash === _lastHash.repos && currentReposHashKey === _lastReposHashKey;
+    const reposUnchanged = !forceVerify && reposHash === _lastHash.repos && currentReposHashKey === _lastReposHashKey;
     const skipped = Symbol('skipped');
     // R2-C2：在构造设置请求的同一时刻记录脏键版本快照。
     const dirtySettingVersionsAtPush = snapshotDirtySettingVersions();
@@ -1844,10 +1914,14 @@ async function pushToBackend(): Promise<boolean> {
       releaseSourceSettings: state.releaseSourceSettings,
       collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
     };
-    // R2-C6：设置读取失败时只发送本次明确编辑过的键——未加载字段的本地
-    // 空值绝不覆盖后端已有配置。没有任何脏键时跳过设置分片（等待下一次
-    // 成功拉取后的正常推送）。
-    const settingsUnavailable = _settingsUnavailableKeys.has(settingsLoadedKey(pushAccountId, pushBackendUrl));
+    // R2-C6：按 (账号, 后端) 正向记录成功加载状态；首次成功读取前先恢复持久化脏键，
+    // 仅发送明确编辑过的字段，避免把本地默认值（如空 customCategories）作为完整快照推送。
+    if (pushAccountId && hasPendingAccountSync(pushAccountId)) {
+      restorePendingSettingDirtyKeys(pushAccountId);
+    }
+    const targetSettingsKey = settingsLoadedKey(pushAccountId, pushBackendUrl);
+    const settingsUnavailable = _settingsUnavailableKeys.has(targetSettingsKey)
+      || (!_settingsLoadedKeys.has(targetSettingsKey) && (_dirtySettingKeys.size > 0 || hasPendingAccountSync(pushAccountId)));
     const settingsPayload = settingsUnavailable
       ? Object.fromEntries(
           Object.entries(fullSettingsPayload).filter(([key]) => _dirtySettingKeys.has(key)),
@@ -1867,7 +1941,11 @@ async function pushToBackend(): Promise<boolean> {
       backend.syncWebDAVConfigs(state.webdavConfigs),
       backend.syncEmbeddingConfigs(state.embeddingConfigs),
       backend.syncVectorSearchConfig(state.vectorSearchConfig),
-      settingsSkipped ? Promise.resolve(skipped) : backend.syncSettings(settingsPayload),
+      settingsSkipped
+        ? (forceVerify
+          ? Promise.reject(new Error('Settings not yet aligned with backend'))
+          : Promise.resolve(skipped))
+        : backend.syncSettings(settingsPayload),
     ]);
     const [reposSync, releasesSync, aiSync, webdavSync, embeddingSync, vectorSearchSync, settingsSync] = results;
 
@@ -1908,16 +1986,14 @@ async function pushToBackend(): Promise<boolean> {
     if (embeddingSync.status === 'fulfilled') _lastHash.embedding = quickHash(state.embeddingConfigs);
     if (vectorSearchSync.status === 'fulfilled') _lastHash.vectorSearch = vectorSearchFingerprint(state.vectorSearchConfig);
     if (settingsSync.status === 'fulfilled' && settingsSync.value !== skipped) {
-      // R2-C2：仅清除本次请求携带且之后未被重新编辑的脏键（版本匹配）；
-      // 请求在途期间的新编辑保持脏标记，后续推送继续保护其本地值。
+      // 审计修复（C4）：先基于仍保留在 _dirtySettingKeyVersions 中的编辑版本更新持久化记录，
+      // 再按 pushedVersion 匹配清除内存版本，保留请求在途期间产生的新版本。
+      clearPendingSettingDirtyKeys(pushAccountId, pushBackendUrl, dirtySettingVersionsAtPush);
       for (const [dirtyKey, pushedVersion] of dirtySettingVersionsAtPush) {
         if ((_dirtySettingKeyVersions.get(dirtyKey) ?? 0) !== pushedVersion) continue;
         _dirtySettingKeys.delete(dirtyKey);
         _dirtySettingKeyVersions.delete(dirtyKey);
       }
-      // 审计修复（C4）：设置分片写入成功后清除该 (账号, 后端) 待推记录中的
-      // 持久化脏键——后端已确认接收，重启后的拉取无需再保护这些字段。
-      clearPendingSettingDirtyKeys(pushAccountId, pushBackendUrl, dirtySettingVersionsAtPush);
       // 只有完整设置载荷写入成功才把「已推送快照」记为已同步；部分载荷
       // （R2-C6 读取失败场景的脏键子集）不能代表其余字段已与后端一致。
       if (!settingsUnavailable) {
@@ -1943,7 +2019,7 @@ async function pushToBackend(): Promise<boolean> {
  * `reportFailures` to reject instead, so a caller can surface an explicit
  * synchronization warning (e.g. the batch star import dialog).
  */
-export async function forceSyncToBackend(options: { reportFailures?: boolean } = {}): Promise<boolean> {
+export async function forceSyncToBackend(options: { reportFailures?: boolean; forceVerify?: boolean } = {}): Promise<boolean> {
   // R2-C5：本次严格推送前先清空上一次推送的分片信息；syncToBackend 若因
   // 冻结窗口/不可用后端提前返回（未尝试写入），不得把这些残留复制给调用方。
   _lastPushFailedShards = [];
@@ -1953,7 +2029,7 @@ export async function forceSyncToBackend(options: { reportFailures?: boolean } =
     _debounceTimer = null;
   }
   _hasPendingLocalChanges = true;
-  const pushed = await syncToBackend();
+  const pushed = await syncToBackend({ forceVerify: options.forceVerify });
   if (!pushed && options.reportFailures) {
     // 审计修复（C41/R2-C5）：附带本次推送实际失败的分片名与「是否尝试写入」。
     // 提前返回（未尝试写入）时 failedShards 必为空数组，调用方据 pushAttempted

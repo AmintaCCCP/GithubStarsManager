@@ -337,13 +337,16 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       console.error('Add account failed:', error);
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
-      if (!useAppStore.getState().user) {
-        // 与 addAccountFromBackend 对称：归档后写入新账号失败时，
-        // 被归档的原账号工作区与凭证原样恢复，当前会话毫发无损。
-        recoverParkedAccount(parkedAccountId ?? preAuthAccountId);
+      try {
+        if (!useAppStore.getState().user) {
+          // 与 addAccountFromBackend 对称：归档后写入新账号失败时，
+          // 被归档的原账号工作区与凭证原样恢复，当前会话毫发无损。
+          recoverParkedAccount(parkedAccountId ?? preAuthAccountId);
+        }
+      } finally {
+        releaseAccountSwitchLock();
+        setIsSwitching(false);
       }
-      releaseAccountSwitchLock();
-      setIsSwitching(false);
     }
   }, [alignTargetAccountOnBackend, authenticateWithGitHub, recoverParkedAccount, refreshMcpBridgeSafely]);
 
@@ -353,6 +356,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     }
     setIsSwitching(true);
     const previousSecret = useAppStore.getState().backendApiSecret;
+    const savedAccountsBeforeRestore = { ...useAppStore.getState().savedAccounts };
     // 审计修复：保存切换前的后端 URL——restoreBackendSession 在
     // restored-token-invalid / github-token-required 分支会保留候选后端的 URL，
     // 失败时只恢复密钥会让原账号拿着原密钥请求候选后端，原连接无法继续工作。
@@ -450,40 +454,44 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       console.error('Restore account from backend failed:', error);
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
-      if (!succeeded) {
-        // 每个失败返回路径都必须恢复原密钥与原后端 URL：失败的候选密钥与
-        // 候选 URL 绝不能残留（包括当前账号仍处于登录态、原有 !user 条件
-        // 不成立的情况），否则原账号拿原密钥请求候选后端无法继续工作。
-        // 先还原持久化 URL 再复原连接，最后复原密钥：还原持久化 URL 保证
-        // 复原连接的探测/自动探测不会读到刚保存的候选 URL；原连接为 null
-        // （本地/自动探测）时显式断开，绝不经 init(undefined) 触发候选后端
-        // 自动探测（审计修复 C63）。
-        if (backend.persistedUrl !== previousPersistedUrl) {
-          backend.persistUrl(previousPersistedUrl);
-        }
-        if (backend.backendUrl !== previousBackendUrl) {
-          try {
-            if (previousBackendUrl) {
-              await backend.init(previousBackendUrl);
-            } else {
-              backend.disconnect();
+      try {
+        if (!succeeded) {
+          if (backend.persistedUrl !== previousPersistedUrl) {
+            backend.persistUrl(previousPersistedUrl);
+          }
+          // 回滚探测期间冻结自动推送：防止 2s 防抖把原账号 A 的新编辑推往候选后端 Y，
+          // 期间编辑按原后端 X 缓冲为待推，待连接复原到 X 后再补推。
+          await withAccountSwitchFrozen(async () => {
+            if (backend.backendUrl !== previousBackendUrl) {
+              try {
+                if (previousBackendUrl) {
+                  await backend.init(previousBackendUrl);
+                } else {
+                  backend.disconnect();
+                }
+              } catch {
+                // 复原连接探测失败时保持探测结果（本地模式或原 URL），不叠加新错误
+              }
             }
-          } catch {
-            // 复原连接探测失败时保持探测结果（本地模式或原 URL），不叠加新错误
+            // 恢复失败时还原密钥与候选登记循环前的 savedAccounts 快照（簿记写入，不记为待推编辑）
+            withAccountSwitchGuardSync(() => {
+              useAppStore.getState().setBackendApiSecret(previousSecret);
+              useAppStore.setState({ savedAccounts: savedAccountsBeforeRestore });
+            });
+            // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
+            recoverParkedAccount(parkedAccountId, committedAccountId);
+          }, previousBackendUrl ?? '');
+          // R4 审计修复：冻结窗口内的真实编辑已按原后端绑定记入待推集合（或
+          // 此前冲刷失败遗留的标记）。只有连接已成功复原到原后端时才立即补推；
+          // 若复原失败，标记仍保留绑定在原后端，绝不推往候选后端。
+          if (backend.backendUrl === previousBackendUrl && hasPendingAccountSync(currentAccountId)) {
+            void syncToBackend();
           }
         }
-        useAppStore.getState().setBackendApiSecret(previousSecret);
-        // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
-        recoverParkedAccount(parkedAccountId, committedAccountId);
-        // R4 审计修复：冻结窗口内的真实编辑已按原后端绑定记入待推集合（或
-        // 此前冲刷失败遗留的标记）。只有连接已成功复原到原后端时才立即补推；
-        // 若复原失败，标记仍保留绑定在原后端，绝不推往候选后端。
-        if (backend.backendUrl === previousBackendUrl && hasPendingAccountSync(currentAccountId)) {
-          void syncToBackend();
-        }
+      } finally {
+        releaseAccountSwitchLock();
+        setIsSwitching(false);
       }
-      releaseAccountSwitchLock();
-      setIsSwitching(false);
     }
   }, [recoverParkedAccount, restoreBackendSession, alignTargetAccountOnBackend, parkCurrentAccountForRestore, refreshMcpBridgeSafely]);
 
@@ -513,14 +521,18 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       //（先补推再拉取）；没有备选账号时保持现有登出行为。
       const nextUser = useAppStore.getState().user;
       const nextAccountId = accountIdKey(nextUser);
+      let fallbackAligned = true;
       if (nextUser && nextAccountId && nextAccountId !== currentAccountId) {
-        await alignTargetAccountOnBackend(
+        fallbackAligned = await alignTargetAccountOnBackend(
           nextAccountId,
           useAppStore.getState().githubToken ?? '',
           nextUser,
         );
       }
       refreshMcpBridgeSafely();
+      if (!fallbackAligned) {
+        return { ok: false, error: 'backend-credential-sync-failed' };
+      }
       return { ok: true };
     } finally {
       releaseAccountSwitchLock();

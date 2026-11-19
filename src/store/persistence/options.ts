@@ -20,7 +20,7 @@ import {
 } from '../schema';
 import { normalizePersistedState } from '../normalizers/persistedState';
 import { useAppStore } from '../useAppStore';
-import { writeAuthMirror } from './authStorage';
+import { readLegacyAuthMirrorForDesktopMigration, writeAuthMirror } from './authStorage';
 import {
   hasGhAccountsBridge,
   loadGhAccountTokens,
@@ -507,13 +507,36 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
     if (legacyTopAccountId && legacyTopToken.trim() && !tokens[legacyTopAccountId]) {
       tokens[legacyTopAccountId] = legacyTopToken;
     }
+    // 一次性桌面迁移兜底：旧快照缺 Token 时从旧认证镜像核对同账号 PAT 并迁入 safeStorage，
+    // 迁移成功后才清掉镜像中的明文 PAT（非桌面端不回读）。
+    let migratedFromMirror: { user: GitHubUser | null; backendApiSecret: string | null } | null = null;
+    if (hasGhAccountsBridge()) {
+      const legacyMirror = readLegacyAuthMirrorForDesktopMigration();
+      const mirrorAccountId = accountIdKey(legacyMirror?.user);
+      if (legacyMirror?.githubToken && mirrorAccountId
+        && (!legacyTopAccountId || mirrorAccountId === legacyTopAccountId)
+        && !tokens[mirrorAccountId]) {
+        tokens[mirrorAccountId] = legacyMirror.githubToken;
+        migratedFromMirror = { user: legacyMirror.user, backendApiSecret: legacyMirror.backendApiSecret };
+      }
+    }
     if (Object.keys(tokens).length > 0 && hasGhAccountsBridge()) {
       // R2-B1：迁移时磁盘完整映射尚未加载，saveGhAccountTokens 自动先读后写
       // 合并更新——迁移写入的 Token 不会抹掉 gh-accounts.enc 中其他账号已有的 PAT。
       // 保存 Promise 交给 onRehydrateStorage 等待完成后再读盘，防止读早于写。
       const tokensSnapshot = { ...tokens };
+      const mirrorToClear = migratedFromMirror;
       pendingMigrationTokenSave = saveGhAccountTokens(tokensSnapshot)
-        .then(() => ({ ok: true as const, tokens: tokensSnapshot }))
+        .then(() => {
+          if (mirrorToClear) {
+            writeAuthMirror({
+              user: mirrorToClear.user,
+              githubToken: null,
+              backendApiSecret: mirrorToClear.backendApiSecret,
+            });
+          }
+          return { ok: true as const, tokens: tokensSnapshot };
+        })
         .catch((err) => ({ ok: false as const, tokens: tokensSnapshot, error: err }));
     }
     stateRecord.githubToken = null;

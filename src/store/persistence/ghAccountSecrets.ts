@@ -75,11 +75,39 @@ let ghAccountTokensFullyLoaded = false;
  */
 let knownDiskTokens: GhAccountTokenMap | null = null;
 
+const PENDING_REMOVED_ACCOUNTS_KEY = 'gsm.pendingGhAccountRemovals';
+
+const readPersistedPendingRemovals = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(PENDING_REMOVED_ACCOUNTS_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string' && GH_ACCOUNT_ID_PATTERN.test(id));
+  } catch {
+    return [];
+  }
+};
+
+const persistPendingRemovals = (ids: Set<string>): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (ids.size === 0) {
+      window.localStorage.removeItem(PENDING_REMOVED_ACCOUNTS_KEY);
+    } else {
+      window.localStorage.setItem(PENDING_REMOVED_ACCOUNTS_KEY, JSON.stringify(Array.from(ids)));
+    }
+  } catch {
+    // ignore storage errors
+  }
+};
+
 /**
- * 待提交的删除列表：保存失败时保留待删除账号，直到后续保存成功才清除，
- * 避免删除请求因单次 I/O 失败而永久丢失、导致已登出/已移除账号的 PAT 残留在磁盘。
+ * 待提交的删除列表（跨重启持久化）：保存失败时保留待删除账号，
+ * 重启后水化读取会先过滤这些账号，直到后续安全存储保存确认删除成功后才清除。
  */
-const pendingRemovedAccountIds = new Set<string>();
+const pendingRemovedAccountIds = new Set<string>(readPersistedPendingRemovals());
 
 /**
  * 串行队列：把 load / save / clear 的读取基底、合并、删除、写入与镜像更新
@@ -128,9 +156,16 @@ const loadGhAccountTokensUnlocked = async (): Promise<GhAccountsLoadResult> => {
     return { status: 'error', error: typeof payload.error === 'string' ? payload.error : 'gh-accounts load failed' };
   }
   if (payload && typeof payload === 'object' && payload.status === 'loaded') {
-    const tokens = sanitizeTokenMap(payload.tokens);
+    const rawTokens = sanitizeTokenMap(payload.tokens);
     ghAccountTokensFullyLoaded = true;
-    knownDiskTokens = { ...tokens };
+    knownDiskTokens = { ...rawTokens };
+    // 跨重启保留的待删除账号不得被回填到会话（直到安全存储确认删除成功）
+    const tokens: GhAccountTokenMap = {};
+    for (const [accountId, token] of Object.entries(rawTokens)) {
+      if (!pendingRemovedAccountIds.has(accountId)) {
+        tokens[accountId] = token;
+      }
+    }
     return { status: 'loaded', tokens };
   }
   // status 'missing'（文件不存在）或无法识别的载荷：磁盘确认无有效映射。
@@ -173,6 +208,7 @@ export const saveGhAccountTokens = (
       pendingRemovedAccountIds.add(accountId);
     }
   }
+  persistPendingRemovals(pendingRemovedAccountIds);
   let base: GhAccountTokenMap;
   if (knownDiskTokens) {
     base = { ...knownDiskTokens };
@@ -196,6 +232,7 @@ export const saveGhAccountTokens = (
   for (const accountId of appliedRemovals) {
     pendingRemovedAccountIds.delete(accountId);
   }
+  persistPendingRemovals(pendingRemovedAccountIds);
   knownDiskTokens = { ...payload };
   ghAccountTokensFullyLoaded = true;
 });
@@ -209,6 +246,7 @@ export const clearGhAccountTokens = (): Promise<void> => enqueueGhAccountsOp(asy
     throw new Error(result.error ?? 'gh-accounts clear failed');
   }
   pendingRemovedAccountIds.clear();
+  persistPendingRemovals(pendingRemovedAccountIds);
   ghAccountTokensFullyLoaded = true;
   knownDiskTokens = {};
 });

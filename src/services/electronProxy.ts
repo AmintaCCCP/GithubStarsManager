@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import type { ElectronPluginAPI } from '../plugins/types';
 import type { LogEntry } from './logger';
+import { clearGhAccountTokens } from '../store/persistence/ghAccountSecrets';
 
 /** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
 export type McpLocalConfig = McpServiceConfig;
@@ -259,13 +260,9 @@ export const clearEncryptedXAuthViaDesktop = async (): Promise<void> => {
   }
 };
 
-/** 已保存 GitHub 账号加密凭证文件（gh-accounts.enc）本地安全清理。 */
+/** 已保存 GitHub 账号加密凭证文件（gh-accounts.enc）本地安全清理（复用 ghAccountsQueue 串行执行）。 */
 export const clearEncryptedGhAccountsViaDesktop = async (): Promise<void> => {
-  if (!window.electronAPI?.ghAccounts?.clear) return;
-  const result = await window.electronAPI.ghAccounts.clear();
-  if (result && !result.success) {
-    throw new Error(result.error || 'failed to clear saved GitHub account credentials');
-  }
+  await clearGhAccountTokens();
 };
 
 

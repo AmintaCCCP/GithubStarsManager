@@ -255,17 +255,6 @@ router.put('/api/repositories', (req, res) => {
     // ai_platforms_shared，v7 迁移加列）——本次提交只授权本次提交的字段，
     // 整行 ai_shared 标记保留为兼容标记，回填查询一律按字段授权过滤。
     const aiSharedFlag = isAiResultSharingEnabled(db, accountId) ? 1 : 0;
-    if (expectedRevision !== null) {
-      const currentRevision = getAccountRevision(db, accountId);
-      if (currentRevision !== expectedRevision) {
-        res.status(409).json({
-          error: 'Repository snapshot has changed since it was fetched; re-fetch and retry the full sync',
-          code: 'SNAPSHOT_CONFLICT',
-          revision: currentRevision,
-        });
-        return;
-      }
-    }
     const stmt = db.prepare(`
       INSERT INTO repositories (
         id, name, full_name, description, html_url, stargazers_count, language,
@@ -514,7 +503,13 @@ router.put('/api/repositories', (req, res) => {
     `);
 
     let newRevision: number | null = null;
-    const upsert = db.transaction(() => {
+    const upsert = db.transaction((): { conflict: true; revision: number } | { conflict: false; count: number } => {
+      if (expectedRevision !== null) {
+        const currentRevision = getAccountRevision(db, accountId);
+        if (currentRevision !== expectedRevision) {
+          return { conflict: true, revision: currentRevision };
+        }
+      }
       if (isFullSync) {
         const repoIds = repositories
           .map((repo) => repo.id)
@@ -526,7 +521,7 @@ router.put('/api/repositories', (req, res) => {
           deleteAllAccountRepositories.run(accountId);
           // Issue #612 A20x：全量推送成功即推进快照版本（即使清空后为空）。
           newRevision = bumpAccountRevision(db, accountId);
-          return 0;
+          return { conflict: false, count: 0 };
         }
 
         const placeholders = repoIds.map(() => '?').join(', ');
@@ -591,11 +586,19 @@ router.put('/api/repositories', (req, res) => {
 
       // Issue #612 A20x：仓库写入成功后递增快照版本。
       newRevision = bumpAccountRevision(db, accountId);
-      return count;
+      return { conflict: false, count };
     });
 
-    const count = upsert();
-    res.json({ upserted: count, revision: newRevision ?? getAccountRevision(db, accountId) });
+    const result = typeof upsert.immediate === 'function' ? upsert.immediate() : upsert();
+    if (result.conflict) {
+      res.status(409).json({
+        error: 'Repository snapshot has changed since it was fetched; re-fetch and retry the full sync',
+        code: 'SNAPSHOT_CONFLICT',
+        revision: result.revision,
+      });
+      return;
+    }
+    res.json({ upserted: result.count, revision: newRevision ?? getAccountRevision(db, accountId) });
   } catch (err) {
     console.error('PUT /api/repositories error:', err);
     res.status(500).json({ error: 'Failed to upsert repositories', code: 'UPSERT_REPOSITORIES_FAILED' });
@@ -670,21 +673,31 @@ router.patch('/api/repositories/:id', (req, res) => {
     // 置位），先前未授权的字段绝不因本次更新被标记共享；整行 ai_shared 仅为
     // 兼容标记，回填查询按字段授权过滤。
     const aiSharedFlag = isAiResultSharingEnabled(db, accountId) ? 1 : 0;
-    if ('ai_summary' in updates) {
+    const summarySharedValue = 'ai_summary' in updates
+      ? (hasNonEmptyTextField(updates.ai_summary) ? aiSharedFlag : 0)
+      : null;
+    const tagsSharedValue = 'ai_tags' in updates
+      ? (hasNonEmptyJsonListField(updates.ai_tags) ? aiSharedFlag : 0)
+      : null;
+    const platformsSharedValue = 'ai_platforms' in updates
+      ? (hasNonEmptyJsonListField(updates.ai_platforms) ? aiSharedFlag : 0)
+      : null;
+    if (summarySharedValue !== null) {
       setClauses.push('ai_summary_shared = ?');
-      values.push(aiSharedFlag);
+      values.push(summarySharedValue);
     }
-    if ('ai_tags' in updates) {
+    if (tagsSharedValue !== null) {
       setClauses.push('ai_tags_shared = ?');
-      values.push(aiSharedFlag);
+      values.push(tagsSharedValue);
     }
-    if ('ai_platforms' in updates) {
+    if (platformsSharedValue !== null) {
       setClauses.push('ai_platforms_shared = ?');
-      values.push(aiSharedFlag);
+      values.push(platformsSharedValue);
     }
-    if (['ai_summary', 'ai_tags', 'ai_platforms'].some((key) => key in updates)) {
+    if (summarySharedValue !== null || tagsSharedValue !== null || platformsSharedValue !== null) {
+      const anyShared = summarySharedValue === 1 || tagsSharedValue === 1 || platformsSharedValue === 1;
       setClauses.push('ai_shared = ?');
-      values.push(aiSharedFlag);
+      values.push(anyShared ? 1 : 0);
     }
 
     if (setClauses.length === 0) {

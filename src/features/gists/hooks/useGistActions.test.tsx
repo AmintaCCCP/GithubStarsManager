@@ -381,6 +381,7 @@ describe('useGistActions account switch guards', () => {
     const onReranked = vi.fn();
     await act(async () => { await result.current.aiSearch('query', [gist], onReranked); });
 
+    expect(mocks.searchGistsWithReranking).toHaveBeenCalledTimes(1);
     expect(onReranked).not.toHaveBeenCalled();
     expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
     expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
@@ -394,6 +395,7 @@ describe('useGistActions account switch guards', () => {
     const { result } = renderHook(() => useGistActions());
     await act(async () => { await result.current.aiSearch('query', [gist], vi.fn()); });
 
+    expect(mocks.searchGistsWithReranking).toHaveBeenCalledTimes(1);
     expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
     expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
   });
@@ -430,6 +432,7 @@ describe('useGistActions account switch guards', () => {
     await act(async () => {
       searchPromise = result.current.aiSearch('query', [gist], onReranked);
     });
+    expect(mocks.searchGistsWithReranking).toHaveBeenCalledTimes(1);
     switchToB();
     bumpAccountSessionGeneration();
     (storeState as unknown as { user: { id: number; login: string; avatar_url: string } }).user = { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' };

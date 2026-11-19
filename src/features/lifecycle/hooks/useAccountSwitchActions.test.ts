@@ -672,9 +672,13 @@ describe('useAccountSwitchActions audit fixes', () => {
       accountWorkspaces: { '2': workspaceOf(2) },
     });
     mocks.backend.isAvailable = true;
-    const usersAtPush: Array<string | null> = [];
+    const pushesAtSync: Array<{ login: string | null; categoryOrder: string[] }> = [];
     mocks.syncToBackend.mockImplementation(async () => {
-      usersAtPush.push(useAppStore.getState().user?.login ?? null);
+      const s = useAppStore.getState();
+      pushesAtSync.push({
+        login: s.user?.login ?? null,
+        categoryOrder: [...s.categoryOrder],
+      });
       return true;
     });
     mocks.restoreBackendSession.mockImplementation(async () => {
@@ -703,7 +707,8 @@ describe('useAccountSwitchActions audit fixes', () => {
         await result.current.switchToAccount('1');
       });
       expect(mocks.syncToBackend).toHaveBeenCalledTimes(1);
-      expect(usersAtPush[0]).toBe('alice');
+      expect(pushesAtSync[0]?.login).toBe('alice');
+      expect(pushesAtSync[0]?.categoryOrder).toContain('edited-during-restore');
       const pushOrder = mocks.syncToBackend.mock.invocationCallOrder[0];
       const pullOrder = mocks.syncFromBackend.mock.invocationCallOrder.at(-1)!;
       expect(pushOrder).toBeLessThan(pullOrder);

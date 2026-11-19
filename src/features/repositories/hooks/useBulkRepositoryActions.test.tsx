@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   unstarRepository: vi.fn(),
   forceSyncToBackend: vi.fn(),
   markPendingAccountSync: vi.fn(),
+  markPendingRepositoryDeletion: vi.fn(),
   backend: { backendUrl: null as string | null },
 }));
 
@@ -37,6 +38,7 @@ vi.mock('../../../services/githubApi', () => ({
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
   markPendingAccountSync: mocks.markPendingAccountSync,
+  markPendingRepositoryDeletion: mocks.markPendingRepositoryDeletion,
   withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
 }));
 
@@ -357,7 +359,9 @@ describe('useBulkRepositoryActions account switch guards', () => {
     // B 归档中与 A 同 ID 的仓库 1 及其 Release 均完整保留
     expect(archivedB.repositories.map(r => r.id)).toEqual([1, 3]);
     expect(archivedB.releases.map(rel => rel.repository.id)).toEqual([1]);
-    // 仅为发起账号 A 标记待补推，且绑定发起时的后端 URL X
+    // 仅为发起账号 A 登记待确认删除与待补推，且绑定发起时的后端 URL X
+    expect(mocks.markPendingRepositoryDeletion).toHaveBeenCalledTimes(1);
+    expect(mocks.markPendingRepositoryDeletion).toHaveBeenCalledWith('1', 1, 'https://backend-x.example/api');
     expect(mocks.markPendingAccountSync).toHaveBeenCalledTimes(1);
     expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', 'https://backend-x.example/api');
     expect(mocks.markPendingAccountSync).not.toHaveBeenCalledWith('2', expect.anything());

@@ -367,12 +367,17 @@ export const useRepositoryCardActions = ({
         // 账号隔离范围（R4 审计修复）：多账号共享同一向量索引时按归属账号
         // 过滤命中，防止他账号向量经同一仓库 ID 串入当前账号的相似视图
         ...(requestAccountId
-          ? {
-            accountIdScope: {
-              accountId: requestAccountId,
-              multiAccount: Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1,
-            },
-          }
+          ? (() => {
+            const isMultiAccount = Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1;
+            return {
+              accountIdScope: {
+                accountId: requestAccountId,
+                multiAccount: isMultiAccount,
+                // 单账号老用户免重建索引，直接兼容存量旧向量；多账号时启用严格隔离。
+                allowLegacyUnscoped: !isMultiAccount,
+              },
+            };
+          })()
           : {}),
       });
       if (

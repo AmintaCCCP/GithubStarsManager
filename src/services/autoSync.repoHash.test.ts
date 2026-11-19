@@ -495,21 +495,22 @@ describe('destructive push safeguards (Issue #611)', () => {
   });
 
   it('rebinds only restore-window markers registered on the origin backend (C1)', () => {
-    const windowAccountId = 'rebind-after-rollback';
-    const otherAccountId = 'rebind-other-backend';
+    const accountId = 'rebind-after-rollback';
     adapter.backendUrl = 'http://window-origin';
-    markPendingAccountSync(windowAccountId);
+    markPendingAccountSync(accountId);
     adapter.backendUrl = 'http://unrelated';
-    markPendingAccountSync(otherAccountId);
+    markPendingAccountSync(accountId);
 
-    // 切换失败、连接回滚到另一个后端：只有显式传入的恢复窗口原后端上的
-    // 记录被重绑；其他后端已有的待推记录保留原归属（绝不能被整体改绑到
-    // 当前 backendUrl，否则会把编辑推到错误后端）。
+    // 切换失败、连接回滚到另一个后端：同一账号在来源后端的记录被重绑到目标后端，
+    // 来源后端不再有标记，无关后端上的同账号标记完整保留。
     adapter.backendUrl = 'http://original';
-    expect(hasPendingAccountSync(windowAccountId)).toBe(false);
-    rebindPendingAccountSyncToCurrentBackend(windowAccountId, 'http://window-origin');
-    expect(hasPendingAccountSync(windowAccountId)).toBe(true);
-    expect(hasPendingAccountSync(otherAccountId)).toBe(false);
+    expect(hasPendingAccountSync(accountId)).toBe(false);
+    rebindPendingAccountSyncToCurrentBackend(accountId, 'http://window-origin');
+    expect(hasPendingAccountSync(accountId)).toBe(true);
+    adapter.backendUrl = 'http://window-origin';
+    expect(hasPendingAccountSync(accountId)).toBe(false);
+    adapter.backendUrl = 'http://unrelated';
+    expect(hasPendingAccountSync(accountId)).toBe(true);
   });
 
   // 审计修复（C2）：409 SNAPSHOT_CONFLICT 重试环路——冲突后重新 GET 对账，
@@ -527,7 +528,7 @@ describe('destructive push safeguards (Issue #611)', () => {
     vi.mocked(backend.fetchRepositories)
       .mockResolvedValueOnce({ repositories: [], total: 0, revision: 5 })
       .mockResolvedValueOnce({ repositories: [createRepository(2), createRepository(3)], total: 2, revision: 7 })
-      .mockResolvedValueOnce({ repositories: [createRepository(2), createRepository(3)], total: 2, revision: 8 });
+      .mockResolvedValueOnce({ repositories: [createRepository(2), createRepository(3), createRepository(4)], total: 3, revision: 8 });
     vi.mocked(backend.syncRepositories)
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(conflict)
@@ -543,14 +544,14 @@ describe('destructive push safeguards (Issue #611)', () => {
     const calls = vi.mocked(backend.syncRepositories).mock.calls;
     // 基线推送：载荷 [1,2]、expectedRevision = 首次 GET 的 rev 5
     expect((calls[0][0] as Repository[]).map(repo => repo.id)).toEqual([1, 2]);
-    expect(calls[0][1]).toEqual({ expectedRevision: 5 });
+    expect(calls[0][1]).toMatchObject({ expectedRevision: 5 });
     // 冲突尝试：载荷 = 本地 [1] ∪ 服务端保留 [3]——repo 2 已本地删除绝不复活，
     // 远端新增的 repo 3 在载荷中且未被删除
     expect((calls[1][0] as Repository[]).map(repo => repo.id)).toEqual([1, 3]);
-    expect(calls[1][1]).toEqual({ expectedRevision: 7 });
-    // 重新对账后的第二次 PUT：expectedRevision = 服务端新 revision 8
-    expect((calls[2][0] as Repository[]).map(repo => repo.id)).toEqual([1, 3]);
-    expect(calls[2][1]).toEqual({ expectedRevision: 8 });
+    expect(calls[1][1]).toMatchObject({ expectedRevision: 7 });
+    // 重新对账后的第二次 PUT：合并 revision 8 新增的 repo 4 且不恢复已删除的 repo 2
+    expect((calls[2][0] as Repository[]).map(repo => repo.id)).toEqual([1, 3, 4]);
+    expect(calls[2][1]).toMatchObject({ expectedRevision: 8 });
     expect(vi.mocked(backend.syncRepositories)).toHaveBeenCalledTimes(3);
   });
 
@@ -577,7 +578,7 @@ describe('destructive push safeguards (Issue #611)', () => {
     expect(calls).toHaveLength(3);
     for (const [payload, options] of calls) {
       expect((payload as Repository[]).map(repo => repo.id)).toEqual([1, 2, 3]);
-      expect(options).toEqual({ expectedRevision: 9 });
+      expect(options).toEqual(expect.objectContaining({ expectedRevision: 9, backendUrl: 'http://backend-conflict' }));
     }
 
     // 待推状态保留：下一次推送重新 GET 对账成功，送达完整合并载荷
@@ -586,7 +587,7 @@ describe('destructive push safeguards (Issue #611)', () => {
     const retryCalls = vi.mocked(backend.syncRepositories).mock.calls;
     expect(retryCalls).toHaveLength(1);
     expect((retryCalls[0][0] as Repository[]).map(repo => repo.id)).toEqual([1, 2, 3]);
-    expect(retryCalls[0][1]).toEqual({ expectedRevision: 9 });
+    expect(retryCalls[0][1]).toEqual(expect.objectContaining({ expectedRevision: 9, backendUrl: 'http://backend-conflict' }));
   });
 });
 
@@ -670,7 +671,7 @@ describe('backend pushes requested during another sync', () => {
     // A20x：全量推送携带 GET 记录的 expectedRevision（测试桩无 revision → null）
     expect(backend.syncRepositories).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]),
-      { expectedRevision: null },
+      expect.objectContaining({ expectedRevision: null }),
     );
     vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);
     await expect(forceSyncToBackend()).resolves.toBe(true);

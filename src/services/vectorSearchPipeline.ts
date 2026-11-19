@@ -62,6 +62,7 @@ export interface VectorSearchPipelineResult {
     lexicalCount: number;
     structuredCount: number;
     fusedCount: number;
+    denseSkipReason?: DenseQueryScopeResolution['reason'];
     crossEncoderUsed: boolean;
     crossEncoderPartial: boolean;
     llmStatus: 'complete' | 'empty' | 'invalid' | 'skipped';
@@ -726,6 +727,8 @@ export interface RunVectorSearchPipelineOptions {
   crossEncoder: CrossEncoderReranker | null;
   signal: AbortSignal;
   onPhase?: (phase: 'analyzing' | 'embedding' | 'recalling' | 'reranking') => void;
+  /** 密集召回被跳过时回调（含无候选回退关键词搜索场景），便于界面向用户提示原因。 */
+  onDenseSkipped?: (reason: NonNullable<DenseQueryScopeResolution['reason']>) => void;
   /**
    * 账号隔离范围（R4 审计修复）：多账号共享向量索引时按归属账号过滤命中；
    * 缺省（未登录边缘态）不过滤，保持既有行为。
@@ -777,9 +780,19 @@ export async function runVectorSearchPipeline(
   // 两路嵌入皆空（关 HyDE 且原始嵌入为空）时直接继续本地召回，绝不等待
   // 最长 4 秒的 Worker 状态超时。
   let denseScopePromise: Promise<DenseQueryScopeResolution> | null = null;
+  let denseSkipReason: DenseQueryScopeResolution['reason'] | undefined;
+  let denseSkipNotified = false;
   const ensureDenseScope = (): Promise<DenseQueryScopeResolution> => {
     if (!denseScopePromise) {
-      denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
+      denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal)
+        .then((scope) => {
+          if (scope.skip && !denseSkipNotified) {
+            denseSkipNotified = true;
+            denseSkipReason = scope.reason ?? 'needs-backfill';
+            options.onDenseSkipped?.(denseSkipReason);
+          }
+          return scope;
+        });
     }
     return denseScopePromise;
   };
@@ -919,6 +932,7 @@ export async function runVectorSearchPipeline(
       lexicalCount: lexical.length,
       structuredCount: structured.length,
       fusedCount: fused.length,
+      ...(denseSkipReason ? { denseSkipReason } : {}),
       ...finished.diagnostics,
       timingsMs,
     },

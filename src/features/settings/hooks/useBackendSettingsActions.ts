@@ -17,6 +17,7 @@ import {
   forceSyncToBackend,
   syncLocalGitHubTokenToBackend,
   tryRestoreAuthFromBackend,
+  withAccountSwitchFrozen,
 } from '../../../services/autoSync';
 
 type BackendStatus = 'connected' | 'disconnected' | 'checking';
@@ -103,29 +104,36 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     }
     const previousUrl = backend.backendUrl;
     state.setBackendApiSecret(secretInput || null);
-    // With an address entered, probe exactly that URL; empty keeps the
-    // previous auto-detect behavior (remembered URL, else same-origin).
-    const connected = await checkConnection(false, trimmedUrl || undefined);
-    if (!connected) {
-      await backend.init(previousUrl ?? undefined);
-      toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
-      return;
-    }
-    try {
-      const authOk = secretInput ? await backend.verifyAuth() : true;
-      if (!authOk) throw new Error('Authentication failed');
-      // Health and auth both passed — remember the address (shared with the
-      // login screen prefill).
-      backend.rememberActiveUrl();
-      toast(t('useBackendSettingsActions.backend-connection-successful'), 'success');
+    // 探测与失败回滚全程冻结自动推送，防止探测期间启动的新推送在两步之间切换后端把旧快照写入新后端
+    const probeSucceeded = await withAccountSwitchFrozen(async () => {
+      // With an address entered, probe exactly that URL; empty keeps the
+      // previous auto-detect behavior (remembered URL, else same-origin).
+      const connected = await checkConnection(false, trimmedUrl || undefined);
+      if (!connected) {
+        await backend.init(previousUrl ?? undefined);
+        toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+        return false;
+      }
+      try {
+        const authOk = secretInput ? await backend.verifyAuth() : true;
+        if (!authOk) throw new Error('Authentication failed');
+        // Health and auth both passed — remember the address (shared with the
+        // login screen prefill).
+        backend.rememberActiveUrl();
+        toast(t('useBackendSettingsActions.backend-connection-successful'), 'success');
+        return true;
+      } catch {
+        await backend.init(previousUrl ?? undefined);
+        setStatus('disconnected');
+        setHealth(null);
+        toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+        return false;
+      }
+    });
+    if (probeSucceeded) {
       // These are deliberate manual settings actions; app-start restoration is not moved here.
       void tryRestoreAuthFromBackend();
       void syncLocalGitHubTokenToBackend();
-    } catch {
-      await backend.init(previousUrl ?? undefined);
-      setStatus('disconnected');
-      setHealth(null);
-      toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
     }
   }, [checkConnection, secretInput, state, t, toast, urlInput]);
 
@@ -142,8 +150,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     setIsSyncingToBackend(true);
     try {
       // 复用 autoSync 的安全推送路径：先做非破坏性对账，且拒绝在分区未对齐
-      // 时推送空仓库快照（手动同步绝不能绕过这两道防线）。
-      const pushed = await forceSyncToBackend({ reportFailures: true });
+      // 时推送空仓库快照（手动同步绝不能绕过这两道防线）。forceVerify 确保
+      // 不会因本地哈希未变或设置分片被跳过而误报成功。
+      const pushed = await forceSyncToBackend({ reportFailures: true, forceVerify: true });
       // 推送等待期间切号：旧会话的结果绝不提交给新会话
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
@@ -170,9 +179,12 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       toast(t('useBackendSettingsActions.backend-not-available'), 'error');
       return;
     }
-    // 账号代次校验（Issue #611）：确认弹窗打开前固定目标会话，弹窗与拉取期间切号后中止
+    // 账号代次与后端目标校验（Issue #611 / C44）：确认弹窗打开前同时固定账号会话与后端目标，
+    // 弹窗或拉取期间切号、换址或断开重连（含 X→Y→X）均中止拉取/应用。
     const startedAccountId = peekCurrentAccountId();
     const startedGeneration = getAccountSessionGeneration();
+    const startedBackendUrl = backend.backendUrl ?? '';
+    const startedConnectionGen = backend.connectionGeneration ?? 0;
     const confirmed = await confirm(
       t('useBackendSettingsActions.sync-from-backend'),
       t('useBackendSettingsActions.syncing-from-backend-will-overwrite-local-data-c'),
@@ -180,9 +192,11 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     );
     if (!confirmed) return;
     if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
-    // 审计修复（C44）：拉取开始时记录当前后端地址——地址可被并行的
-    // testConnection 更换且不递增会话代次，仅靠会话校验识别不到。
-    const startedBackendUrl = backend.backendUrl ?? '';
+    if ((backend.backendUrl ?? '') !== startedBackendUrl || (backend.connectionGeneration ?? 0) !== startedConnectionGen) {
+      console.warn('Sync from backend aborted: backend target changed during confirmation');
+      toast(t('useBackendSettingsActions.sync-failed'), 'error');
+      return;
+    }
     setIsSyncingFromBackend(true);
     try {
       const [repoData, releaseData, aiConfigData, webdavConfigData, settingsData] = await Promise.all([
@@ -196,10 +210,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
-      // 审计修复（C44）：后端地址在拉取等待期间被更换（如另一面板的
-      // testConnection）时丢弃响应并提示用户——响应可能来自另一个后端分区。
-      if ((backend.backendUrl ?? '') !== startedBackendUrl) {
-        console.warn('Sync from backend discarded: backend URL changed during fetch');
+      // 审计修复（C44）：后端地址或连接代次在拉取等待期间变化时丢弃响应并提示用户。
+      if ((backend.backendUrl ?? '') !== startedBackendUrl || (backend.connectionGeneration ?? 0) !== startedConnectionGen) {
+        console.warn('Sync from backend discarded: backend target changed during fetch');
         toast(t('useBackendSettingsActions.sync-failed'), 'error');
         return;
       }
@@ -231,7 +244,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       toast(t('useBackendSettingsActions.synced-from-backend-repos-v1-releases-v2-ai-conf', { v1: repoData.repositories.length, v2: releaseData.releases.length, v3: aiConfigData.length, v4: webdavConfigData.length }), 'success');
     } catch (error) {
       console.error('Sync from backend failed:', error);
-      toast(`${t('useBackendSettingsActions.sync-failed')}: ${(error as Error).message}`, 'error');
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(`${t('useBackendSettingsActions.sync-failed')}: ${(error as Error).message}`, 'error');
+      }
     } finally {
       setIsSyncingFromBackend(false);
     }

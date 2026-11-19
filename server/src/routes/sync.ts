@@ -7,6 +7,8 @@ import {
   resolveWritableAccountScope,
   hasPendingDefaultPartitionData,
   bumpAccountRevision,
+  getAccountCredentialVersion,
+  bumpAccountCredentialVersion,
   claimLegacyDefaultWithAdminConfirmation,
   fetchGitHubUserId,
   ACCOUNT_SCOPED_SETTING_KEYS,
@@ -24,17 +26,48 @@ function isDeclaredAccountId(value: unknown): value is string {
 /**
  * Issue #612 R2-A19：导入分类的 id 归一化（顶层与工作区路径共用）。
  * 旧版备份的分类条目可能缺失 id（旧 POST /api/categories 不写 id），直接入库
- * 会撞 categories.id 的 NOT NULL 约束并回滚整个导入事务。缺失时分配基于名称
- * 的确定性派生标识（`legacy-category-<名称>`）：同一备份重复导入生成同一 id
- * （配合 INSERT OR REPLACE 幂等），前缀形态与客户端生成的显式 ID 区分；
- * 显式 ID（含数字形态）原样保留。
+ * 会撞 categories.id 的 NOT NULL 约束并回滚整个导入事务。
+ * - 显式 ID（含数字形态）原样保留并预先占位；
+ * - 缺失时使用 `legacy-category-${encodeURIComponent(rawName)}` 保留原始名称区分
+ *   （避免 `Build Tools` 与 `Build-Tools` 碰撞）；
+ * - 同名条目或与显式 ID 冲突时追加稳定的 `#2` / `#3` 序号后缀，保证重复导入
+ *   同一备份生成同一组 ID（配合 INSERT OR REPLACE 幂等更新而非创建副本）。
  */
-function normalizeImportedCategoryId(rawId: unknown, name: unknown): string | number {
-  if (typeof rawId === 'string' && rawId.trim()) return rawId;
-  if (typeof rawId === 'number' && Number.isFinite(rawId)) return rawId;
-  const rawName = typeof name === 'string' && name.trim() ? name.trim() : 'unnamed';
-  return `legacy-category-${rawName.replace(/\s+/g, '-')}`;
+function buildImportedCategoryIds(categories: Record<string, unknown>[]): Array<string | number | null> {
+  const usedIds = new Set<string>();
+  const resolved: Array<string | number | null> = categories.map((c) => {
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
+    if (typeof c.id === 'string' && c.id.trim()) {
+      usedIds.add(c.id);
+      return c.id;
+    }
+    if (typeof c.id === 'number' && Number.isFinite(c.id)) {
+      usedIds.add(String(c.id));
+      return c.id;
+    }
+    return null;
+  });
+
+  for (let i = 0; i < categories.length; i++) {
+    if (resolved[i] !== null) continue;
+    const c = categories[i];
+    if (!c || typeof c !== 'object' || Array.isArray(c)) continue;
+    const rawName = typeof c.name === 'string' && c.name.trim() ? c.name.trim() : 'unnamed';
+    const baseId = `legacy-category-${encodeURIComponent(rawName)}`;
+    let candidate = baseId;
+    let suffix = 2;
+    while (usedIds.has(candidate)) {
+      candidate = `${baseId}#${suffix}`;
+      suffix++;
+    }
+    usedIds.add(candidate);
+    resolved[i] = candidate;
+  }
+
+  return resolved;
 }
+
+const toSharedBit = (value: unknown): number => (value === true || value === 1) ? 1 : 0;
 
 /**
  * 服务端导出（SELECT *）把 is_read 序列化为数字 0/1，客户端备份则是布尔值。
@@ -386,6 +419,8 @@ router.post('/api/sync/import', async (req, res) => {
       unverifiedOwner: boolean;
       /** Issue #612 R2-A23：凭据验证结果按工作区条目绑定（重复账号条目互不影响）。 */
       tokenVerification?: { ok: boolean; reason?: string };
+      /** 异步 PAT 校验前记录的目标账号凭据版本，用于事务内检测并发清除/轮换。 */
+      credentialVersionBefore?: number;
     }> = [];
     if (Array.isArray(accountWorkspacesRaw)) {
       for (const ws of accountWorkspacesRaw) {
@@ -497,6 +532,11 @@ router.post('/api/sync/import', async (req, res) => {
       && Boolean(topTokenValue)
       && !topTokenValue.startsWith('***');
 
+    const topLevelCredVersionBefore = getAccountCredentialVersion(db, accountId);
+    for (const entry of workspaceEntries) {
+      entry.credentialVersionBefore = getAccountCredentialVersion(db, entry.accountId);
+    }
+
     let topLevelTokenVerification: { ok: boolean; reason?: string } | null = null;
     await Promise.all([
       ...workspaceEntries.map(async (entry) => {
@@ -537,20 +577,42 @@ router.post('/api/sync/import', async (req, res) => {
     // Issue #612 A3：验证未通过而未恢复的工作区凭据报告（在响应中返回）。
     const skippedCredentials: Array<{ account_id: string; restored: boolean; reason?: string }> = [];
 
-    const importAll = db.transaction(() => {
+    const importAll = db.transaction((): { scopeError: boolean } => {
+      // 事务首次写入前重新解析无账号头请求的范围：若异步 PAT 验证期间账号状态变化
+      // 导致范围变得歧义或目标改变，直接拒绝导入，绝不将已验证载荷改投到新目标。
+      const currentScope = resolveWritableAccountScope(req, db);
+      if (!currentScope.ok || currentScope.accountId !== accountId) {
+        return { scopeError: true };
+      }
+
       // Issue #612 A10：workspaceEntries 非空时顶层 repositories/releases/
       // categories 不再静默丢弃——按已选定策略把顶层数据写入当前请求账号分区
       // （分区隔离约束由 A1 的目标范围校验保证：请求分区已明确且与备份声明
       // 一致，或调用方已显式确认迁移）。
       const hasAccountWorkspaces = workspaceEntries.length > 0;
-      // Issue #612 R2-A15/A18：顶层兼容副本复用未核验 default 工作区（A4）的
-      // 归属检查，并在事务内重新评估（不得仅凭等待 PAT 验证前记录的判断）：
-      // 目标 default 分区仍有待认领数据时，顶层 repositories/releases/
-      // categories 及账号级设置绝不得写入该分区；分区为空或已认领时照常恢复
-      // default 备份及账号设置。
-      const topLevelDefaultBlocked = accountId === 'default' && hasPendingDefaultPartitionData(db);
+      // Issue #612 R2-A15/A18：在事务开始后、首次写入前检查一次 default 待认领状态，
+      // 顶层与 default 工作区共用该结果——既拦截验证期间的外部写入，又不会把本事务
+      // 刚写入的顶层仓库误判为待认领数据。
+      const pendingDefaultAtTxStart = hasPendingDefaultPartitionData(db);
+      const topLevelDefaultBlocked = accountId === 'default' && pendingDefaultAtTxStart;
+
+      // 在首次写入前记录事务开始时的凭据版本差异：若异步验证期间目标账号凭据已被
+      // 清除或轮换，事务内绝不用旧的已验证 PAT 覆盖较新状态。
+      const topLevelCredChanged = getAccountCredentialVersion(db, accountId) !== topLevelCredVersionBefore;
+      const wsCredChangedByAccount = new Map<string, boolean>();
+      for (const entry of workspaceEntries) {
+        if (!wsCredChangedByAccount.has(entry.accountId)) {
+          wsCredChangedByAccount.set(
+            entry.accountId,
+            getAccountCredentialVersion(db, entry.accountId) !== (entry.credentialVersionBefore ?? 0),
+          );
+        }
+      }
 
       // Repositories（导入到当前账号分区；account_id 占位参数末位追加）
+      // 保留备份中的 ai_shared / ai_*_shared 共享授权标记（旧备份缺省时落 0）；
+      // vector_indexed_at 一律清空为 NULL，避免旧版备份恢复后把缺少 accountId 元数据
+      // 的旧向量视为已索引。
       const repos = data.repositories as Record<string, unknown>[] | undefined;
       if (!topLevelDefaultBlocked && Array.isArray(repos) && repos.length > 0) {
         const repoStmt = db.prepare(`
@@ -562,8 +624,9 @@ router.post('/api/sync/import', async (req, res) => {
             custom_description, custom_tags, custom_category, category_locked, last_edited,
             subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
             description_display, tags_display,
+            ai_shared, ai_summary_shared, ai_tags_shared, ai_platforms_shared,
             account_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         let importedRepos = 0;
         for (const r of repos) {
@@ -617,13 +680,17 @@ router.post('/api/sync/import', async (req, res) => {
             typeof r.custom_tags === 'string' ? r.custom_tags : (r.custom_tags == null ? null : JSON.stringify(r.custom_tags)),
             r.custom_category ?? null, (r.category_locked === true || r.category_locked === 1) ? 1 : 0, r.last_edited ?? null,
             r.subscribed_to_releases ? 1 : 0,
-            r.vector_indexed_at ?? null,
+            null,
             licenseValue,
             // INSERT OR REPLACE 会整行替换，故备份无此列时落 null（影响：增量谓词会
             // 触发一次重索引回填指纹），合预期。
             vectorIndexedLicense
             , toDisplayPref(r.description_display, DESCRIPTION_DISPLAY_VALUES)
             , toDisplayPref(r.tags_display, TAGS_DISPLAY_VALUES)
+            , toSharedBit(r.ai_shared)
+            , toSharedBit(r.ai_summary_shared)
+            , toSharedBit(r.ai_tags_shared)
+            , toSharedBit(r.ai_platforms_shared)
             , accountId
           );
           importedRepos += 1;
@@ -715,14 +782,17 @@ router.post('/api/sync/import', async (req, res) => {
           INSERT OR REPLACE INTO categories (id, name, description, icon, keywords, color, sort_order, is_custom, account_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
-        for (const c of cats) {
+        const catIds = buildImportedCategoryIds(cats);
+        for (let i = 0; i < cats.length; i++) {
+          const c = cats[i];
+          const catId = catIds[i];
           // Issue #612 A6：与工作区路径一致，事务内跳过无效对象，不因单条脏数据
           // 回滚整个导入。
-          if (!c || typeof c !== 'object' || Array.isArray(c)) continue;
+          if (!c || typeof c !== 'object' || Array.isArray(c) || catId === null) continue;
           catStmt.run(
             // Issue #612 R2-A19：旧版分类 id 为 NULL/缺失时分配确定性稳定标识
             // （顶层与工作区共用），显式 ID 原样保留，避免 NOT NULL 约束回滚。
-            normalizeImportedCategoryId(c.id, c.name), c.name ?? '', c.description ?? null, c.icon ?? '📁',
+            catId, c.name ?? '', c.description ?? null, c.icon ?? '📁',
             typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
             c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0,
             accountId
@@ -819,15 +889,18 @@ router.post('/api/sync/import', async (req, res) => {
           if (key === 'github_token' && typeof value === 'string' && value.startsWith('***')) {
             continue; // Skip masked token
           }
+          // Issue #612 R2-A15：目标 default 分区仍有待认领数据时，无论是否包含工作区
+          // （包括不含工作区的 v1 备份），所有账号级设置均跳过，仅继续恢复真正的全局设置。
+          if (topLevelDefaultBlocked && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
+            continue;
+          }
           if (hasAccountWorkspaces && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
             // Issue #612 A2(a)：顶层账号范围设置必须纳入与 default 工作区相同的
             // 归属校验后才可写入全局表（default 分区的设置存储位置）。请求本身
             // 不在 default 分区时，全局表中的账号级键归属无法核验，一律跳过，
             // 防止把归属未验证的设置写进认领来源分区。真正的全局设置（非账号级
             // 键）不受影响，仍独立恢复。
-            // Issue #612 R2-A15：目标 default 分区仍有待认领数据时同样跳过
-            // （顶层兼容副本绝不得写进待认领的 default 分区）。
-            if (accountId !== 'default' || topLevelDefaultBlocked) continue;
+            if (accountId !== 'default') continue;
             if (key === 'github_token' && value && typeof value === 'string') {
               // Issue #612 R2-A17：顶层真实 PAT 必须先通过 /user 身份验证
               // （与 A3 工作区路径同语义），失败保留目标凭据并报告。
@@ -840,9 +913,21 @@ router.post('/api/sync/import', async (req, res) => {
                 });
                 continue;
               }
+              if (topLevelCredChanged) {
+                skippedCredentials.push({
+                  account_id: accountId,
+                  restored: false,
+                  reason: 'Account credential changed during verification',
+                });
+                continue;
+              }
               globalSettingsStmt.run(key, encrypt(value, config.encryptionKey));
+              bumpAccountCredentialVersion(db, accountId);
             } else {
               globalSettingsStmt.run(key, serializeSettingValue(value));
+              if (key === 'github_token') {
+                bumpAccountCredentialVersion(db, accountId);
+              }
             }
             settingsCount++;
             continue;
@@ -859,12 +944,21 @@ router.post('/api/sync/import', async (req, res) => {
               });
               continue;
             }
+            if (topLevelCredChanged) {
+              skippedCredentials.push({
+                account_id: accountId,
+                restored: false,
+                reason: 'Account credential changed during verification',
+              });
+              continue;
+            }
             const encrypted = encrypt(value, config.encryptionKey);
             if (accountId !== 'default') {
               accountSettingsStmt.run(accountId, key, encrypted);
             } else {
               globalSettingsStmt.run(key, encrypted);
             }
+            bumpAccountCredentialVersion(db, accountId);
           } else if (key === 'github_token' && (value === null || value === undefined || value === '')) {
             // 显式空 Token（null / ''；掩码 '***' 已在上方跳过）：除写入空值占位
             // 外，必须同步清空 accounts 的加密凭据副本，避免旧 Token 回退复活。
@@ -874,6 +968,7 @@ router.post('/api/sync/import', async (req, res) => {
             } else {
               globalSettingsStmt.run(key, serializeSettingValue(value));
             }
+            bumpAccountCredentialVersion(db, accountId);
           } else if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && accountId !== 'default') {
             accountSettingsStmt.run(accountId, key, serializeSettingValue(value));
           } else {
@@ -899,8 +994,9 @@ router.post('/api/sync/import', async (req, res) => {
             custom_description, custom_tags, custom_category, category_locked, last_edited,
             subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
             description_display, tags_display,
+            ai_shared, ai_summary_shared, ai_tags_shared, ai_platforms_shared,
             account_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const wsRelStmtPreserveIsRead = db.prepare(`
           INSERT INTO releases (
@@ -969,11 +1065,10 @@ router.post('/api/sync/import', async (req, res) => {
         let workspaceSettingsCount = 0;
 
         for (const { accountId: wsAccountId, workspace, unverifiedOwner, tokenVerification: entryTokenVerification } of workspaceEntries) {
-          // Issue #612 R2-A18：在事务内重新检查 default 分区待认领状态——等待
-          // PAT 验证期间可能有并发写入使事务前记录的 unverifiedOwner 过期；
-          // 无并发写入时空白目标的恢复行为不变。
+          // Issue #612 R2-A18：复用事务开始前（首次写入前）采集的 pendingDefaultAtTxStart，
+          // 既拦截验证期间的外部写入，又避免把本事务刚写入的顶层仓库误判为待认领数据。
           if (unverifiedOwner || (wsAccountId === 'default'
-            && (accountId !== 'default' || hasPendingDefaultPartitionData(db)))) continue;
+            && (accountId !== 'default' || pendingDefaultAtTxStart))) continue;
           const wsRepos = workspace.repositories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsRepos)) {
             for (const r of wsRepos) {
@@ -1021,11 +1116,15 @@ router.post('/api/sync/import', async (req, res) => {
                 typeof r.custom_tags === 'string' ? r.custom_tags : (r.custom_tags == null ? null : JSON.stringify(r.custom_tags)),
                 r.custom_category ?? null, (r.category_locked === true || r.category_locked === 1) ? 1 : 0, r.last_edited ?? null,
                 r.subscribed_to_releases ? 1 : 0,
-                r.vector_indexed_at ?? null,
+                null,
                 licenseValue,
                 vectorIndexedLicense,
                 toDisplayPref(r.description_display, DESCRIPTION_DISPLAY_VALUES),
                 toDisplayPref(r.tags_display, TAGS_DISPLAY_VALUES),
+                toSharedBit(r.ai_shared),
+                toSharedBit(r.ai_summary_shared),
+                toSharedBit(r.ai_tags_shared),
+                toSharedBit(r.ai_platforms_shared),
                 wsAccountId
               );
               workspaceRepoCount++;
@@ -1059,12 +1158,16 @@ router.post('/api/sync/import', async (req, res) => {
 
           const wsCats = workspace.categories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsCats)) {
-            for (const c of wsCats) {
+            const wsCatIds = buildImportedCategoryIds(wsCats);
+            for (let i = 0; i < wsCats.length; i++) {
+              const c = wsCats[i];
+              const catId = wsCatIds[i];
+              if (!c || typeof c !== 'object' || Array.isArray(c) || catId === null) continue;
               wsCatStmt.run(
                 // Issue #612 R2-A19：旧版分类 id 为 NULL/缺失时分配确定性稳定
                 // 标识（与顶层路径共用），显式 ID 原样保留，避免 NOT NULL 约束
                 // 导致整个导入事务回滚。
-                wsAccountId, normalizeImportedCategoryId(c.id, c.name), c.name ?? '', c.description ?? null, c.icon ?? '📁',
+                wsAccountId, catId, c.name ?? '', c.description ?? null, c.icon ?? '📁',
                 typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
                 c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0
               );
@@ -1084,6 +1187,7 @@ router.post('/api/sync/import', async (req, res) => {
               let serialized = value === null || value === undefined
                 ? null
                 : typeof value === 'object' ? JSON.stringify(value) : (value as string);
+              let credentialUpdated = false;
               if (key === 'github_token' && typeof value === 'string' && value) {
                 // Issue #612 A3：真实 Token（勾选「包含密钥」的备份）必须先通过
                 // 事务外的 /user 身份验证，且属于该工作区账号才写入；验证失败
@@ -1098,16 +1202,29 @@ router.post('/api/sync/import', async (req, res) => {
                   });
                   continue;
                 }
+                if (wsCredChangedByAccount.get(wsAccountId)) {
+                  skippedCredentials.push({
+                    account_id: wsAccountId,
+                    restored: false,
+                    reason: 'Account credential changed during verification',
+                  });
+                  continue;
+                }
                 // 与其他凭据一致，写入前必须 encrypt()，绝不能把明文凭证当作
                 // 普通设置序列化入库。
                 serialized = encrypt(value, config.encryptionKey);
+                credentialUpdated = true;
               } else if (key === 'github_token' && (value === null || value === undefined || value === '')) {
                 // 显式空 Token（null / ''）：同步清空 accounts 的加密凭据副本，
                 // 避免已清空的 Token 经 accounts 回退复活。
                 wsClearAccountTokenStmt.run(wsAccountId);
+                credentialUpdated = true;
               }
               if (wsAccountId === 'default') wsGlobalSettingsStmt.run(key, serialized);
               else wsSettingsStmt.run(wsAccountId, key, serialized);
+              if (credentialUpdated) {
+                bumpAccountCredentialVersion(db, wsAccountId);
+              }
               workspaceSettingsCount++;
             }
           }
@@ -1175,17 +1292,39 @@ router.post('/api/sync/import', async (req, res) => {
 
       // Issue #612 A20x：导入写入的每个分区推进仓库快照版本（仅当发生了
       // 仓库/发行版写入；分区归属与 A1 的目标范围校验一致）。
+      // 仓库导入会重置 vector_indexed_at，同步清除回填检查标记以便后续重新核验。
+      const clearBackfillChecked = (targetAccountId: string) => {
+        try {
+          db.prepare(
+            "DELETE FROM partition_meta WHERE account_id = ? AND key = 'vector_account_backfill_checked'"
+          ).run(targetAccountId);
+        } catch {
+          // 轻量 stub 缺表时忽略
+        }
+      };
       if ((counts.repositories ?? 0) > 0 || (counts.releases ?? 0) > 0) {
         bumpAccountRevision(db, accountId);
+        if ((counts.repositories ?? 0) > 0) {
+          clearBackfillChecked(accountId);
+        }
       }
       if (workspaceEntries.length > 0) {
         for (const wsAccountId of workspaceWrittenAccounts) {
           bumpAccountRevision(db, wsAccountId);
+          clearBackfillChecked(wsAccountId);
         }
       }
+      return { scopeError: false };
     });
 
-    importAll();
+    const importResult = typeof importAll.immediate === 'function' ? importAll.immediate() : importAll();
+    if (importResult.scopeError) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
     // Issue #612 A3：验证未通过的工作区凭据在响应中报告（目标账号现有凭据保留）。
     res.json({ imported: counts, skipped_credentials: skippedCredentials });
   } catch (err) {

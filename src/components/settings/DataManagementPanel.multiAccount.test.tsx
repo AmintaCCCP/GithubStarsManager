@@ -35,10 +35,42 @@ vi.mock('../../services/xTweetService', () => ({
 vi.mock('../../services/telegramService', () => ({
   abortTelegramSync: vi.fn().mockResolvedValue(undefined),
 }));
+const ghAccountSecretsMocks = vi.hoisted(() => ({
+  clearGhAccountTokens: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../services/electronProxy', () => ({
   clearEncryptedXAuthViaDesktop: vi.fn().mockResolvedValue(undefined),
-  clearEncryptedGhAccountsViaDesktop: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../../store/persistence/ghAccountSecrets', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../store/persistence/ghAccountSecrets')>();
+  return {
+    ...actual,
+    clearGhAccountTokens: ghAccountSecretsMocks.clearGhAccountTokens,
+  };
+});
+
+const stubUrlObjectMethods = () => {
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+  const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+  const createObjectURLMock = vi.fn<(blob: Blob) => string>(() => 'blob:mock-url');
+  const revokeObjectURLMock = vi.fn();
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURLMock });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURLMock });
+  const restore = () => {
+    if (originalCreate) {
+      Object.defineProperty(URL, 'createObjectURL', originalCreate);
+    } else {
+      delete (URL as unknown as Record<string, unknown>).createObjectURL;
+    }
+    if (originalRevoke) {
+      Object.defineProperty(URL, 'revokeObjectURL', originalRevoke);
+    } else {
+      delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+    }
+  };
+  return { createObjectURLMock, revokeObjectURLMock, restore };
+};
 
 const t = (key: string) => key;
 
@@ -174,49 +206,50 @@ const importBackupAndClick = async (
 
 beforeEach(() => {
   vi.clearAllMocks();
+  ghAccountSecretsMocks.clearGhAccountTokens.mockResolvedValue(undefined);
   setupStore();
 });
 
 describe('DataManagementPanel multi-account import/export (Issue #611 audit fixes)', () => {
   it('exports workspaces trimmed to selectedTypes: only customCategories leaks no repository data', async () => {
     const user = userEvent.setup();
-    const createObjectURLMock = vi.fn<(blob: Blob) => string>(() => 'blob:mock-url');
-    const revokeObjectURLMock = vi.fn();
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURLMock });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURLMock });
+    const { createObjectURLMock, restore } = stubUrlObjectMethods();
+    try {
+      render(<DataManagementPanel t={t} />);
 
-    render(<DataManagementPanel t={t} />);
+      // 反选除 customCategories 之外的所有类型
+      const labelsToUncheck = [
+        'dataManagementPanel.repositories',
+        'dataManagementPanel.releases',
+        'dataManagementPanel.ai-configs',
+        'dataManagementPanel.webdav-configs',
+        'dataManagementPanel.asset-filters',
+        'dataManagementPanel.discovery-data',
+        'dataManagementPanel.subscription-data',
+        'dataManagementPanel.release-subscriptions',
+        'dataManagementPanel.search-filters',
+        'dataManagementPanel.ui-settings',
+      ];
+      for (const label of labelsToUncheck) {
+        await user.click(screen.getByLabelText(label));
+      }
 
-    // 反选除 customCategories 之外的所有类型
-    const labelsToUncheck = [
-      'dataManagementPanel.repositories',
-      'dataManagementPanel.releases',
-      'dataManagementPanel.ai-configs',
-      'dataManagementPanel.webdav-configs',
-      'dataManagementPanel.asset-filters',
-      'dataManagementPanel.discovery-data',
-      'dataManagementPanel.subscription-data',
-      'dataManagementPanel.release-subscriptions',
-      'dataManagementPanel.search-filters',
-      'dataManagementPanel.ui-settings',
-    ];
-    for (const label of labelsToUncheck) {
-      await user.click(screen.getByLabelText(label));
+      await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
+
+      expect(createObjectURLMock).toHaveBeenCalledOnce();
+      const blob = createObjectURLMock.mock.calls[0][0] as Blob;
+      const payload = JSON.parse(await blob.text());
+
+      // 工作区字段按选择裁剪：其他账号的仓库数据绝不进入导出 JSON
+      expect(payload.data.repositories).toBeUndefined();
+      expect(payload.data.customCategories).toBeDefined();
+      expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
+      expect(payload.data.accountWorkspaces['2'].customCategories[0].id).toBe('cat-bob-local');
+      // 当前账号（实时合成）的仓库同样被裁剪
+      expect(payload.data.accountWorkspaces['1'].repositories).toEqual([]);
+    } finally {
+      restore();
     }
-
-    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
-
-    expect(createObjectURLMock).toHaveBeenCalledOnce();
-    const blob = createObjectURLMock.mock.calls[0][0] as Blob;
-    const payload = JSON.parse(await blob.text());
-
-    // 工作区字段按选择裁剪：其他账号的仓库数据绝不进入导出 JSON
-    expect(payload.data.repositories).toBeUndefined();
-    expect(payload.data.customCategories).toBeDefined();
-    expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
-    expect(payload.data.accountWorkspaces['2'].customCategories[0].id).toBe('cat-bob-local');
-    // 当前账号（实时合成）的仓库同样被裁剪
-    expect(payload.data.accountWorkspaces['1'].repositories).toEqual([]);
   });
 
   it('captures the live workspace when a cross-account replace backup lacks the current account workspace', async () => {
@@ -375,107 +408,107 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
 
   it('exports account attribution when only releaseSubscriptions is selected', async () => {
     const user = userEvent.setup();
-    const createObjectURLMock = vi.fn<(blob: Blob) => string>(() => 'blob:mock-url');
-    const revokeObjectURLMock = vi.fn();
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURLMock });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURLMock });
+    const { createObjectURLMock, restore } = stubUrlObjectMethods();
+    try {
+      render(<DataManagementPanel t={t} />);
 
-    render(<DataManagementPanel t={t} />);
+      // 反选除 release-subscriptions 之外的所有类型
+      const labelsToUncheck = [
+        'dataManagementPanel.repositories',
+        'dataManagementPanel.releases',
+        'dataManagementPanel.ai-configs',
+        'dataManagementPanel.webdav-configs',
+        'dataManagementPanel.asset-filters',
+        'dataManagementPanel.discovery-data',
+        'dataManagementPanel.subscription-data',
+        'dataManagementPanel.categories',
+        'dataManagementPanel.search-filters',
+        'dataManagementPanel.ui-settings',
+      ];
+      for (const label of labelsToUncheck) {
+        await user.click(screen.getByLabelText(label));
+      }
 
-    // 反选除 release-subscriptions 之外的所有类型
-    const labelsToUncheck = [
-      'dataManagementPanel.repositories',
-      'dataManagementPanel.releases',
-      'dataManagementPanel.ai-configs',
-      'dataManagementPanel.webdav-configs',
-      'dataManagementPanel.asset-filters',
-      'dataManagementPanel.discovery-data',
-      'dataManagementPanel.subscription-data',
-      'dataManagementPanel.categories',
-      'dataManagementPanel.search-filters',
-      'dataManagementPanel.ui-settings',
-    ];
-    for (const label of labelsToUncheck) {
-      await user.click(screen.getByLabelText(label));
+      await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
+
+      expect(createObjectURLMock).toHaveBeenCalledOnce();
+      const blob = createObjectURLMock.mock.calls[0][0] as Blob;
+      const payload = JSON.parse(await blob.text());
+
+      // 仅导出订阅时也必须带账号归属：否则导入端无法识别跨账号备份
+      expect(payload.data.releaseSubscriptions).toEqual([111]);
+      expect(payload.data.activeAccountId).toBe('1');
+      expect(payload.data.accountWorkspaces).toBeDefined();
+      expect(payload.data.savedAccounts).toBeDefined();
+      // 工作区按所选类型裁剪：只含订阅/已读字段，不含其他账号仓库
+      expect(payload.data.accountWorkspaces['1'].releaseSubscriptions).toEqual([111]);
+      expect(payload.data.accountWorkspaces['1'].repositories).toEqual([]);
+      expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
+    } finally {
+      restore();
     }
-
-    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
-
-    expect(createObjectURLMock).toHaveBeenCalledOnce();
-    const blob = createObjectURLMock.mock.calls[0][0] as Blob;
-    const payload = JSON.parse(await blob.text());
-
-    // 仅导出订阅时也必须带账号归属：否则导入端无法识别跨账号备份
-    expect(payload.data.releaseSubscriptions).toEqual([111]);
-    expect(payload.data.activeAccountId).toBe('1');
-    expect(payload.data.accountWorkspaces).toBeDefined();
-    expect(payload.data.savedAccounts).toBeDefined();
-    // 工作区按所选类型裁剪：只含订阅/已读字段，不含其他账号仓库
-    expect(payload.data.accountWorkspaces['1'].releaseSubscriptions).toEqual([111]);
-    expect(payload.data.accountWorkspaces['1'].repositories).toEqual([]);
-    expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
   });
 
   it('replace import of a categories-only export restores categories without wiping other accounts', async () => {
     // 往返：仅导出 customCategories → replace 导入，非当前账号的仓库等
     // 未选数据绝不被裁剪备份的空占位清空
     const user = userEvent.setup();
-    const createObjectURLMock = vi.fn<(blob: Blob) => string>(() => 'blob:mock-url');
-    const revokeObjectURLMock = vi.fn();
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURLMock });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURLMock });
+    const { createObjectURLMock, restore } = stubUrlObjectMethods();
+    try {
+      render(<DataManagementPanel t={t} />);
+      const labelsToUncheck = [
+        'dataManagementPanel.repositories',
+        'dataManagementPanel.releases',
+        'dataManagementPanel.ai-configs',
+        'dataManagementPanel.webdav-configs',
+        'dataManagementPanel.asset-filters',
+        'dataManagementPanel.discovery-data',
+        'dataManagementPanel.subscription-data',
+        'dataManagementPanel.release-subscriptions',
+        'dataManagementPanel.search-filters',
+        'dataManagementPanel.ui-settings',
+      ];
+      for (const label of labelsToUncheck) {
+        await user.click(screen.getByLabelText(label));
+      }
+      await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
+      const blob = createObjectURLMock.mock.calls[0][0] as Blob;
+      const payload = JSON.parse(await blob.text());
+      expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
 
-    render(<DataManagementPanel t={t} />);
-    const labelsToUncheck = [
-      'dataManagementPanel.repositories',
-      'dataManagementPanel.releases',
-      'dataManagementPanel.ai-configs',
-      'dataManagementPanel.webdav-configs',
-      'dataManagementPanel.asset-filters',
-      'dataManagementPanel.discovery-data',
-      'dataManagementPanel.subscription-data',
-      'dataManagementPanel.release-subscriptions',
-      'dataManagementPanel.search-filters',
-      'dataManagementPanel.ui-settings',
-    ];
-    for (const label of labelsToUncheck) {
-      await user.click(screen.getByLabelText(label));
-    }
-    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
-    const blob = createObjectURLMock.mock.calls[0][0] as Blob;
-    const payload = JSON.parse(await blob.text());
-    expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
-
-    // 审计修复（C56a）：导出后先修改 Alice/Bob 本地分类，再替换导入——
-    // 断言分类恢复为备份值（而非导出后本地值），且 Bob 未选仓库未导入。
-    useAppStore.setState({ customCategories: [category('cat-alice-edited', 'Alice Edited')] });
-    useAppStore.setState((current) => ({
-      accountWorkspaces: {
-        ...current.accountWorkspaces,
-        '2': {
-          ...current.accountWorkspaces['2'],
-          customCategories: [category('cat-bob-edited', 'Bob Edited')],
+      // 审计修复（C56a）：导出后先修改 Alice/Bob 本地分类，再替换导入——
+      // 断言分类恢复为备份值（而非导出后本地值），且 Bob 未选仓库未导入。
+      useAppStore.setState({ customCategories: [category('cat-alice-edited', 'Alice Edited')] });
+      useAppStore.setState((current) => ({
+        accountWorkspaces: {
+          ...current.accountWorkspaces,
+          '2': {
+            ...current.accountWorkspaces['2'],
+            customCategories: [category('cat-bob-edited', 'Bob Edited')],
+          },
         },
-      },
-    }));
+      }));
 
-    const exportedText = await blob.text();
-    const exportedFile = new File([exportedText], 'exported-categories.json', { type: 'application/json' });
-    const fileInput = screen.getByLabelText('dataManagementPanel.select-file') as HTMLInputElement;
-    await user.upload(fileInput, exportedFile);
-    await screen.findByRole('dialog');
-    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
+      const exportedText = await blob.text();
+      const exportedFile = new File([exportedText], 'exported-categories.json', { type: 'application/json' });
+      const fileInput = screen.getByLabelText('dataManagementPanel.select-file') as HTMLInputElement;
+      await user.upload(fileInput, exportedFile);
+      await screen.findByRole('dialog');
+      await user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
 
-    const state = useAppStore.getState();
-    // Alice 分类恢复为备份值（cat-alice），导出后的本地修改被替换
-    expect(state.customCategories.map((c: Category) => c.id)).toEqual(['cat-alice']);
-    expect(state.customCategories[0].name).toBe('Alice Cat');
-    // Bob 未选仓库未导入（实时仍是 bob-ai），Bob 分类恢复为备份值
-    expect(state.accountWorkspaces['2']?.repositories.map((r: Repository) => r.ai_summary))
-      .toEqual(['bob-ai']);
-    expect(state.accountWorkspaces['2']?.customCategories.map((c: Category) => c.id))
-      .toEqual(['cat-bob-local']);
-    expect(state.accountWorkspaces['2']?.customCategories[0].name).toBe('Bob Local');
+      const state = useAppStore.getState();
+      // Alice 分类恢复为备份值（cat-alice），导出后的本地修改被替换
+      expect(state.customCategories.map((c: Category) => c.id)).toEqual(['cat-alice']);
+      expect(state.customCategories[0].name).toBe('Alice Cat');
+      // Bob 未选仓库未导入（实时仍是 bob-ai），Bob 分类恢复为备份值
+      expect(state.accountWorkspaces['2']?.repositories.map((r: Repository) => r.ai_summary))
+        .toEqual(['bob-ai']);
+      expect(state.accountWorkspaces['2']?.customCategories.map((c: Category) => c.id))
+        .toEqual(['cat-bob-local']);
+      expect(state.accountWorkspaces['2']?.customCategories[0].name).toBe('Bob Local');
+    } finally {
+      restore();
+    }
   });
 
   it('archives backup-account subscriptions to its workspace on cross-account replace import', async () => {
@@ -767,6 +800,7 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
 
       await vi.waitFor(() => {
         const state = useAppStore.getState();
+        expect(ghAccountSecretsMocks.clearGhAccountTokens).toHaveBeenCalledOnce();
         expect(state.savedAccounts).toEqual({});
         expect(state.user).toBeNull();
         expect(state.githubToken).toBeNull();
@@ -777,5 +811,23 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('does not report success when desktop credential clearing fails during delete-all', async () => {
+    ghAccountSecretsMocks.clearGhAccountTokens.mockRejectedValueOnce(new Error('safeStorage locked'));
+    render(<DataManagementPanel t={t} />);
+    fireEvent.click(screen.getByRole('button', { name: 'dataManagementPanel.delete-all-data-2' }));
+    fireEvent.change(screen.getByLabelText(/please-enter-your-github-username/), {
+      target: { value: 'alice' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'dataManagementPanel.confirm-delete' }));
+
+    await waitFor(() => {
+      expect(ghAccountSecretsMocks.clearGhAccountTokens).toHaveBeenCalledOnce();
+      expect(screen.queryByText(/dataManagementPanel\.all-data-deleted-reloading-page/)).not.toBeInTheDocument();
+    });
+    // 清理失败时不清空内存态（等待用户重试）
+    expect(useAppStore.getState().user?.login).toBe('alice');
+    expect(Object.keys(useAppStore.getState().savedAccounts)).toEqual(['1']);
   });
 });

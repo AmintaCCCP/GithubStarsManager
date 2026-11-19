@@ -84,12 +84,16 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
       return;
     }
     setError('');
-    const result = await addAccountWithToken(trimmed, reauthAccount?.accountId);
-    if (!result.ok) {
-      setError(describeError(result.error));
-      return;
+    try {
+      const result = await addAccountWithToken(trimmed, reauthAccount?.accountId);
+      if (!result.ok) {
+        setError(describeError(result.error));
+        return;
+      }
+      handleCancel();
+    } catch (err) {
+      setError(describeError(err instanceof Error && err.message ? err.message : undefined));
     }
-    handleCancel();
   };
 
   const handleConfirmBackend = async () => {
@@ -98,13 +102,17 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
       return;
     }
     setError('');
-    // 补授权入口把目标账号固定住：候选后端的活跃账号不匹配时不得切换会话。
-    const result = await addAccountFromBackend(backendUrl.trim(), backendSecret.trim(), reauthAccount?.accountId);
-    if (!result.ok) {
-      setError(describeError(result.error));
-      return;
+    try {
+      // 补授权入口把目标账号固定住：候选后端的活跃账号不匹配时不得切换会话。
+      const result = await addAccountFromBackend(backendUrl.trim(), backendSecret.trim(), reauthAccount?.accountId);
+      if (!result.ok) {
+        setError(describeError(result.error));
+        return;
+      }
+      handleCancel();
+    } catch (err) {
+      setError(describeError(err instanceof Error && err.message ? err.message : undefined));
     }
-    handleCancel();
   };
 
   const hintForReauth = !!reauthAccount && mode === 'token';

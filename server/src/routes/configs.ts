@@ -14,6 +14,8 @@ import {
   fetchGitHubUserId,
   getAccountCredentialVersion,
   bumpAccountCredentialVersion,
+  getActiveAccountVersion,
+  bumpActiveAccountVersion,
   ACCOUNT_SCOPED_SETTING_KEYS,
   INTERNAL_SETTING_KEYS,
 } from '../db/accountScope.js';
@@ -711,6 +713,16 @@ router.put('/api/settings', async (req, res) => {
       }
     }
 
+    if ('github_token' in updates && updates.github_token !== undefined) {
+      if (updates.github_token !== null && typeof updates.github_token !== 'string') {
+        res.status(400).json({
+          error: 'github_token must be a string or null',
+          code: 'INVALID_GITHUB_TOKEN',
+        });
+        return;
+      }
+    }
+
     // Issue #612 A11：把新 PAT 写入真实账号分区之前，在事务外用 GitHub /user
     // 验证其身份。验证失败（网络错误 / 超时 / 401 / 身份不符）时保留该账号现有
     // 凭据：跳过本次 Token 写入并在响应中报告，绝不保存归属不明的凭据。
@@ -722,6 +734,7 @@ router.put('/api/settings', async (req, res) => {
     let tokenVerificationFailed = false;
     let tokenWriteSuperseded = false;
     const credentialVersionBefore = isRealAccount ? getAccountCredentialVersion(db, accountId) : 0;
+    const activeAccountVersionBefore = isRealAccount ? getActiveAccountVersion(db) : 0;
     const rawToken = updates.github_token;
     if (isRealAccount && typeof rawToken === 'string' && rawToken && !rawToken.startsWith('***')) {
       let storedEncrypted: string | null = null;
@@ -791,7 +804,7 @@ router.put('/api/settings', async (req, res) => {
               accountPayload.tokenEncrypted = value;
               bumpAccountCredentialVersion(db, accountId);
             }
-          } else if (isRealAccount) {
+          } else if (isRealAccount && (value === '' || value === null)) {
             // 显式清空（'' / null）：除 account_settings 外，accounts 表的加密
             // 凭据副本必须一并清空，否则代理会继续复用旧 Token。
             // Issue #612 R2-A1：显式清空无论当前值是否为空都推进凭据版本，
@@ -843,11 +856,13 @@ router.put('/api/settings', async (req, res) => {
           accountPayload.tokenCleared,
         );
         // 后台 Token 补写（只有 github_token，没有 user_profile）绝不能改写
-        // 活跃账号：另一台设备刚切到 B 时，A 的迟到补写不能把新设备拽回 A。
+        // 活跃账号；异步 PAT 校验期间若已发生较新的账号切换，也不得改回旧账号。
         const activeRow = db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'")
           .get() as { value: string | null } | undefined;
-        if (accountPayload.userProfile !== undefined || !activeRow?.value) {
+        const activeChangedDuringWait = getActiveAccountVersion(db) !== activeAccountVersionBefore;
+        if (!activeChangedDuringWait && (accountPayload.userProfile !== undefined || !activeRow?.value)) {
           globalStmt.run('active_account_id', accountId);
+          bumpActiveAccountVersion(db);
         }
       }
     });

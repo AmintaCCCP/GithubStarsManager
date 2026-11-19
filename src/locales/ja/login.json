@@ -59,7 +59,7 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "トークンはこのデバイスと自分のバックエンドにのみ保存され、アプリのサーバーには送信されません。",
+    "token-permissions-local-storage": "トークンはこのデバイスと自分のバックエンドにのみ保存され（WebDAV やファイルバックアップで「バックアップ・エクスポートにキーを含める」を有効にした場合を除く）、アプリのサーバーには送信されません。",
     "saved-accounts": "保存済みアカウント",
     "click-to-sign-in": "クリックしてサインイン",
     "token-required": "トークンが必要です"

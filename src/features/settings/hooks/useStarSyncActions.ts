@@ -49,13 +49,19 @@ export const useStarSyncActions = (): StarSyncActions => {
       { type: 'warning' },
     );
     if (!confirmed) return;
-    if (typeof useAppStore.getState === 'function' && !isCurrentAccountSession(snapshotAccountId, snapshotGeneration)) {
+    const hasStoreGetState = typeof useAppStore.getState === 'function';
+    if (hasStoreGetState && !isCurrentAccountSession(snapshotAccountId, snapshotGeneration)) {
       return;
     }
-    await pushCategoriesToLists(
-      createGitHubListsApiService(snapshotToken, { accountId: snapshotAccountId }),
-      categoryIds,
-    );
+    const listsApi = createGitHubListsApiService(snapshotToken, { accountId: snapshotAccountId });
+    if (hasStoreGetState) {
+      await pushCategoriesToLists(listsApi, categoryIds, {
+        accountId: snapshotAccountId,
+        generation: snapshotGeneration,
+      });
+    } else {
+      await pushCategoriesToLists(listsApi, categoryIds);
+    }
   }, [confirm, githubToken, pushCategoriesToLists, setListsPushError, t, user]);
 
   return { pushCategoriesToLists: push };

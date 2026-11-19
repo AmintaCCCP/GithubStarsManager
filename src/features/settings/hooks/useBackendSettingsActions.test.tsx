@@ -31,6 +31,7 @@ vi.mock('../../../services/backendAdapter', () => ({
 vi.mock('../../../services/autoSync', () => ({
   syncLocalGitHubTokenToBackend: mocks.syncLocalGitHubTokenToBackend,
   tryRestoreAuthFromBackend: mocks.tryRestoreAuthFromBackend,
+  withAccountSwitchFrozen: async <T,>(fn: () => Promise<T>) => fn(),
 }));
 vi.mock('../../../hooks/useDialog', () => ({
   useDialog: () => ({ toast: mocks.toast, confirm: mocks.confirm }),

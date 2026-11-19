@@ -135,10 +135,10 @@ export const Header: React.FC = () => {
       { type: 'warning' },
     );
     if (!confirmed) return;
-    // R2-B13：removeAccount 失败（切换锁被占用）时明确提示等待重试。
+    // R2-B13：removeAccount 失败（切换锁被占用或备选账号后端凭据对齐失败）时按具体错误码提示。
     const result = await removeAccount(account.accountId);
     if (!result.ok) {
-      toast(t('header.switch-in-progress'), 'error');
+      toast(switchErrorText(result.error ?? 'switch-in-progress'), 'error');
     }
   };
 

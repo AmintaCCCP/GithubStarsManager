@@ -89,7 +89,11 @@ export interface AppActions {
   setLastSync: (timestamp: string) => void;
   setSyncMode: (mode: SyncMode) => void;
   setSyncModeConfigured: (configured: boolean) => void;
-  pushCategoriesToLists: (api: GitHubListsApiService, categoryIds?: string[]) => Promise<void>;
+  pushCategoriesToLists: (
+    api: GitHubListsApiService,
+    categoryIds?: string[],
+    session?: { accountId: string | null; generation: number },
+  ) => Promise<void>;
   resetListsPush: () => void;
   setListsPushError: (error: string | null) => void;
   setCategoryListIdMap: (categoryId: string, listId: string) => void;
@@ -246,9 +250,10 @@ export interface AppActions {
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
   /**
    * Release 刷新状态（审计修复 B4）：发起时传 owner（发起账号 ID + 会话代次）；
-   * finally 清理时传同一身份——仅当该身份仍是标志持有者才清除（跨账号/跨会话
-   * 的过期 finally 不清除新账号已重新发起的刷新状态）；不传 owner 保持既有
-   * 布尔语义。
+   * 异步 finally 清理必须传入发起刷新时使用的同一 owner——仅当该身份仍是标志
+   * 持有者才清除（跨账号/跨会话的过期 finally 不清除新账号已重新发起的刷新状态）。
+   * 不传 owner 时，仅在没有旧 owner 记录阻止清理的情况下沿用布尔语义；若仍记录着
+   * 旧账号或旧代次的 owner，无 owner 的 setReleaseIsRefreshing(false) 会被忽略。
    */
   setReleaseIsRefreshing: (refreshing: boolean, owner?: { accountId: string | null; generation: number }) => void;
   setIncludePreRelease: (include: boolean) => void;

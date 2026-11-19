@@ -169,10 +169,16 @@ export const useReleaseTimelineActions = () => {
     ): T[] => currentReleases.map((rel) => {
       const before = releaseFieldsBeforeUpdate.get(rel.id);
       if (!before || !before.mutated) return rel;
+      // 按字段检查当前值是否仍归本次乐观写入所有：保留请求期间刷新的并发更新（如新的 updated_asset_ids）
+      const restoreIsRead = before.is_read !== true && rel.is_read === true;
+      const restoreUpdatedAssets = Boolean(before.updated_asset_ids && before.updated_asset_ids.length > 0)
+        && Array.isArray(rel.updated_asset_ids)
+        && rel.updated_asset_ids.length === 0;
+      if (!restoreIsRead && !restoreUpdatedAssets) return rel;
       return {
         ...rel,
-        is_read: before.is_read,
-        ...(before.updated_asset_ids !== undefined
+        ...(restoreIsRead ? { is_read: before.is_read } : {}),
+        ...(restoreUpdatedAssets && before.updated_asset_ids !== undefined
           ? { updated_asset_ids: [...before.updated_asset_ids] }
           : {}),
       };
@@ -188,10 +194,11 @@ export const useReleaseTimelineActions = () => {
       optimisticReadReleases = new Set(useAppStore.getState().readReleases);
       if (typeof useAppStore.subscribe === 'function') {
         unsubscribeReadWatcher = useAppStore.subscribe((nextState, prevState) => {
-          if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+          // 忽略切号本身引起的工作区替换；但在发起账号活跃（含 A→B→A 切回后）期间，
+          // 任何非单条增量的 readReleases 替换（如备份恢复）都使本次乐观更新失去所有权。
+          if (nextState.user?.id !== prevState.user?.id) return;
+          if (peekCurrentAccountId() !== startedAccountId) return;
           if (nextState.readReleases === prevState.readReleases) return;
-          // 仅允许单条并发增量标记已读（size 恰好 +1 且保留全部原元素）；
-          // 任何删减或批量替换（如备份恢复把 {101} 替换为 {101, 202}）均视为整体替换并收回所有权。
           const isSingleIncrementalAdd = nextState.readReleases.size === prevState.readReleases.size + 1
             && Array.from(prevState.readReleases).every(id => nextState.readReleases.has(id));
           if (!isSingleIncrementalAdd) {
@@ -200,7 +207,9 @@ export const useReleaseTimelineActions = () => {
         });
       }
       await backend.markAllReleasesAsRead();
-      toast(t('useReleaseTimelineActions.all-marked-as-read'), 'success');
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(t('useReleaseTimelineActions.all-marked-as-read'), 'success');
+      }
     } catch {
       if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
         const current = useAppStore.getState();
@@ -248,7 +257,9 @@ export const useReleaseTimelineActions = () => {
           });
         }
       }
-      toast(t('useReleaseTimelineActions.failed-to-mark-all-as-read'), 'error');
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(t('useReleaseTimelineActions.failed-to-mark-all-as-read'), 'error');
+      }
     } finally {
       unsubscribeReadWatcher?.();
       setIsMarkingAllRead(false);
@@ -299,6 +310,14 @@ export const useReleaseTimelineActions = () => {
       state.updateRepository({ ...starredRepo, subscribed_to_releases: false });
       state.batchUnsubscribeReleases([starredRepo.id]);
     }
+    // 在实际删除前捕获当前自定义来源条目，避免从确认框打开前的旧快照恢复过时元数据
+    const preDeleteSourceSettings = useAppStore.getState().releaseSourceSettings;
+    const removedWatchCustomSnapshot = sourcesToRemove.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)
+      ? preDeleteSourceSettings.watchCustomReleaseRepos.find(item => normalizeRepoKey(item.full_name) === repoKey)
+      : undefined;
+    const removedCustomSnapshot = sourcesToRemove.includes(CUSTOM_RELEASE_SOURCE_ID)
+      ? preDeleteSourceSettings.customReleaseRepos.find(item => normalizeRepoKey(item.full_name) === repoKey)
+      : undefined;
     if (sourcesToRemove.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)) state.removeReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, releaseRepo.full_name);
     if (sourcesToRemove.includes(CUSTOM_RELEASE_SOURCE_ID)) state.removeReleaseSourceRepository(CUSTOM_RELEASE_SOURCE_ID, releaseRepo.full_name);
 
@@ -314,7 +333,7 @@ export const useReleaseTimelineActions = () => {
       console.error('Failed to unsubscribe release:', error);
       // 审计修复（C41 / R2-C5）：按分片实际提交结果分别决定是否回滚 starred 与 custom 来源。
       // 若 repositories 已提交而仅 settings 失败，保留已确认的 starred 退订，仅恢复未确认的 custom 来源；
-      // 若尚未尝试任何写入或失败清单未知，才回滚整个本地操作。
+      // 若尚未尝试任何写入或失败清单未知，才回滚整个本地操作（含无来源仓库被删除的历史 Release）。
       const failedShards = (error as { failedShards?: string[] }).failedShards;
       const pushAttempted = (error as { pushAttempted?: boolean }).pushAttempted !== false;
       const rollbackAll = !pushAttempted || !Array.isArray(failedShards) || failedShards.length === 0;
@@ -324,11 +343,14 @@ export const useReleaseTimelineActions = () => {
         sourcesToRemove.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)
         || sourcesToRemove.includes(CUSTOM_RELEASE_SOURCE_ID)
       ) && (rollbackAll || failedShards.includes('settings'));
+      const shouldRollbackRemovedReleases = !stillActive
+        && removedReleasesSnapshot.length > 0
+        && (rollbackAll || shouldRollbackStarred || shouldRollbackSettings);
       // 同步等待期间可能已切号（含 A→B→A）：发起账号的回滚绝不写入新账号工作区
       if (!isCurrentAccountSession(accountIdBeforeConfirm, generationBeforeConfirm)) {
         return;
       }
-      if (shouldRollbackStarred || shouldRollbackSettings) {
+      if (shouldRollbackStarred || shouldRollbackSettings || shouldRollbackRemovedReleases) {
         useAppStore.setState((current) => {
           const next: {
             repositories?: typeof current.repositories;
@@ -354,37 +376,33 @@ export const useReleaseTimelineActions = () => {
             }
             next.releaseSubscriptions = releaseSubscriptions;
           }
-          // 2/3：恢复未确认提交的 custom / watchCustom 来源条目
-          if (shouldRollbackSettings && sourcesToRemove.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)) {
-            const removed = stateBeforeConfirm.releaseSourceSettings.watchCustomReleaseRepos
-              .find(item => normalizeRepoKey(item.full_name) === repoKey);
+          // 2/3：恢复未确认提交的 custom / watchCustom 来源条目（使用删除前最新快照）
+          if (shouldRollbackSettings && removedWatchCustomSnapshot) {
             const stillRemoved = !current.releaseSourceSettings.watchCustomReleaseRepos
               .some(item => normalizeRepoKey(item.full_name) === repoKey);
-            if (removed && stillRemoved) {
+            if (stillRemoved) {
               next.releaseSourceSettings = {
                 ...current.releaseSourceSettings,
-                watchCustomReleaseRepos: [...current.releaseSourceSettings.watchCustomReleaseRepos, removed],
+                watchCustomReleaseRepos: [...current.releaseSourceSettings.watchCustomReleaseRepos, removedWatchCustomSnapshot],
               };
             }
           }
-          if (shouldRollbackSettings && sourcesToRemove.includes(CUSTOM_RELEASE_SOURCE_ID)) {
-            const removed = stateBeforeConfirm.releaseSourceSettings.customReleaseRepos
-              .find(item => normalizeRepoKey(item.full_name) === repoKey);
+          if (shouldRollbackSettings && removedCustomSnapshot) {
             const stillRemoved = !current.releaseSourceSettings.customReleaseRepos
               .some(item => normalizeRepoKey(item.full_name) === repoKey);
-            if (removed && stillRemoved) {
+            if (stillRemoved) {
               // R2-C20：基于已累积的 next.releaseSourceSettings 合并——同一仓库
               // 同时来自 watchCustom 与 custom 两个来源时，先前恢复的
               // watchCustomReleaseRepos 不得被本分支覆盖。
               const baseSettings = next.releaseSourceSettings ?? current.releaseSourceSettings;
               next.releaseSourceSettings = {
                 ...baseSettings,
-                customReleaseRepos: [...baseSettings.customReleaseRepos, removed],
+                customReleaseRepos: [...baseSettings.customReleaseRepos, removedCustomSnapshot],
               };
             }
           }
           // 3/3：恢复本次因来源全部退出被实际删除的 release 记录（按 ID 去重）
-          if (!stillActive && removedReleasesSnapshot.length > 0) {
+          if (shouldRollbackRemovedReleases) {
             const existingIds = new Set(current.releases.map(item => item.id));
             const restoredReleases = removedReleasesSnapshot.filter(item => !existingIds.has(item.id));
             if (restoredReleases.length > 0) {

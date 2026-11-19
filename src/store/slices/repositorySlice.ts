@@ -8,7 +8,7 @@ import { getAllCategories } from '../helpers/categoryHelpers';
 import { buildListsPushPlan, validateListsPushPlan, GITHUB_LISTS_MAX_COUNT, GITHUB_LISTS_NAME_MAX_LENGTH } from '../helpers/listsPushPlan';
 import { hasActiveSearchFilters } from '../../utils/repoSearch';
 import { areRepositoryRecordsEqual, replaceRepositoryInList } from '../helpers/repositoryRecords';
-import { shouldPreserveExisting } from '../helpers/accountWorkspace';
+import { accountIdKey, getAccountSessionGeneration, shouldPreserveExisting } from '../helpers/accountWorkspace';
 import { findIdentityMatch, isValidGitHubRepositoryId } from '../../utils/repositoryIdentity';
 
 /** 合成一个不与现有记录冲突的本地 id（timestamp + random，避免并发竞态）。 */
@@ -190,11 +190,18 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
       resetListsPush: () => set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null } }),
       setListsPushError: (error) => set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error } }),
       setCategoryListIdMap: (categoryId, listId) => set((state) => ({ categoryListIdMap: { ...state.categoryListIdMap, [categoryId]: listId } })),
-      pushCategoriesToLists: async (api, categoryIds) => {
+      pushCategoriesToLists: async (api, categoryIds, session) => {
         const state = get();
         const t = i18n.getFixedT(state.language, 'app');
+        const sessionAccountId = session ? session.accountId : accountIdKey(state.user);
+        const sessionGeneration = session ? session.generation : getAccountSessionGeneration();
+        const isSessionActive = (): boolean => (
+          accountIdKey(get().user) === sessionAccountId
+          && getAccountSessionGeneration() === sessionGeneration
+        );
         // 重入保护：已有回写进行中时直接返回，避免并发创建重复 list 并互相覆盖成员
         if (state.listsPush.isRunning) return;
+        if (!isSessionActive()) return;
         if (!state.githubToken) {
           set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.not-connected-to-github-yet') } });
           return;
@@ -224,12 +231,15 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
 
           // 仅推送选中分类时，选中集合为空（含未知/已隐藏 id）则直接报错，不发起请求
           if (categoryIds && allCategories.length === 0) {
-            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.no-categories-selected') } });
+            if (isSessionActive()) {
+              set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.no-categories-selected') } });
+            }
             return;
           }
 
           // 1. 获取当前全部 list（含成员）
           const currentLists = await api.getUserLists(user!.login);
+          if (!isSessionActive()) return;
 
           // 2. 构建"托管 list"映射计划：每个本地分类 → list id。
           //    使用分类的稳定身份（规范名 + 持久化 id 映射），而不是翻译后的 cat.name：
@@ -288,9 +298,11 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           const renameFailures: string[] = [];
           const categoryById = new Map(allCategories.map(cat => [cat.id, cat]));
           for (const entry of plan) {
+            if (!isSessionActive()) return;
             const cat = categoryById.get(entry.categoryId)!;
             if (entry.kind === 'create') {
               const id = await api.createUserList(entry.name, true);
+              if (!isSessionActive()) return;
               listIdByCategoryId.set(entry.categoryId, id);
               nextCategoryListIdMap[entry.categoryId] = id;
               managedListIds.add(id);
@@ -304,6 +316,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
                 console.warn('rename list failed', entry.listId, entry.remoteName, '->', cat.name, e);
                 renameFailures.push(`${entry.remoteName} -> ${cat.name}`);
               }
+              if (!isSessionActive()) return;
             }
             listIdByCategoryId.set(entry.categoryId, entry.listId);
             managedListIds.add(entry.listId);
@@ -371,12 +384,14 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             return { owner: original.slice(0, idx), name: original.slice(idx + 1) };
           });
           const nodeIdMap = await api.resolveRepositoryNodeIds(ownerNamePairs);
+          if (!isSessionActive()) return;
 
           // 9. 覆盖写入（保留非托管 list 成员），逐仓库更新进度
           let updatedCount = 0;
           let done = 0;
           const total = reposToUpdate.size;
           for (const [key, targetIds] of reposToUpdate) {
+            if (!isSessionActive()) return;
             done++;
             set({ listsPush: { isRunning: true, total, done, currentLabel: key, message: null, error: null } });
             const itemId = nodeIdMap.get(key);
@@ -391,14 +406,18 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
               continue;
             }
             await api.updateUserListsForItem(itemId, finalListIds);
+            if (!isSessionActive()) return;
             updatedCount++;
           }
 
+          if (!isSessionActive()) return;
           set({ listsPush: { isRunning: false, total, done, currentLabel: null, message: t('repositorySlice.pushed-v1-lists-updated-updatedcount-repos', { v1: listIdByCategoryId.size, updatedCount: updatedCount }), error: null }, categoryListIdMap: nextCategoryListIdMap });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error('Push categories to lists failed:', error);
-          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.push-failed-detail', { message }) } });
+          if (isSessionActive()) {
+            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.push-failed-detail', { message }) } });
+          }
         }
       },
       deleteRepository: (repoId) => set((state) => {

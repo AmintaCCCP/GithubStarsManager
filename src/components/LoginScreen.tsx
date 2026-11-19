@@ -382,6 +382,11 @@ export const LoginScreen: React.FC = () => {
       const startPull = async () => {
         prePullWorkspace = captureAccountWorkspace(useAppStore.getState());
         pullStarted = true;
+        if (!liveBelongsToTarget) {
+          // 清理无主顶层残留（如旧版 customCategories），避免后端设置响应省略该字段时
+          // 残留被归档进目标账号或成为其实时工作区；拉取失败时 catch 会按 prePullWorkspace 还原。
+          discardPartialLoginWorkspace();
+        }
         // 审计修复（B13）：以显式账号 ID 拉取（不提前 setUser 生成请求头），
         // 拉取成功后统一提交工作区与登录态。
         await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
@@ -542,6 +547,10 @@ export const LoginScreen: React.FC = () => {
         // 拉取成功后统一提交工作区与登录态。
         prePullWorkspace = captureAccountWorkspace(useAppStore.getState());
         pullStarted = true;
+        if (!liveBelongsToTarget) {
+          // 清理无主顶层残留，避免后端未返回 customCategories 等字段时混入目标账号工作区。
+          discardPartialLoginWorkspace();
+        }
         await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
         if (nextAccountId) {
           const pulledWorkspace = captureAccountWorkspace(useAppStore.getState());

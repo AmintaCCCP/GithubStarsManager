@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   uploadFile: vi.fn(),
   listFiles: vi.fn(),
   downloadFile: vi.fn(),
+  getCurrentUser: vi.fn(),
+  hasGhAccountsBridge: vi.fn(() => false),
+  syncGhAccountTokensFromState: vi.fn<(...args: unknown[]) => Promise<boolean>>(async () => true),
 }));
 
 vi.mock('../../../hooks/useDialog', () => ({
@@ -30,6 +33,17 @@ vi.mock('../../../services/webdavService', () => ({
     downloadFile = mocks.downloadFile;
     constructor() { /* active config is provided by the store */ }
   },
+}));
+
+vi.mock('../../../services/githubApiFactory', () => ({
+  createGitHubApiService: () => ({
+    getCurrentUser: mocks.getCurrentUser,
+  }),
+}));
+
+vi.mock('../../../store/persistence/ghAccountSecrets', () => ({
+  hasGhAccountsBridge: () => mocks.hasGhAccountsBridge(),
+  syncGhAccountTokensFromState: (...args: unknown[]) => mocks.syncGhAccountTokensFromState(...args),
 }));
 
 const userA = { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null };
@@ -100,7 +114,11 @@ const activeWebDAV = {
   isActive: true,
 };
 
+const initialStoreState = useAppStore.getInitialState();
+
 const setupStore = (): void => {
+  // 每个用例先重置真实 Store，确保订阅/已读/分类等字段不会跨用例残留
+  useAppStore.setState(initialStoreState, true);
   useAppStore.setState({
     user: userA,
     githubToken: 'ghp_a',
@@ -127,6 +145,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.confirm.mockResolvedValue(true);
   mocks.uploadFile.mockResolvedValue(true);
+  mocks.getCurrentUser.mockResolvedValue(userB);
+  mocks.hasGhAccountsBridge.mockReturnValue(false);
+  mocks.syncGhAccountTokensFromState.mockResolvedValue(true);
   setupStore();
 });
 

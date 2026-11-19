@@ -74,7 +74,7 @@ describe('migrations', () => {
 
       // 幂等性：写入非零分区版本并将 ai_shared 置 1，将 schema_version 回退到最大版本 5 后重跑迁移，
       // 不得报错、不得清空元数据或重置共享标记
-      db.prepare("INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES ('default', 'revision', '7')").run();
+      db.prepare("INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES ('default', 'repo_revision', '7')").run();
       db.prepare('UPDATE repositories SET ai_shared = 1 WHERE id = 1').run();
       db.prepare('DELETE FROM schema_version WHERE version > 5').run();
       expect(db.prepare('SELECT MAX(version) AS maxVersion FROM schema_version').get())
@@ -83,7 +83,7 @@ describe('migrations', () => {
       runMigrations(db);
       const repoColumnsAfterRerun = (db.prepare('PRAGMA table_info(repositories)').all() as Array<{ name: string }>).map((c) => c.name);
       expect(repoColumnsAfterRerun.filter((name) => name === 'ai_shared')).toHaveLength(1);
-      expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = 'default' AND key = 'revision'").get())
+      expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = 'default' AND key = 'repo_revision'").get())
         .toMatchObject({ value: '7' });
       expect(db.prepare('SELECT account_id, id, ai_shared FROM repositories').all())
         .toEqual([{ account_id: 'default', id: 1, ai_shared: 1 }]);
@@ -137,6 +137,21 @@ describe('v4 legacy default PAT snapshot gating (Issue #612 R2-A8)', () => {
 
       expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'").get())
         .toMatchObject({ value: 'legacy-token' });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('freezes an empty sentinel when legacy data exists without a PAT', () => {
+    const db = new Database(':memory:');
+    try {
+      initV3Schema(db);
+      db.prepare("INSERT INTO settings (key, value) VALUES ('customCategories', ?)").run('["legacy"]');
+
+      runMigrations(db);
+
+      expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'").get())
+        .toEqual({ value: '' });
     } finally {
       db.close();
     }

@@ -198,6 +198,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           const sessionUsesTargetCredentials = current.isAuthenticated
             && current.githubToken === target.githubToken;
           const now = nowIso();
+          if (!sessionUsesTargetCredentials) {
+            // 先推进会话代次，再同时提交新凭证与刷新状态重置，确保旧会话异步操作无法控制新会话加载状态
+            bumpAccountSessionGeneration();
+          }
           set({
             savedAccounts: {
               ...current.savedAccounts,
@@ -206,10 +210,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
             ...(sessionUsesTargetCredentials ? {} : {
               githubToken: target.githubToken,
               isAuthenticated: true,
+              releaseIsRefreshing: false,
             }),
           });
           if (!sessionUsesTargetCredentials) {
-            bumpAccountSessionGeneration();
             writeAuthMirror({
               user: target.user,
               githubToken: target.githubToken,
@@ -363,7 +367,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         // active_account_id 分区）isFullSync 推送出去。
         cancelPendingAccountSwitchPush();
         resetSyncHashes();
-        const restore = restoreWorkspace && workspaceHasData(restoreWorkspace) ? restoreWorkspace : undefined;
+        const restore = restoreWorkspace
+          && (workspaceHasData(restoreWorkspace) || restoreWorkspace.syncModeConfigured === true)
+          ? restoreWorkspace
+          : undefined;
         withAccountSwitchGuardSync(() => {
           set({ ...applyAccountWorkspace(restore) });
         });

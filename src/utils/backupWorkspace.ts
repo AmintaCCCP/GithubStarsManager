@@ -233,9 +233,12 @@ export const applyAccountWorkspaceForTypes = (
   const rawHas = (key: string): boolean => !rawFields || Object.prototype.hasOwnProperty.call(rawFields, key);
   const patch: Partial<AccountWorkspaceRuntime> = {};
   if (selectedTypes.includes('repositories')) {
-    if (rawHas('repositories')) {
-      patch.repositories = workspace.repositories;
-      patch.searchResults = workspace.repositories;
+    const validatedRepositories = rawFields
+      ? (rawHas('repositories') ? validateBackupRepositories(rawFields.repositories) : undefined)
+      : workspace.repositories;
+    if (Array.isArray(validatedRepositories)) {
+      patch.repositories = validatedRepositories;
+      patch.searchResults = validatedRepositories;
     }
     if (rawHas('lastSync')) patch.lastSync = workspace.lastSync;
     if (rawHas('gists')) {
@@ -296,11 +299,14 @@ const applyValidatedWorkspaceFields = (
   const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
   const includeCategories = selectedTypes.includes('customCategories');
   // R2-C7：写入 repositories 前逐项校验原始备份值——缺失/null 视为未提供
-  //（保留本机值），非数组或含无效条目的数组整体不写入，绝不用损坏数据
-  // 覆盖本机仓库列表；显式 [] 仍是有效的清空语义。
+  //（保留本机值），非数组或含无效条目的数组立即抛错拒绝整个工作区恢复，
+  // 绝不部分写入其他字段；显式 [] 仍是有效的清空语义。
   const validatedRepositories = includeRepos && rawHas('repositories')
     ? validateBackupRepositories(rawAccount.repositories)
     : undefined;
+  if (validatedRepositories === null) {
+    throw new Error('Invalid repositories in backup workspace');
+  }
   return {
     ...local,
     ...(Array.isArray(validatedRepositories) ? { repositories: validatedRepositories } : {}),
@@ -314,7 +320,7 @@ const applyValidatedWorkspaceFields = (
       : {}),
     ...(includeRepos && rawIsArray('forks') ? { forks: incoming.forks } : {}),
     ...(includeRepos && rawIsArray('readForks') ? { readForks: incoming.readForks } : {}),
-    ...(includeRepos && rawHas('syncMode') && (rawAccount.syncMode === 'auto' || rawAccount.syncMode === 'manual')
+    ...(includeRepos && rawHas('syncMode') && (rawAccount.syncMode === 'stars' || rawAccount.syncMode === 'stars-and-lists')
       ? { syncMode: incoming.syncMode }
       : {}),
     ...(includeRepos && rawHas('syncModeConfigured') && typeof rawAccount.syncModeConfigured === 'boolean'
@@ -371,17 +377,13 @@ export const mergeBackupWorkspaces = (
   const normalized = normalizeAccountWorkspaces(backupWorkspaces);
   const merged: Record<string, AccountWorkspace> = { ...localWorkspaces };
   for (const [accountId, incoming] of Object.entries(normalized)) {
-    const existing = merged[accountId];
-    if (!existing) {
-      merged[accountId] = incoming;
-    } else {
-      merged[accountId] = applyValidatedWorkspaceFields(
-        existing,
-        raw[accountId] ?? {},
-        incoming,
-        ALL_WORKSPACE_BACKUP_TYPES,
-      );
-    }
+    const existing = merged[accountId] ?? emptyAccountWorkspace();
+    merged[accountId] = applyValidatedWorkspaceFields(
+      existing,
+      raw[accountId] ?? {},
+      incoming,
+      ALL_WORKSPACE_BACKUP_TYPES,
+    );
   }
   if (preferLive && liveAccountId && liveSnapshot) {
     merged[liveAccountId] = liveSnapshot;

@@ -15,7 +15,7 @@ import {
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
-import { forceSyncToBackend, markPendingAccountSync, withAccountSwitchGuardSync } from '../../../services/autoSync';
+import { forceSyncToBackend, markPendingAccountSync, markPendingRepositoryDeletion, withAccountSwitchGuardSync } from '../../../services/autoSync';
 import { backend } from '../../../services/backendAdapter';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../../../utils/categoryUtils';
@@ -159,7 +159,10 @@ export const useBulkRepositoryActions = ({
             };
           });
         });
-        // 审计修复（C26）：登记到发起时的 (账号, 后端)，切回后先补推删除再拉取。
+        // 审计修复（C26）：为每个成功取消 Star 的仓库登记待确认删除，并登记账号级待补推。
+        for (const repositoryId of successIds) {
+          markPendingRepositoryDeletion(startedAccountId, repositoryId, startedBackendUrl);
+        }
         markPendingAccountSync(startedAccountId, startedBackendUrl);
       }
       return false;

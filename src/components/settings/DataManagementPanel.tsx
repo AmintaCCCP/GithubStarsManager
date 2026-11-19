@@ -9,7 +9,8 @@ import { xTweetStorage } from '../../services/xTweetStorage';
 import { telegramStorage } from '../../services/telegramStorage';
 import { abortXTweetSync } from '../../services/xTweetService';
 import { abortTelegramSync } from '../../services/telegramService';
-import { clearEncryptedXAuthViaDesktop, clearEncryptedGhAccountsViaDesktop } from '../../services/electronProxy';
+import { clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
+import { clearGhAccountTokens } from '../../store/persistence/ghAccountSecrets';
 import { normalizeAssetFilters } from '../../utils/assetFilters';
 import {
   AlertDialog,
@@ -330,7 +331,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     data: ExportData | null;
     isOpen: boolean;
     fileName: string;
-  }>({ data: null, isOpen: false, fileName: '' });
+    openedAccountId: string | null;
+  }>({ data: null, isOpen: false, fileName: '', openedAccountId: null });
   const exportItems = useMemo(() => [
     { key: 'repositories', label: t('dataManagementPanel.repositories') },
     { key: 'releases', label: t('dataManagementPanel.releases') },
@@ -803,7 +805,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           return;
         }
 
-        setImportPreview({ data, isOpen: true, fileName: file.name });
+        setImportPreview({
+          data,
+          isOpen: true,
+          fileName: file.name,
+          openedAccountId: accountIdKey(useAppStore.getState().user),
+        });
       } catch {
         showError(t('dataManagementPanel.failed-to-parse-file-ensure-it-is-a-valid-json-f'));
       }
@@ -814,6 +821,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const importData = useCallback(async (selectedTypes: string[], mode: 'merge' | 'replace') => {
     if (!importPreview.data) return;
+
+    const currentAccountIdAtImport = accountIdKey(useAppStore.getState().user);
+    if (importPreview.openedAccountId !== currentAccountIdAtImport) {
+      addLog(t('dataManagementPanel.import-data'), false, 'account changed while import preview was open');
+      showError(t('useBackupActions.account-changed-during-restore'));
+      setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
+      return;
+    }
 
     setIsImporting(true);
     try {
@@ -845,13 +860,32 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         showError(t('dataManagementPanel.invalid-backup-file-format'));
         return;
       }
-      // 审计修复（C52）：releaseSubscriptions 必须是数组（接受 [] 显式清空）。
-      // 非数组载荷直接拒绝导入——归档路径的 Set 构造会抛错且不回滚，绝不把
-      // 部分归档写入 store。
-      if (importedData.releaseSubscriptions !== undefined && !Array.isArray(importedData.releaseSubscriptions)) {
-        addLog(t('dataManagementPanel.import-data'), false, 'invalid releaseSubscriptions');
-        showError(t('dataManagementPanel.invalid-backup-file-format'));
-        return;
+      // 审计修复（C52 / R11）：在提交任何变更前统一校验所有会被展开或迭代的数组字段
+      // （缺失字段保留现值，显式 [] 仍允许清空；非数组载荷整体拒绝，防止部分写入）。
+      const arrayImportFields: Array<keyof ExportData['data']> = [
+        'releaseSubscriptions',
+        'readReleases',
+        'releases',
+        'gists',
+        'starredGists',
+        'forks',
+        'readForks',
+        'customCategories',
+        'hiddenDefaultCategoryIds',
+        'categoryOrder',
+        'aiConfigs',
+        'webdavConfigs',
+        'assetFilters',
+        'discoveryRepos',
+        'subscriptionRepos',
+      ];
+      for (const field of arrayImportFields) {
+        const value = importedData[field];
+        if (value !== undefined && !Array.isArray(value)) {
+          addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)}`);
+          showError(t('dataManagementPanel.invalid-backup-file-format'));
+          return;
+        }
       }
 
       // ── 多账号恢复（Issue #611）───────────────────────────────────────
@@ -964,7 +998,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               ...mergeWorkspaceCategorySettings(localWorkspace, backupWorkspace),
             }
             : backupWorkspace;
-          useAppStore.setState(applyAccountWorkspaceForTypes(effective, selectedTypes));
+          const rawCurrentAccountWorkspace = (
+            importedData.accountWorkspaces as Record<string, Record<string, unknown>> | undefined
+          )?.[currentAccountId];
+          useAppStore.setState(
+            applyAccountWorkspaceForTypes(
+              effective,
+              selectedTypes,
+              restoreMode === 'replace' ? rawCurrentAccountWorkspace : undefined,
+            ),
+          );
           // 应用后以恢复后的实时状态为准同步当前账号工作区快照，
           // 避免字典中残留备份旧快照与实时状态不一致
           const restored = useAppStore.getState();
@@ -1077,11 +1120,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (nextReplacedWorkspaces) {
           useAppStore.setState({ accountWorkspaces: nextReplacedWorkspaces });
         }
-        if (selectedTypes.includes('repositories') && validatedImportRepositories !== undefined) {
+        const hasRepoScopedTopLevelData = validatedImportRepositories !== undefined
+          || importedData.gists !== undefined
+          || importedData.starredGists !== undefined
+          || importedData.forks !== undefined
+          || importedData.readForks !== undefined
+          || importedData.syncMode !== undefined
+          || importedData.syncModeConfigured !== undefined;
+        if (selectedTypes.includes('repositories') && hasRepoScopedTopLevelData) {
           if (backupTargetsOtherAccount) {
-            // 顶层仓库属于备份账号：归档而非覆盖当前登录账号视图（每个目标账号仅提交一次）
+            // 顶层仓库/Gist/Fork 等属于备份账号：归档而非覆盖当前登录账号视图（每个目标账号仅提交一次）
             archiveTopLevelToBackupAccountOnce('replace');
-          } else {
+          } else if (validatedImportRepositories !== undefined) {
             store.setRepositories(validatedImportRepositories, { allowEmpty: true });
           }
         }
@@ -1323,11 +1373,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
           useAppStore.setState({ accountWorkspaces: merged });
         }
-        if (selectedTypes.includes('repositories') && validatedImportRepositories !== undefined) {
+        const hasRepoScopedTopLevelData = validatedImportRepositories !== undefined
+          || importedData.gists !== undefined
+          || importedData.starredGists !== undefined
+          || importedData.forks !== undefined
+          || importedData.readForks !== undefined
+          || importedData.syncMode !== undefined
+          || importedData.syncModeConfigured !== undefined;
+        if (selectedTypes.includes('repositories') && hasRepoScopedTopLevelData) {
           if (backupTargetsOtherAccount) {
             // merge：备份顶层按 id 并入备份账号工作区，保留已合并的本机条目（每个目标账号仅合并一次）
             archiveTopLevelToBackupAccountOnce('merge');
-          } else {
+          } else if (validatedImportRepositories !== undefined) {
             const existingIds = new Set(store.repositories.map(r => r.id));
             const newRepos = validatedImportRepositories.filter(r => !existingIds.has(r.id));
             store.setRepositories([...store.repositories, ...newRepos]);
@@ -1613,6 +1670,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         const importedWorkspace = importedWorkspaces[currentAccountId];
         const effective = {
           ...mergeWorkspacesById(liveWorkspace, importedWorkspace),
+          ...(selectedTypes.includes('releaseSubscriptions')
+            ? {
+                releaseSourceSettings: mergeReleaseSourceSettings(
+                  liveWorkspace.releaseSourceSettings,
+                  importedWorkspace.releaseSourceSettings,
+                ),
+              }
+            : {}),
           ...(selectedTypes.includes('customCategories')
             ? mergeWorkspaceCategorySettings(liveWorkspace, importedWorkspace)
             : {}),
@@ -1635,7 +1700,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
 
       addLog(t('dataManagementPanel.import-data'), true);
-      setImportPreview({ data: null, isOpen: false, fileName: '' });
+      setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
     } catch (error) {
       addLog(t('dataManagementPanel.import-data'), false, String(error));
       showError(t('dataManagementPanel.import-failed-please-try-again'));
@@ -1807,10 +1872,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         // 忽略桌面端清理失败
       }
 
-      // 审计修复（自审计补充）：同步清除桌面端加密保存的 GitHub 账号凭证文件
+      // 审计修复（自审计补充 / R11）：通过串行队列清除桌面端加密保存的 GitHub 账号凭证文件
       // （gh-accounts.enc），失败时纳入 pendingStorages 允许用户重试，绝不报告全部数据已删除。
       try {
-        await clearEncryptedGhAccountsViaDesktop();
+        await clearGhAccountTokens();
       } catch (e) {
         pendingStorages.push('GitHub account credentials');
         throw e;
@@ -2556,7 +2621,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           open={importPreview.isOpen}
           onOpenChange={(open) => {
             if (!open && !isImporting) {
-              setImportPreview({ data: null, isOpen: false, fileName: '' });
+              setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
             }
           }}
         >
@@ -2627,7 +2692,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               <DialogFooter className="pt-4">
                 <Button
                   variant="outline"
-                  onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
+                  onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null })}
                   disabled={isImporting}
                   className="flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                 >

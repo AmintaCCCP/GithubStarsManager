@@ -27,6 +27,11 @@ function resolveGitHubTokenForRequest(
     | undefined;
 
   if (accountId !== 'default') {
+    // 无账号头请求不得直接采用未证实归属的真实账号 PAT：仅当请求显式指定账号，
+    // 或该账号已通过 legacy 认领证实与旧版身份一致时，才允许使用该真实账号的 PAT。
+    if (!explicitAccountId && getLegacyDefaultClaimedBy(db) !== accountId) {
+      return { token: null, decryptFailed: false, scopeRequired: true };
+    }
     const accountSetting = db
       .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
       .get(accountId) as { value: string | null } | undefined;

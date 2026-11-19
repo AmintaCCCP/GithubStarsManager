@@ -28,6 +28,34 @@ export const readAuthMirror = (): AuthMirror | null => {
   }
 };
 
+/**
+ * 仅供 v19 一次性桌面端迁移使用：读取旧认证镜像中尚未迁出的明文 PAT 与对应用户 ID，
+ * 以便桌面端在成功迁入 safeStorage 加密文件后再安全清除旧镜像中的 PAT。
+ */
+export const readLegacyAuthMirrorForDesktopMigration = (): {
+  user: GitHubUser | null;
+  githubToken: string | null;
+  backendApiSecret: string | null;
+} | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_MIRROR_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuthMirror>;
+    const token = typeof parsed.githubToken === 'string' && parsed.githubToken.trim()
+      ? parsed.githubToken.trim()
+      : null;
+    if (!token) return null;
+    return {
+      user: parsed.user ?? null,
+      githubToken: token,
+      backendApiSecret: typeof parsed.backendApiSecret === 'string' ? parsed.backendApiSecret : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const writeAuthMirror = (auth: AuthMirror): void => {
   if (typeof window === 'undefined') return;
   try {

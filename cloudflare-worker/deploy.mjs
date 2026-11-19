@@ -1179,12 +1179,14 @@ function deployWorker(accountMetadataIndexed = false) {
 
 /**
  * Issue #612 A28/A31：部署后验证 accountId 元数据索引与回填状态。
- * 1) 先执行无范围、threshold: 0 的采样查询：统计缺少 accountId 元数据的 legacy
- *    向量占比，并从结果中选取一个真实存在的非空 accountId；
- * 2) 以该 accountId + threshold: 0 执行账号过滤查询：仅当 matches 非空时才判定
+ * 1) 先执行无范围、低阈值（VERIFY_QUERY_THRESHOLD = -1e9，保留合法的负 cosine/dot 分数）的采样查询：
+ *    统计缺少 accountId 元数据的 legacy 向量占比，并从结果中选取一个真实存在的非空 accountId；
+ * 2) 以该 accountId + 低阈值执行账号过滤查询：仅当 matches 非空时才判定
  *    元数据索引生效（Vectorize 缺少元数据索引时会静默返回空 matches 而非报错）。
  * 返回 { verified: boolean, reason?: string } 供调用方决定是否回滚。
  */
+const VERIFY_QUERY_THRESHOLD = -1e9;
+
 async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions) {
   if (!workerUrl || !authToken) return { verified: false, reason: 'missing_config' };
   const base = normalizeUrl(workerUrl).replace(/\/+$/, '');
@@ -1194,7 +1196,7 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions) {
     const vector = Array.from({ length: dim }, () => Math.random() * 2 - 1);
     const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` };
 
-    // 1) 无范围采样查询（threshold: 0），统计 legacy 向量并提取真实 accountId
+    // 1) 无范围采样查询（使用低阈值以保留合法负分），统计 legacy 向量并提取真实 accountId
     const sampleController = new AbortController();
     const sampleTimeout = setTimeout(() => sampleController.abort(), 8000);
     let sampleMatches = [];
@@ -1202,7 +1204,7 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions) {
       const sampleRes = await fetch(`${base}/query`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ vector, topK: 50, threshold: 0 }),
+        body: JSON.stringify({ vector, topK: 50, threshold: VERIFY_QUERY_THRESHOLD }),
         signal: sampleController.signal,
       });
       if (!sampleRes.ok) {
@@ -1240,7 +1242,7 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions) {
       return { verified: false, reason: 'no_account_id' };
     }
 
-    // 2) 使用真实存在的 accountId + threshold: 0 执行过滤查询；仅当 matches 非空才判定生效
+    // 2) 使用真实存在的 accountId + 低阈值执行过滤查询；仅当 matches 非空才判定生效
     const scopedController = new AbortController();
     const scopedTimeout = setTimeout(() => scopedController.abort(), 8000);
     let scopedOk = false;
@@ -1248,7 +1250,7 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions) {
       const scopedRes = await fetch(`${base}/query`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ vector, topK: 5, threshold: 0, accountId: sampleAccountId }),
+        body: JSON.stringify({ vector, topK: 5, threshold: VERIFY_QUERY_THRESHOLD, accountId: sampleAccountId }),
         signal: scopedController.signal,
       });
       if (!scopedRes.ok) {

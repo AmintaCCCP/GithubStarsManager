@@ -435,13 +435,10 @@ export class VectorSearchService {
  * buildEmbeddingText 的输出格式变化时必须递增，
  * 使增量索引能检测到格式变化并强制重新索引所有向量。
  *
- * R2-C22/C23：v3 → v4 不改变文本格式，而是用于一次性迁移——v3 及更早的索引
- * 可能缺少账号归属元数据，单纯依赖 `accountScopedCleanup` 或本机账号数量都
- * 无法证明无范围 legacy 向量的归属。版本升级使所有存量仓库在 needsReindex
- * 判定为需重建，重建后的向量带 `accountId` 元数据；单账号的稠密召回兼容
- * 因此通过迁移路径满足，而不是按本机账号数放宽无范围召回。
+ * 保持 v3 不变：单账号老用户升级后可直接沿用存量 v3 向量（免重新调 Embedding API），
+ * 仅在添加多账号时通过多账号隔离路径按需重建索引。
  */
-export const EMBEDDING_FORMAT_VERSION = 4;
+export const EMBEDDING_FORMAT_VERSION = 3;
 
 /**
  * 拼接仓库文本用于 embedding

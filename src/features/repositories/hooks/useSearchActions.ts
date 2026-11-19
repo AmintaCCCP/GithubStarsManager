@@ -421,10 +421,14 @@ export const useSearchActions = (): SearchActions => {
           // 归属账号过滤（同仓库在两个账号列表中都存在时，既有 id 集合过滤
           // 无法拦截他账号向量经同一 ID 水合进来）
           const scopeAccountId = peekCurrentAccountId();
+          const isMultiAccount = Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1;
           const accountIdScope = scopeAccountId
             ? {
               accountId: scopeAccountId,
-              multiAccount: Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1,
+              multiAccount: isMultiAccount,
+              // 单账号老用户免重建索引，直接兼容存量无前缀/无 accountId 向量；
+              // 添加多账号后再启用严格账号元数据过滤隔离。
+              allowLegacyUnscoped: !isMultiAccount,
             }
             : undefined;
           const result = await runVectorSearchPipeline({
@@ -438,6 +442,17 @@ export const useSearchActions = (): SearchActions => {
             crossEncoder,
             signal: controller.signal,
             accountIdScope,
+            onDenseSkipped: (reason) => {
+              if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+              const notice = reason === 'worker-unsupported'
+                ? 'Vector worker does not support multi-account recall; redeploy cloudflare-worker and rebuild the index.'
+                : reason === 'metadata-index-not-ready'
+                  ? 'Account metadata index is not ready; create the accountId metadata index, backfill vectors, and enable ACCOUNT_METADATA_INDEXED.'
+                  : reason === 'status-failed'
+                    ? 'Failed to verify vector worker status; fell back to local search.'
+                    : 'Vector index needs rebuild for multi-account search; fell back to local search.';
+              toast(notice, 'info');
+            },
             onPhase: (phase) => {
               // 审计修复（C23）：回调先比较发起会话（账号 ID + 会话代次），
               // 不一致立即返回，不更新新账号的搜索阶段。
@@ -519,7 +534,7 @@ export const useSearchActions = (): SearchActions => {
         setSearchPhase(null);
       }
     }
-  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, keywordSearch, t]);
+  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, keywordSearch, t, toast]);
 
   const syncStars = useCallback(async (mode: 'auto' | 'stars-only' | 'stars-and-lists' = 'auto') => {
     if (!githubToken) {

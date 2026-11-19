@@ -190,7 +190,8 @@ describe('useReleaseTimelineActions account switch guards', () => {
 
     await act(async () => { await result.current.handleMarkAllRead(); });
 
-    expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
+    // 会话已切换：不向新会话显示旧请求的失败提示
+    expect(mocks.toast).not.toHaveBeenCalled();
     // 切号后回滚被丢弃：B 的独立已读集合不被 A 的回滚改写（B 不被修改）
     expect(storeState.readReleases).toEqual(new Set([205]));
     // A 的归档快照只回滚本次操作：乐观新增的 101 被撤销，操作前的 7/8 保留，release 字段也恢复
@@ -213,7 +214,7 @@ describe('useReleaseTimelineActions account switch guards', () => {
       storeState.readReleases = new Set<number>([101]);
       storeState.releases = [{
         id: 101,
-        repository: { id: 10, name: 'repo', full_name: 'me/repo' },
+        repository: { id: 1, name: 'repo', full_name: 'owner/repo' },
         name: 'v1',
         is_read: true,
         updated_asset_ids: [],
@@ -225,7 +226,8 @@ describe('useReleaseTimelineActions account switch guards', () => {
 
     await act(async () => { await result.current.handleMarkAllRead(); });
 
-    expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
+    // 代次已变化：抑制旧会话提示，同时仍对重新激活的 A 执行归属明确的回滚
+    expect(mocks.toast).not.toHaveBeenCalled();
     // R2-C29：发起账号已重新激活——实时集合与 release 字段必须撤销乐观更新，归档未被改写
     expect(storeState.readReleases).toEqual(new Set([7, 8]));
     expect(storeState.releases[0]).toMatchObject({ id: 101, is_read: false, updated_asset_ids: [10] });
@@ -243,7 +245,7 @@ describe('useReleaseTimelineActions account switch guards', () => {
 
     await act(async () => { await result.current.handleMarkAllRead(); });
 
-    expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
+    expect(mocks.toast).not.toHaveBeenCalled();
     expect(storeState.readReleases).toEqual(new Set([205]));
     expect((storeState as { accountWorkspaces?: Record<string, unknown> }).accountWorkspaces).toBeUndefined();
   });

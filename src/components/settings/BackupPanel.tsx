@@ -8,6 +8,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { accountIdKey, getAccountSessionGeneration } from '../../store/helpers/accountWorkspace';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import { useBackupActions } from '../../features/settings/hooks/useBackupActions';
+import { useDialog } from '../../hooks/useDialog';
 import {
   Dialog,
   DialogContent,
@@ -28,9 +29,22 @@ interface BackupPanelProps {
  * WebDAV 上可恢复的备份供用户选择（预选包含当前账号工作区的最新备份，
  * 标 ★），选中后才进入恢复确认与下载流程。
  */
+const getCurrentActiveWebDAVConfig = (): WebDAVConfig | null => {
+  const store = useAppStore.getState();
+  return store.webdavConfigs.find((config) => config.id === store.activeWebDAVConfig) ?? null;
+};
+
+const getWebDAVConfigFingerprint = (config: WebDAVConfig | null | undefined): string => (
+  config
+    ? JSON.stringify([config.id, config.url, config.path, config.username, config.password, config.isActive])
+    : ''
+);
+
 export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   const lastBackup = useAppStore((state) => state.lastBackup);
   const { activeConfig, isBackingUp, isRestoring, backup, restore, listBackups } = useBackupActions();
+  const { toast } = useDialog();
+  const activeConfigFingerprint = getWebDAVConfigFingerprint(activeConfig);
   const [isListingBackups, setIsListingBackups] = useState(false);
   const [backupSelection, setBackupSelection] = useState<{
     open: boolean;
@@ -51,30 +65,33 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   });
   const [listError, setListError] = useState<string | null>(null);
 
-  // WebDAV 活跃配置变化时作废旧的备份列表选择，防止用新配置下载旧列表的同名文件
+  // WebDAV 活跃配置切换或 URL/路径/凭据变更时作废旧的备份列表选择，防止下载错位文件
   useEffect(() => {
     setBackupSelection((current) => (
-      current.open && current.listedConfig && current.listedConfig.id !== activeConfig?.id
+      current.open
+      && current.listedConfig
+      && getWebDAVConfigFingerprint(current.listedConfig) !== activeConfigFingerprint
         ? { ...current, open: false, selected: null, listedConfig: null }
         : current
     ));
-  }, [activeConfig?.id]);
+  }, [activeConfigFingerprint]);
 
   const handleRestoreClick = async () => {
     const listedConfig = activeConfig ?? null;
+    const listedFingerprint = getWebDAVConfigFingerprint(listedConfig);
     const listedAccountId = accountIdKey(useAppStore.getState().user);
     const listedGeneration = getAccountSessionGeneration();
     setIsListingBackups(true);
     setListError(null);
     try {
       const { files, recommended } = await listBackups();
+      // 列举期间活跃 WebDAV 配置被切换或修改（含 URL/路径编辑）：丢弃过期响应
+      if (getWebDAVConfigFingerprint(getCurrentActiveWebDAVConfig()) !== listedFingerprint) {
+        return;
+      }
       if (files.length === 0) {
-        // 无备份文件：走恢复流程给出既有的 no-backup-files-found 提示
-        await restore(undefined, {
-          expectedAccountId: listedAccountId,
-          expectedGeneration: listedGeneration,
-          ...(listedConfig ? { config: listedConfig } : {}),
-        });
+        // 无备份文件：直接给出无备份提示，不调用 restore，避免两次列举间新上传的文件未经用户核对就被自动恢复
+        toast(t('useBackupActions.no-backup-files-found'), 'error');
         return;
       }
       setBackupSelection({
@@ -87,6 +104,9 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         listedGeneration,
       });
     } catch (error) {
+      if (getWebDAVConfigFingerprint(getCurrentActiveWebDAVConfig()) !== listedFingerprint) {
+        return;
+      }
       setListError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsListingBackups(false);
@@ -96,13 +116,17 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   const confirmRestoreSelection = async () => {
     const { selected, listedConfig, listedAccountId, listedGeneration } = backupSelection;
     setBackupSelection((current) => ({ ...current, open: false }));
-    if (selected) {
-      await restore(selected, {
-        expectedAccountId: listedAccountId,
-        ...(listedGeneration !== null ? { expectedGeneration: listedGeneration } : {}),
-        ...(listedConfig ? { config: listedConfig } : {}),
-      });
+    if (
+      !selected
+      || getWebDAVConfigFingerprint(getCurrentActiveWebDAVConfig()) !== getWebDAVConfigFingerprint(listedConfig)
+    ) {
+      return;
     }
+    await restore(selected, {
+      expectedAccountId: listedAccountId,
+      ...(listedGeneration !== null ? { expectedGeneration: listedGeneration } : {}),
+      ...(listedConfig ? { config: listedConfig } : {}),
+    });
   };
 
   return (

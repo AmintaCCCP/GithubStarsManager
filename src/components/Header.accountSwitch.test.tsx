@@ -88,11 +88,14 @@ const baseState = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  baseState.user = userA;
   mocks.confirm.mockResolvedValue(true);
   mocks.switchToAccount.mockResolvedValue({ ok: true });
+  mocks.logoutCurrentAccount.mockResolvedValue(true);
   vi.mocked(useAppStore).mockImplementation(((
     selector?: (state: typeof baseState) => unknown,
   ) => (selector ? selector(baseState) : baseState)) as typeof useAppStore);
+  (useAppStore as unknown as { getState: () => typeof baseState }).getState = () => baseState;
 });
 
 describe('Header account switcher', () => {
@@ -245,6 +248,41 @@ describe('Header account switcher', () => {
       expect(mocks.logoutCurrentAccount).toHaveBeenCalledWith('1');
     });
     expect(mocks.toast).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('passes original account id and shows logout-account-changed when account switches during logout confirm', async () => {
+    baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    let resolveConfirm!: (value: boolean) => void;
+    mocks.confirm.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => {
+        resolveConfirm = resolve;
+      }),
+    );
+    mocks.logoutCurrentAccount.mockResolvedValueOnce(false);
+    const { rerender, unmount } = render(<Header />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'header.logout' }));
+    await waitFor(() => {
+      expect(mocks.confirm).toHaveBeenCalledTimes(1);
+    });
+
+    // 确认框待决期间当前账号从 1 切换为 2
+    baseState.user = userB;
+    baseState.savedAccounts = {
+      '1': savedAccount('1', userA, 'ghp_a'),
+      '2': savedAccount('2', userB, 'ghp_b'),
+    };
+    rerender(<Header />);
+
+    resolveConfirm(true);
+
+    await waitFor(() => {
+      expect(mocks.logoutCurrentAccount).toHaveBeenCalledWith('1');
+    });
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith('header.logout-account-changed', 'error');
+    });
     unmount();
   });
 

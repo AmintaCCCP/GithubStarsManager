@@ -278,7 +278,7 @@ export function snapshotLegacyDefaultTokenBeforeOverwrite(db: Database.Database)
       .prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'")
       .get() as { value: string | null } | undefined;
     if (existingSnapshot !== undefined) return;
-    if (!hasDefaultPartitionRows(db)) return;
+    if (!hasDefaultPartitionRows(db) && !hasLegacyGlobalAccountSettings(db)) return;
     const currentGlobal = readSetting(db, 'github_token') ?? '';
     db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('legacy_default_github_token', ?)")
       .run(currentGlobal);
@@ -385,13 +385,51 @@ function hasDefaultPartitionRows(db: Database.Database): boolean {
   return false;
 }
 
+const LEGACY_GLOBAL_ACCOUNT_SETTING_KEYS: readonly string[] = [
+  'customCategories',
+  'categoryOrder',
+  'hiddenDefaultCategoryIds',
+  'defaultCategoryOverrides',
+  'releaseSourceSettings',
+  'categoryListIdMap',
+  'syncMode',
+  'syncModeConfigured',
+  'ai_result_sharing_enabled',
+];
+
 /**
- * default 分区是否仍存在「归属未确立」的待认领数据（认领未发生且分区里有行）。
+ * 全局 settings 表中是否仍存在旧版账号级设置（如 v3 升级后仅保存了 customCategories
+ * 而无 repositories/releases/categories 行的场景）。
+ */
+function hasLegacyGlobalAccountSettings(db: Database.Database): boolean {
+  try {
+    const placeholders = LEGACY_GLOBAL_ACCOUNT_SETTING_KEYS.map(() => '?').join(', ');
+    const row = db
+      .prepare(`SELECT 1 AS one FROM settings WHERE key IN (${placeholders}) LIMIT 1`)
+      .get(...LEGACY_GLOBAL_ACCOUNT_SETTING_KEYS);
+    return Boolean(row);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * default 分区是否仍存在「归属未确立」的待认领数据（认领未发生且分区里有行，
+ * 或全局 settings 表中存在旧版账号级设置）。
  * Issue #612 A4：无头导入的外部 default 工作区绝不能写进这种分区——否则外部
  * 数据会与待认领存量混在一起，被首个通过身份校验的账号一并自动认领。
  */
 export function hasPendingDefaultPartitionData(db: Database.Database): boolean {
-  return isLegacyClaimPending(db) && hasDefaultPartitionRows(db);
+  return isLegacyClaimPending(db) && (hasDefaultPartitionRows(db) || hasLegacyGlobalAccountSettings(db));
+}
+
+/**
+ * 是否存在至少一个真实（非 default）账号分区。
+ * 用于 default 分区向量查询判断是否需要发送 accountId 范围过滤，避免共存的真实账号
+ * 高分向量占满 topK。
+ */
+export function hasAnyNonDefaultPartition(db: Database.Database): boolean {
+  return collectNonDefaultPartitionIds(db).size > 0;
 }
 
 /**
@@ -478,6 +516,27 @@ export function bumpAccountCredentialVersion(db: Database.Database, accountId: s
     `).run(accountId);
   } catch (err) {
     // 与 bumpAccountRevision 相同的容忍范围：仅轻量 stub 缺表，其余向上抛出。
+    if (!isMissingPartitionMetaTableError(err)) throw err;
+  }
+}
+
+const GLOBAL_META_SCOPE = '__global__';
+
+/** 全局活跃账号切换版本（用于防止异步 PAT 校验完成后覆盖期间发生的较新账号切换）。 */
+export function getActiveAccountVersion(db: Database.Database): number {
+  const raw = getPartitionMeta(db, GLOBAL_META_SCOPE, 'active_account_revision');
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/** 活跃账号变更后递增全局活跃账号版本。 */
+export function bumpActiveAccountVersion(db: Database.Database): void {
+  try {
+    db.prepare(`
+      INSERT INTO partition_meta (account_id, key, value) VALUES (?, 'active_account_revision', '1')
+      ON CONFLICT(account_id, key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
+    `).run(GLOBAL_META_SCOPE);
+  } catch (err) {
     if (!isMissingPartitionMetaTableError(err)) throw err;
   }
 }
@@ -589,7 +648,11 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
   }
 
   // default 分区无任何待认领数据且无 v4 迁移固化的存量 Token：无需身份校验，直接返回（不发起网络请求）。
-  if (!hasDefaultPartitionRows(db) && !readSetting(db, 'legacy_default_github_token')) {
+  if (
+    !hasDefaultPartitionRows(db)
+    && !hasLegacyGlobalAccountSettings(db)
+    && !readSetting(db, 'legacy_default_github_token')
+  ) {
     return { ownerId: null, verifiedToken: null };
   }
 
@@ -800,13 +863,12 @@ function runLegacyDefaultClaimTransaction(
       db.prepare('INSERT OR IGNORE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)')
         .run(accountId, key, value);
     }
-    // Issue #612 R2-A7：迁移进来的存量仓库在多账号索引中仍是 legacy 无前缀向量
-    //（没有 accountId 元数据），按账号过滤的查询永远无法召回——清除全部索引
-    // 标记（与 mcp/provider.ts 的重建恢复路径一致），客户端下次同步携带账号
-    // 元数据重新上传。
-    db.prepare(
-      'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
-    ).run(accountId);
+    // 仅在多账号共存时清除存量仓库的 vector_indexed_at，避免单账号老用户升级后被迫全量重建向量。
+    if (collectNonDefaultPartitionIds(db).size > 1) {
+      db.prepare(
+        'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
+      ).run(accountId);
+    }
     // Issue #612 R2-A6：认领迁移了仓库/发行版数据，在写入认领标记前推进目标
     // 账号快照版本——认领前快照的全量 PUT 会因版本过期返回 409，避免覆盖。
     bumpAccountRevision(db, accountId);
@@ -816,6 +878,7 @@ function runLegacyDefaultClaimTransaction(
     const active = readSetting(db, 'active_account_id');
     if (!active || !ACCOUNT_ID_PATTERN.test(active)) {
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('active_account_id', accountId);
+      bumpActiveAccountVersion(db);
     }
     return counts;
   });

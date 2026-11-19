@@ -5,6 +5,7 @@ import { logger } from '../services/logger.js';
 import {
   resolveActiveAccountScope,
   getLegacyDefaultClaimedBy,
+  hasAnyNonDefaultPartition,
   hasMultipleAccountPartitions,
   getPartitionMeta,
   bumpAccountRevision,
@@ -314,36 +315,56 @@ async function ensureAccountVectorMetadataBackfill(
   queryVector: number[],
 ): Promise<void> {
   if (accountId === 'default') return;
-  if (getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) === '1') return;
+  const workerIdentity = workerUrl.replace(/\/$/, '');
+  if (getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) === workerIdentity) return;
 
-  // ── 探测阶段（网络）：失败静默返回，不置位，下次查询重试 ──
+  // ── 探测阶段（网络）：/query 失败直接返回并允许重试；/status 失败单独捕获，保留 /query 结果 ──
   let probeMatches: Array<{ id: string; metadata?: Record<string, unknown> }>;
-  let vectorCount: number | null = null;
   try {
-    const probe = await fetchWithTimeout(`${workerUrl}/query`, {
-      method: 'POST',
-      headers: queryHeaders,
-      body: JSON.stringify({ vector: queryVector, topK: VECTOR_PROBE_TOPK, threshold: 0 }),
-    });
-    if (!probe.ok) return; // Worker 不可用 / 被拒：不置位，下次重试
-    const payload = (await probe.json().catch(() => null)) as
-      | { matches?: Array<{ id: string; metadata?: Record<string, unknown> }> }
-      | null;
-    if (!payload || !Array.isArray(payload.matches)) return;
-    probeMatches = payload.matches;
-
-    const statusRes = await fetchWithTimeout(`${workerUrl}/status`, { headers: queryHeaders });
-    if (statusRes.ok) {
-      const status = (await statusRes.json().catch(() => null)) as { vectorCount?: unknown } | null;
-      if (status && typeof status.vectorCount === 'number' && Number.isFinite(status.vectorCount)) {
-        vectorCount = status.vectorCount;
-      }
+    const probeResult = await fetchWithBodyTimeout(
+      `${workerIdentity}/query`,
+      {
+        method: 'POST',
+        headers: queryHeaders,
+        body: JSON.stringify({ vector: queryVector, topK: VECTOR_PROBE_TOPK, threshold: 0 }),
+      },
+      async (res) => {
+        if (!res.ok) return { ok: false as const, payload: null };
+        const payload = (await res.json().catch(() => null)) as
+          | { matches?: Array<{ id: string; metadata?: Record<string, unknown> }> }
+          | null;
+        return { ok: true as const, payload };
+      },
+    );
+    if (!probeResult.ok || !probeResult.payload || !Array.isArray(probeResult.payload.matches)) {
+      return; // Worker 不可用 / 被拒：不置位，下次重试
     }
+    probeMatches = probeResult.payload.matches;
   } catch (err) {
     logger.warn('mcp.vector', 'Account metadata backfill probe failed', {
       error: err instanceof Error ? err.message : String(err),
     });
     return;
+  }
+
+  let vectorCount: number | null = null;
+  try {
+    const statusResult = await fetchWithBodyTimeout(
+      `${workerIdentity}/status`,
+      { headers: queryHeaders },
+      async (res) => {
+        if (!res.ok) return null;
+        return (await res.json().catch(() => null)) as { vectorCount?: unknown } | null;
+      },
+    );
+    if (statusResult && typeof statusResult.vectorCount === 'number' && Number.isFinite(statusResult.vectorCount)) {
+      vectorCount = statusResult.vectorCount;
+    }
+  } catch (err) {
+    // /status 失败时将总数保留为未知，同时保留 /query 已取得的旧向量探测结果以安排重建
+    logger.warn('mcp.vector', 'Account metadata backfill status check failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
   const repos = loadAllRepositories(accountId);
@@ -355,19 +376,31 @@ async function ensureAccountVectorMetadataBackfill(
     if (metaAccountId && metaAccountId !== accountId) return false;
     return byId.has(rawId);
   });
-  // 完整确认条件：索引规模不超出单次探测窗口（threshold=0 时窗口即全量）。
-  const canFullyConfirm = vectorCount !== null && vectorCount <= VECTOR_PROBE_TOPK;
-  // 无法可靠确认归属（窗口不足 / /status 不可用）或确认存在 legacy 向量时，
+  // 完整确认条件：索引规模不超出单次探测窗口，且 /query 返回数量与 /status 报告总数一致。
+  // 若两者不一致（如期间并发写入或负分向量被过滤），视为无法确认并走重建路径。
+  const canFullyConfirm =
+    vectorCount !== null &&
+    vectorCount <= VECTOR_PROBE_TOPK &&
+    probeMatches.length === vectorCount;
+  // 无法可靠确认归属（窗口不足 / /status 不可用 / 数量不一致）或确认存在 legacy 向量时，
   // 明确安排一次全量重建；完整确认无 legacy 向量时仅标记完成。
   const scheduleRebuild = hasLegacyVectors || !canFullyConfirm;
 
-  // ── 写入阶段（R2-A13/A14）：单事务，失败回滚并向上传播 ──
+  // ── 写入阶段（R2-A13/A14）：单事务，提交前核对当前 Worker 标识，失败回滚并向上传播 ──
   const applyBackfillDecision = db.transaction((): boolean => {
-    // 重新检查完成标记：迟到的并发探测不得再次清除已重建的索引状态。
+    const currentConfig = db
+      .prepare('SELECT worker_url FROM vector_search_configs WHERE id = ?')
+      .get('default') as { worker_url?: unknown } | undefined;
+    const currentWorkerIdentity = typeof currentConfig?.worker_url === 'string'
+      ? currentConfig.worker_url.replace(/\/$/, '')
+      : '';
+    if (currentWorkerIdentity !== workerIdentity) return false;
+
+    // 重新检查完成标记：相同 Worker 标识的并发探测共享完成状态，不得再次清除已重建的索引状态。
     const claimedRow = db
       .prepare('SELECT value FROM partition_meta WHERE account_id = ? AND key = ?')
       .get(accountId, VECTOR_BACKFILL_CHECKED_KEY) as { value: string | null } | undefined;
-    if (claimedRow && claimedRow.value === '1') return false;
+    if (claimedRow && claimedRow.value === workerIdentity) return false;
     if (scheduleRebuild) {
       const cleared = db.prepare(
         'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
@@ -376,7 +409,7 @@ async function ensureAccountVectorMetadataBackfill(
       if (cleared > 0) bumpAccountRevision(db, accountId);
     }
     db.prepare('INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES (?, ?, ?)')
-      .run(accountId, VECTOR_BACKFILL_CHECKED_KEY, '1');
+      .run(accountId, VECTOR_BACKFILL_CHECKED_KEY, workerIdentity);
     return scheduleRebuild;
   });
 
@@ -388,15 +421,17 @@ async function ensureAccountVectorMetadataBackfill(
   }
 }
 
-async function fetchWithTimeout(
+async function fetchWithBodyTimeout<T>(
   url: string,
   init: RequestInit,
+  readBody: (res: Response) => Promise<T>,
   timeoutMs = FETCH_TIMEOUT_MS
-): Promise<Response> {
+): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    return await readBody(response);
   } finally {
     clearTimeout(timer);
   }
@@ -462,16 +497,21 @@ async function embedQuery(
     body = { model, input: texts };
   }
 
-  const res = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Embedding API error ${res.status} (${apiType} ${url}): ${text.slice(0, 200)}`);
-  }
-  const data = (await res.json()) as Record<string, unknown>;
+  const data = await fetchWithBodyTimeout(
+    url,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    },
+    async (res) => {
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Embedding API error ${res.status} (${apiType} ${url}): ${text.slice(0, 200)}`);
+      }
+      return (await res.json()) as Record<string, unknown>;
+    },
+  );
 
   if (apiType === 'ollama') {
     const embeddings = data.embeddings as number[][] | undefined;
@@ -566,55 +606,77 @@ export async function vectorSearch(
     'Content-Type': 'application/json',
     ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
   };
-  const sendWorkerQuery = (scopedAccountId?: string) => fetchWithTimeout(`${workerUrl}/query`, {
-    method: 'POST',
-    headers: queryHeaders,
-    body: JSON.stringify({
-      vector,
-      topK: workerTopK,
-      threshold,
-      ...(scopedAccountId ? { accountId: scopedAccountId } : {}),
-    }),
-  });
+  const sendWorkerQuery = (scopedAccountId?: string) => fetchWithBodyTimeout(
+    `${workerUrl}/query`,
+    {
+      method: 'POST',
+      headers: queryHeaders,
+      body: JSON.stringify({
+        vector,
+        topK: workerTopK,
+        threshold,
+        ...(scopedAccountId ? { accountId: scopedAccountId } : {}),
+      }),
+    },
+    async (response) => {
+      if (!response.ok) {
+        return { ok: false as const, status: response.status, text: await response.text().catch(() => '') };
+      }
+      const json = (await response.json()) as {
+        matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }>;
+      };
+      return { ok: true as const, status: response.status, data: json };
+    },
+  );
 
   // Issue #612 R2-A12：default（无活跃账号）查询同样要向 Worker 提供能隔离
   // default 候选的范围（accountId='default' 过滤），避免其他账号候选占满
   // topK 后被本地丢弃、共享索引中其他账号的 legacy 向量串入候选。仅当能确认
-  // 索引中无其他账号候选（本部署无其他账号分区——与 A26 的单账号判定一致）
-  // 时保留无范围兼容路径，保证单租户 legacy 索引的召回不受影响。
+  // 索引中无任何非 default 分区时才保留无范围兼容路径。
   const workerScope = accountId !== 'default'
     ? accountId
-    : (hasMultipleAccountPartitions(db) ? 'default' : undefined);
-  let res: Response;
+    : (hasAnyNonDefaultPartition(db) ? 'default' : undefined);
+  let queryResult:
+    | { ok: false; status: number; text: string }
+    | { ok: true; status: number; data: { matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }> } };
   try {
-    res = await sendWorkerQuery(workerScope);
+    queryResult = await sendWorkerQuery(workerScope);
   } catch {
-    // 连接失败 / 15s 超时 abort 都走这里；findSimilarRepositories 依赖本函数
+    // 连接失败 / 15s 超时 abort / 非 JSON 响应都走这里；findSimilarRepositories 依赖本函数
     // 永不 throw，异常必须折叠进声明的 { available: false } 结果
     return {
       available: false,
       reason: 'worker_query_failed',
     };
   }
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    const isMetadataNotIndexed = res.status === 400 && text.includes('ACCOUNT_METADATA_NOT_INDEXED');
+  if (!queryResult.ok) {
+    const { status, text } = queryResult;
+    const isMetadataNotIndexed = status === 400 && text.includes('ACCOUNT_METADATA_NOT_INDEXED');
     if (isMetadataNotIndexed && accountId !== 'default' && getLegacyDefaultClaimedBy(db) === accountId) {
       // Issue #612 A25：在启用 accountId 过滤前完成存量向量元数据回填——探测
       // 无法可靠确认索引归属时明确安排一次全量重建（R2-A11/A13/A14）。
-      await ensureAccountVectorMetadataBackfill(db, accountId, workerUrl, queryHeaders, vector);
+      try {
+        await ensureAccountVectorMetadataBackfill(db, accountId, workerUrl, queryHeaders, vector);
+      } catch (err) {
+        logger.warn('mcp.vector', 'Account metadata backfill transaction failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return { available: false, reason: 'vector_backfill_failed' };
+      }
       // Issue #612 A26：无范围兼容查询仅当能确认 Worker 候选集属于单账号部署
       // 时才允许——单账号判定纳入 accounts 与全部分区表，不再只看 repositories。
       const isSingleAccount = !hasMultipleAccountPartitions(db);
       if (isSingleAccount) {
         try {
-          res = await sendWorkerQuery(undefined);
+          queryResult = await sendWorkerQuery(undefined);
         } catch {
           return { available: false, reason: 'worker_query_failed' };
         }
-        if (!res.ok) {
-          const retryText = await res.text().catch(() => '');
-          return { available: false, reason: `worker_query_failed: ${res.status} ${retryText.slice(0, 120)}` };
+        if (!queryResult.ok) {
+          return {
+            available: false,
+            reason: `worker_query_failed: ${queryResult.status} ${queryResult.text.slice(0, 120)}`,
+          };
         }
       } else {
         return { available: false, reason: 'account_metadata_not_indexed' };
@@ -623,26 +685,43 @@ export async function vectorSearch(
       // R2-A12：default 范围查询在元数据索引未就绪时同样声明语义化原因。
       return { available: false, reason: 'account_metadata_not_indexed' };
     } else {
-      return { available: false, reason: `worker_query_failed: ${res.status} ${text.slice(0, 120)}` };
+      return { available: false, reason: `worker_query_failed: ${status} ${text.slice(0, 120)}` };
     }
   }
-  let data: {
-    matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }>;
-  };
-  try {
-    data = (await res.json()) as typeof data;
-  } catch {
-    return {
-      available: false,
-      reason: 'worker_query_failed',
-    };
-  }
+  const data = queryResult.data;
   // JSON null / 缺 matches 字段是合法 JSON，res.json() 不会 reject，必须在此
   // 做结构校验；Electron 端 runVectorSearch 保持相同语义
   if (!data || !Array.isArray(data.matches)) {
     return { available: false, reason: 'worker_query_failed' };
   }
   const matches = data.matches;
+  // 若元数据索引已启用（过滤查询返回 200 空结果），但账号分区仍有非空 vector_indexed_at
+  // （如备份恢复或单账号升级保留的旧向量标记）且尚未针对当前 Worker 完成回填探测，
+  // 触发一次回填探测以在存在旧向量时清除索引标记并安排重建。
+  if (
+    matches.length === 0
+    && accountId !== 'default'
+    && getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) !== workerUrl
+  ) {
+    let hasIndexedRepos = false;
+    try {
+      const indexedRow = db
+        .prepare('SELECT 1 AS one FROM repositories WHERE account_id = ? AND vector_indexed_at IS NOT NULL LIMIT 1')
+        .get(accountId);
+      hasIndexedRepos = Boolean(indexedRow);
+    } catch {
+      // 轻量 stub 缺列/缺表时忽略
+    }
+    if (hasIndexedRepos) {
+      try {
+        await ensureAccountVectorMetadataBackfill(db, accountId, workerUrl, queryHeaders, vector);
+      } catch (err) {
+        logger.warn('mcp.vector', 'Account metadata backfill after empty scoped search failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
   const repos = loadAllRepositories(accountId);
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 

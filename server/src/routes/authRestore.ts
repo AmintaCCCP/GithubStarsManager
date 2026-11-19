@@ -3,7 +3,11 @@ import { getDb } from '../db/connection.js';
 import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
-import { resolveAccountScope, claimLegacyDefaultIfNeeded } from '../db/accountScope.js';
+import {
+  claimLegacyDefaultIfNeeded,
+  getLegacyDefaultClaimedBy,
+  resolveWritableAccountScope,
+} from '../db/accountScope.js';
 
 const router = Router();
 
@@ -161,26 +165,57 @@ router.post('/api/sync/auth', async (req, res) => {
       : '';
     const headerAccountId = req.header('x-github-account-id')?.trim() ?? '';
     // Issue #612 A19：请求体 account_id 与请求头 x-github-account-id 按同一优先级
-    // 解析出唯一最终账号——认领层（accountScopeMiddleware）以请求头为准，恢复层
-    // 采用相同优先级收敛，两者不一致时绝不分别选择不同账号。
-    const accountId = /^\d+$/.test(headerAccountId)
+    // 解析出唯一显式账号；无账号头且未提供 account_id 的旧客户端兼容恢复与全局活跃
+    // 账号解析分开，无法安全确定目标账号时不返回其他账号的 PAT，要求显式选择账号。
+    const explicitAccountId = /^\d+$/.test(headerAccountId)
       ? headerAccountId
       : /^\d+$/.test(bodyAccountId)
         ? bodyAccountId
-        : resolveAccountScope(req, db);
+        : null;
+
+    let accountId: string | null = explicitAccountId;
+    let accountSelectionRequired = false;
+
+    if (!accountId) {
+      const resolved = resolveWritableAccountScope(req, db);
+      if (!resolved.ok) {
+        accountSelectionRequired = true;
+      } else if (resolved.accountId !== 'default') {
+        const claimedBy = getLegacyDefaultClaimedBy(db);
+        let hasGlobalToken = false;
+        try {
+          const row = db
+            .prepare("SELECT value FROM settings WHERE key = 'github_token'")
+            .get() as { value: string | null } | undefined;
+          hasGlobalToken = typeof row?.value === 'string' && row.value.length > 0;
+        } catch {
+          hasGlobalToken = false;
+        }
+        // 未完成旧数据认领但库中仍存在全局 PAT 时，不能假设无头旧客户端属于当前唯一真实分区
+        if (claimedBy !== resolved.accountId && hasGlobalToken) {
+          accountSelectionRequired = true;
+        } else {
+          accountId = resolved.accountId;
+        }
+      } else {
+        accountId = resolved.accountId;
+      }
+    }
 
     // Issue #612 A19：认领与恢复两层都处理最终选定账号。请求头路径已由全局
     // 中间件认领（此处为幂等快速返回）；仅请求体指定账号（无请求头）时在此
     // 触发认领。失败不阻塞恢复（与中间件语义一致）。
-    try {
-      await claimLegacyDefaultIfNeeded(db, accountId);
-    } catch (err) {
-      logger.warn('authRestore', 'Legacy default claim attempt failed during auth restore', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+    if (accountId) {
+      try {
+        await claimLegacyDefaultIfNeeded(db, accountId);
+      } catch (err) {
+        logger.warn('authRestore', 'Legacy default claim attempt failed during auth restore', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
-    const activeToken = readScopedToken(db, accountId);
+    const activeToken = accountId ? readScopedToken(db, accountId) : null;
 
     let accounts: AccountEntry[] = [];
     try {
@@ -193,6 +228,7 @@ router.post('/api/sync/auth', async (req, res) => {
     res.set(NO_STORE_HEADERS).json({
       github_token: activeToken,
       active_account_id: accountId,
+      ...(accountSelectionRequired ? { account_selection_required: true } : {}),
       accounts,
     });
   } catch (err) {

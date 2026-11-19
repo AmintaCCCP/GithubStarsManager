@@ -618,7 +618,8 @@ export interface AccountSwitchActions {
      - 若备份中标记了 `backupData.activeAccountId` 且与当前登录的 `currentAccountId` 不同：
        - 将备份顶层的 `repositories / releases / customCategories` 等归入 `accountWorkspaces[backupData.activeAccountId]`；
        - 若 `accountWorkspaces[currentAccountId]` 在备份中存在，则将 `accountWorkspaces[currentAccountId]` 应用到当前顶层状态；若不存在，则保留当前登录账号的本地顶层状态不被覆盖！
-     - 若 `backupData.activeAccountId` 与当前账号一致（或旧版无 `activeAccountId` 的单账号备份），则按原逻辑恢复到当前顶层状态，并同步更新 `accountWorkspaces[currentAccountId]`。
+     - 若 `backupData.activeAccountId` 存在且与当前账号一致，则按原逻辑恢复到当前顶层状态，并同步更新 `accountWorkspaces[currentAccountId]`；
+     - 若旧版备份缺少 `backupData.activeAccountId` 等归属信息，恢复前必须**先要求用户确认**备份归属账号与恢复目标；**确认前不得覆盖顶层数据或更新 `accountWorkspaces`**，仅在用户确认后按确认的目标账号写入。
 
 #### 5.3 场景 C：后端 `/api/sync/export` 与 `/api/sync/import`（`server/src/routes/sync.ts`）
 

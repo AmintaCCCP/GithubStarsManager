@@ -423,11 +423,11 @@ describe('MCP provider discovery', () => {
         const probeBody = JSON.parse(fetchMockLocal.mock.calls[2][1].body as string);
         expect(probeBody).toMatchObject({ topK: 50, threshold: 0 });
 
-        // 重建已安排：索引标记清除、快照版本推进、完成标记写入（同一事务）
+        // 重建已安排：索引标记清除、快照版本推进、完成标记绑定当前 Worker 标识（同一事务）
         const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
         expect(row.vector_indexed_at).toBeNull();
         expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
-          .toMatchObject({ value: '1' });
+          .toMatchObject({ value: 'https://worker.example' });
         expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
           .toMatchObject({ value: '1' });
       } finally {
@@ -439,7 +439,7 @@ describe('MCP provider discovery', () => {
       const db = await setupVectorDb();
       try {
         getDbMock.mockReturnValue(db);
-        // /status 报告向量数在探测窗口内（threshold=0 即全量），且候选都带
+        // /status 报告向量数在探测窗口内且与 /query 返回数一致，且候选都带
         // 账号前缀（无 legacy 向量）→ 仅标记完成，不清除重建标记。
         const fetchMockLocal = vi.fn()
           .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
@@ -455,9 +455,113 @@ describe('MCP provider discovery', () => {
         const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
         expect(row.vector_indexed_at).toBe('2025-01-01T00:00:00Z');
         expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
-          .toMatchObject({ value: '1' });
+          .toMatchObject({ value: 'https://worker.example' });
         // 未清除标记 → 不推进快照版本（R2-A14）
         expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
+          .toBeUndefined();
+      } finally {
+        db.close();
+      }
+    });
+
+    it('schedules rebuild when /status fails or vectorCount mismatches /query count', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // /query 找到旧向量，/status 网络失败 → 仍保留探测结果并安排重建
+        const fetchMockLocal = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }))
+          .mockRejectedValueOnce(new TypeError('status failed'))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchMockLocal);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toMatchObject({ available: true });
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+      } finally {
+        db.close();
+      }
+
+      const db2 = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db2);
+        // /query 返回 1 条，但 /status 报告总数 2（数量不一致）→ 视为无法确认并安排重建
+        const fetchMockMismatch = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }))
+          .mockResolvedValueOnce(jsonResponse({ vectorCount: 2 }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchMockMismatch);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toMatchObject({ available: true });
+        const row = db2.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+      } finally {
+        db2.close();
+      }
+    });
+
+    it('sends default scope when any non-default partition exists and triggers backfill on empty scoped 200', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // 1) default 与一个真实账号共存时，default 查询必须发送 accountId: 'default'
+        db.prepare("DELETE FROM settings WHERE key = 'active_account_id'").run();
+        db.prepare(
+          "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics) VALUES ('default', 2, 'beta', 'acme/beta', 'https://github.com/acme/beta', 'acme', '[]')",
+        ).run();
+        const fetchDefault = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '2', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchDefault);
+
+        await provider.vectorSearch('retrieval', {});
+        const defaultQueryBody = JSON.parse(fetchDefault.mock.calls[1][1].body as string);
+        expect(defaultQueryBody.accountId).toBe('default');
+
+        // 2) 元数据索引已启用（200 空结果）但分区有非空 vector_indexed_at 时触发回填探测并清除旧标记
+        db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+        const fetchEmpty = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }))
+          .mockResolvedValueOnce(jsonResponse({ vectorCount: 1 }));
+        vi.stubGlobal('fetch', fetchEmpty);
+
+        const emptyRes = await provider.vectorSearch('retrieval', {});
+        expect(emptyRes).toMatchObject({ available: true, matches: [] });
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+      } finally {
+        db.close();
+      }
+    });
+
+    it('returns structured unavailable result instead of rejecting when backfill transaction fails', async () => {
+      const db = await setupVectorDb();
+      try {
+        // 用只读触发器/代理使事务写入失败，验证 vectorSearch 返回 available: false 而不 reject
+        db.exec(`
+          CREATE TRIGGER fail_backfill BEFORE UPDATE ON repositories
+          BEGIN SELECT RAISE(ABORT, 'simulated db write failure'); END;
+        `);
+        getDbMock.mockReturnValue(db);
+        const fetchMockFail = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }))
+          .mockResolvedValueOnce(jsonResponse({ vectorCount: 1 }));
+        vi.stubGlobal('fetch', fetchMockFail);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toEqual({ available: false, reason: 'vector_backfill_failed' });
+        // 失败回滚，未写入完成标记，可重试
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
           .toBeUndefined();
       } finally {
         db.close();
