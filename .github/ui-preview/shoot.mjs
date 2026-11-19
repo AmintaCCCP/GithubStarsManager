@@ -626,7 +626,23 @@ async function gotoForSeeding(page, url) {
 function installElectronStub(plugins) {
   const emptyMarketplace = { sources: [], entries: [] };
   const mutationError = { code: 'unsupported', message: 'preview stub' };
+  // gh-accounts safeStorage simulation (desktop default posture): the v19
+  // persistence strips persisted PATs and moves them to the desktop secure
+  // store; a faithful in-memory store keeps seeded sessions authenticated so
+  // scenes render the real shell instead of falling back to the login page.
+  const ghTokenStore = { tokens: {} };
   const base = {
+    ghAccounts: {
+      save: async (tokens) => {
+        ghTokenStore.tokens = { ...ghTokenStore.tokens, ...(tokens ?? {}) };
+        return { success: true };
+      },
+      get: async () => ({ status: 'loaded', tokens: { ...ghTokenStore.tokens } }),
+      clear: async () => {
+        ghTokenStore.tokens = {};
+        return { success: true };
+      },
+    },
     plugins: {
       list: async () => ({ plugins, invalidPlugins: [] }),
       installFromDirectory: async () => ({ success: false, error: mutationError }),
@@ -932,9 +948,7 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       }];
     }
 
-    if (scene.electronStub) {
-      await page.addInitScript(installElectronStub, scene.plugins ?? []);
-    }
+    await page.addInitScript(installElectronStub, scene.plugins ?? []);
     await gotoForSeeding(page, url);
     const seedState = { ...baseState, ...scene, currentView: scene.currentView, themeMode: scene.themeMode };
     if (scene.loginScreen) {
