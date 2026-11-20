@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useBatchStarImport } from './useBatchStarImport';
 import { GitHubTokenPermissionError } from '../../../services/githubApi';
+import { bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
 
 const mocks = vi.hoisted(() => ({
   token: 'token',
@@ -81,6 +82,39 @@ describe('useBatchStarImport', () => {
     expect(result.current.duplicateCount).toBe(7);
     expect(result.current.rows.every(row => row.selected)).toBe(true);
     expect(mocks.starRepository).not.toHaveBeenCalled();
+  });
+
+  it('drops preview rows produced by an account that was switched mid-resolution (R12 finding 9)', async () => {
+    mocks.storeUser = { id: 1 };
+    mocks.getRepositoryDetails.mockImplementation(async (owner: string, name: string) => {
+      // 解析等待期间切到账号 2
+      mocks.storeUser = { id: 2 };
+      bumpAccountSessionGeneration();
+      return detail(owner, name);
+    });
+    const { result } = renderHook(() => useBatchStarImport());
+
+    await act(() => result.current.preview('https://github.com/owner/repository'));
+
+    expect(result.current.rows).toEqual([]);
+    expect(mocks.starRepository).not.toHaveBeenCalled();
+  });
+
+  it('refuses to star a preview generated before an account switch (R12 finding 9)', async () => {
+    mocks.storeUser = { id: 1 };
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repository'));
+    expect(result.current.rows).toHaveLength(1);
+
+    // 预览后切到账号 2（旧预览不得用 B 的 Token 提交）
+    mocks.storeUser = { id: 2 };
+    bumpAccountSessionGeneration();
+    mocks.token = 'token-b';
+    await act(() => result.current.starSelected());
+
+    expect(mocks.starRepository).not.toHaveBeenCalled();
+    expect(mocks.addRepository).not.toHaveBeenCalled();
+    expect(result.current.syncError).toContain('账号已切换');
   });
 
   it('keeps already-starred and inaccessible repositories out of the selection', async () => {

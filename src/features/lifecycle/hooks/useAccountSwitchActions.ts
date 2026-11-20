@@ -1,11 +1,15 @@
 import { useCallback, useState } from 'react';
+import { useT } from '../../../i18n/useT';
+import { useOptionalDialog } from '../../../hooks/useDialog';
+import { hasPendingGhAccountSecretRemovals, syncGhAccountTokensFromState } from '../../../store/persistence/ghAccountSecrets';
 import { useAppStore } from '../../../store/useAppStore';
-import { accountIdKey, applyAccountWorkspace } from '../../../store/helpers/accountWorkspace';
+import { accountIdKey, applyAccountWorkspace, bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
 import { backend, normalizeBackendRestoreAccount } from '../../../services/backendAdapter';
 import {
   hasPendingAccountSync,
   markPendingAccountSync,
   prepareForAccountSwitch,
+  restorePendingSettingValuesForCurrentBackend,
   schedulePendingAccountSyncRetry,
   syncFromBackend,
   syncToBackend,
@@ -14,6 +18,7 @@ import {
   withAccountSwitchGuardSync,
 } from '../../../services/autoSync';
 import { refreshMcpElectronBridge } from '../../../services/mcpElectronBridge';
+import { abortActiveAnalysisJobs } from '../../repositories/hooks/analysisJobRegistry';
 import { useLoginActions } from './useLoginActions';
 import type { BackendLoginResult } from './useLoginActions';
 import type { GitHubUser } from '../../../types';
@@ -97,9 +102,28 @@ export function resetPendingBackendCredentialAlignForTest(): void {
   pendingBackendCredentialAlignAccounts.clear();
 }
 
+/**
+ * 交接项 1（R12）：设备端账号凭据删除的重试入口。
+ *
+ * logout 是同步动作（B9 守卫语义不变），设备端安全存储的删除异步落定；
+ * 删除失败时旧 PAT 已被 pending-removal 标记屏蔽（不会回填会话），重启后的
+ * 水化收尾会自动重试。需要立即重试的调用方（登出流程/菜单）可调用本函数：
+ * 再入队一次幂等保存，成功时待删标记随之清除，返回是否已无待删项。
+ */
+export async function retryPendingAccountSecretRemoval(): Promise<boolean> {
+  if (!hasPendingGhAccountSecretRemovals()) return true;
+  await syncGhAccountTokensFromState(useAppStore.getState());
+  return !hasPendingGhAccountSecretRemovals();
+}
+
 export const useAccountSwitchActions = (): AccountSwitchActions => {
   const [isSwitching, setIsSwitching] = useState(false);
   const { restoreBackendSession, authenticateWithGitHub } = useLoginActions();
+  // 交接项 1（R12）：设备端删除失败提示。使用可选 Dialog 上下文——本 Hook
+  // 也用于无 DialogProvider 的编排/测试环境，缺失时保持静默（数据风险已被
+  // pending-removal 屏蔽，启动重试由水化收尾负责）。
+  const dialog = useOptionalDialog();
+  const t = useT('app');
 
   /**
    * 外部恢复失败/取消时，把被归档的当前账号工作区与凭证原样恢复（零丢失）。
@@ -168,14 +192,26 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     // 待对齐标记（允许同账号路径与菜单重试）并返回 false；两个标志都为 false
     //（或缺省，兼容旧响应/测试桩）才维持原成功路径。静默吞错会让代理继续
     // 使用旧 PAT，用户看到「添加成功」但后续 GitHub 请求持续失败。
+    //
+    // Issue #612 R12（跨域契约）：activeAccountUpdateSkipped 表示 PAT 校验等待
+    // 期间另一设备把后端活跃账号切到了别的账号，本次 active_account_id 写入
+    // 被跳过。本地已切到目标账号、后端活跃账号却仍指向其他账号——必须视为
+    // 「切换未在后端生效」：不报告成功、登记待对齐（同账号重试会重新对齐），
+    // 并给出可重试的用户提示。缺省 false 兼容旧响应/测试桩。
     let credentialsAligned = true;
+    let activeAccountUpdateSkipped = false;
     try {
       const syncResult = await backend.syncSettings({
         github_token: token,
         active_account_id: accountId,
         user_profile: user,
       });
-      if (syncResult?.tokenUpdateSkipped === true || syncResult?.tokenUpdateSuperseded === true) {
+      activeAccountUpdateSkipped = syncResult?.activeAccountUpdateSkipped === true;
+      if (
+        syncResult?.tokenUpdateSkipped === true
+        || syncResult?.tokenUpdateSuperseded === true
+        || activeAccountUpdateSkipped
+      ) {
         credentialsAligned = false;
         pendingBackendCredentialAlignAccounts.add(accountId);
       } else {
@@ -186,7 +222,18 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       pendingBackendCredentialAlignAccounts.add(accountId);
       console.warn('Failed to align account settings on backend:', error);
     }
+    if (activeAccountUpdateSkipped) {
+      // 可重试提示：并发切换冲突已在服务端被记录（active_account_update_skipped），
+      // 本地会话已在目标账号，但后端活跃账号仍指向其他账号。使用可选 Dialog
+      // 上下文——本 Hook 也用于无 DialogProvider 的编排/测试环境。
+      dialog?.toast(t('accountSwitch.active-account-update-skipped'), 'warning');
+    }
     try {
+      // R12 finding 3（hooks 侧消费）：在应用目标后端数据（补推/对齐拉取）前，
+      // 先把归属于当前后端的待推设置值恢复到工作区——同账号切换后端时，
+      // 目标后端的拉取会覆盖本地设置，只有按 (账号, 后端) 保存的值能在回到
+      // 原后端时恢复用户当时的编辑。
+      restorePendingSettingValuesForCurrentBackend(accountId);
       // 冲刷失败遗留：先补推本地工作区（推送失败时保留持久待推标记，非强制拉取
       // 会走合并分支；只有推送确认成功后才由 pushLatest 清除待推标记）。
       if (hasPendingAccountSync(accountId)) {
@@ -202,7 +249,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       console.warn('Failed to pull target account data from backend:', error);
     }
     return credentialsAligned;
-  }, []);
+  }, [dialog, t]);
 
   const parkCurrentAccountForRestore = useCallback((): string | null => {
     try {
@@ -302,8 +349,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       const latest = useAppStore.getState();
       const currentAccountId = accountIdKey(latest.user);
       if (currentAccountId === targetAccountId) {
-        // 同一账号重复添加：仅更新 Token
+        // 同一账号重复添加：仅更新 Token。
+        // R12 finding 16：提交不同的 PAT 必须推进会话代次——旧凭据发起的在途
+        // 任务（刷新/索引/分析）不得继续把结果写进使用新凭据的会话；重复提交
+        // 相同 PAT 不推进，避免无谓中止当前任务。
+        const tokenChanged = latest.githubToken !== token;
         withAccountSwitchGuardSync(() => {
+          if (tokenChanged) bumpAccountSessionGeneration();
           latest.setGitHubToken(token);
           latest.setUser(user);
         });
@@ -383,6 +435,10 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     // recoverParkedAccount 内部还会核对顶层当前身份，正常成功路径不受影响）。
     let committedAccountId: string | null = null;
     try {
+      // R12 finding 6：候选连接提交前中止依赖旧连接的分析任务——否则优化器
+      // 会读取已切到候选后端的实时连接，把旧账号的仓库标识（owner/repo）
+      // 发往候选后端（即使之后验证失败或回滚，标识也已外发）。
+      abortActiveAnalysisJobs();
       // 切换后端前先在旧 URL/旧密钥上下文下排空旧后端的推送与在途同步；
       // 恢复期间由 withAccountSwitchGuard 静音订阅，阻止新推送把旧账号数据
       // 发送到新后端（backend.init 提交新 URL 后，晚启动的推送会以旧密钥与
@@ -448,9 +504,15 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         // 删除其分区中已有的仓库与发布记录。
         await withAccountSwitchGuard(async () => {
           withAccountSwitchGuardSync(() => {
-            useAppStore.getState().setBackendApiSecret(secret);
-            useAppStore.getState().setGitHubToken(result.githubToken);
-            useAppStore.getState().setUser(result.user);
+            const live = useAppStore.getState();
+            // R12 finding 16：同账号恢复但凭据不同（后端保存了新 PAT）时推进
+            // 会话代次；相同凭据不推进，避免中止当前任务。
+            if (accountIdKey(live.user) === targetAccountId && live.githubToken !== result.githubToken) {
+              bumpAccountSessionGeneration();
+            }
+            live.setBackendApiSecret(secret);
+            live.setGitHubToken(result.githubToken);
+            live.setUser(result.user);
           });
         });
         return { ok: true, result, targetAccountId };
@@ -579,13 +641,19 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       // 最终校验（拒绝时返回 false），绝不登出另一个账号。
       const loggedOut = useAppStore.getState().logout(expectedAccountId);
       if (loggedOut === false) return false;
+      // 交接项 1（R12）：等待设备端删除落定并立即重试一次；仍失败时明确
+      // 提示用户（旧凭据已被屏蔽，重启后会自动重试）。
+      const deviceCleanupDone = await retryPendingAccountSecretRemoval();
+      if (!deviceCleanupDone) {
+        dialog?.toast(t('accountSwitch.device-credential-removal-pending'), 'warning');
+      }
       refreshMcpBridgeSafely();
       return true;
     } finally {
       releaseAccountSwitchLock();
       setIsSwitching(false);
     }
-  }, [refreshMcpBridgeSafely]);
+  }, [dialog, refreshMcpBridgeSafely, t]);
 
   return {
     isSwitching,

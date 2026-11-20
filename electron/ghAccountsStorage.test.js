@@ -20,13 +20,28 @@ describe('ghAccountsStorage path helper', () => {
 describe('ghAccountsStorage save, load, clear', () => {
   const makeCtx = ({ available = true, fsOverrides = {} } = {}) => {
     const storage = new Map();
+    // 第 12 轮审计修复：文件缺失必须抛出带 code:'ENOENT' 的错误（真实 fs 语义）
+    //——readFileSync 返回 undefined 会让用例走「空内容」分支而不是「文件缺失」
+    // 异常分支，unlinkSync 同样不会抛 ENOENT，首次加载与空映射保存用例即使把
+    // 真实的文件缺失当错误处理也照常通过。
+    const fsError = (op, p) => {
+      const err = new Error(`ENOENT: no such file or directory, ${op} '${p}'`);
+      err.code = 'ENOENT';
+      return err;
+    };
     const fakeFs = {
       existsSync: (p) => storage.has(p),
       writeFileSync: (p, data) => storage.set(p, data),
-      readFileSync: (p) => storage.get(p),
-      unlinkSync: (p) => storage.delete(p),
+      readFileSync: (p) => {
+        if (!storage.has(p)) throw fsError('open', p);
+        return storage.get(p);
+      },
+      unlinkSync: (p) => {
+        if (!storage.has(p)) throw fsError('unlink', p);
+        storage.delete(p);
+      },
       renameSync: (from, to) => {
-        if (!storage.has(from)) throw new Error('ENOENT: temp file missing');
+        if (!storage.has(from)) throw fsError('rename', from);
         storage.set(to, storage.get(from));
         storage.delete(from);
       },
@@ -68,8 +83,34 @@ describe('ghAccountsStorage save, load, clear', () => {
     const filePath = path.join('/test/data', GH_ACCOUNTS_FILENAME);
     const tempPath = `${filePath}.tmp`;
 
-    const saveRes = saveEncryptedGhAccounts(ctx, { '42': 'ghp_token_1' });
+    // 第 12 轮审计修复：记录 writeFileSync 与 renameSync 的调用参数——必须先
+    // 写入与目标同目录的临时文件（跨文件系统 rename 会失败），再将该临时文件
+    // 重命名为目标文件。
+    const writeTargets = [];
+    let renameFrom = null;
+    let renameTo = null;
+    const recordingCtx = {
+      ...ctx,
+      fs: {
+        ...ctx.fs,
+        writeFileSync: (p, data) => {
+          writeTargets.push(p);
+          storage.set(p, data);
+        },
+        renameSync: (from, to) => {
+          renameFrom = from;
+          renameTo = to;
+          storage.set(to, storage.get(from));
+          storage.delete(from);
+        },
+      },
+    };
+
+    const saveRes = saveEncryptedGhAccounts(recordingCtx, { '42': 'ghp_token_1' });
     assert.deepEqual(saveRes, { success: true });
+    assert.deepEqual(writeTargets, [tempPath]);
+    assert.equal(renameFrom, tempPath);
+    assert.equal(renameTo, filePath);
     // Temp file is gone after the rename; only the target remains.
     assert.equal(storage.has(tempPath), false);
     assert.ok(storage.has(filePath));

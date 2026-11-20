@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "移除已保存的账号",
     "remove-account-confirm-desc": "仅移除该账号的快捷登录凭证，本地缓存的仓库与分类数据仍会保留。确定继续吗？",
     "account-switched": "已切换到账号 @{{login}}",
-    "account-repo-count": "{{count}} 个仓库"
+    "account-repo-count": "{{count}} 个仓库",
+    "retry-credential-alignment": "重试后端凭据对齐"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "同步分类到 GitHub list"
@@ -1436,6 +1437,10 @@
     "confirm": "添加并切换",
     "reauth-hint": "请为账号 @{{login}} 重新输入有效的 GitHub Token",
     "account-mismatch": "该 Token 属于另一个 GitHub 账号，请使用 @{{login}} 的 Token 登录。",
-    "backend-credential-sync-failed": "账号已添加，但后端凭据未能更新。请稍后重试。"
+    "backend-credential-sync-failed": "已登录该账号，但后端凭据未能更新。请稍后从账号菜单重试。"
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "已退出登录，但设备端凭据清理未完成。旧凭据已被屏蔽，将在下次启动时自动重试。",
+    "active-account-update-skipped": "切换期间另一台设备更改了后端的活跃账号，后端未能切换到本账号。本机会话已切换到该账号；请从账号菜单重试以对齐后端。"
   }
 }

@@ -41,7 +41,8 @@
     "failed": "スター追加失敗",
     "starred": "スターを追加しました",
     "check-name": "名前を確認してください",
-    "no-description": "説明なし"
+    "no-description": "説明なし",
+    "session-changed": "アカウントが切り替わりました。もう一度プレビューしてからスターしてください。"
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "プラグインの結果を適用できません",
@@ -247,7 +248,11 @@
     "unstar": "キャンセルスター",
     "successfully-unstarred": "スターは正常にキャンセルされました",
     "failed-to-unstar-repository-please-check-your-ne": "スターのキャンセルに失敗しました。ネットワーク接続を確認するか、再度ログインしてください。",
-    "similar-results-may-be-incomplete-the-dens": "類似リポジトリの結果は不完全な可能性があります：密ベクトルインデックスを利用できません。({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "類似リポジトリの結果は不完全な可能性があります：密ベクトルインデックスを利用できません。({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "類似リポジトリの結果は不完全な可能性があります：ベクトルワーカーはアカウント単位の検索に対応していません。同梱の Cloudflare Worker をデプロイしてから再試行してください。",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "類似リポジトリの結果は不完全な可能性があります：ベクトルの accountId メタデータインデックスが準備できていません。accountId メタデータインデックスを作成して検証し、既存のベクトルをバックフィルしたうえで、デプロイで ACCOUNT_METADATA_INDEXED を有効にしてください。",
+    "dense-index-unavailable-reason-status-failed": "類似リポジトリの結果は不完全な可能性があります：ベクトルインデックスの状態確認に失敗しました。しばらくしてから再試行してください。",
+    "dense-index-unavailable-reason-needs-backfill": "類似リポジトリの結果は不完全な可能性があります：ベクトルインデックスがアカウント単位の検索に対応していません。設定のベクトル検索で現在のアカウントのインデックスを再構築してください。"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "最初に設定で GitHub トークンを構成するか、バックエンド サービスに接続してください。",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "リストの同期に失敗しました。スター ウェアハウスは同期されました。後でもう一度試すか、GitHub トークンの権限を確認してください (ユーザー スコープが必要です)。",
     "sync-completed-found-newrepocount-new-repositori": "同期が完了しました！ {{newRepoCount}} 個の新しいリポジトリが見つかりました。",
     "sync-completed-all-repositories-are-up-to-date": "同期が完了しました！すべてのリポジトリは最新です。",
+    "sync-completed-backend-write-failed": "スターは更新されましたが、バックエンドへの書き込みに失敗しました。ローカルデータは保持され、バックエンド同期は自動的に再試行されます。",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub トークンの有効期限が切れているか、無効です。再度ログインしてください。",
     "sync-failed-please-check-your-network-connection": "同期に失敗しました。ネットワーク接続を確認するか、後でもう一度試してください。",
     "list-sync-new-categories_one": "（{{count}} 個の分類を新規作成）",

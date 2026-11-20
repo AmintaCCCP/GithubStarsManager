@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "Supprimer le compte enregistré",
     "remove-account-confirm-desc": "Cela supprime uniquement les identifiants de connexion enregistrés pour ce compte. Les dépôts et catégories en cache seront conservés. Continuer ?",
     "account-switched": "Compte basculé vers @{{login}}",
-    "account-repo-count": "{{count}} dépôts"
+    "account-repo-count": "{{count}} dépôts",
+    "retry-credential-alignment": "Réessayer la synchronisation des identifiants du backend"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Synchroniser les catégories avec la liste GitHub"
@@ -1436,6 +1437,10 @@
     "confirm": "Ajouter et basculer",
     "reauth-hint": "Veuillez saisir un jeton GitHub valide pour @{{login}}",
     "account-mismatch": "Ce jeton appartient à un autre compte GitHub. Connectez-vous avec le jeton de @{{login}}.",
-    "backend-credential-sync-failed": "Le compte a été ajouté, mais les identifiants du backend n'ont pas pu être mis à jour. Réessayez plus tard."
+    "backend-credential-sync-failed": "Connexion au compte effectuée, mais les identifiants du backend n'ont pas pu être mis à jour. Réessayez plus tard depuis le menu des comptes."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Déconnexion effectuée, mais le nettoyage des identifiants sur l'appareil n'est pas terminé. L'ancien identifiant reste masqué et sera réessayé automatiquement au prochain démarrage.",
+    "active-account-update-skipped": "Un autre appareil a changé le compte actif du backend pendant ce changement de compte ; le backend n'a donc pas basculé sur ce compte. La session locale utilise déjà ce compte ; réessayez depuis le menu des comptes pour aligner le backend."
   }
 }

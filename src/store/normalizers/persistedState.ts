@@ -89,21 +89,18 @@ export const normalizePersistedState = (
   }
   const authMirror = readAuthMirror();
 
-  // Effective auth: persisted values win; the synchronous localStorage mirror
-  // back-fills when the IndexedDB snapshot lost them (asynchronous unload write).
-  // Only pair persisted user with mirror token when both belong to the same account.
+  // Effective auth: persisted values win. The mirror only back-fills the user
+  // and backend secret（IndexedDB 异步卸载写入丢失时兜底）。
+  // 第 12 轮审计修复：移除常规水合中已失效的镜像 PAT 匹配分支——审计修复
+  // B7/CWE-922 起 readAuthMirror 恒返回 githubToken: null，无论账号 ID 是否
+  // 匹配该分支都不能回填 PAT，仅剩一套不参与凭据选择的账号匹配规则。
+  // 常规水合直接采用持久化的字符串 PAT（否则 null）；旧镜像明文 PAT 的迁移
+  // 仍由专用读取函数 readLegacyAuthMirrorForDesktopMigration 处理。
   const resolvedUser = safePersisted.user ?? authMirror?.user ?? null;
-  // 审计修复（B5）：组合回填要求两侧都有「有效账号 ID」且相等——任一侧缺
-  // 有效 ID 视为不匹配，不得把两个 null ID 当作同一账号（防止把镜像 Token
-  // 绑到无有效 ID 的持久化用户上）。
-  const persistedUserId = accountIdKey(safePersisted.user);
-  const mirrorUserId = accountIdKey(authMirror?.user ?? null);
-  const mirrorMatchesPersistedUser = !safePersisted.user
-    || (mirrorUserId !== null && mirrorUserId === persistedUserId);
   const resolvedGithubToken =
     typeof safePersisted.githubToken === 'string'
       ? safePersisted.githubToken
-      : (mirrorMatchesPersistedUser ? (authMirror?.githubToken ?? null) : null);
+      : null;
   const resolvedBackendApiSecret =
     typeof safePersisted.backendApiSecret === 'string'
       ? (safePersisted.backendApiSecret || null)

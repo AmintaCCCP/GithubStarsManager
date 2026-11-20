@@ -41,7 +41,8 @@
     "failed": "별표 추가 실패",
     "starred": "별표 추가 완료",
     "check-name": "이 이름을 확인하세요",
-    "no-description": "설명 없음"
+    "no-description": "설명 없음",
+    "session-changed": "계정이 변경되었습니다. 다시 미리 본 뒤 스타하세요."
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "플러그인 결과를 적용할 수 없습니다.",
@@ -247,7 +248,11 @@
     "unstar": "취소별",
     "successfully-unstarred": "스타가 취소되었습니다.",
     "failed-to-unstar-repository-please-check-your-ne": "스타를 취소하지 못했습니다. 네트워크 연결을 확인하거나 다시 로그인하세요.",
-    "similar-results-may-be-incomplete-the-dens": "유사 저장소 결과가 불완전할 수 있습니다: 밀집 벡터 인덱스를 사용할 수 없습니다. ({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "유사 저장소 결과가 불완전할 수 있습니다: 밀집 벡터 인덱스를 사용할 수 없습니다. ({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "유사 저장소 결과가 불완전할 수 있습니다: 벡터 워커가 계정 범위 검색을 지원하지 않습니다. 번들로 제공되는 Cloudflare 워커를 배포한 후 다시 시도하세요.",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "유사 저장소 결과가 불완전할 수 있습니다: 벡터 accountId 메타데이터 인덱스가 준비되지 않았습니다. accountId 메타데이터 인덱스를 만들고 검증한 뒤 기존 벡터를 백필하고 배포에서 ACCOUNT_METADATA_INDEXED를 활성화하세요.",
+    "dense-index-unavailable-reason-status-failed": "유사 저장소 결과가 불완전할 수 있습니다: 벡터 인덱스 상태 확인에 실패했습니다. 잠시 후 다시 시도하세요.",
+    "dense-index-unavailable-reason-needs-backfill": "유사 저장소 결과가 불완전할 수 있습니다: 벡터 인덱스가 계정 범위 검색을 할 준비되지 않았습니다. 설정의 벡터 검색에서 현재 계정의 인덱스를 다시 구축하세요."
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "먼저 설정에서 GitHub 토큰을 구성하거나 백엔드 서비스에 연결하세요.",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "목록 동기화에 실패했습니다. 스타 창고가 동기화되었습니다. 나중에 다시 시도하거나 GitHub 토큰 권한을 확인하세요(사용자 범위 필요).",
     "sync-completed-found-newrepocount-new-repositori": "동기화가 완료되었습니다! {{newRepoCount}}개의 새 저장소가 발견되었습니다.",
     "sync-completed-all-repositories-are-up-to-date": "동기화가 완료되었습니다! 모든 저장소가 최신 상태입니다.",
+    "sync-completed-backend-write-failed": "스타는 업데이트되었지만 백엔드 쓰기에 실패했습니다. 로컬 데이터는 유지되며 백엔드 동기화는 자동으로 다시 시도됩니다.",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub 토큰이 만료되었거나 유효하지 않습니다. 다시 로그인하세요.",
     "sync-failed-please-check-your-network-connection": "동기화에 실패했습니다. 네트워크 연결을 확인하거나 나중에 다시 시도하세요.",
     "list-sync-new-categories_one": " (분류 {{count}}개 새로 생성)",

@@ -6,6 +6,7 @@ import { normalizeAssetFilters } from '../utils/assetFilters';
 import { createGitHubApiService } from './githubApiFactory';
 import { logger } from './logger';
 import type { Repository } from '../types';
+import type { AppStoreState } from '../store/types';
 
 // Prevent sync loops: when we pull data FROM backend and update store,
 // the store subscription would trigger a push TO backend. This flag blocks that.
@@ -39,6 +40,13 @@ let _frozenWindowEditAccounts = new Set<string>();
 // 修改过的设置键。窗口退出时随 markPendingAccountSync 的 dirtySettingKeys
 // 一起按 (accountId, backendUrl) 持久化，重启后拉取仍能保留这些本地编辑值。
 let _frozenWindowDirtySettingKeys = new Map<string, Set<string>>();
+
+// 冻结窗口内的设置待推「值」缓冲（R12 跨域修复，finding 3）：同账号从 X 恢复
+// 到 Y 时，X 后端分区尚待推送的设置编辑只记录脏键会丢失值——Y 的拉取会覆盖
+// 本地工作区的 categoryOrder 等字段，切回 X 时脏键仍在但原值已无法恢复。
+// 这里在编辑发生的瞬间按账号保存每个脏键的新值；窗口退出时随 (accountId,
+// backendUrl) 一起持久化，重试该后端时写回工作区并随推送发送。
+let _frozenWindowDirtySettingValues = new Map<string, Record<string, unknown>>();
 
 /**
  * Wrap an account switch sequence so the Store subscription treats all state
@@ -95,6 +103,7 @@ export async function withAccountSwitchFrozen<T>(
   const previousFrozen = _isAccountSwitchFrozen;
   const previousBuffer = _frozenWindowEditAccounts;
   const previousDirtyBuffer = _frozenWindowDirtySettingKeys;
+  const previousDirtyValueBuffer = _frozenWindowDirtySettingValues;
   // 嵌套窗口共享最外层缓冲：只有最外层窗口退出时做缓冲分流
   const isOutermostWindow = !previousFrozen;
   _isSwitchingAccount = true;
@@ -105,6 +114,7 @@ export async function withAccountSwitchFrozen<T>(
   if (isOutermostWindow) {
     _frozenWindowEditAccounts = new Set();
     _frozenWindowDirtySettingKeys = new Map();
+    _frozenWindowDirtySettingValues = new Map();
   }
   try {
     return await fn();
@@ -115,13 +125,18 @@ export async function withAccountSwitchFrozen<T>(
     if (isOutermostWindow) {
       const bufferedAccounts = _frozenWindowEditAccounts;
       const bufferedDirtyKeys = _frozenWindowDirtySettingKeys;
+      const bufferedDirtyValues = _frozenWindowDirtySettingValues;
       _frozenWindowEditAccounts = previousBuffer;
       _frozenWindowDirtySettingKeys = previousDirtyBuffer;
+      _frozenWindowDirtySettingValues = previousDirtyValueBuffer;
       for (const accountId of bufferedAccounts) {
         // 审计修复（C4）：窗口内编辑过的设置脏键随待推标记一起持久化，
         // 恢复失败/成功分流后拉取合并仍能保留这些本地编辑值。
+        // R12 finding 3：脏键对应的「值」也一起持久化——同账号切到另一后端后
+        // 目标后端的拉取会覆盖本地工作区，只有保存值才能在重试原后端时恢复。
         markPendingAccountSync(accountId, originBackendUrl, {
           dirtySettingKeys: [...(bufferedDirtyKeys.get(accountId) ?? [])],
+          dirtySettingValues: bufferedDirtyValues.get(accountId),
         });
       }
     }
@@ -187,7 +202,19 @@ let _storeUnsubscribe: (() => void) | null = null;
 
 // Prevent overlapping pushes to backend
 let _isPushingToBackend = false;
-let _pushPromise: Promise<boolean> | null = null;
+// R12 跨域修复（finding 1）：推送结果按「推送链路」绑定，而不是模块级可变变量。
+// 复用进行中的推送是设计（串行/去重），但结果必须随被等待的 promise 一起返回，
+// 任何调用方都不能读取被另一次推送覆盖的共享失败状态。
+interface PushAttemptOutcome {
+  /** 本次推送是否真正发出了写入请求；false = 提前返回（未尝试写入）。 */
+  attempted: boolean;
+  /** 本次推送实际失败的分片名（最后一次尝试）。 */
+  failedShards: string[];
+}
+interface SyncPushResult extends PushAttemptOutcome {
+  pushed: boolean;
+}
+let _pushPromise: Promise<SyncPushResult> | null = null;
 // Queue a push if one is requested while a pull is in-flight
 let _hasPendingPush = false;
 // Force-verify repository and settings shards on manual "Sync to backend"
@@ -424,10 +451,6 @@ const PUSH_SHARD_NAMES = [
   'vectorSearch',
   'settings',
 ] as const;
-let _lastPushFailedShards: string[] = [];
-// R2-C5：本次 pushToBackend 是否真正执行了写入尝试。false 表示提前返回
-//（空工作区未对齐/无账号/后端切换），调用方不得按分片成功与否做回滚判断。
-let _lastPushAttempted = false;
 
 /** 记录某账号在本对齐会话内本地仓库列表曾非空（空列表全量推送豁免依据）。 */
 function markAccountSeenNonEmptyRepos(accountId: string | null | undefined): void {
@@ -541,10 +564,51 @@ const SETTING_DIRTY_KEYS = [
   'collapsedSidebarCategoryCount',
 ] as const;
 
+/**
+ * 待推设置的键→值快照（R12 跨域修复，finding 3）：按 (accountId, backendUrl)
+ * 归属。脏键只说明「哪些字段本地编辑过」，值才是重试该后端时应当发送的内容——
+ * 同账号切到另一后端后，目标后端的拉取会用其数据覆盖本地工作区，只有持久化
+ * 的值才能在切回原后端时恢复这次编辑。
+ */
+type PendingSettingValues = Record<string, unknown>;
+
+function isSettingDirtyKey(value: unknown): value is typeof SETTING_DIRTY_KEYS[number] {
+  return typeof value === 'string' && (SETTING_DIRTY_KEYS as readonly string[]).includes(value);
+}
+
+/** 校验持久化/合并来源的设置值快照：仅保留白名单键与可序列化的定义值。 */
+function normalizePendingSettingValues(value: unknown): PendingSettingValues | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const values: PendingSettingValues = {};
+  for (const [key, settingValue] of Object.entries(value)) {
+    if (!isSettingDirtyKey(key) || settingValue === undefined) continue;
+    values[key] = settingValue;
+  }
+  return Object.keys(values).length > 0 ? values : undefined;
+}
+
 interface PendingSyncAccountRecord {
   accountId: string;
   backendUrl: string;
   dirtySettingKeys?: string[];
+  /** 待推设置的键→值快照（finding 3），与 dirtySettingKeys 同步维护。 */
+  dirtySettingValues?: PendingSettingValues;
+}
+
+/**
+ * 待推记录的持久化格式：`[accountId, backendUrl, dirtySettingKeys?, values?]`。
+ * 保持旧格式（2/3 元组）可读；没有值的记录绝不写空对象，避免无谓放大快照。
+ */
+function serializePendingSyncRecord(entry: PendingSyncAccountRecord): unknown[] {
+  const dirtySettingKeys = entry.dirtySettingKeys ?? [];
+  const dirtySettingValues = normalizePendingSettingValues(entry.dirtySettingValues);
+  if (dirtySettingKeys.length === 0 && !dirtySettingValues) {
+    return [entry.accountId, entry.backendUrl];
+  }
+  if (!dirtySettingValues) {
+    return [entry.accountId, entry.backendUrl, dirtySettingKeys];
+  }
+  return [entry.accountId, entry.backendUrl, dirtySettingKeys, dirtySettingValues];
 }
 
 const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
@@ -559,16 +623,19 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
       } else if (Array.isArray(item) && typeof item[0] === 'string') {
         const backendUrl = typeof item[1] === 'string' ? item[1] : '';
         // 三元组格式（C4）：[accountId, backendUrl, dirtySettingKeys[]]
+        // 四元组格式（R12 finding 3）：[..., dirtySettingKeys[], dirtySettingValues{}]
         const rawDirtyKeys = Array.isArray(item[2]) ? item[2] : [];
         const dirtySettingKeys = rawDirtyKeys.filter((key): key is typeof SETTING_DIRTY_KEYS[number] => (
           (SETTING_DIRTY_KEYS as readonly string[]).includes(key as string)
         ));
+        const dirtySettingValues = normalizePendingSettingValues(item[3]);
         entries.set(
           pendingSyncCompositeKey(item[0], backendUrl),
           {
             accountId: item[0],
             backendUrl,
             ...(dirtySettingKeys.length > 0 ? { dirtySettingKeys } : {}),
+            ...(dirtySettingValues ? { dirtySettingValues } : {}),
           },
         );
       }
@@ -603,10 +670,16 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
           ...(existingAtTarget?.dirtySettingKeys ?? []),
           ...(entry.dirtySettingKeys ?? []),
         ]));
+        const mergedDirtyValues = {
+          ...normalizePendingSettingValues(existingAtTarget?.dirtySettingValues),
+          ...normalizePendingSettingValues(entry.dirtySettingValues),
+        };
+        const mergedValues = normalizePendingSettingValues(mergedDirtyValues);
         entries.set(targetKey, {
           accountId: entry.accountId,
           backendUrl: migrationBackendUrl,
           ...(mergedDirtyKeys.length > 0 ? { dirtySettingKeys: mergedDirtyKeys } : {}),
+          ...(mergedValues ? { dirtySettingValues: mergedValues } : {}),
         });
         rebound = true;
       }
@@ -614,13 +687,7 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
         try {
           localStorage.setItem(
             PENDING_SYNC_ACCOUNTS_KEY,
-            JSON.stringify([...entries.values()].map(
-              ({ accountId, backendUrl, dirtySettingKeys }) => (
-                dirtySettingKeys && dirtySettingKeys.length > 0
-                  ? [accountId, backendUrl, dirtySettingKeys]
-                  : [accountId, backendUrl]
-              ),
-            )),
+            JSON.stringify([...entries.values()].map(serializePendingSyncRecord)),
           );
         } catch {
           // 存储不可用时忽略：本次会话内绑定仍然生效，下次启动重试迁移
@@ -637,13 +704,7 @@ const persistPendingSyncAccounts = (): void => {
   try {
     localStorage.setItem(
       PENDING_SYNC_ACCOUNTS_KEY,
-      JSON.stringify([..._pendingSyncAccounts.values()].map(
-        ({ accountId, backendUrl, dirtySettingKeys }) => (
-          dirtySettingKeys && dirtySettingKeys.length > 0
-            ? [accountId, backendUrl, dirtySettingKeys]
-            : [accountId, backendUrl]
-        ),
-      )),
+      JSON.stringify([..._pendingSyncAccounts.values()].map(serializePendingSyncRecord)),
     );
   } catch {
     // 存储不可用（隐私模式/配额）时退化为会话内标记
@@ -656,16 +717,19 @@ const _pendingSyncAccounts = loadPendingSyncAccounts();
  * 记录账号级待推状态（补推成功前必须保留，跨重启持久化）。
  * dirtySettingKeys（C4）：待推设置的脏键随标记一起按 (accountId, backendUrl)
  * 持久化，重启后由 restorePendingSettingDirtyKeys 恢复进会话脏键集合。
+ * dirtySettingValues（R12 finding 3）：同一批脏键的值快照；同账号切换后端时
+ * 目标后端的拉取不得让这些待推值丢失，重试原后端时按此快照恢复。
  */
 export function markPendingAccountSync(
   accountId: string,
   targetBackendUrl = backend.backendUrl ?? '',
-  options?: { dirtySettingKeys?: string[] },
+  options?: { dirtySettingKeys?: string[]; dirtySettingValues?: PendingSettingValues },
 ): void {
   const key = pendingSyncCompositeKey(accountId, targetBackendUrl);
   const dirtySettingKeys = options?.dirtySettingKeys?.filter(
     (key): key is typeof SETTING_DIRTY_KEYS[number] => (SETTING_DIRTY_KEYS as readonly string[]).includes(key),
   );
+  const incomingValues = normalizePendingSettingValues(options?.dirtySettingValues);
   const existing = _pendingSyncAccounts.get(key);
   if (existing) {
     // 已有记录：合并脏键（并集），绝不丢失先前窗口记录的编辑字段
@@ -673,9 +737,17 @@ export function markPendingAccountSync(
     const nextDirty = dirtySettingKeys
       ? [...mergedDirty]
       : existing.dirtySettingKeys;
+    // 值快照按「同一键后写覆盖先写」合并：同一窗口内对同一字段的多次编辑取
+    // 最后一次的值；未提供新值时保留既有快照。
+    const mergedValues = {
+      ...normalizePendingSettingValues(existing.dirtySettingValues),
+      ...incomingValues,
+    };
+    const nextValues = normalizePendingSettingValues(mergedValues);
     _pendingSyncAccounts.set(key, {
       ...existing,
       ...(nextDirty && nextDirty.length > 0 ? { dirtySettingKeys: nextDirty } : {}),
+      ...(nextValues ? { dirtySettingValues: nextValues } : {}),
     });
     persistPendingSyncAccounts();
     return;
@@ -684,6 +756,7 @@ export function markPendingAccountSync(
     accountId,
     backendUrl: targetBackendUrl,
     ...(dirtySettingKeys && dirtySettingKeys.length > 0 ? { dirtySettingKeys } : {}),
+    ...(incomingValues ? { dirtySettingValues: incomingValues } : {}),
   });
   persistPendingSyncAccounts();
 }
@@ -723,10 +796,16 @@ function clearPendingSettingDirtyKeys(
     if (pushedVersion === undefined) return true;
     return _dirtySettingKeyVersions.get(dirtyKey) !== pushedVersion;
   });
+  const remainingSet = new Set(remainingDirty);
+  const remainingValues = Object.fromEntries(
+    Object.entries(normalizePendingSettingValues(existing.dirtySettingValues) ?? {})
+      .filter(([dirtyKey]) => remainingSet.has(dirtyKey)),
+  );
   _pendingSyncAccounts.set(key, {
     accountId,
     backendUrl: targetBackendUrl,
     ...(remainingDirty.length > 0 ? { dirtySettingKeys: remainingDirty } : {}),
+    ...(Object.keys(remainingValues).length > 0 ? { dirtySettingValues: remainingValues } : {}),
   });
   persistPendingSyncAccounts();
 }
@@ -747,6 +826,44 @@ function restorePendingSettingDirtyKeys(accountId: string): void {
     // 凭旧版本清除这些键（R2-C2）。
     markDirtySettingKeys(entry.dirtySettingKeys);
   }
+}
+
+/**
+ * 把归属于指定 (账号, 后端) 的待推设置「值」写回工作区（R12 finding 3）。
+ *
+ * 同账号从 X 切到 Y 后，Y 的拉取会把 categoryOrder 等字段覆盖成 Y 的值；
+ * 切回 X 时只有持久化的值快照能恢复用户当时的编辑。保护规则：
+ * - 只处理该 (账号, 后端) 精确匹配的记录（旧版 backendUrl '' 记录没有值）；
+ * - 本会话已重新编辑过的键（`_dirtySettingKeys` 命中）保留实时值——用户
+ *   更晚的编辑优先，绝不用旧快照覆盖；
+ * - 静音订阅器，恢复动作本身不得被记成新的本地编辑或触发额外推送。
+ */
+function restorePendingSettingValues(accountId: string, targetBackendUrl: string): void {
+  const entry = _pendingSyncAccounts.get(pendingSyncCompositeKey(accountId, targetBackendUrl));
+  const savedValues = normalizePendingSettingValues(entry?.dirtySettingValues);
+  if (!savedValues) return;
+  const patch: Record<string, unknown> = {};
+  for (const key of SETTING_DIRTY_KEYS) {
+    if (!(key in savedValues)) continue;
+    if (_dirtySettingKeys.has(key)) continue;
+    patch[key] = savedValues[key];
+  }
+  if (Object.keys(patch).length === 0) return;
+  muteSubscriberWrites(() => {
+    useAppStore.setState(patch as Partial<AppStoreState>);
+  });
+}
+
+/**
+ * R12 finding 3（hooks 消费入口）：把当前后端的待推设置值恢复到工作区。
+ * 在应用目标后端数据（对齐拉取/补推）前调用，确保本地工作区代表该后端的
+ * 待推编辑，而不是被另一后端覆盖后的值。
+ */
+export function restorePendingSettingValuesForCurrentBackend(
+  accountId: string | null | undefined,
+): void {
+  if (!accountId) return;
+  restorePendingSettingValues(accountId, backend.backendUrl ?? '');
 }
 
 /**
@@ -783,6 +900,9 @@ export function rebindPendingAccountSyncToCurrentBackend(
   // 已编辑键保护。目标不存在时按来源记录（含全部脏键）原样迁移。
   markPendingAccountSync(accountId, backendUrl, {
     dirtySettingKeys: existing.dirtySettingKeys,
+    // R12 finding 3：值快照随记录一起迁移到恢复后的后端，补推时才能发送
+    // 原始编辑值而不是被候选后端拉取覆盖后的工作区值。
+    dirtySettingValues: existing.dirtySettingValues,
   });
 }
 
@@ -857,9 +977,30 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
     if (previousAccountId) {
       // 审计修复（C4）：待推设置的脏键随标记一起按 (accountId, backendUrl)
       // 持久化，重启后拉取合并分支据此保留本地已编辑值。
-      markPendingAccountSync(previousAccountId, backend.backendUrl ?? '', {
+      // R12 finding 3：除脏键外一并保存值快照——若新会话切到另一后端，其拉取
+      // 会覆盖本地工作区；只有保存的值能在回到原后端时恢复这些待推编辑。
+      const pendingTargetBackendUrl = backend.backendUrl ?? '';
+      const pendingState = useAppStore.getState() as unknown as Record<string, unknown>;
+      const pendingValues: PendingSettingValues = {};
+      for (const dirtyKey of _dirtySettingKeys) {
+        if (!isSettingDirtyKey(dirtyKey)) continue;
+        const value = pendingState[dirtyKey];
+        if (value === undefined) continue;
+        pendingValues[dirtyKey] = value;
+      }
+      markPendingAccountSync(previousAccountId, pendingTargetBackendUrl, {
         dirtySettingKeys: [..._dirtySettingKeys],
+        dirtySettingValues: pendingValues,
       });
+      // 这些脏键已随待推记录持久化（值也一并保存）。本会话的脏键集合必须
+      // 同步清空：否则同账号换后端返回后，restorePendingSettingValues 会因
+      // 「本会话曾编辑」的旧标记跳过恢复，把目标后端覆盖后的值推回原后端。
+      // 记录仍在——重新进入该 (账号, 后端) 时 restorePendingSettingDirtyKeys
+      // 会重新登记保护。
+      for (const dirtyKey of _dirtySettingKeys) {
+        _dirtySettingKeyVersions.delete(dirtyKey);
+      }
+      _dirtySettingKeys.clear();
     }
     logger.warn('sync.switch', 'Backend flush incomplete before account switch; pending edits stay bound to the previous account partition', {
       accountId: previousAccountId ?? null,
@@ -1213,7 +1354,25 @@ export async function syncLocalGitHubTokenToBackend(
 }
 
 /**
- * 应用后端 settings 分片（拉取与待推合并分支共用同一套规则）。
+ * 以同步作用域静音本机编辑订阅（第 12 轮审计修复）：远端数据/设置应用到
+ * Store 的写入不得被订阅器记为本机编辑——否则订阅器会把后端分类等写回记为
+ * 本机脏键，旧回包经补推可覆盖其他设备的更新。zustand 订阅器同步触发，
+ * try/finally 作用域即覆盖全部写入。
+ */
+function muteSubscriberWrites<T>(fn: () => T): T {
+  const previous = _isSyncingFromBackend;
+  _isSyncingFromBackend = true;
+  try {
+    return fn();
+  } finally {
+    _isSyncingFromBackend = previous;
+  }
+}
+
+/**
+ * 应用后端 settings 分片（拉取与待推合并分支共用同一套规则）的静音版：
+ * 待推合并分支在订阅器活跃状态下调用，必须经 muteSubscriberWrites 包裹；
+ * 拉取应用分支已处于 _isSyncingFromBackend 作用域内，直接调用原函数。
  * `protectLocal` 用于待推分支：本地非空而后端为空的字段保留本地值，
  * 既不让本机空值覆盖后端配置，也不回滚拉取窗口内的本地编辑。
  */
@@ -1285,6 +1444,11 @@ function applyBackendSettings(settings: Record<string, unknown>, protectLocal = 
   }
 }
 
+/** applyBackendSettings 的静音版：订阅器不把应用后端设置产生的写入记为本机编辑。 */
+function applyBackendSettingsMuted(settings: Record<string, unknown>, protectLocal = false): void {
+  muteSubscriberWrites(() => applyBackendSettings(settings, protectLocal));
+}
+
 /**
  * Pull all data from backend and update local store.
  * Backend-first strategy: backend data overwrites local data.
@@ -1328,6 +1492,10 @@ export async function syncFromBackend(options: {
   // 保留本地已编辑值、未编辑字段仍从后端合并。
   if (activeAccountId && hasPendingAccountSync(activeAccountId)) {
     _hasPendingLocalChanges = true;
+    // R12 finding 3：先把归属于当前后端的待推设置值写回工作区，再恢复脏键
+    // 保护——否则拉取合并保留的是被另一后端覆盖后的本地值，而不是用户当时
+    // 编辑的值。
+    restorePendingSettingValues(activeAccountId, backend.backendUrl ?? '');
     restorePendingSettingDirtyKeys(activeAccountId);
   }
   if (options.force) {
@@ -1462,8 +1630,11 @@ export async function syncFromBackend(options: {
       }
       // 待推分支只跳过仓库快照，但设置同样来自后端：不应用就会用本地空值
       // （如 customCategories）覆盖后端已有配置；已编辑字段通过 protectLocal 保留。
+      // 第 12 轮审计修复：应用远端设置必须以同步作用域静音本机编辑订阅——
+      // 否则订阅器会把后端分类写回记为本机脏键，旧回包经补推可覆盖其他设备
+      // 的更新。保留既有本机脏键与后续补推行为。
       if (settingsResult.status === 'fulfilled') {
-        applyBackendSettings(settingsResult.value, true);
+        applyBackendSettingsMuted(settingsResult.value, true);
         _lastHash.settings = quickHash(settingsResult.value);
         markSettingsLoaded(fetchedAccountId, fetchedBackendUrl);
       } else {
@@ -1472,7 +1643,17 @@ export async function syncFromBackend(options: {
       }
       // 待推分支同样记录 AI 配置的读取结论：读取成功后该 (账号, 后端) 的
       // 空列表推送才被允许（未读取成功时空列表不得清空后端 AI 配置）。
+      // 第 12 轮审计修复：读取成功 ≠ 本机状态已对齐——本机列表为空而后端返回
+      // 非空配置时，先在静音作用域内应用后端列表再标记已读取；否则后续补推会
+      // 把未对齐的空列表当作已对齐状态发送，清空后端的 AI 配置。本机已有配置
+      // （可能是用户编辑状态）时保持原语义。
       if (aiResult.status === 'fulfilled') {
+        const backendAiConfigs = aiResult.value;
+        if (useAppStore.getState().aiConfigs.length === 0 && backendAiConfigs.length > 0) {
+          muteSubscriberWrites(() => {
+            useAppStore.getState().setAIConfigs(backendAiConfigs);
+          });
+        }
         markAIConfigsLoaded(fetchedAccountId, fetchedBackendUrl);
       }
       return;
@@ -1723,42 +1904,64 @@ export async function syncFromBackend(options: {
  * Queued callers wait for a push containing the latest local state.
  */
 export async function syncToBackend(options: { forceVerify?: boolean } = {}): Promise<boolean> {
+  return (await syncToBackendWithResult(options)).pushed;
+}
+
+/**
+ * R12 跨域修复（finding 1）：按调用返回本次等待的推送结果。
+ *
+ * - 本次调用发起推送：结果对象由本次 `pushLatest` 链独占持有并随 promise
+ *   返回，其他调用无法覆盖；
+ * - 本次调用复用进行中的 `_pushPromise`（串行/去重是设计语义）：得到的是
+ *   该推送链的结果；本次调用会先置 `_hasPendingPush`，推送循环在返回前会把
+ *   最新本地状态再推一次，因此最终结果覆盖本次调用的编辑。
+ *
+ * 任何路径都不再读写模块级共享的失败分片变量。
+ */
+async function syncToBackendWithResult(
+  options: { forceVerify?: boolean } = {},
+): Promise<SyncPushResult> {
   if (_isAccountSwitchFrozen) {
     const id = accountIdKey(useAppStore.getState().user);
     if (id) _frozenWindowEditAccounts.add(id);
-    return false;
+    return { pushed: false, attempted: false, failedShards: [] };
   }
   // 后端不可用时本次写入从未发生：显式校验推送（forceVerify）不得报告成功，
   // 必须作为「未尝试写入」返回失败；普通后台同步保持静默跳过（返回 true）。
-  if (!backend.isAvailable) return !options.forceVerify;
+  if (!backend.isAvailable) {
+    return { pushed: !options.forceVerify, attempted: false, failedShards: [] };
+  }
   if (options.forceVerify) {
     _pendingForceVerify = true;
   }
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
     await waitForInFlightSync();
-    return syncToBackend(options);
+    return syncToBackendWithResult(options);
   }
   if (_pushPromise) {
     _hasPendingPush = true;
     return _pushPromise;
   }
 
-  const pushLatest = async (): Promise<boolean> => {
+  const pushLatest = async (): Promise<SyncPushResult> => {
     // 清除标记必须归属本次推送的账号与后端：推送期间若会话或后端已切走，
     // 不能误清其他目标的待推状态。
     const pushAccountId = accountIdKey(useAppStore.getState().user);
     const pushBackendUrl = backend.backendUrl ?? '';
     let forceVerify = _pendingForceVerify;
     _pendingForceVerify = false;
-    let succeeded = await pushToBackend({ forceVerify });
+    // 本次推送链独占的分片结果：每次 pushToBackend 尝试都会重置它，
+    // 最终值即最后一次尝试的结果（与旧模块变量的「最后尝试胜出」语义一致）。
+    const outcome: PushAttemptOutcome = { attempted: false, failedShards: [] };
+    let succeeded = await pushToBackend({ forceVerify }, outcome);
     // Requests and edits arriving after the snapshot need a fresh push.
     // Failed writes stay pending for retry without an automatic retry loop.
     while (_hasPendingPush || (succeeded && _hasPendingLocalChanges)) {
       if (_isAccountSwitchFrozen) break;
       forceVerify = _pendingForceVerify;
       _pendingForceVerify = false;
-      succeeded = await pushToBackend({ forceVerify });
+      succeeded = await pushToBackend({ forceVerify }, outcome);
     }
     // 只有确认最新状态已全部落盘且未切换目标才清除账号级待推标记：推送期间的
     // 新编辑会在循环里再推一次，最后一轮失败时标记必须保留。
@@ -1770,7 +1973,11 @@ export async function syncToBackend(options: { forceVerify?: boolean } = {}): Pr
     ) {
       clearPendingAccountSync(pushAccountId, pushBackendUrl);
     }
-    return succeeded;
+    return {
+      pushed: succeeded,
+      attempted: outcome.attempted,
+      failedShards: [...outcome.failedShards],
+    };
   };
   const currentPromise = pushLatest();
   _pushPromise = currentPromise;
@@ -1802,6 +2009,9 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
   let lastConflictError: unknown = null;
   const pushSessionGeneration = getAccountSessionGeneration();
   const pushResetGeneration = _resetGeneration;
+  // 第 12 轮审计修复：推送发起时的凭据身份——同账号凭据替换（setGitHubToken
+  // 不递增会话代次）必须使旧载荷失效，代次校验单独覆盖不到这一路径。
+  const pushToken = useAppStore.getState().githubToken ?? '';
   for (let attempt = 1; attempt <= SNAPSHOT_CONFLICT_MAX_ATTEMPTS; attempt += 1) {
     // 审计修复：每次 GET 之前固定目标后端地址，GET 与 PUT 校验使用同一值。
     // 若 GET 期间连接从 X 切到 Y，PUT 携带固定的 X——syncRepositories 发现
@@ -1859,6 +2069,17 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
       && !pendingDeleted?.has(repo.id)
     ));
     const payload = [...mergedLocalRepos, ...serverKept];
+    // 第 12 轮审计修复：GET 快照与全量 PUT 之间重新校验会话——切号/切代次/
+    // 同账号凭据替换都使旧载荷失效，校验失败时抛错保留待推状态，绝不发送
+    // PUT。连接校验（目标地址 vs 当前连接）由 backend.syncRepositories 在
+    // 写入前兜底（原注释的「连接变化后在写入前失败」此前只对后端地址成立）。
+    const sessionValidBeforePut = _resetGeneration === pushResetGeneration
+      && getAccountSessionGeneration() === pushSessionGeneration
+      && accountIdKey(useAppStore.getState().user) === accountId
+      && (useAppStore.getState().githubToken ?? '') === pushToken;
+    if (!sessionValidBeforePut) {
+      throw new Error('Repository push aborted: account session changed between snapshot fetch and write');
+    }
     try {
       await backend.syncRepositories(payload, {
         expectedRevision: remote.revision ?? null,
@@ -1927,12 +2148,16 @@ export function schedulePendingAccountSyncRetry(accountId: string): void {
  * throwing; local edits made while the snapshot is in flight stay pending
  * for the next push.
  */
-async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<boolean> {
-  // R2-C5：失败分片信息始终归属于本次推送。任何提前返回（空工作区未对齐、
-  // 无活跃账号、后端已切换）都表示「未尝试写入」，必须清掉上一次推送残留的
-  // 分片列表，forceSyncToBackend 不得把它复制给未执行的推送。
-  _lastPushFailedShards = [];
-  _lastPushAttempted = false;
+async function pushToBackend(
+  options: { forceVerify?: boolean } = {},
+  // R2-C5/C41 + R12 finding 1：失败分片信息归属于本次推送尝试。结果对象由
+  // 调用链（pushLatest）独占持有，绝不写入模块级共享变量——任何提前返回
+  //（空工作区未对齐、无活跃账号、后端已切换）都表示「未尝试写入」，在入口
+  // 重置本次尝试的分片列表即可，不会影响其他调用的结果。
+  outcome: PushAttemptOutcome = { attempted: false, failedShards: [] },
+): Promise<boolean> {
+  outcome.attempted = false;
+  outcome.failedShards = [];
   // R5 审计修复（发现1，CodeRabbit Major/Heavy lift）：本地真空且该账号的
   // 后端分区尚未被观察（本会话既没有成功的仓库拉取、本地列表也从未非空）时，
   // 绝不能发送空列表 isFullSync 快照——服务端会物理删除该账号分区的全部
@@ -1975,6 +2200,10 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
       _hasPendingLocalChanges = true;
       return false;
     }
+    // R12 finding 3：重试有待推记录的后端时，先把归属于该 (账号, 后端) 的
+    // 待推设置值写回工作区，再取快照构造载荷——否则发送的是另一后端覆盖后
+    // 的值，用户在原后端的编辑会永久丢失。
+    if (pushAccountId) restorePendingSettingValues(pushAccountId, pushBackendUrl);
     const state = useAppStore.getState();
     const forceVerify = options.forceVerify === true;
     // 仓库分片未变化（例如只改了设置）时不要发送 isFullSync 全量快照：
@@ -2018,6 +2247,13 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
         )
       : fullSettingsPayload;
     const settingsSkipped = settingsUnavailable && Object.keys(settingsPayload).length === 0;
+    // 第 12 轮审计修复：手动同步（forceVerify）在设置分片尚未对齐时不得把
+    // 「仅写入脏键子集」报告为完整成功——其余设置既未校验也未写入。部分写入
+    // 本身保留（安全：只含本机明确编辑过的键），但结果按未完成上报：手动调用
+    // 方（设置页）不会误报「同步完成」，与无脏键时拒绝并报错的既有行为一致
+    //（设置未对齐的手动同步一律不报告完整成功），也绝不为获得成功结果发送
+    // 未对齐的默认值。
+    const settingsManualUnverified = forceVerify && settingsUnavailable;
     // 审计修复（PR #612）：当前 (账号, 后端) 尚未成功读取过 AI 配置时，本地空
     // 数组不代表「无配置」——跳过写入，防止 bulk PUT 清空该分区的全部 AI 配置。
     // 列表非空或已对齐时按原语义推送。
@@ -2031,7 +2267,7 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
     }
 
     // 从这里开始本次推送确实发出了写入尝试（R2-C5）。
-    _lastPushAttempted = true;
+    outcome.attempted = true;
     const results = await Promise.allSettled([
       // 跨端契约 A20x（审计修复 C2）：内容变化的全量推送经服务端快照合并
       // （GET → 服务端状态 ∪ 本地修改 − 本地明确删除 → PUT expectedRevision →
@@ -2054,9 +2290,12 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
     if (failures.length > 0) {
       // 记录失败分片名（审计修复 C41）：forceSyncToBackend(reportFailures) 抛错时
       // 附带给调用方，用于按分片判断是否回滚本地乐观变更。
-      _lastPushFailedShards = results.flatMap((result, index) => (
+      outcome.failedShards = results.flatMap((result, index) => (
         result.status === 'rejected' ? [PUSH_SHARD_NAMES[index]] : []
       ));
+      if (settingsManualUnverified && !outcome.failedShards.includes('settings')) {
+        outcome.failedShards = [...outcome.failedShards, 'settings'];
+      }
       logger.warn('sync.pushToBackend', `Synced to backend with ${failures.length} error(s)`, { failureCount: failures.length, durationMs: Date.now() - pushStartTime });
       _hasPendingLocalChanges = true;
       // 审计修复（C3）：部分分片失败（如仓库 PUT 成功但设置 PUT 失败）时安排
@@ -2066,6 +2305,16 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
       if (_syncGeneration === pushGeneration) {
         schedulePendingAccountSyncRetry(pushAccountId);
       }
+    } else if (settingsManualUnverified) {
+      // 第 12 轮审计修复：所有已发分片成功但设置未对齐——按未完成上报（含
+      // 分片名供调用方诊断），保留待推状态等待设置对齐后的完整写入。
+      logger.warn('sync.pushToBackend', 'Manual sync finished with a partial settings write; settings are not yet aligned with the backend', {
+        accountId: pushAccountId,
+        backendUrl: pushBackendUrl,
+        durationMs: Date.now() - pushStartTime,
+      });
+      outcome.failedShards = [...outcome.failedShards, 'settings'];
+      _hasPendingLocalChanges = true;
     } else {
       logger.info('sync.pushToBackend', 'Synced to backend', { durationMs: Date.now() - pushStartTime });
       _pushRetryDelay = 2000;
@@ -2103,7 +2352,9 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
         _lastHash.settings = quickHash(fullSettingsPayload);
       }
     }
-    return failures.length === 0;
+    // 第 12 轮审计修复：手动同步在设置未对齐时不得报告完整成功（部分脏键
+    // 写入已完成，但其余设置未校验未写入）。
+    return failures.length === 0 && !settingsManualUnverified;
   } catch (err) {
     logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err, { durationMs: Date.now() - pushStartTime });
     _hasPendingLocalChanges = true;
@@ -2123,17 +2374,16 @@ async function pushToBackend(options: { forceVerify?: boolean } = {}): Promise<b
  * synchronization warning (e.g. the batch star import dialog).
  */
 export async function forceSyncToBackend(options: { reportFailures?: boolean; forceVerify?: boolean } = {}): Promise<boolean> {
-  // R2-C5：本次严格推送前先清空上一次推送的分片信息；syncToBackend 若因
-  // 冻结窗口/不可用后端提前返回（未尝试写入），不得把这些残留复制给调用方。
-  _lastPushFailedShards = [];
-  _lastPushAttempted = false;
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
   _hasPendingLocalChanges = true;
-  const pushed = await syncToBackend({ forceVerify: options.forceVerify });
-  if (!pushed && options.reportFailures) {
+  // R12 跨域修复（finding 1）：分片结果随本次调用返回，不再读取模块级共享
+  // 变量。本次调用或复用的推送链若因冻结窗口/不可用后端提前返回（未尝试
+  // 写入），结果为 attempted=false 且 failedShards 为空，绝不混入其他推送。
+  const result = await syncToBackendWithResult({ forceVerify: options.forceVerify });
+  if (!result.pushed && options.reportFailures) {
     // 审计修复（C41/R2-C5）：附带本次推送实际失败的分片名与「是否尝试写入」。
     // 提前返回（未尝试写入）时 failedShards 必为空数组，调用方据 pushAttempted
     // 区分「未执行」与「关键分片成功但辅助分片失败」，仅在确认尝试过写入后
@@ -2142,11 +2392,11 @@ export async function forceSyncToBackend(options: { reportFailures?: boolean; fo
       failedShards?: string[];
       pushAttempted?: boolean;
     };
-    error.failedShards = [..._lastPushFailedShards];
-    error.pushAttempted = _lastPushAttempted;
+    error.failedShards = [...result.failedShards];
+    error.pushAttempted = result.attempted;
     throw error;
   }
-  return pushed;
+  return result.pushed;
 }
 
 /**
@@ -2233,8 +2483,18 @@ export function startAutoSync(): () => void {
             if (dirtySettingKeys.length > 0) {
               const windowKeys = _frozenWindowDirtySettingKeys.get(editAccountId)
                 ?? new Set<string>();
-              for (const key of dirtySettingKeys) windowKeys.add(key);
+              // R12 finding 3：同时保存编辑后的值。窗口退出后目标后端（Y）的
+              // 拉取会覆盖本地工作区，仅记录脏键无法在切回原后端（X）时恢复
+              // 用户当时的设置内容。
+              const windowValues = _frozenWindowDirtySettingValues.get(editAccountId) ?? {};
+              const editState = state as unknown as Record<string, unknown>;
+              for (const key of dirtySettingKeys) {
+                windowKeys.add(key);
+                // 同一键在窗口内多次编辑时保留最后一次写入的值。
+                if (editState[key] !== undefined) windowValues[key] = editState[key];
+              }
               _frozenWindowDirtySettingKeys.set(editAccountId, windowKeys);
+              _frozenWindowDirtySettingValues.set(editAccountId, windowValues);
             }
           }
         } else {

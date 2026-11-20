@@ -440,25 +440,53 @@ describe('destructive push safeguards (Issue #611)', () => {
     delete adapter.backendUrl;
   });
 
-  it('does not resurrect repositories the user deleted locally', async () => {
+  it('does not resurrect repositories the user deleted locally (restart with a fresh module instance)', async () => {
     vi.mocked(backend.fetchRepositories).mockResolvedValue({
       repositories: [createRepository(1), createRepository(2)],
       total: 2,
     });
     await forceSyncToBackend();
+    // 第 12 轮审计修复：重启场景用全新模块实例验证——resetSyncHashes() 不会
+    // 清空内存中的删除基线，仅靠它无法发现「基线只存内存、持久化写入/读取
+    // 失效」的回归。第一次推送必须已把基线写入持久化存储。
+    expect(window.localStorage.getItem('gsm.pushedRepoIdsV2'))
+      .toContain('http://backend-a|1');
 
-    // Simulate a restart: the pushed-ID baseline is persisted, the session
-    // observation sets are not.
-    resetSyncHashes();
-    useAppStore.setState({ repositories: [createRepository(1)] });
-    vi.mocked(backend.syncRepositories).mockClear();
+    // Simulate a restart: reload autoSync so every in-memory structure —
+    // including the deletion baseline — is rebuilt from persisted storage.
+    vi.resetModules();
+    const freshAutoSync = await import('./autoSync');
+    const freshBackend = (await import('./backendAdapter')).backend as typeof backend;
+    const freshStore = (await import('../store/useAppStore')).useAppStore;
+    // 等待新 store 实例的持久化水化结算后再播种状态，防止异步水化合并覆盖。
+    if (!freshStore.persist.hasHydrated()) {
+      await new Promise<void>((resolve) => {
+        const unsubscribe = freshStore.persist.onFinishHydration(() => resolve());
+        if (freshStore.persist.hasHydrated()) {
+          unsubscribe();
+          resolve();
+        }
+      });
+    }
+    freshStore.setState({
+      user: { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null },
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      repositories: [createRepository(1)],
+    });
+    vi.mocked(freshBackend.fetchRepositories).mockResolvedValue({
+      repositories: [createRepository(1), createRepository(2)],
+      total: 2,
+    });
 
-    // The remote still holds repo 2, but the user deleted it locally.
-    await forceSyncToBackend();
+    // The remote still holds repo 2, but the user deleted it locally. The
+    // fresh module instance must recover the deletion baseline from persisted
+    // storage and keep repo 2 out of the payload.
+    await freshAutoSync.forceSyncToBackend();
 
-    expect(useAppStore.getState().repositories.map((repo) => repo.id)).toEqual([1]);
-    const pushed = vi.mocked(backend.syncRepositories).mock.calls.at(-1)?.[0] ?? [];
+    const pushed = vi.mocked(freshBackend.syncRepositories).mock.calls.at(-1)?.[0] ?? [];
     expect(pushed.map((repo) => repo.id)).toEqual([1]);
+    expect(freshStore.getState().repositories.map((repo) => repo.id)).toEqual([1]);
   });
 
   it('defers a destructive push when the remote snapshot is incomplete', async () => {

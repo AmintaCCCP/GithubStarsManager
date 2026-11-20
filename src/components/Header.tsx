@@ -2,7 +2,7 @@
 
 import { useT } from '../i18n/useT';
 import React, { useMemo, useState } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X, ChevronDown, Check, UserPlus, Trash2 } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X, ChevronDown, Check, UserPlus, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -84,6 +84,19 @@ export const Header: React.FC = () => {
   // 审计修复（B21）：仅存在多个账号时才把「退出登录」菜单化；单账号保留
   // 原独立退出入口。
   const hasMultipleAccounts = savedAccountList.length > 1;
+
+  // 审计修复（R12）：快捷登录唯一的已保存账号时，switchToAccount 先提交本地
+  // 会话；后端凭据对齐失败会保留待对齐标记并提示重试——但切换菜单仅在多账号
+  // 时渲染，单账号用户无法通过选择当前账号重试。当前账号存在待对齐标记时，
+  // 即使只有一个账号也在资料区旁提供重试入口（复用 handleSwitchAccount：其
+  // 守卫对带待对齐标记的当前账号放行，重新走后端对齐）。标记为模块级集合，
+  // 切换失败/成功的路径都会经 isSwitchingMenu 触发重渲染，读取时刻足够新。
+  const currentSavedAccountEntry = currentAccountId
+    ? savedAccountList.find((account) => account.accountId === currentAccountId) ?? null
+    : null;
+  const currentAccountNeedsAlignRetry = !!currentAccountId
+    && !hasMultipleAccounts
+    && hasPendingBackendCredentialAlign(currentAccountId);
 
   const repoCountFor = (account: SavedAccount): number => (
     account.accountId === currentAccountId
@@ -312,6 +325,26 @@ export const Header: React.FC = () => {
                   </TooltipTrigger>
                   <TooltipContent>{t('header.add-account')}</TooltipContent>
                 </Tooltip>
+                {/* R12：单账号且当前账号有待对齐标记时提供后端凭据重试入口；
+                    正常单账号布局不渲染此按钮。专用文案键
+                    header.retry-credential-alignment。 */}
+                {currentAccountNeedsAlignRetry && currentSavedAccountEntry && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void handleSwitchAccount(currentSavedAccountEntry)}
+                        disabled={isSwitchingMenu}
+                        aria-label={t('header.retry-credential-alignment')}
+                      >
+                        <RefreshCw className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('header.retry-credential-alignment')}</TooltipContent>
+                  </Tooltip>
+                )}
               </>
             )}
             {user && hasMultipleAccounts && (

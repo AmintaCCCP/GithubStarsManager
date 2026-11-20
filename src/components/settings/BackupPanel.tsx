@@ -57,6 +57,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   const activeConfigFingerprint = getWebDAVConfigFingerprint(activeConfig);
   // 当前活跃账号标识（响应式）：列表打开期间账号切换时用于关闭列表
   const currentAccountId = useAppStore((state) => accountIdKey(state.user));
+  // 审计修复（R12）：会话代次不是响应式状态——同账号更换凭据时（switchAccount
+  // 同账号分支）代次递增但 currentAccountId 不变，仅订阅账号 ID 会漏掉这类
+  // 变化，旧列表仍可操作（要等 restore 的最终校验拒绝）。每次代次递增都伴随
+  // user 变化（切换/登出）或 githubToken / isAuthenticated 变化（同账号换凭据
+  // 或修复破损会话），一并订阅这三个响应式会话标识，让代次变化时下方 effect
+  // 必然重查。
+  const sessionGithubToken = useAppStore((state) => state.githubToken);
+  const sessionAuthenticated = useAppStore((state) => state.isAuthenticated);
   const [isListingBackups, setIsListingBackups] = useState(false);
   const [backupSelection, setBackupSelection] = useState<{
     open: boolean;
@@ -90,7 +98,8 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
 
   // 审计修复：备份列表打开后账号切换/会话代次变化时关闭列表——推荐文件可能
   // 按新会话计算，而恢复仍绑定旧会话（要等 restore 的最终校验拒绝）。会话
-  // 代次不是响应式状态，但每次代次递增都伴随 user 变化触发本 effect 重查。
+  // 代次不是响应式状态，但每次代次递增都伴随 user / githubToken /
+  // isAuthenticated 变化（见上方订阅注释），这些标识变化触发本 effect 重查。
   useEffect(() => {
     setBackupSelection((current) => (
       current.open
@@ -99,7 +108,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         ? { ...current, open: false, selected: null }
         : current
     ));
-  }, [currentAccountId]);
+  }, [currentAccountId, sessionGithubToken, sessionAuthenticated]);
 
   const handleRestoreClick = async () => {
     const listedConfig = activeConfig ?? null;

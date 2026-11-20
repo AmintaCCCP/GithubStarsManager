@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import {
   cancelPendingAccountSwitchPush,
+  clearPendingSyncState,
   consumePendingAccountSync,
+  forceSyncToBackend,
   hasPendingAccountSync,
   prepareForAccountSwitch,
   resetSyncHashes,
@@ -357,8 +359,61 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     const lastPayload = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
     expect(lastPayload.categoryOrder).toEqual(['restored-edit']);
     expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    // 第 12 轮审计修复：补推写入必须指向原后端与发起账号——「标记回到原后端，
+    // 写入仍指向候选后端」的回归在此暴露。syncSettings 不携带写入选项参数，
+    // 目标与账号断言落在携带写入选项的仓库分片上（设置分片经当前连接写入，
+    // 当前连接已复原为 http://origin）。
+    const repoSyncOptions = vi.mocked(backend.syncRepositories).mock.calls[0]?.[1];
+    expect(repoSyncOptions).toMatchObject({ backendUrl: 'http://origin', accountId: '1' });
     // 补推成功即清除账号级标记（审计修复：仅在确认对账成功后清除）；
     // 失败路径由 pushToBackend 保留标记，重启后仍会补推。
+    expect(hasPendingAccountSync('1')).toBe(false);
+    delete adapter.backendUrl;
+  });
+
+  it('persists frozen-window pending setting values and replays them after another backend overwrote the workspace (R12 finding 3)', async () => {
+    // 同账号 A 从原后端 X 恢复到候选后端 Y：窗口内的设置编辑只为 (A, X)
+    // 记录脏键+值；Y 的拉取随后覆盖本地工作区。切回 X 补推时必须发送保存的
+    // 值，而不是 Y 已覆盖的实时工作区值。
+    clearPendingSyncState();
+    seedTwoAccounts([]);
+    cancelPendingAccountSwitchPush();
+    const adapter = backend as unknown as { backendUrl?: string };
+    adapter.backendUrl = 'http://origin';
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['pending-origin-edit'] });
+    });
+
+    // 脏键与值一起按 (A, X) 持久化（四元组格式）。
+    expect(hasPendingAccountSync('1')).toBe(true);
+    const persisted = JSON.parse(window.localStorage.getItem('gsm.pendingSyncAccounts') ?? '[]') as unknown[];
+    expect(persisted).toContainEqual([
+      '1',
+      'http://origin',
+      ['categoryOrder'],
+      { categoryOrder: ['pending-origin-edit'] },
+    ]);
+
+    // 恢复到候选后端 Y：Y 的拉取把本地 categoryOrder 覆盖为 Y 的值；候选
+    // 后端上没有 (A, X) 的待推记录。
+    adapter.backendUrl = 'http://candidate';
+    withAccountSwitchGuardSync(() => {
+      useAppStore.setState({ categoryOrder: ['candidate-backend-value'] });
+    });
+    expect(hasPendingAccountSync('1')).toBe(false);
+
+    // 切回原后端 X：补推前恢复保存的待推值，并按该值构造设置载荷。
+    adapter.backendUrl = 'http://origin';
+    expect(hasPendingAccountSync('1')).toBe(true);
+    await syncToBackend();
+
+    expect(useAppStore.getState().categoryOrder).toEqual(['pending-origin-edit']);
+    const settingsPayloads = vi.mocked(backend.syncSettings).mock.calls;
+    const lastPayload = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
+    expect(lastPayload.categoryOrder).toEqual(['pending-origin-edit']);
     expect(hasPendingAccountSync('1')).toBe(false);
     delete adapter.backendUrl;
   });
@@ -465,6 +520,64 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     // 记录只消费一次
     expect(consumePendingAccountSync('1')).toBe(false);
     expect(hasPendingAccountSync('1')).toBe(false);
+  });
+
+  it('returns the awaited push shard result to every concurrent force call (R12 finding 1)', async () => {
+    seedAccountA();
+    // 只有仓库分片失败：设置等辅助分片成功。
+    vi.mocked(backend.syncRepositories).mockRejectedValue(new Error('repos down'));
+    vi.mocked(backend.syncSettings).mockResolvedValue({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
+
+    // 第二次调用在第一次推送等待期间进入：旧实现会在入口清空模块级失败状态，
+    // 导致先发起方在 await 返回后读到 pushAttempted=false / 空分片列表。
+    const first = forceSyncToBackend({ reportFailures: true });
+    const second = forceSyncToBackend({ reportFailures: true });
+    const outcomes = await Promise.allSettled([first, second]);
+
+    for (const outcome of outcomes) {
+      expect(outcome.status).toBe('rejected');
+      if (outcome.status !== 'rejected') continue;
+      const error = outcome.reason as Error & { failedShards?: string[]; pushAttempted?: boolean };
+      expect(error.pushAttempted).toBe(true);
+      expect(error.failedShards).toContain('repositories');
+    }
+  });
+
+  it('persists dirty setting values when the flush fails and replays them after a backend switch (R12 finding 3)', async () => {
+    clearPendingSyncState();
+    seedAccountA();
+    const adapter = backend as unknown as { backendUrl?: string };
+    adapter.backendUrl = 'http://origin';
+    vi.mocked(backend.syncSettings).mockClear();
+
+    // 失败的冲刷：设置编辑留在会话脏键里，prepareForAccountSwitch 必须把
+    // 键与值一起持久化，并清空会话脏键（否则返回原后端时旧脏键标记会阻止
+    // 恢复保存值）。
+    useAppStore.setState({ categoryOrder: ['flush-failed-edit'] });
+    rejectAllSyncs();
+    await prepareForAccountSwitch('1');
+
+    const persisted = JSON.parse(window.localStorage.getItem('gsm.pendingSyncAccounts') ?? '[]') as unknown[];
+    expect(persisted).toContainEqual([
+      '1',
+      'http://origin',
+      ['categoryOrder'],
+      { categoryOrder: ['flush-failed-edit'] },
+    ]);
+
+    // 同账号切到另一后端：其拉取覆盖本地工作区。
+    adapter.backendUrl = 'http://candidate';
+    withAccountSwitchGuardSync(() => {
+      useAppStore.setState({ categoryOrder: ['candidate-backend-value'] });
+    });
+
+    // 切回原后端重试：补推载荷必须使用持久化的值，而不是被覆盖后的工作区值。
+    adapter.backendUrl = 'http://origin';
+    await syncToBackend();
+    const settingsPayloads = vi.mocked(backend.syncSettings).mock.calls;
+    const lastPayload = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
+    expect(lastPayload.categoryOrder).toEqual(['flush-failed-edit']);
+    delete adapter.backendUrl;
   });
 
   it('keeps the account pending record when no push runs and clears it only after a successful push', async () => {

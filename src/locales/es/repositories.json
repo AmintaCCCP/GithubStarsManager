@@ -41,7 +41,8 @@
     "failed": "Error al marcar",
     "starred": "Marcado",
     "check-name": "Comprueba este nombre",
-    "no-description": "Sin descripción"
+    "no-description": "Sin descripción",
+    "session-changed": "La cuenta cambió. Vuelve a previsualizar los enlaces antes de marcarlos."
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "No se pueden aplicar los resultados del complemento",
@@ -247,7 +248,11 @@
     "unstar": "CancelarEstrella",
     "successfully-unstarred": "Estrella cancelada exitosamente",
     "failed-to-unstar-repository-please-check-your-ne": "No se pudo cancelar Star. Verifique la conexión de red o inicie sesión nuevamente.",
-    "similar-results-may-be-incomplete-the-dens": "Los repositorios similares pueden estar incompletos: el índice de vectores denso no está disponible. ({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "Los repositorios similares pueden estar incompletos: el índice de vectores denso no está disponible. ({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "Los repositorios similares pueden estar incompletos: el worker de vectores no admite la recuperación por cuenta. Implemente el worker de Cloudflare incluido y reintente.",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "Los repositorios similares pueden estar incompletos: el índice de metadatos de accountId de los vectores no está listo. Cree y verifique el índice de metadatos de accountId, rellene los vectores existentes y active ACCOUNT_METADATA_INDEXED en el despliegue.",
+    "dense-index-unavailable-reason-status-failed": "Los repositorios similares pueden estar incompletos: la verificación del estado del índice de vectores falló. Reintente más tarde.",
+    "dense-index-unavailable-reason-needs-backfill": "Los repositorios similares pueden estar incompletos: el índice de vectores no está listo para la recuperación por cuenta. Reconstruya el índice en la configuración de búsqueda de vectores de la cuenta actual."
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Primero configure el token de GitHub en la configuración o conéctese al servicio backend.",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "La sincronización de la lista falló, el almacén estrella se ha sincronizado. Inténtelo de nuevo más tarde o verifique los permisos del token de GitHub (requiere alcance de usuario).",
     "sync-completed-found-newrepocount-new-repositori": "¡Sincronización completada! {{newRepoCount}} nuevos repositorios encontrados.",
     "sync-completed-all-repositories-are-up-to-date": "¡Sincronización completada! Todos los repositorios están actualizados.",
+    "sync-completed-backend-write-failed": "Las estrellas se actualizaron, pero la escritura en el backend falló. Los datos locales se conservan y la sincronización con el backend se reintentará automáticamente.",
     "github-token-has-expired-or-is-invalid-please-lo": "El token de GitHub ha caducado o no es válido; inicie sesión nuevamente.",
     "sync-failed-please-check-your-network-connection": "Error de sincronización. Verifique su conexión de red o vuelva a intentarlo más tarde.",
     "list-sync-new-categories_one": " ({{count}} categoría nueva creada)",

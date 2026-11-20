@@ -306,7 +306,7 @@ router.put('/api/repositories', (req, res) => {
                   AND other_cfg.value IN ('1', 'true')
               )
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
-            LIMIT 1
+            ORDER BY other.rowid LIMIT 1
           ), repositories.ai_summary)
         END,
         ai_tags = CASE
@@ -346,8 +346,14 @@ router.put('/api/repositories', (req, res) => {
           ), repositories.ai_platforms)
         END,
         analyzed_at = CASE
+          -- Issue #612 R12：analyzed_at 必须与最终采用的 ai_summary 来自同一条
+          -- 记录——本载荷提供总结时时间也只能来自本载荷（缺失则留空）；保留
+          -- 本地总结时不用其他账号的时间补空值；仅当总结来自跨账号回填时，
+          -- 时间从同一来源行复制（与 ai_summary 子查询同 WHERE + 同 ORDER BY，
+          -- 命中同一条记录）。
+          WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.analyzed_at
           WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at
-          WHEN repositories.analyzed_at IS NOT NULL AND repositories.analyzed_at != '' THEN repositories.analyzed_at
+          WHEN repositories.ai_summary IS NOT NULL AND repositories.ai_summary != '' THEN repositories.analyzed_at
           ELSE COALESCE((
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
@@ -359,8 +365,8 @@ router.put('/api/repositories', (req, res) => {
                   AND other_cfg.key = 'ai_result_sharing_enabled'
                   AND other_cfg.value IN ('1', 'true')
               )
-              AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
-            LIMIT 1
+              AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
+            ORDER BY other.rowid LIMIT 1
           ), repositories.analyzed_at)
         END,
         -- Issue #612 A21：写入 AI 内容的行按当前账号的共享设置置位 ai_shared；
@@ -368,10 +374,17 @@ router.put('/api/repositories', (req, res) => {
         -- Issue #612 R2-A10：整行 ai_shared 仅为兼容标记，回填查询按下方
         -- ai_*_shared 字段授权过滤；普通同步原样回写已有/继承内容不触发新授权，
         -- 仅在字段值确实新增或变化时才按当前账号共享设置更新授权标记。
+        -- Issue #612 R12：ai_tags / ai_platforms 按解析后的列表内容比较（JSON
+        -- 归一化），而不是比较 JSON 文本格式——备份导入可能保留 '[ "x" ]' 形态，
+        -- 原样回写为 '["x"]' 时内容未变，绝不因文本格式差异把继承内容判为
+        -- 「新提交」而置共享授权位。存储值不是合法 JSON（或为 NULL）时按内容
+        -- 变化处理，与旧的文本比较行为一致。
         ai_shared = CASE
           WHEN (excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' AND excluded.ai_summary != COALESCE(repositories.ai_summary, ''))
-            OR (excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' AND excluded.ai_tags != COALESCE(repositories.ai_tags, '[]'))
-            OR (excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' AND excluded.ai_platforms != COALESCE(repositories.ai_platforms, '[]'))
+            OR (excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]'
+              AND (IFNULL(json_valid(repositories.ai_tags), 0) = 0 OR json(repositories.ai_tags) != json(excluded.ai_tags)))
+            OR (excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]'
+              AND (IFNULL(json_valid(repositories.ai_platforms), 0) = 0 OR json(repositories.ai_platforms) != json(excluded.ai_platforms)))
           THEN @aiShared
           ELSE repositories.ai_shared
         END,
@@ -391,14 +404,14 @@ router.put('/api/repositories', (req, res) => {
         END,
         ai_tags_shared = CASE
           WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]'
-            AND excluded.ai_tags != COALESCE(repositories.ai_tags, '[]')
+            AND (IFNULL(json_valid(repositories.ai_tags), 0) = 0 OR json(repositories.ai_tags) != json(excluded.ai_tags))
           THEN @aiShared
           WHEN repositories.ai_tags IS NULL OR repositories.ai_tags = '[]' THEN 0
           ELSE repositories.ai_tags_shared
         END,
         ai_platforms_shared = CASE
           WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]'
-            AND excluded.ai_platforms != COALESCE(repositories.ai_platforms, '[]')
+            AND (IFNULL(json_valid(repositories.ai_platforms), 0) = 0 OR json(repositories.ai_platforms) != json(excluded.ai_platforms))
           THEN @aiShared
           WHEN repositories.ai_platforms IS NULL OR repositories.ai_platforms = '[]' THEN 0
           ELSE repositories.ai_platforms_shared
@@ -458,7 +471,7 @@ router.put('/api/repositories', (req, res) => {
                   AND other_cfg.value IN ('1', 'true')
               )
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
-            LIMIT 1
+            ORDER BY other.rowid LIMIT 1
           ), ai_summary)
           ELSE ai_summary END,
         ai_tags = CASE
@@ -494,7 +507,13 @@ router.put('/api/repositories', (req, res) => {
           ), ai_platforms)
           ELSE ai_platforms END,
         analyzed_at = CASE
-          WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE((
+          -- Issue #612 R12：批量回填的时间与最终采用的总结来自同一条记录——
+          -- 本地总结保留（旧 ai_summary 非空）时不用其他账号的时间补空值；
+          -- 总结被回填时时间从同一来源行复制（与 ai_summary 子查询同 WHERE +
+          -- 同 ORDER BY，命中同一条记录），来源行缺时间时保持空值。
+          WHEN (analyzed_at IS NULL OR analyzed_at = '')
+            AND (ai_summary IS NULL OR ai_summary = '')
+          THEN COALESCE((
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
@@ -505,8 +524,8 @@ router.put('/api/repositories', (req, res) => {
                   AND other_cfg.key = 'ai_result_sharing_enabled'
                   AND other_cfg.value IN ('1', 'true')
               )
-              AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
-            LIMIT 1
+              AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
+            ORDER BY other.rowid LIMIT 1
           ), analyzed_at)
           ELSE analyzed_at END,
         -- Issue #612 审计（679）：被回填字段的共享标记清零（UPDATE 的右侧表达式

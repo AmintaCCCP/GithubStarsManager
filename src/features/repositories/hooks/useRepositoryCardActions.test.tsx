@@ -234,6 +234,48 @@ describe('useRepositoryCardActions', () => {
     );
   });
 
+  it('localizes the dense-index degradation toast from the stable reason code (R12 handoff 3)', async () => {
+    mocks.runSimilarRepositoryPipeline.mockResolvedValue({
+      repositories: [{ ...repository, id: 2 }],
+      diagnostics: {
+        denseIndexUnavailable: true,
+        denseIndexUnavailableReason: 'legacy english text',
+        denseIndexUnavailableReasonCode: 'worker-unsupported',
+      },
+    });
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith(
+      '相似仓库结果可能不完整：向量 Worker 不支持按账号过滤召回。请部署随附的 Cloudflare Worker 后重试。',
+      'warning',
+    );
+  });
+
+  it('falls back to the legacy diagnostic text when the reason code is missing (R12)', async () => {
+    mocks.runSimilarRepositoryPipeline.mockResolvedValue({
+      repositories: [{ ...repository, id: 2 }],
+      diagnostics: {
+        denseIndexUnavailable: true,
+        denseIndexUnavailableReason: 'legacy reason text',
+        denseIndexUnavailableReasonCode: null,
+      },
+    });
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.stringContaining('legacy reason text'),
+      'warning',
+    );
+  });
+
   it('stores the PR-03 failure patch and preserves the failure toast on AI errors', async () => {
     mocks.analyzeRepository.mockRejectedValue(new Error('model unavailable'));
     const { result } = renderActions();
@@ -458,10 +500,11 @@ describe('useRepositoryCardActions account switch guards', () => {
     expect(mocks.toast).not.toHaveBeenCalled();
   });
 
-  it('keeps the deletion state for the reactivated account after A→B→A (unstar)', async () => {
-    // 审计修复（C31）：取消星标请求在 A 发起后保持 pending，用实际切号操作
-    // 切 B 再切回 A（推进真实会话代次）后完成——执行真实的 setState 工作区删除，
-    // 验证重新激活的 A 已移除该仓库及 release，且 B 中同 ID 仓库保持不变。
+  it('preserves a repo re-starred during the switch and skips the pending deletion (R12 finding 5)', async () => {
+    // A 的取消星标在途时切 B 再切回 A，用户重新加星并同步（starred_at 刷新）；
+    // 迟到的成功响应不得删除这条新记录，也不得登记待删除（GitHub 上仍是已加星）。
+    const original = { ...repository, starred_at: '2026-01-01T00:00:00.000Z' } as Repository;
+    const restarred = { ...repository, starred_at: '2026-03-01T00:00:00.000Z' } as Repository;
     const stateWithWorkspaces = storeState as unknown as {
       repositories: Repository[];
       searchResults: Repository[];
@@ -471,17 +514,86 @@ describe('useRepositoryCardActions account switch guards', () => {
         releases: Array<{ id: number; repository: { id: number } }>;
       }>;
     };
+    stateWithWorkspaces.repositories = [restarred];
+    stateWithWorkspaces.searchResults = [restarred];
+    stateWithWorkspaces.releases = [{ id: 101, repository: { id: restarred.id } }];
+    stateWithWorkspaces.accountWorkspaces = {
+      '1': { repositories: [], releases: [] },
+      '2': { repositories: [], releases: [] },
+    };
+    (mockUseAppStore as unknown as { setState: (updater: unknown) => void }).setState = vi.fn((updater: unknown) => {
+      const patch = typeof updater === 'function'
+        ? (updater as (state: typeof storeState) => Record<string, unknown>)(storeState)
+        : updater as Record<string, unknown>;
+      if (patch && typeof patch === 'object') Object.assign(storeState, patch);
+    });
+
+    let releaseUnstar!: () => void;
+    mocks.unstarRepository.mockImplementation(() => new Promise<void>((resolve) => {
+      releaseUnstar = resolve;
+    }));
+    const { result } = renderActions(original);
+    let promise!: Promise<void>;
+    await act(async () => {
+      promise = result.current.unstar();
+    });
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    await act(async () => {
+      releaseUnstar();
+      await promise;
+    });
+
+    expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
+    // 重新加星的同 ID 仓库保留在实时工作区，且不登记待删除/待补推
+    expect(stateWithWorkspaces.repositories.map(r => r.id)).toEqual([restarred.id]);
+    expect(stateWithWorkspaces.releases.map(rel => rel.id)).toEqual([101]);
+    expect(mocks.markPendingRepositoryDeletion).not.toHaveBeenCalled();
+    expect(mocks.markPendingAccountSync).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+  });
+
+  it('keeps the deletion state for the reactivated account after A→B→A (unstar)', async () => {
+    // 审计修复（C31）：取消星标请求在 A 发起后保持 pending，用实际切号操作
+    // 切 B 再切回 A（推进真实会话代次）后完成——执行真实的 setState 工作区删除，
+    // 验证重新激活的 A 已移除该仓库及 release，且 B 中同 ID 仓库保持不变。
+    const stateWithWorkspaces = storeState as unknown as {
+      repositories: Repository[];
+      searchResults: Repository[];
+      releases: Array<{ id: number; repository: { id: number } }>;
+      releaseSubscriptions: Set<number>;
+      readReleases: Set<number>;
+      accountWorkspaces: Record<string, {
+        repositories: Repository[];
+        releases: Array<{ id: number; repository: { id: number } }>;
+        releaseSubscriptions: number[];
+        readReleases: number[];
+      }>;
+    };
     stateWithWorkspaces.repositories = [repository];
     stateWithWorkspaces.searchResults = [repository];
-    stateWithWorkspaces.releases = [{ id: 101, repository: { id: repository.id } }];
+    stateWithWorkspaces.releases = [
+      { id: 101, repository: { id: repository.id } },
+      { id: 102, repository: { id: 555 } },
+    ];
+    stateWithWorkspaces.releaseSubscriptions = new Set([repository.id, 999]);
+    stateWithWorkspaces.readReleases = new Set([101, 102, 999]);
     stateWithWorkspaces.accountWorkspaces = {
       '1': {
         repositories: [repository],
-        releases: [{ id: 101, repository: { id: repository.id } }],
+        releases: [
+          { id: 101, repository: { id: repository.id } },
+          { id: 102, repository: { id: 555 } },
+        ],
+        releaseSubscriptions: [repository.id, 999],
+        readReleases: [101, 102, 999],
       },
       '2': {
         repositories: [{ ...repository, full_name: 'other/example-repository' }],
         releases: [{ id: 202, repository: { id: repository.id } }],
+        releaseSubscriptions: [repository.id],
+        readReleases: [202],
       },
     };
     (mockUseAppStore as unknown as { setState: (updater: unknown) => void }).setState = vi.fn((updater: unknown) => {
@@ -509,11 +621,21 @@ describe('useRepositoryCardActions account switch guards', () => {
     });
 
     expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
-    // 重新激活的 A 已移除该仓库与 release，同时不触碰 B 中同 ID 的仓库与 release
+    // 重新激活的 A 已移除该仓库及其 release（其他仓库的 release 保留），
+    // 同时不触碰 B 中同 ID 的仓库与 release
     expect(stateWithWorkspaces.repositories).toEqual([]);
-    expect(stateWithWorkspaces.releases).toEqual([]);
+    expect(stateWithWorkspaces.releases.map(rel => rel.id)).toEqual([102]);
     expect(stateWithWorkspaces.accountWorkspaces['2'].repositories.map(r => r.id)).toEqual([repository.id]);
     expect(stateWithWorkspaces.accountWorkspaces['2'].releases.map(rel => rel.id)).toEqual([202]);
+    // R12（交接项 4）：与 deleteRepository 同一清理规则——实时工作区的订阅
+    // 与已读索引同步清理，B 中同 ID 仓库的订阅/已读保持不变
+    expect(stateWithWorkspaces.releaseSubscriptions.has(repository.id)).toBe(false);
+    expect(stateWithWorkspaces.releaseSubscriptions.has(999)).toBe(true);
+    expect([...stateWithWorkspaces.readReleases].sort()).toEqual([102]);
+    expect(stateWithWorkspaces.accountWorkspaces['1'].releaseSubscriptions).toEqual([999]);
+    expect(stateWithWorkspaces.accountWorkspaces['1'].readReleases).toEqual([102]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].releaseSubscriptions).toEqual([repository.id]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].readReleases).toEqual([202]);
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
     // C29：为发起账号保留删除状态——登记 (发起账号, 发起时后端) 待补推标记

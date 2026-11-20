@@ -109,6 +109,10 @@ const restoreAuthWithExplicitAccount = async (accountId: string): Promise<Backen
       method: 'POST',
       headers: getBackendAuthHeaders(accountId),
       signal: controller.signal,
+      // R12（finding 18）：定向恢复请求带认证头，禁止跟随重定向——同源重定向
+      // 可以把带认证头的请求转到另一个路径，并让恢复流程接受该路径的响应。
+      // 直接响应不受影响；重定向按网络失败处理（restore-failed，可重试）。
+      redirect: 'error',
     });
     if (!res.ok) return null;
     return await res.json() as BackendAuthRestore;
@@ -187,6 +191,13 @@ export const useLoginActions = (): LoginActions => {
 
     try {
       const user = await authenticateWithGitHub(restored.github_token);
+      // R12（finding 8）：定向恢复必须核对身份归属——服务端返回的 Token 属于
+      // 用户选中的账号时才可返回 connected。不匹配时按可处理的失败返回
+      // restored-token-invalid（进入补填 Token 流程），绝不持久化 URL，也绝不
+      // 把另一个账号当作已连接用户返回。
+      if (options?.accountId && accountIdKey(user) !== options.accountId) {
+        return { status: 'restored-token-invalid' };
+      }
       // Backend, API key, and stored token are all proven — remember the URL
       // (the setup step re-remembers after persisting a new token).
       // R2-B12：deferPersist 为 true 时候选仅完成身份验证不持久化 URL——调用方

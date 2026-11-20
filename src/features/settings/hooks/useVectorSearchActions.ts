@@ -2,16 +2,15 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { EmbeddingApiType } from '../../../types';
 import {
-  buildAccountScopedVectorId,
   EMBEDDING_FORMAT_VERSION,
   EmbeddingClient,
   indexAllRepos,
+  isAccountScopeMigrationDone,
   needsReindex,
   selectIndexableRepos,
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
-import { backend } from '../../../services/backendAdapter';
 import { logger } from '../../../services/logger';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
 import {
@@ -208,12 +207,6 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     try {
       const currentState = useAppStore.getState();
       const repositories = currentState.repositories;
-      // R2-C24：清理删除的可验证依据——运行开始时列表不在加载/同步中，且该
-      // 账号完成过至少一次同步（lastSync）。仅有「运行前后 ID 集合相等」不能
-      // 证明列表完整：部分恢复/陈旧快照同样可以相等。
-      const startedWithAuthoritativeList = !currentState.isLoading
-        && !currentState.isSyncingStars
-        && !!currentState.lastSync;
       const excludedVectorIds = repositories
         .filter((repository) => Boolean(repository.vector_indexed_at) && (!repository.analyzed_at || repository.analysis_failed))
         .map((repository) => String(repository.id));
@@ -222,9 +215,21 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         ? currentState.vectorSearchConfig.embeddingFormatVersion
         : LEGACY_EMBEDDING_FORMAT_VERSION;
       const now = new Date().toISOString();
-      // 标记必须来自实际上传的副本：与 indexAllRepos 共用同一候选选择规则
-      // （分析/增量过滤 + 按 id 首条去重），避免重复 id 时标记与向量元数据错位。
-      const uploadCandidates = selectIndexableRepos(repositories, { incremental, formatVersion: currentFormatVersion, currentFormatVersion: EMBEDDING_FORMAT_VERSION });
+      // 标记必须来自实际上传的副本（R12 审计修复）：indexAllRepos 在「该账号
+      // 尚未完成当前 Worker 的账号范围迁移」时会忽略增量过滤、全量补写带前缀
+      // 向量——打戳候选必须复现同一判定，否则被补写的仓库会用空许可证打戳，
+      // 下一次增量索引因许可证不一致再次选中它。
+      const workerId = typeof clients.vectorService.workerId === 'string' && clients.vectorService.workerId
+        ? clients.vectorService.workerId
+        : null;
+      const accountScopeMigrationPending = incremental
+        && !!jobAccountId
+        && !isAccountScopeMigrationDone(jobAccountId, workerId);
+      const uploadCandidates = selectIndexableRepos(repositories, {
+        incremental: incremental && !accountScopeMigrationPending,
+        formatVersion: currentFormatVersion,
+        currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      });
       const licenseById = new Map<number, string | null>();
       for (const repository of uploadCandidates) {
         if (!licenseById.has(repository.id)) licenseById.set(repository.id, repository.license ?? null);
@@ -267,137 +272,21 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       if (stamped.length && !onAccountChanged()) state.updateRepositoriesMetadata(stamped.map(stamp));
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       if (!incremental && result.errors === 0) {
-        // R5 审计修复（CodeRabbit 发现 2）：cleanup 的删除范围绝不能只凭本机
-        // savedAccounts 数量推断——共享 Worker 索引中可能有其他设备/其他账号
-        // 上传的向量（ID 为 `${accountId}:${repoId}` 前缀形态），本机账号数
-        // 无法发现它们。与 Worker 的范围约定：
-        // - 新版 Worker（/status 返回 accountScopedCleanup）支持 accountPrefix：
-        //   只删除当前账号前缀的向量，其他设备/其他账号的向量一律保留；
-        //   legacy 无前缀向量归属无法由客户端证明（共享索引可能仍有其他设备/
-        //   旧客户端上传的向量），一律保留（includeLegacy=false）；
-        // - 旧版 Worker 会把 keepIds 之外的全部采样向量物理删除（含其他账号），
-        //   无法安全限定范围——一律跳过 cleanup：宁可保留冗余向量靠后续重建
-        //   收敛，也绝不删除其他账号的数据（重新部署仓库内 Worker 即可恢复）；
-        // - 未登录边缘态（jobAccountId 为 null）无法限定清理范围，同样跳过。
-        if (!jobAccountId) {
-          logger.warn('vectorSearch.index', 'Skip vector cleanup: no active account context to scope the deletion');
-        } else {
-          let accountScopedCleanup = false;
-          const statusController = new AbortController();
-          const abortStatus = () => statusController.abort();
-          controller.signal.addEventListener('abort', abortStatus);
-          const statusTimeout = setTimeout(abortStatus, 10_000);
-          try {
-            const status = await clients.vectorService.getStatus(statusController.signal);
-            accountScopedCleanup = status.accountScopedCleanup === true;
-          } catch (error) {
-            if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-            logger.warn('vectorSearch.index', 'Skip vector cleanup: worker status probe failed', {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          } finally {
-            clearTimeout(statusTimeout);
-            controller.signal.removeEventListener('abort', abortStatus);
-          }
-          if (!accountScopedCleanup) {
-            logger.warn('vectorSearch.index', 'Skip vector cleanup: worker does not support account-scoped deletion; redeploy the bundled cloudflare-worker to enable it');
-          } else {
-            // 审计修复（C49）：cleanup 的删除授权必须可证明。keepIds 不再只含
-            // 「本次上传 + 排除项」——其语义是「keepIds 之外的当前账号向量全部
-            // 物理删除」，本地工作区不完整（拉取中途/部分恢复/陈旧快照）或
-            // 索引等待期间工作区已变化时，会把仍加星仓库的向量误删。改为：
-            // - keepIds 纳入运行开始时的完整本地列表（两种 ID 形态）；
-            // - 清理执行前重读实时仓库列表，仅当 ID 集合与运行开始时完全一致
-            //   且运行开始/清理执行时列表都处于「已同步且无加载/同步在途」的
-            //   可验证状态时才执行删除（R2-C24：相等本身不能证明完整）；
-            // - 无法确认完整性/时效性时跳过删除并保留已上传结果（partial 语义，
-            //   冗余向量由后续重建收敛）。
-            const liveState = useAppStore.getState();
-            const startRepoIds = new Set(repositories.map((repository) => String(repository.id)));
-            const liveRepoIds = new Set(liveState.repositories.map((repository) => String(repository.id)));
-            const listBasisValid = startedWithAuthoritativeList
-              && !liveState.isLoading
-              && !liveState.isSyncingStars
-              && !!liveState.lastSync;
-            const workspaceUnchanged = listBasisValid
-              && startRepoIds.size === liveRepoIds.size
-              && [...startRepoIds].every((id) => liveRepoIds.has(id))
-              && liveState.repositories.length > 0;
-            const cleanupKeepIds = [...new Set([
-              ...repositories.map((repository) => String(repository.id)),
-              ...repositories.map((repository) => buildAccountScopedVectorId(jobAccountId, repository.id)),
-              ...excludedVectorIds,
-              ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
-              ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
-            ])];
-            // R5（CodeRabbit Major）：删除授权必须来自当前账号的权威加星列表。
-            // 两台设备可以在不启用后端同步的情况下共享同一 GitHub 账号与 Worker
-            // ——本地「起止快照一致 + lastSync」无法证明列表完整（设备 B 可能在
-            // 设备 A 上次同步后加星并索引了新仓库，清理请求会把它误删）。因此
-            // 权威快照只能来自后端：backend.isAvailable 为 false 或核对失败时
-            // 一律跳过删除并保留已上传向量，冗余向量由后续重建收敛。
-            let authoritativeSnapshotMatches = false;
-            if (workspaceUnchanged && backend.isAvailable) {
-              // 多设备共享后端时，清理前核对后端权威快照；返回后再重读实时列表与同步状态，
-              // 仅当起止本地快照与后端快照三者完全一致且无同步在途时才执行删除。
-              try {
-                const remote = await backend.fetchRepositories(jobAccountId);
-                const postFetchState = useAppStore.getState();
-                const postFetchBasisValid = !postFetchState.isLoading
-                  && !postFetchState.isSyncingStars
-                  && !!postFetchState.lastSync
-                  && postFetchState.repositories.length > 0;
-                const postFetchLiveIds = new Set(postFetchState.repositories.map((repository) => String(repository.id)));
-                const remoteComplete = remote.repositories.length >= (remote.total ?? remote.repositories.length);
-                const remoteIds = new Set(remote.repositories.map((repository) => String(repository.id)));
-                authoritativeSnapshotMatches = postFetchBasisValid
-                  && remoteComplete
-                  && postFetchLiveIds.size === startRepoIds.size
-                  && [...startRepoIds].every((id) => postFetchLiveIds.has(id))
-                  && remoteIds.size === postFetchLiveIds.size
-                  && [...remoteIds].every((id) => postFetchLiveIds.has(id));
-              } catch {
-                authoritativeSnapshotMatches = false;
-              }
-            }
-            try {
-              if (onAccountChanged() || controller.signal.aborted) {
-                const abortErr = new Error('Aborted');
-                abortErr.name = 'AbortError';
-                throw abortErr;
-              }
-              if (!authoritativeSnapshotMatches) {
-                logger.warn('vectorSearch.index', 'Skip vector cleanup: the account workspace changed during indexing (or could not be verified against the authoritative snapshot); uploads are kept and stale vectors converge on the next rebuild', {
-                  accountId: jobAccountId,
-                  startCount: startRepoIds.size,
-                  liveCount: liveRepoIds.size,
-                });
-              } else {
-                const cleanup = await clients.vectorService.cleanup(cleanupKeepIds, {
-                  accountPrefix: jobAccountId,
-                  // 无明确归属证明时保留 legacy 向量：多设备共享同一索引时，本机
-                  // 只有一个已保存账号并不能证明无前缀向量都属于它。
-                  includeLegacy: false,
-                  signal: controller.signal,
-                });
-                if (cleanup.partial) {
-                  logger.warn('vectorSearch.index', 'Vector cleanup stopped before confirming completion; uploads are complete', {
-                    accountId: jobAccountId,
-                    deleted: cleanup.deleted,
-                  });
-                }
-              }
-            } catch (cleanupError) {
-              // 上传与本地标记已完成：清理失败只记告警，绝不能把整次索引报告为
-              // 0 条——保留实际上传结果，冗余向量由下次清理收敛。
-              if (cleanupError instanceof Error && cleanupError.name === 'AbortError') throw cleanupError;
-              logger.warn('vectorSearch.index', 'Vector cleanup failed after a successful upload', {
-                accountId: jobAccountId,
-                error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-              });
-            }
-          }
-        }
+        // 第 12 轮审计（CodeRabbit Major ×2）：破坏性 cleanup 在客户端无法证明安全，
+        // 一律跳过删除并保留已上传结果。
+        // 1) 同一 GitHub 账号可能在多台设备上共用同一 Worker 而不同步到本后端：
+        //    后端快照只能证明「本后端」的仓库列表，不能证明该账号在该索引中的
+        //    全部写入来源——按 keepIds 扫除会删掉另一台设备上传的向量（账号前缀
+        //    只能隔离不同账号，隔离不了同账号的独立写入）。
+        // 2) 快照核对与 Worker 采样删除之间存在 await 间隔，且 Worker 没有可验证
+        //    的版本条件（revision/expectedRevision 仅后端提供），核对之后同步并
+        //    上传的向量仍可能被采样删除。
+        // 冗余向量不会污染搜索结果（hydrateMatches 只水合本地仍存在的仓库），
+        // 仅占用索引空间；待 Worker 提供可验证的版本条件后再恢复删除。
+        logger.warn('vectorSearch.index', 'Skip vector cleanup: destructive deletion cannot prove coverage of every writer of this account in the shared index (and the worker has no version condition); uploads are kept', {
+          accountId: jobAccountId,
+          indexed: result.indexed,
+        });
       }
       // cleanup 等待期间可能切号（stamped 为空时上方 onAccountChanged 不会触发）：
       // 共享状态写入前同时校验账号与取消信号，旧账号任务不得更新新账号的

@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import {
   resolveAccountScope,
   resolveWritableAccountScope,
+  hasInvalidAccountHeader,
   hasPendingDefaultPartitionData,
   bumpAccountRevision,
   getAccountCredentialVersion,
@@ -55,8 +56,20 @@ function encodeCategoryIdPart(raw: string): string {
  *   （避免 `Build Tools` 与 `Build-Tools` 碰撞）；
  * - 同名条目或与显式 ID 冲突时追加稳定的 `#2` / `#3` 序号后缀，保证重复导入
  *   同一备份生成同一组 ID（配合 INSERT OR REPLACE 幂等更新而非创建副本）。
+ *
+ * Issue #612 R12：生成 ID 同时检查目标分区已有的分类 ID，并区分「同一旧分类
+ * 的重复导入」与「不同分类占用同一 ID」：
+ * - 目标分区存在同 ID 且同名的记录 → 视为同一条旧分类，复用该 ID（INSERT OR
+ *   REPLACE 幂等更新，重试不创建副本）；
+ * - 目标分区存在同 ID 但名称不同的记录 → 无法确认是同一条分类：保留目标记录，
+ *   为导入条目分配下一个候选 ID，并把被保留的目标记录记入 conflicts（响应中
+ *   报告冲突）。冲突路径同样是确定性的：同一备份重试生成同一组 ID，不产生副本。
  */
-function buildImportedCategoryIds(categories: Record<string, unknown>[]): Array<string | number | null> {
+function buildImportedCategoryIds(
+  db: ReturnType<typeof getDb>,
+  targetAccountId: string,
+  categories: Record<string, unknown>[],
+): { ids: Array<string | number | null>; conflicts: Array<{ id: string; name: string }> } {
   const usedIds = new Set<string>();
   const resolved: Array<string | number | null> = categories.map((c) => {
     if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
@@ -71,6 +84,18 @@ function buildImportedCategoryIds(categories: Record<string, unknown>[]): Array<
     return null;
   });
 
+  const conflicts: Array<{ id: string; name: string }> = [];
+  const targetNameById = (id: string): string | null => {
+    try {
+      const row = db.prepare('SELECT name FROM categories WHERE account_id = ? AND id = ?')
+        .get(targetAccountId, id) as { name: string | null } | undefined;
+      return row ? String(row.name ?? '') : null;
+    } catch {
+      // 轻量 stub 缺表时按无目标记录处理
+      return null;
+    }
+  };
+
   for (let i = 0; i < categories.length; i++) {
     if (resolved[i] !== null) continue;
     const c = categories[i];
@@ -79,7 +104,16 @@ function buildImportedCategoryIds(categories: Record<string, unknown>[]): Array<
     const baseId = `legacy-category-${encodeCategoryIdPart(rawName)}`;
     let candidate = baseId;
     let suffix = 2;
-    while (usedIds.has(candidate)) {
+    for (;;) {
+      if (usedIds.has(candidate)) {
+        candidate = `${baseId}#${suffix}`;
+        suffix++;
+        continue;
+      }
+      const targetName = targetNameById(candidate);
+      if (targetName === null || targetName === rawName) break;
+      // 同 ID 不同名：无法确认是同一条旧分类——保留目标记录，换下一个候选 ID
+      conflicts.push({ id: candidate, name: rawName });
       candidate = `${baseId}#${suffix}`;
       suffix++;
     }
@@ -87,7 +121,7 @@ function buildImportedCategoryIds(categories: Record<string, unknown>[]): Array<
     resolved[i] = candidate;
   }
 
-  return resolved;
+  return { ids: resolved, conflicts };
 }
 
 const toSharedBit = (value: unknown): number => (value === true || value === 1) ? 1 : 0;
@@ -188,6 +222,17 @@ function exportAccountWorkspace(db: ReturnType<typeof getDb>, accountId: string)
 router.post('/api/sync/export', (req, res) => {
   try {
     const db = getDb();
+    // Issue #612 R12：显式携带但格式无效的账号头（如 `abc`）必须像仓库/发行版
+    // 列表接口一样在解析范围前拒绝——resolveAccountScope 会把无效头当作未指定
+    // 账号回退到活跃账号，导出会错误地把活跃账号数据标记为该账号。真正未携带
+    // 账号头的旧版请求保留原行为。
+    if (hasInvalidAccountHeader(req)) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
     const accountId = resolveAccountScope(req, db);
 
     const repositories = db.prepare('SELECT * FROM repositories WHERE account_id = ?').all(accountId) as Record<string, unknown>[];
@@ -600,18 +645,34 @@ router.post('/api/sync/import', async (req, res) => {
     // Issue #612 A3：验证未通过而未恢复的工作区凭据报告（在响应中返回）。
     const skippedCredentials: Array<{ account_id: string; restored: boolean; reason?: string }> = [];
 
-    const importAll = db.transaction((): { scopeError: boolean; skippedPendingClaim: string[] } => {
+    const importAll = db.transaction((): {
+      scopeError: boolean;
+      skippedPendingClaim: string[];
+      topLevelDefaultBlocked: boolean;
+      /** Issue #612 R12：顶层迁移让位给目标分区工作区快照而跳过的重叠记录数。 */
+      migrationOverlapSkipped: { repositories: number; releases: number; categories: number };
+      /** Issue #612 R12：因目标分区同 ID 不同名而保留目标记录的生成 ID 冲突。 */
+      categoryIdConflicts: Array<{ account_id: string; id: string; name: string }>;
+    } => {
       // 事务首次写入前重新解析无账号头请求的范围：若异步 PAT 验证期间账号状态变化
       // 导致范围变得歧义或目标改变，直接拒绝导入，绝不将已验证载荷改投到新目标。
       const currentScope = resolveWritableAccountScope(req, db);
       if (!currentScope.ok || currentScope.accountId !== accountId) {
-        return { scopeError: true, skippedPendingClaim: [] };
+        return {
+          scopeError: true,
+          skippedPendingClaim: [],
+          topLevelDefaultBlocked: false,
+          migrationOverlapSkipped: { repositories: 0, releases: 0, categories: 0 },
+          categoryIdConflicts: [],
+        };
       }
 
       // Issue #612 审计（597）：记录因 default 分区待认领保护而跳过的恢复分区——
       // 保留归属保护不变，但绝不静默丢弃：没有数据被应用时返回可操作的冲突
       // 响应，仍有其他数据提交时在响应中列出被跳过的分区与待认领这一原因。
       const skippedPendingClaim: string[] = [];
+      const migrationOverlapSkipped = { repositories: 0, releases: 0, categories: 0 };
+      const categoryIdConflicts: Array<{ account_id: string; id: string; name: string }> = [];
       const backupHasNonEmptyArray = (key: string): boolean => {
         const value = (data as Record<string, unknown>)[key];
         return Array.isArray(value) && value.length > 0;
@@ -631,6 +692,60 @@ router.post('/api/sync/import', async (req, res) => {
         if (backupHasNonEmptyArray('repositories')) skippedPendingClaim.push('repositories');
         if (backupHasNonEmptyArray('releases')) skippedPendingClaim.push('releases');
         if (backupHasNonEmptyArray('categories')) skippedPendingClaim.push('categories');
+      }
+
+      // Issue #612 R12：显式迁移（allowAccountMigration，声明账号 ≠ 请求分区）把
+      // 顶层数据写入请求分区时，备份中指向同一分区（wsAccountId === accountId）
+      // 的工作区数据与顶层迁移数据可能指向同一条记录——两个来源先后
+      // INSERT OR REPLACE 会互相覆盖且都计为成功。写入前先收集目标分区工作区
+      // 将写入的记录 ID：重叠记录采用明确优先级——分区自身的工作区快照优先，
+      // 顶层迁移让位（保留所有互不重叠的数据），并在响应中报告跳过的重叠数量。
+      const isMigrationImport = (data as { allowAccountMigration?: unknown }).allowAccountMigration === true
+        && declaredAccountId !== undefined
+        && declaredAccountId !== accountId;
+      const workspaceOverlapIds: {
+        repositories: Set<number>;
+        releases: Set<number>;
+        categories: Set<string | number>;
+      } | null = isMigrationImport
+        ? { repositories: new Set(), releases: new Set(), categories: new Set() }
+        : null;
+      if (workspaceOverlapIds) {
+        for (const { accountId: wsAccountId, workspace, unverifiedOwner } of workspaceEntries) {
+          if (wsAccountId !== accountId) continue;
+          const willSkipWorkspace = unverifiedOwner || (wsAccountId === 'default'
+            && (accountId !== 'default' || pendingDefaultAtTxStart));
+          if (willSkipWorkspace) continue;
+          const wsRepos = workspace.repositories as Record<string, unknown>[] | undefined;
+          if (Array.isArray(wsRepos)) {
+            for (const r of wsRepos) {
+              if (!r || typeof r !== 'object' || Array.isArray(r)
+                || typeof r.id !== 'number' || !Number.isInteger(r.id) || r.id <= 0
+                || typeof r.name !== 'string'
+                || typeof r.full_name !== 'string'
+                || typeof r.html_url !== 'string') continue;
+              workspaceOverlapIds.repositories.add(r.id);
+            }
+          }
+          const wsRels = workspace.releases as Record<string, unknown>[] | undefined;
+          if (Array.isArray(wsRels)) {
+            for (const r of wsRels) {
+              const repository = r.repository as { id?: unknown } | undefined;
+              const repoId = r.repo_id ?? repository?.id;
+              if (typeof r.id !== 'number' || !Number.isInteger(r.id) || r.id <= 0
+                || typeof repoId !== 'number' || !Number.isInteger(repoId) || repoId <= 0
+                || typeof r.tag_name !== 'string' || !r.tag_name.trim()) continue;
+              workspaceOverlapIds.releases.add(r.id);
+            }
+          }
+          const wsCats = workspace.categories as unknown[] | undefined;
+          if (Array.isArray(wsCats) && wsCats.length > 0) {
+            const { ids: wsOverlapCatIds } = buildImportedCategoryIds(db, wsAccountId, wsCats as Record<string, unknown>[]);
+            for (const catId of wsOverlapCatIds) {
+              if (catId !== null) workspaceOverlapIds.categories.add(catId);
+            }
+          }
+        }
       }
 
       // 在首次写入前记录事务开始时的凭据版本差异：若异步验证期间目标账号凭据已被
@@ -680,6 +795,12 @@ router.post('/api/sync/import', async (req, res) => {
             || typeof r.full_name !== 'string'
             || typeof r.html_url !== 'string'
           ) {
+            continue;
+          }
+          // Issue #612 R12：与目标分区工作区重叠的记录让位给分区自身的工作区快照
+          //（仅显式迁移场景收集了重叠 ID），绝不静默互相覆盖。
+          if (workspaceOverlapIds?.repositories.has(r.id)) {
+            migrationOverlapSkipped.repositories += 1;
             continue;
           }
           // license：兼容旧备份（无该列→null）、GitHub 对象形态、已规范化的 SPDX 字符串。
@@ -789,7 +910,14 @@ router.post('/api/sync/import', async (req, res) => {
             zipball_url = excluded.zipball_url,
             tarball_url = excluded.tarball_url
         `);
+        let importedReleases = 0;
         for (const r of rels) {
+          // Issue #612 R12：与目标分区工作区重叠的发行版让位（仅显式迁移场景）。
+          // id 已在上方的 releases 预校验中确认为正整数。
+          if (workspaceOverlapIds?.releases.has(r.id as number)) {
+            migrationOverlapSkipped.releases += 1;
+            continue;
+          }
           const repository = r.repository as { id?: number; full_name?: string; name?: string } | undefined;
           const explicitIsRead = hasExplicitIsRead(r);
           const relStmt = explicitIsRead ? relStmtOverwriteIsRead : relStmtPreserveIsRead;
@@ -808,8 +936,9 @@ router.post('/api/sync/import', async (req, res) => {
             r.tarball_url ?? null,
             accountId
           );
+          importedReleases += 1;
         }
-        counts.releases = rels.length;
+        counts.releases = importedReleases;
       }
 
       // Categories（导入到当前账号分区）
@@ -819,13 +948,22 @@ router.post('/api/sync/import', async (req, res) => {
           INSERT OR REPLACE INTO categories (id, name, description, icon, keywords, color, sort_order, is_custom, account_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
-        const catIds = buildImportedCategoryIds(cats);
+        const { ids: catIds, conflicts: topLevelCatConflicts } = buildImportedCategoryIds(db, accountId, cats);
+        for (const conflict of topLevelCatConflicts) {
+          categoryIdConflicts.push({ account_id: accountId, ...conflict });
+        }
+        let importedCategories = 0;
         for (let i = 0; i < cats.length; i++) {
           const c = cats[i];
           const catId = catIds[i];
           // Issue #612 A6：与工作区路径一致，事务内跳过无效对象，不因单条脏数据
           // 回滚整个导入。
           if (!c || typeof c !== 'object' || Array.isArray(c) || catId === null) continue;
+          // Issue #612 R12：与目标分区工作区重叠的分类让位（仅显式迁移场景）。
+          if (workspaceOverlapIds?.categories.has(catId)) {
+            migrationOverlapSkipped.categories += 1;
+            continue;
+          }
           catStmt.run(
             // Issue #612 R2-A19：旧版分类 id 为 NULL/缺失时分配确定性稳定标识
             // （顶层与工作区共用），显式 ID 原样保留，避免 NOT NULL 约束回滚。
@@ -834,8 +972,11 @@ router.post('/api/sync/import', async (req, res) => {
             c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0,
             accountId
           );
+          // Issue #612 R12：只统计实际写入的顶层分类——跳过的无效条目
+          // （如 [null]）不得报告为已导入（与工作区分支的计数时机一致）。
+          importedCategories += 1;
         }
-        counts.categories = cats.length;
+        counts.categories = importedCategories;
       }
 
       // Asset Filters
@@ -1131,7 +1272,11 @@ router.post('/api/sync/import', async (req, res) => {
           const skipDefaultWorkspace = unverifiedOwner || (wsAccountId === 'default'
             && (accountId !== 'default' || pendingDefaultAtTxStart));
           if (skipDefaultWorkspace) {
-            if (topLevelDefaultBlocked && wsAccountId === 'default'
+            // Issue #612 R12：目标为数字账号时，备份中的 default 工作区同样因归属
+            // 未验证被跳过——必须在响应中单独报告该分区未恢复及原因，否则响应
+            // 无法区分完整恢复与部分恢复。topLevelDefaultBlocked（目标 default +
+            // 待认领）时沿用既有报告路径与原因。
+            if (wsAccountId === 'default'
               && !skippedPendingClaim.includes('account_workspaces.default')) {
               skippedPendingClaim.push('account_workspaces.default');
             }
@@ -1226,7 +1371,10 @@ router.post('/api/sync/import', async (req, res) => {
 
           const wsCats = workspace.categories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsCats)) {
-            const wsCatIds = buildImportedCategoryIds(wsCats);
+            const { ids: wsCatIds, conflicts: wsCatConflicts } = buildImportedCategoryIds(db, wsAccountId, wsCats);
+            for (const conflict of wsCatConflicts) {
+              categoryIdConflicts.push({ account_id: wsAccountId, ...conflict });
+            }
             for (let i = 0; i < wsCats.length; i++) {
               const c = wsCats[i];
               const catId = wsCatIds[i];
@@ -1392,7 +1540,13 @@ router.post('/api/sync/import', async (req, res) => {
           clearBackfillChecked(wsAccountId);
         }
       }
-      return { scopeError: false, skippedPendingClaim };
+      return {
+        scopeError: false,
+        skippedPendingClaim,
+        topLevelDefaultBlocked,
+        migrationOverlapSkipped,
+        categoryIdConflicts,
+      };
     });
 
     const importResult = typeof importAll.immediate === 'function' ? importAll.immediate() : importAll();
@@ -1405,26 +1559,42 @@ router.post('/api/sync/import', async (req, res) => {
     }
     // Issue #612 审计（597）：待认领保护跳过的分区必须在响应中说明——完全没有
     // 数据被应用时返回可操作的冲突响应（而不是看似成功、实际什么都没写的 200）；
-    // 仍有其他数据提交时在响应中列出被跳过的分区与「default 待认领」这一原因。
+    // 仍有其他数据提交时在响应中列出被跳过的分区与跳过原因。
+    // Issue #612 R12：跳过原因按实际保护来源区分——目标 default 待认领
+    // （legacy_default_claim_pending）与目标为数字账号时备份 default 工作区归属
+    // 未验证（default_workspace_ownership_unverified）。
     const skippedPendingClaim = importResult.skippedPendingClaim;
+    const skippedReason = importResult.topLevelDefaultBlocked
+      ? 'legacy_default_claim_pending'
+      : 'default_workspace_ownership_unverified';
     const appliedTotal = Object.values(counts).reduce(
       (sum, value) => sum + (typeof value === 'number' ? value : 0),
       0,
     );
     if (appliedTotal === 0 && skippedPendingClaim.length > 0) {
       res.status(409).json({
-        error: 'Nothing was imported: the target default partition still has unclaimed legacy data, so the backup\'s repositories, releases, categories and account-level settings were skipped. Complete the legacy claim first (or re-send with an explicit X-GitHub-Account-Id after claiming) and retry the import.',
+        error: importResult.topLevelDefaultBlocked
+          ? 'Nothing was imported: the target default partition still has unclaimed legacy data, so the backup\'s repositories, releases, categories and account-level settings were skipped. Complete the legacy claim first (or re-send with an explicit X-GitHub-Account-Id after claiming) and retry the import.'
+          : 'Nothing was imported: the backup\'s default workspace was skipped because its ownership could not be verified for the requested numeric account. Restore the default workspace with a request resolved to the default partition (after completing the legacy claim); an explicit X-GitHub-Account-Id cannot make a backup default workspace owned by a numeric account.',
         code: 'LEGACY_DEFAULT_CLAIM_PENDING',
         skipped_partitions: skippedPendingClaim,
+        reason: skippedReason,
       });
       return;
     }
     // Issue #612 A3：验证未通过的工作区凭据在响应中报告（目标账号现有凭据保留）。
+    const { migrationOverlapSkipped } = importResult;
     res.json({
       imported: counts,
       skipped_credentials: skippedCredentials,
       ...(skippedPendingClaim.length > 0
-        ? { skipped_pending_claim: { partitions: skippedPendingClaim, reason: 'legacy_default_claim_pending' } }
+        ? { skipped_pending_claim: { partitions: skippedPendingClaim, reason: skippedReason } }
+        : {}),
+      ...(importResult.categoryIdConflicts.length > 0
+        ? { category_id_conflicts: importResult.categoryIdConflicts }
+        : {}),
+      ...(migrationOverlapSkipped.repositories + migrationOverlapSkipped.releases + migrationOverlapSkipped.categories > 0
+        ? { migration_overlaps_skipped: migrationOverlapSkipped }
         : {}),
     });
   } catch (err) {

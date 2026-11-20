@@ -250,7 +250,24 @@ describe('useReleaseTimelineActions account switch guards', () => {
     expect((storeState as { accountWorkspaces?: Record<string, unknown> }).accountWorkspaces).toBeUndefined();
   });
 
+  const seedCustomSource = () => {
+    // R12（finding 1）：给同一仓库配置自定义来源——只有存在来源时退订流程
+    // 才会进入来源移除分支，切号守卫的断言才有意义。
+    (storeState as { releaseSourceSettings: unknown }).releaseSourceSettings = {
+      enabledSourceIds: ['custom-release'],
+      watchCustomReleaseRepos: [],
+      customReleaseRepos: [{
+        id: 1,
+        name: 'repo',
+        full_name: 'owner/repo',
+        html_url: 'https://github.com/owner/repo',
+        owner: { login: 'owner', avatar_url: '' },
+      }],
+    };
+  };
+
   it('aborts the unsubscribe flow entirely when the account switched during the confirm dialog', async () => {
+    seedCustomSource();
     mocks.confirm.mockImplementation(async () => {
       switchToB();
       return true;
@@ -260,19 +277,46 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleUnsubscribeRelease(1); });
 
     // 确认等待期间切号：来源移除、Release 删除与同步全部跳过
+    expect(storeState.removeReleaseSourceRepository).not.toHaveBeenCalled();
     expect(storeState.batchUnsubscribeReleases).not.toHaveBeenCalled();
     expect(storeState.updateRepository).not.toHaveBeenCalled();
     expect(storeState.removeReleasesByRepoFullName).not.toHaveBeenCalled();
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
   });
 
+  it('does not expand a collapsed repository when the unsubscribe rollback runs (R12 finding 20)', async () => {
+    seedCustomSource();
+    mocks.forceSyncToBackend.mockRejectedValue(new Error('backend down'));
+    storeState.removeReleaseSourceRepository.mockImplementation(() => {
+      (storeState as unknown as { releaseSourceSettings: { customReleaseRepos: unknown[] } })
+        .releaseSourceSettings.customReleaseRepos = [];
+    });
+    // 该仓库原本处于收起状态
+    storeState.releaseExpandedRepositories = new Set<number>();
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.handleUnsubscribeRelease(1); });
+
+    // 失败回滚只恢复删除前已展开的仓库——原本收起的仓库保持收起
+    expect(storeState.releaseExpandedRepositories.size).toBe(0);
+  });
+
   it('still unsubscribes when the account never changed (control)', async () => {
+    seedCustomSource();
+    // 真实 store action 会移除来源；测试桩需同步修改夹具，后续 alreadySubscribed
+    // 判定（stillActive）才会走「来源已清空 → 删除 Release」分支。
+    storeState.removeReleaseSourceRepository.mockImplementation(() => {
+      (storeState as unknown as { releaseSourceSettings: { customReleaseRepos: unknown[] } })
+        .releaseSourceSettings.customReleaseRepos = [];
+    });
     const { result } = renderActions();
 
     await act(async () => { await result.current.handleUnsubscribeRelease(1); });
 
     expect(mocks.confirm).toHaveBeenCalled();
     expect(mocks.forceSyncToBackend).toHaveBeenCalled();
+    // 来源移除必须携带预期的来源 ID 与仓库名
+    expect(storeState.removeReleaseSourceRepository).toHaveBeenCalledWith('custom-release', 'owner/repo');
     // 审计回归守护：来源已清空时必须实际删除该仓库的时间线 Release
     //（R11 修复曾误删此调用，导致退订后 Release 残留）。
     expect(storeState.removeReleasesByRepoFullName).toHaveBeenCalledWith('owner/repo');

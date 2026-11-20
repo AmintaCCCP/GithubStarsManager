@@ -395,10 +395,16 @@ export const useRepositoryCardActions = ({
 
       if (result.repositories.length === 0) {
         toast(t('useRepositoryCardActions.no-similar-repositories-found'), 'info');
+      } else if (result.diagnostics.denseIndexUnavailableReasonCode) {
+        // 交接项 3（R12）：稠密索引不可用时管道仍会返回词法/结构化召回的非空
+        // 结果——但结果可能不完整，必须明确提示用户。提示按稳定原因代码本地化
+        // （services 域提供 4 个代码与 10 locale 文案）；英文诊断文本仅作日志。
+        toast(
+          t(`useRepositoryCardActions.dense-index-unavailable-reason-${result.diagnostics.denseIndexUnavailableReasonCode}`),
+          'warning',
+        );
       } else if (result.diagnostics.denseIndexUnavailableReason) {
-        // 转交 3（CodeRabbit，similarRepositoryPipeline）：稠密索引不可用时
-        // 管道仍会返回词法/结构化召回的非空结果——但结果可能不完整，必须
-        // 明确提示用户，而不是静默降级。
+        // 代码缺失回退（旧管道/第三方管道）：保留既有英文诊断提示
         toast(
           t('useRepositoryCardActions.similar-results-may-be-incomplete-the-dens', { v1: result.diagnostics.denseIndexUnavailableReason }),
           'warning',
@@ -454,6 +460,10 @@ export const useRepositoryCardActions = ({
     // 审计修复（C29）：发起时保存目标后端地址，供切号完成路径登记 (账号, 后端)
     // 待补推删除标记。
     const startedBackendUrl = backend.backendUrl ?? '';
+    // 审计修复（R12，CodeRabbit Major）：记录发起时该仓库的星标时间——迟到的
+    // 取消星标响应据此区分「原始记录仍在」与「切号期间重新加星的同 ID 记录」
+    //（重新加星路径都会刷新 starred_at），后者必须保留且不登记删除。
+    const startedStarredAt = repository.starred_at;
 
     const confirmMessage = t('useRepositoryCardActions.are-you-sure-you-want-to-unstar-v1-this-will-rem', { v1: repository.full_name });
 
@@ -480,24 +490,56 @@ export const useRepositoryCardActions = ({
       // release 归档一致）；同时登记发起账号 (账号, 后端) 的待同步删除标记，
       // 切回后先补推删除再拉取，保证该仓库不再显示为已 Star。
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
-        if (startedAccountId && typeof useAppStore.setState === 'function') {
-          const unstarredRepoId = repository.id;
+        const unstarredRepoId = repository.id;
+        const reconcileState = typeof useAppStore.getState === 'function' ? useAppStore.getState() : null;
+        // 只有发起账号仍是当前账号时，实时列表才属于它——切到 B 后实时列表
+        // 是 B 的工作区，同 ID 仓库与 A 无关，绝不能据此判定「重新加星」。
+        const liveRecord = isCurrentAccount(startedAccountId)
+          ? reconcileState?.repositories.find((r) => r.id === unstarredRepoId)
+          : undefined;
+        const parkedRecord = startedAccountId
+          ? reconcileState?.accountWorkspaces?.[startedAccountId]?.repositories.find((r) => r.id === unstarredRepoId)
+          : undefined;
+        // R12：同 ID 记录在等待期间被重新加星（starred_at 已刷新）时保留它，
+        // 绝不按旧响应删除，也不登记待删除（GitHub 上仍为已加星）。
+        const restarred = [liveRecord, parkedRecord].some((record) => (
+          !!record && (record.starred_at ?? undefined) !== (startedStarredAt ?? undefined)
+        ));
+        if (!restarred && startedAccountId && typeof useAppStore.setState === 'function') {
           const parkedAccountId: string = startedAccountId;
           if (isCurrentAccount(startedAccountId)) {
             withAccountSwitchGuardSync(() => {
-              useAppStore.setState((state) => ({
-                repositories: state.repositories.filter((r) => r.id !== unstarredRepoId),
-                // 审计修复：搜索激活时视图直接渲染 searchResults——取消星标的
-                // 仓库必须与正常 deleteRepository 路径一样从结果中过滤掉。
-                searchResults: state.searchResults.filter((r) => r.id !== unstarredRepoId),
-                releases: state.releases.filter((rel) => rel.repository.id !== unstarredRepoId),
-              }));
+              useAppStore.setState((state) => {
+                // R12：与 deleteRepository 同一清理规则——移除已删除仓库的订阅，
+                // 并清掉剩余 Release 已不包含的已读 ID。
+                const remainingReleaseIds = new Set(
+                  state.releases.filter((rel) => rel.repository.id !== unstarredRepoId).map((rel) => rel.id),
+                );
+                const nextSubscriptions = new Set(state.releaseSubscriptions ?? []);
+                nextSubscriptions.delete(unstarredRepoId);
+                return {
+                  repositories: state.repositories.filter((r) => r.id !== unstarredRepoId),
+                  // 审计修复：搜索激活时视图直接渲染 searchResults——取消星标的
+                  // 仓库必须与正常 deleteRepository 路径一样从结果中过滤掉。
+                  searchResults: state.searchResults.filter((r) => r.id !== unstarredRepoId),
+                  releases: state.releases.filter((rel) => rel.repository.id !== unstarredRepoId),
+                  releaseSubscriptions: nextSubscriptions,
+                  readReleases: new Set(
+                    Array.from(state.readReleases ?? []).filter((releaseId) => remainingReleaseIds.has(releaseId)),
+                  ),
+                };
+              });
             });
           }
           withAccountSwitchGuardSync(() => {
             useAppStore.setState((state) => {
               const parked = state.accountWorkspaces[parkedAccountId];
               if (!parked) return state;
+              const remainingReleaseIds = new Set(
+                parked.releases.filter((rel) => rel.repository.id !== unstarredRepoId).map((rel) => rel.id),
+              );
+              const nextSubscriptions = new Set(parked.releaseSubscriptions ?? []);
+              nextSubscriptions.delete(unstarredRepoId);
               return {
                 accountWorkspaces: {
                   ...state.accountWorkspaces,
@@ -505,13 +547,15 @@ export const useRepositoryCardActions = ({
                     ...parked,
                     repositories: parked.repositories.filter((r) => r.id !== unstarredRepoId),
                     releases: parked.releases.filter((rel) => rel.repository.id !== unstarredRepoId),
+                    releaseSubscriptions: Array.from(nextSubscriptions),
+                    readReleases: Array.from(parked.readReleases ?? []).filter((releaseId) => remainingReleaseIds.has(releaseId)),
                   },
                 },
               };
             });
           });
         }
-        if (startedAccountId) {
+        if (startedAccountId && !restarred) {
           // R2-C3：即使发起账号没有任何推送基线，也要按 (账号, 发起时后端)
           // 持久化登记已确认的删除，切回后的拉取/推送合并据此排除该仓库。
           markPendingRepositoryDeletion(startedAccountId, repository.id, startedBackendUrl);

@@ -11,18 +11,21 @@ import {
   bumpAccountSessionGeneration,
   captureAccountWorkspace,
   switchAccountWorkspace,
-  workspaceHasData,
+  workspaceHasRetainableData,
 } from '../helpers/accountWorkspace';
 import { initialGistSearchFilters, initialSearchFilters } from '../schema';
 import { clearAuthMirror, writeAuthMirror, writeSessionBackendSecret } from '../persistence/authStorage';
 import { syncGhAccountTokensFromState } from '../persistence/ghAccountSecrets';
+import { forgetV19MigrationInputs } from '../persistence/v19MigrationInputs';
 
 const nowIso = (): string => new Date().toISOString();
 
 /** listsPush 的空闲快照：会话拆除/切换时重置旧会话的推送标记（形状与 resetListsPush 一致）。 */
 const listsPushIdle = { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null };
 
-/** 从 savedAccounts 中剔除指定账号，保持其余条目引用不变。 */
+/**
+ * 从 savedAccounts 中剔除指定账号，保持其余条目引用不变。
+ */
 const excludeSavedAccount = (
   savedAccounts: Record<string, import('../../types').SavedAccount>,
   accountId: string,
@@ -149,6 +152,11 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         // login restore) applies every shard even if the backend data has
         // not changed since this session.
         resetSyncHashes();
+        // 第 12 轮审计 ISSUE-1(C)：登出必须让该账号的 v19 迁移输入立即失效。
+        // 这次 set() 会同步触发 partialize——若迁移输入仍在，未确认态下
+        // savedAccountsForShard 会把旧 PAT 回填进分片，下次启动即可凭旧记录
+        // 一键恢复已退出账号（违反「退出即清除已保存 PAT」）。
+        if (accountId) forgetV19MigrationInputs([accountId]);
         withAccountSwitchGuardSync(() => set({
           user: null,
           githubToken: null,
@@ -157,6 +165,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           accountWorkspaces,
           // 会话级刷新状态随会话拆除重置（B4）
           releaseIsRefreshing: false,
+          // Fork 刷新标志同 B4 语义随会话拆除重置（第 12 轮审计修复）：旧账号
+          // 的在途 Fork 刷新不得禁用登录后新会话的刷新入口；过期 finally 清理
+          // 由 setForkIsRefreshing 的归属校验拦截。
+          forkIsRefreshing: false,
           // 旧会话的 Lists 推送标记随会话拆除重置（同 B4 语义）
           listsPush: listsPushIdle,
           // 退出即清除当前账号已保存的 PAT：登录页不能凭旧记录一键恢复会话。
@@ -171,7 +183,19 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         // logout 保留其他账号的记录；当前账号仅保留资料与工作区，凭据已清除。
         // 被清除的当前账号 Token 也要从桌面端加密存储移除（B7）。显式移除列表
         // 保证即使磁盘映射未完整加载，也会真正删除该账号的 PAT（自审计补充）。
-        syncGhAccountTokensFromState(get(), accountId ? [accountId] : []);
+        // 第 12 轮审计修复：内存会话已在上方清除，设备端删除结果单独处理——
+        // 删除失败（加密存储暂时不可写）时不得静默，记录告警；待删标记已随
+        // 保存请求持久化（ghAccountSecrets），下次启动读取会继续屏蔽旧 PAT，
+        // 水化收尾的重试（options.ts 无 Token 分支）会再次应用删除。UI 侧的
+        // 「设备清理未完成」提示与重试入口由 hooks 层按
+        // hasPendingGhAccountSecretRemovals() 消费。
+        void syncGhAccountTokensFromState(get(), accountId ? [accountId] : []).then((deviceRemoved) => {
+          if (!deviceRemoved) {
+            logger.warn('store.logout', 'Device-side gh-account secret removal failed; old PAT stays masked until retry', {
+              accountId: accountId ?? null,
+            });
+          }
+        });
         return true;
       },
       upsertSavedAccount: (user, githubToken) => {
@@ -196,7 +220,12 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
       },
       switchAccount: (targetAccountId) => {
         const current = get();
-        const target = current.savedAccounts[targetAccountId];
+        // 第 12 轮审计修复：先确认 targetAccountId 是 savedAccounts 自身的键——
+        // 普通对象读取继承属性（如 'constructor'）会得到非账号值，后续
+        // target.githubToken.trim() 会抛异常而不是返回 false。
+        const target = Object.prototype.hasOwnProperty.call(current.savedAccounts, targetAccountId)
+          ? current.savedAccounts[targetAccountId]
+          : undefined;
         if (!target || !target.githubToken.trim()) return false;
         const currentAccountId = accountIdKey(current.user);
         if (currentAccountId === targetAccountId) {
@@ -222,6 +251,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
               githubToken: target.githubToken,
               isAuthenticated: true,
               releaseIsRefreshing: false,
+              // 会话代次已递增：旧会话的 Fork 刷新标志与 Lists 推送标记一并
+              // 重置（同 B4 语义），防止残留标志阻止新会话操作。
+              forkIsRefreshing: false,
               // 会话代次已递增：旧会话的 Lists 推送标记一并重置，防止
               // isRunning 残留阻止后续推送（同下方跨账号切换的语义）。
               listsPush: listsPushIdle,
@@ -287,6 +319,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           // 不得禁用新账号的刷新入口；其 finally 清理由
           // setReleaseIsRefreshing(false) 的归属会话校验拦截（preferenceSlice）。
           releaseIsRefreshing: false,
+          // Fork 刷新标志同 B4 语义随账号切换重置（第 12 轮审计修复）：旧账号
+          // 的在途 Fork 刷新不得禁用新账号的刷新按钮与账号选择器；过期 finally
+          // 清理由 setForkIsRefreshing 的归属校验拦截（timelineSlice）。
+          forkIsRefreshing: false,
           // 旧会话的 Lists 推送随会话切换失效：其 isRunning 标记不得残留到新
           // 账号（否则 pushCategoriesToLists 的重入保护会永久阻止新账号发起
           // 推送）；此刻新会话尚不可能已开始推送，重置不会误清新会话状态。
@@ -307,6 +343,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
       removeSavedAccount: (accountId) => {
         const current = get();
         const currentAccountId = accountIdKey(current.user);
+        // 第 12 轮审计 ISSUE-1(C)：移除账号即让该账号的 v19 迁移输入失效——
+        // 与登出同语义，后续 partialize 不得把旧 PAT 回填进分片。
+        forgetV19MigrationInputs([accountId]);
         if (accountId !== currentAccountId) {
           // 移除非当前账号：仅删除保存的凭证，保留其 accountWorkspaces 数据
           set({ savedAccounts: excludeSavedAccount(current.savedAccounts, accountId) });
@@ -359,6 +398,8 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           // Release 刷新状态随归档中止（B4）：被归档账号的在途刷新不再禁用
           // 恢复后新会话的刷新入口
           releaseIsRefreshing: false,
+          // Fork 刷新标志同 B4 语义随归档中止（第 12 轮审计修复）
+          forkIsRefreshing: false,
           ...applyAccountWorkspace(undefined),
         }));
         writeAuthMirror({ user: null, githubToken: null, backendApiSecret: current.backendApiSecret });
@@ -385,8 +426,11 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         // active_account_id 分区）isFullSync 推送出去。
         cancelPendingAccountSwitchPush();
         resetSyncHashes();
+        // 第 12 轮审计 ISSUE-1：与登录页/switchAccountWorkspace 共用同一个
+        // 「工作区是否有可保留数据」判定——订阅/已读/自定义来源设置同样要恢复。
         const restore = restoreWorkspace
-          && (workspaceHasData(restoreWorkspace) || restoreWorkspace.syncModeConfigured === true)
+          && (workspaceHasRetainableData(restoreWorkspace)
+            || restoreWorkspace.syncModeConfigured === true)
           ? restoreWorkspace
           : undefined;
         withAccountSwitchGuardSync(() => {

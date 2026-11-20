@@ -119,17 +119,88 @@ describe('ghAccountSecrets save semantics (R2-B1)', () => {
   });
 
   it('fully overwrites once the full map has been loaded (logout removal works)', async () => {
+    // 第 12 轮审计修复：初始映射必须已包含待删除账号与另一个账号——否则即使
+    // 实现完全忽略 removedAccountIds，断言也会通过。正常加载成功的路径下，
+    // 登出删除必须真正从已加载映射中移除该账号。
     setBridge({
-      get: vi.fn().mockResolvedValue({ status: 'missing' }),
+      get: vi.fn().mockResolvedValue({
+        status: 'loaded',
+        tokens: { '42': 'ghp_42_disk', '7': 'ghp_other_account' },
+      }),
       save: vi.fn().mockResolvedValue({ success: true }),
     });
     const secrets = await importFresh();
 
     await secrets.loadGhAccountTokens();
-    await secrets.saveGhAccountTokens({ '42': 'ghp_session_token' });
+    // 登出账号 42：显式移除列表必须真正删除该账号（其余账号保留）。
+    await secrets.saveGhAccountTokens({ '7': 'ghp_other_account' }, ['42']);
 
-    // 已确认磁盘为空 ⇒ 全量覆写，不会把磁盘上已确认移除的账号合并回来。
-    expect(getBridgeMock().save).toHaveBeenLastCalledWith({ '42': 'ghp_session_token' });
+    // 已确认完整映射 ⇒ 全量覆写：42 被删除，绝不合并回来。
+    expect(getBridgeMock().save).toHaveBeenLastCalledWith({ '7': 'ghp_other_account' });
+  });
+
+  it('commits pending-removal cancellation only after the encrypted write is confirmed (round-12 audit fix)', async () => {
+    // 删除 42 失败 → 待删标记屏蔽旧 PAT；用户用新 PAT 重新授权 42（替换保存
+    // 先失败再成功）。标记取消必须延迟到写入确认：替换失败时旧 PAT 仍被屏蔽，
+    // 替换成功后新 PAT 可加载。
+    const saveMock = vi.fn()
+      .mockResolvedValueOnce({ success: false, error: 'disk busy' })
+      .mockResolvedValueOnce({ success: false, error: 'disk busy again' })
+      .mockResolvedValue({ success: true });
+    setBridge({
+      get: vi.fn().mockResolvedValue({
+        status: 'loaded',
+        tokens: { '42': 'ghp_old_42' },
+      }),
+      save: saveMock,
+    });
+    const secrets = await importFresh();
+    await secrets.loadGhAccountTokens();
+
+    // 第一次：登出删除 42 失败——待删标记保留并持久化。
+    const removalFailed = await secrets.syncGhAccountTokensFromState(
+      { user: null, githubToken: null, savedAccounts: {} },
+      ['42'],
+    );
+    expect(removalFailed).toBe(false);
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+
+    // 用户随后用新 PAT 重新授权 42：替换保存也失败。
+    const replacementFailed = await secrets.syncGhAccountTokensFromState({
+      user: { id: 42 },
+      githubToken: 'ghp_new_42',
+      savedAccounts: {},
+    });
+    expect(replacementFailed).toBe(false);
+    // 写入失败时待删标记不得被提前取消：旧 PAT 仍被屏蔽（下次启动不回填）。
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+
+    // 替换保存成功后标记才清除：候选映射允许新 PAT 替换旧值。
+    const replacementOk = await secrets.syncGhAccountTokensFromState({
+      user: { id: 42 },
+      githubToken: 'ghp_new_42',
+      savedAccounts: {},
+    });
+    expect(replacementOk).toBe(true);
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
+    expect(getBridgeMock().save).toHaveBeenLastCalledWith({ '42': 'ghp_new_42' });
+  });
+
+  it('treats an explicit removal as authoritative even when the same call supplies a token (round-12 audit)', async () => {
+    // 同一次保存既显式删除 42 又携带其 Token 时按删除处理（与第 11 轮及更早
+    // 语义一致）：绝不把 Token 写回被删除账号，删除成功后待删标记清除。
+    window.localStorage.clear();
+    setBridge({
+      get: vi.fn().mockResolvedValue({ status: 'loaded', tokens: { '42': 'ghp_disk_token' } }),
+      save: vi.fn().mockResolvedValue({ success: true }),
+    });
+    const secrets = await importFresh();
+
+    await secrets.loadGhAccountTokens();
+    await secrets.saveGhAccountTokens({ '42': 'ghp_new_token' }, ['42']);
+
+    expect(getBridgeMock().save).toHaveBeenLastCalledWith({});
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
   });
 
   it('drops invalid entries from the payload before writing', async () => {

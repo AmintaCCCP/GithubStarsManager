@@ -231,6 +231,15 @@ export const applyAccountWorkspaceForTypes = (
   rawFields?: Record<string, unknown>,
 ): Partial<AccountWorkspaceRuntime> => {
   const rawHas = (key: string): boolean => !rawFields || Object.prototype.hasOwnProperty.call(rawFields, key);
+  // 第 12 轮审计修复：实时恢复补丁与归档补丁（applyValidatedWorkspaceFields）
+  // 共用同一套字段级校验——仅凭字段存在就写入会把无效字段（如备份中的
+  // `gists: null` 经归一化得到的 []）当成清空指令，清空当前账号的实时数据，
+  // 造成实时状态与归档状态不一致。集合字段必须为真数组（显式 [] 仍表示
+  // 清空），映射/设置对象字段必须为普通对象；缺省 rawFields 时保持旧行为
+  //（调用方保证 workspace 已按备份字段填充，如 merge 分支）。
+  const liveFieldIsArray = (key: string): boolean => !rawFields || rawFieldIsArray(rawFields, key);
+  const liveFieldIsObject = (key: string): boolean => !rawFields
+    || (Object.prototype.hasOwnProperty.call(rawFields, key) && isPlainObject(rawFields[key]));
   const patch: Partial<AccountWorkspaceRuntime> = {};
   if (selectedTypes.includes('repositories')) {
     const validatedRepositories = rawFields
@@ -241,37 +250,33 @@ export const applyAccountWorkspaceForTypes = (
       patch.searchResults = validatedRepositories;
     }
     if (rawHas('lastSync')) patch.lastSync = workspace.lastSync;
-    if (rawHas('gists')) {
+    if (liveFieldIsArray('gists')) {
       patch.gists = workspace.gists;
       patch.gistSearchResults = workspace.gists;
     }
-    if (rawHas('starredGists')) patch.starredGists = workspace.starredGists;
+    if (liveFieldIsArray('starredGists')) patch.starredGists = workspace.starredGists;
     if (rawHas('selectedGistCategory')) patch.selectedGistCategory = workspace.selectedGistCategory;
-    // 与归档补丁共用字段校验（审计修复）：forks: null 会被归一化成 []，
-    // 仅凭字段存在就写入会把无效字段当成清空指令，清空当前账号的 Fork 列表；
-    // null/非数组按「未提供」忽略，显式 [] 才清空。未提供 rawFields 时保持
-    // 旧行为（调用方保证 workspace 已按备份字段填充，如 merge 分支）。
-    if (rawHas('forks') && (!rawFields || rawFieldIsArray(rawFields, 'forks'))) {
+    if (liveFieldIsArray('forks')) {
       patch.forks = workspace.forks;
     }
-    if (rawHas('readForks')) patch.readForks = new Set(workspace.readForks);
+    if (liveFieldIsArray('readForks')) patch.readForks = new Set(workspace.readForks);
     if (rawHas('syncMode')) patch.syncMode = workspace.syncMode;
     if (rawHas('syncModeConfigured')) patch.syncModeConfigured = workspace.syncModeConfigured;
   }
-  if (selectedTypes.includes('releases') && rawHas('releases')) {
+  if (selectedTypes.includes('releases') && liveFieldIsArray('releases')) {
     patch.releases = workspace.releases;
   }
   if (selectedTypes.includes('releaseSubscriptions')) {
-    if (rawHas('releaseSubscriptions')) patch.releaseSubscriptions = new Set(workspace.releaseSubscriptions);
-    if (rawHas('releaseSourceSettings')) patch.releaseSourceSettings = workspace.releaseSourceSettings;
-    if (rawHas('readReleases')) patch.readReleases = new Set(workspace.readReleases);
+    if (liveFieldIsArray('releaseSubscriptions')) patch.releaseSubscriptions = new Set(workspace.releaseSubscriptions);
+    if (liveFieldIsObject('releaseSourceSettings')) patch.releaseSourceSettings = workspace.releaseSourceSettings;
+    if (liveFieldIsArray('readReleases')) patch.readReleases = new Set(workspace.readReleases);
   }
   if (selectedTypes.includes('customCategories')) {
-    if (rawHas('customCategories')) patch.customCategories = workspace.customCategories;
-    if (rawHas('hiddenDefaultCategoryIds')) patch.hiddenDefaultCategoryIds = workspace.hiddenDefaultCategoryIds;
-    if (rawHas('categoryOrder')) patch.categoryOrder = workspace.categoryOrder;
-    if (rawHas('defaultCategoryOverrides')) patch.defaultCategoryOverrides = workspace.defaultCategoryOverrides;
-    if (rawHas('categoryListIdMap')) patch.categoryListIdMap = workspace.categoryListIdMap;
+    if (liveFieldIsArray('customCategories')) patch.customCategories = workspace.customCategories;
+    if (liveFieldIsArray('hiddenDefaultCategoryIds')) patch.hiddenDefaultCategoryIds = workspace.hiddenDefaultCategoryIds;
+    if (liveFieldIsArray('categoryOrder')) patch.categoryOrder = workspace.categoryOrder;
+    if (liveFieldIsObject('defaultCategoryOverrides')) patch.defaultCategoryOverrides = workspace.defaultCategoryOverrides;
+    if (liveFieldIsObject('categoryListIdMap')) patch.categoryListIdMap = workspace.categoryListIdMap;
   }
   return patch;
 };

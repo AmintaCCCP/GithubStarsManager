@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "保存済みアカウントの削除",
     "remove-account-confirm-desc": "このアカウントの保存されたサインイン情報のみを削除します。キャッシュされたリポジトリとカテゴリは保持されます。続行しますか？",
     "account-switched": "@{{login}} に切り替えました",
-    "account-repo-count": "{{count}} 件のリポジトリ"
+    "account-repo-count": "{{count}} 件のリポジトリ",
+    "retry-credential-alignment": "バックエンド認証情報の同期を再試行"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "カテゴリを GitHub リストに同期する"
@@ -1436,6 +1437,10 @@
     "confirm": "追加して切り替え",
     "reauth-hint": "@{{login}} の有効な GitHub トークンを再入力してください",
     "account-mismatch": "このトークンは別の GitHub アカウントのものです。@{{login}} のトークンでサインインしてください。",
-    "backend-credential-sync-failed": "アカウントは追加されましたが、バックエンドの認証情報を更新できませんでした。後でもう一度お試しください。"
+    "backend-credential-sync-failed": "アカウントにはログインしましたが、バックエンドの認証情報を更新できませんでした。後でアカウントメニューから再試行してください。"
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "ログアウトしましたが、デバイス側の認証情報の削除が完了しませんでした。古い認証情報は引き続き無効化され、次回起動時に自動的に再試行されます。",
+    "active-account-update-skipped": "この切り替えの途中で別のデバイスがバックエンドのアクティブアカウントを変更したため、バックエンドはこのアカウントに切り替わりませんでした。ローカルセッションはすでにこのアカウントです。アカウントメニューから再試行してバックエンドを同期してください。"
   }
 }

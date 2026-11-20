@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "Gespeichertes Konto entfernen",
     "remove-account-confirm-desc": "Dies entfernt nur die gespeicherten Anmeldedaten dieses Kontos. Zwischengespeicherte Repositories und Kategorien bleiben erhalten. Fortfahren?",
     "account-switched": "Zu @{{login}} gewechselt",
-    "account-repo-count": "{{count}} Repositories"
+    "account-repo-count": "{{count}} Repositories",
+    "retry-credential-alignment": "Backend-Anmeldedaten erneut synchronisieren"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Kategorien mit der GitHub-Liste synchronisieren"
@@ -1436,6 +1437,10 @@
     "confirm": "Hinzufügen und wechseln",
     "reauth-hint": "Bitte gib ein gültiges GitHub-Token für @{{login}} ein",
     "account-mismatch": "Dieses Token gehört zu einem anderen GitHub-Konto. Bitte melde dich mit dem Token von @{{login}} an.",
-    "backend-credential-sync-failed": "Das Konto wurde hinzugefügt, aber die Backend-Anmeldedaten konnten nicht aktualisiert werden. Bitte später erneut versuchen."
+    "backend-credential-sync-failed": "Bei dem Konto angemeldet, aber die Backend-Anmeldedaten konnten nicht aktualisiert werden. Bitte später über das Kontomenü erneut versuchen."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Abgemeldet, aber die Bereinigung der Geräte-Anmeldedaten ist nicht abgeschlossen. Die alten Anmeldedaten bleiben gesperrt und werden beim nächsten Start automatisch erneut entfernt.",
+    "active-account-update-skipped": "Ein anderes Gerät hat während dieses Kontowechsels das aktive Konto im Backend geändert, daher wurde das Backend nicht auf dieses Konto umgestellt. Die lokale Sitzung verwendet dieses Konto bereits; versuche es über das Kontomenü erneut, um das Backend abzugleichen."
   }
 }

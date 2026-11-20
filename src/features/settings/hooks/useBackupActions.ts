@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { AIConfig, Repository, WebDAVConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import { defaultCategories } from '../../../store/schema';
 import {
   accountIdKey,
   applyAccountWorkspace,
@@ -39,8 +40,54 @@ import {
  */
 const backupGistEntriesAreValid = (value: unknown): boolean => {
   if (!Array.isArray(value)) return false;
-  return value.every((entry) => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry));
+  // R12（finding 25）：文件值也必须是非空对象——`{ files: { 'README.md': null } }`
+  // 会通过旧校验并写入实时状态；5xx 降级路径复用 existing.files 时
+  // githubApi 的 file.content 会对 null 取值抛 TypeError。
+  return value.every((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const files = (entry as { files?: unknown }).files;
+    if (files === undefined) return true;
+    if (typeof files !== 'object' || files === null || Array.isArray(files)) return false;
+    return Object.values(files).every((file) => Boolean(file) && typeof file === 'object' && !Array.isArray(file));
+  });
 };
+
+/**
+ * 备份文件名解析（R12 finding 11/23）：
+ * - 新版：`github-stars-backup-<ISO 去冒号点>-<账号tag>.json`
+ * - 旧版：`github-stars-backup-YYYY-MM-DD.json`（时间未知，账号 ID 无法从
+ *   文件名证明归属——`-16.json` 不代表账号 16）。
+ * 返回精确时间（旧版按当日结束计，明确表示「同日顺序未知」）与只对新版
+ * 文件名有效的账号 tag。
+ */
+const NEW_BACKUP_NAME_RE = /^github-stars-backup-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z-(.+)\.json$/;
+const LEGACY_BACKUP_NAME_RE = /^github-stars-backup-(\d{4}-\d{2}-\d{2})\.json$/;
+const parseBackupName = (file: string): { timestamp: number | null; accountTag: string | null } => {
+  const newMatch = NEW_BACKUP_NAME_RE.exec(file);
+  if (newMatch) {
+    return {
+      timestamp: Date.parse(`${newMatch[1]}T${newMatch[2]}:${newMatch[3]}:${newMatch[4]}.${newMatch[5]}Z`),
+      accountTag: newMatch[6],
+    };
+  }
+  const legacyMatch = LEGACY_BACKUP_NAME_RE.exec(file);
+  if (legacyMatch) {
+    // 旧版只有日期：按当日结束排序，避免同日的旧版备份被新版早晨备份压过
+    //（finding 23 的具体场景），并明确表示「同日顺序未知」。
+    return { timestamp: Date.parse(`${legacyMatch[1]}T23:59:59.999Z`), accountTag: null };
+  }
+  return { timestamp: null, accountTag: null };
+};
+
+/** 按文件名中的实际备份时间升序（listBackups 与无参 restore 共用）。 */
+const sortBackupFiles = (files: string[]): string[] => [...files].sort((left, right) => {
+  const leftTime = parseBackupName(left).timestamp;
+  const rightTime = parseBackupName(right).timestamp;
+  if (leftTime === null && rightTime === null) return left.localeCompare(right);
+  if (leftTime === null) return -1;
+  if (rightTime === null) return 1;
+  return leftTime - rightTime;
+});
 
 export interface RestoreBackupOptions {
   /** 列举备份时绑定的账号 ID（用于检测 listBackups 期间切号）。 */
@@ -195,13 +242,16 @@ export const useBackupActions = (): BackupActions => {
     if (!activeConfig) return { files: [], recommended: null };
     const service = new WebDAVService(activeConfig);
     const files = await service.listFiles();
-    const backupFiles = files.filter((file) => file.startsWith('github-stars-backup-')).sort();
-    // 审计修复（C46）：默认推荐包含当前账号工作区的最新备份——备份文件名
-    // 以 `-{账号ID}.json`（或未登录时的 `-local.json`）结尾。
+    const candidates = files.filter((file) => file.startsWith('github-stars-backup-'));
+    // R12（finding 23）：按文件名中的实际备份时间排序（旧版仅日期 → 当日结束），
+    // 不再混用两种文件名的字典序（`T` > `-` 会让同日的早晨新版排在旧版之后）。
+    const sorted = sortBackupFiles(candidates);
+    // 审计修复（C46）：默认推荐包含当前账号工作区的最新备份。R12（finding 11）：
+    // 账号 tag 只能从新版文件名解析——旧版 `-16.json` 不代表账号 16。
     const accountTag = accountIdKey(useAppStore.getState().user) ?? 'local';
-    const accountBackups = backupFiles.filter((file) => file.endsWith(`-${accountTag}.json`));
-    const recommended = accountBackups.at(-1) ?? backupFiles.at(-1) ?? null;
-    return { files: backupFiles, recommended };
+    const accountBackups = sorted.filter((file) => parseBackupName(file).accountTag === accountTag);
+    const recommended = accountBackups.at(-1) ?? sorted.at(-1) ?? null;
+    return { files: sorted, recommended };
   }, [activeConfig]);
 
   const restore = useCallback(async (backupFile?: string, options?: RestoreBackupOptions) => {
@@ -255,7 +305,13 @@ export const useBackupActions = (): BackupActions => {
           toast(t('useBackupActions.no-backup-files-found'), 'error');
           return;
         }
-        fileName = backupFiles.sort().reverse()[0];
+        // R12（finding 23）：与 listBackups 共用同一套按实际备份时间的排序
+        const latestBackup = sortBackupFiles(backupFiles).at(-1);
+        if (!latestBackup) {
+          toast(t('useBackupActions.no-backup-files-found'), 'error');
+          return;
+        }
+        fileName = latestBackup;
       }
       const content = await service.downloadFile(fileName);
       if (!ensureSameAccount()) return;
@@ -318,6 +374,15 @@ export const useBackupActions = (): BackupActions => {
       // 审计修复（CodeRabbit）：Gist 数据含 null/非对象条目时拒绝该字段并在
       // 结果提示中警示（顶层与工作区两条路径共用该标记）。
       let gistPayloadRejected = false;
+      // R12（finding 22）：在分流前统一校验顶层 Gist 字段——跨账号归档分支
+      // 虽不写入实时状态，但备份携带的无效 Gist 数据仍必须通过结果提示告知
+      // 用户（旧实现只在同账号分支设置 rejected 标记，跨账号恢复会静默成功）。
+      for (const gistField of ['gists', 'starredGists'] as const) {
+        const rawGists = (backupData as Record<string, unknown>)[gistField];
+        if (rawGists !== undefined && !backupGistEntriesAreValid(rawGists)) {
+          gistPayloadRejected = true;
+        }
+      }
       // R2-C8：登记账号/写入工作区前逐份校验各账号工作区的仓库数据（与顶层
       // 恢复和本地 JSON 导入共用 validateBackupRepositories）。非数组或含无效
       // 条目时整体拒绝恢复，绝不用损坏/部分数据覆盖本机工作区；显式 [] 的
@@ -595,12 +660,24 @@ export const useBackupActions = (): BackupActions => {
                 ...(category as Parameters<typeof state.addCustomCategory>[0]),
                 isCustom: true,
               }));
-            useAppStore.setState((current) => ({
-              customCategories: restoredCategories,
-              selectedCategory: restoredCategories.some((category) => category.id === current.selectedCategory)
-                ? current.selectedCategory
-                : 'all',
-            }));
+            // R12（finding 24）：恢复后仍可用的默认分类（未隐藏）保持当前选择，
+            // 不能因为备份里的 customCategories 为空就把选择重置为 all。
+            const restoredHiddenIds = Array.isArray(backupData.hiddenDefaultCategoryIds)
+              ? new Set(
+                backupData.hiddenDefaultCategoryIds.filter((id): id is string => typeof id === 'string'),
+              )
+              : null;
+            useAppStore.setState((current) => {
+              const hiddenDefaultIds = restoredHiddenIds ?? new Set(current.hiddenDefaultCategoryIds);
+              const selected = current.selectedCategory;
+              const selectedStillAvailable = selected === 'all'
+                || restoredCategories.some((category) => category.id === selected)
+                || (defaultCategories.some((category) => category.id === selected) && !hiddenDefaultIds.has(selected));
+              return {
+                customCategories: restoredCategories,
+                selectedCategory: selectedStillAvailable ? selected : 'all',
+              };
+            });
           }
           if (Array.isArray(backupData.hiddenDefaultCategoryIds)) {
             for (const categoryId of useAppStore.getState().hiddenDefaultCategoryIds) {

@@ -37,6 +37,8 @@ vi.mock('../../services/telegramService', () => ({
 }));
 const ghAccountSecretsMocks = vi.hoisted(() => ({
   clearGhAccountTokens: vi.fn().mockResolvedValue(undefined),
+  // R12 审计补强：导入提交后等待安全存储写入；用例可挂起/失败该写入验证竞态。
+  syncGhAccountTokensFromState: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('../../services/electronProxy', () => ({
@@ -47,6 +49,7 @@ vi.mock('../../store/persistence/ghAccountSecrets', async (importOriginal) => {
   return {
     ...actual,
     clearGhAccountTokens: ghAccountSecretsMocks.clearGhAccountTokens,
+    syncGhAccountTokensFromState: ghAccountSecretsMocks.syncGhAccountTokensFromState,
   };
 });
 
@@ -207,6 +210,7 @@ const importBackupAndClick = async (
 beforeEach(() => {
   vi.clearAllMocks();
   ghAccountSecretsMocks.clearGhAccountTokens.mockResolvedValue(undefined);
+  ghAccountSecretsMocks.syncGhAccountTokensFromState.mockResolvedValue(true);
   setupStore();
 });
 
@@ -829,7 +833,10 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
       expect(ghAccountSecretsMocks.clearGhAccountTokens).toHaveBeenCalledOnce();
     });
     await screen.findByText('dataManagementPanel.delete-failed-please-try-again');
-    expect(screen.queryByText(/dataManagementPanel\.all-data-deleted-reloading-page/)).not.toBeInTheDocument();
+    // 审计修复（R12 测试覆盖）：用生产代码实际采用的成功文案键断言提示不存在
+    //（deleteAllData 成功路径显示 all-data-deleted-app-will-reload）——检查
+    // 从未渲染的键会让失败路径的断言恒真。
+    expect(screen.queryByText('dataManagementPanel.all-data-deleted-app-will-reload')).not.toBeInTheDocument();
     // 清理失败时不清空内存态：用户、凭据记录与工作区仍保留（等待用户重试）
     expect(useAppStore.getState().user?.login).toBe('alice');
     expect(Object.keys(useAppStore.getState().savedAccounts)).toEqual(['1']);
@@ -950,6 +957,241 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
 
       expect(fetchMock).toHaveBeenCalled();
       expect(useAppStore.getState().savedAccounts['3']?.githubToken).toBe('ghp_carol_token');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // ── R12 审计修复回归 ────────────────────────────────────────────────
+
+  it('derives import types from standalone top-level gists so merge mode restores them (R12)', async () => {
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '1',
+      includeKeysInBackup: true,
+      // 顶层仅有 gists 字段（无 repositories/accountWorkspaces）——别名解析
+      // 必须直接读取顶层受支持字段，否则合并会跳过 Gist 却报告成功
+      gists: [gist('gist-top-only', 'top-level only gist')],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    expect(state.gists.map((g: Gist) => g.id)).toContain('gist-top-only');
+    expect(state.gistSearchResults.map((g: Gist) => g.id)).toContain('gist-top-only');
+    expect(state.accountWorkspaces['1']?.gists.map((g: Gist) => g.id)).toContain('gist-top-only');
+  });
+
+  it('rejects imports whose gist list contains invalid entries before any write (R12)', async () => {
+    const user = userEvent.setup();
+    await importBackupFile(user, {
+      activeAccountId: '1',
+      includeKeysInBackup: true,
+      repositories: [repo(9, 'should-not-be-written')],
+      gists: [null],
+    });
+    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
+
+    // 整体拒绝且发生在首次写入前：仓库不被替换（绝不写入部分有效数据）
+    expect(await screen.findByText('dataManagementPanel.invalid-backup-file-format')).toBeInTheDocument();
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('alice-live');
+    expect(useAppStore.getState().gists).toEqual([]);
+  });
+
+  it('dedupes entries with the same id within one backup in merge mode (R12)', async () => {
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '1',
+      includeKeysInBackup: true,
+      gists: [gist('gist-dup', 'first'), gist('gist-dup', 'second')],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    // 同一备份内重复 ID 仅接受首条；本机已有条目不受影响
+    expect(state.gists.filter((g: Gist) => g.id === 'gist-dup')).toHaveLength(1);
+    expect(state.gistSearchResults.filter((g: Gist) => g.id === 'gist-dup')).toHaveLength(1);
+  });
+
+  it('aborts import when the session generation changed after the preview opened (same-account credential switch, R12)', async () => {
+    const user = userEvent.setup();
+    await importBackupFile(user, {
+      activeAccountId: '1',
+      includeKeysInBackup: true,
+      repositories: [repo(9, 'fresh-import')],
+    });
+
+    // 同账号更换凭据：会话代次递增但账号 ID 不变——仅核对账号 ID 拦不住
+    useAppStore.setState({ savedAccounts: { '1': savedAccount('1', userA, 'ghp_rotated') } });
+    expect(useAppStore.getState().switchAccount('1')).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
+
+    expect(await screen.findByText('useBackupActions.account-changed-during-restore')).toBeInTheDocument();
+    // 导入被拒绝：实时仓库未被旧预览的替换结果覆盖
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('alice-live');
+    expect(useAppStore.getState().repositories.some((r: Repository) => r.id === 9)).toBe(false);
+  });
+
+  it('keeps local credentials saved while backup PAT verification was in flight (R12)', async () => {
+    // 核对等待期间本机为同账号保存了新 PAT：提交时基于最新 savedAccounts 合并，
+    // 本机凭据优先于已验证的备份 PAT
+    let resolveVerify: (value: boolean) => void = () => {};
+    const fetchMock = vi.fn().mockImplementation(() => new Promise((resolve) => {
+      resolveVerify = (value: boolean) => resolve({
+        ok: value,
+        json: async () => ({ id: 3, login: 'carol' }),
+      });
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const user = userEvent.setup();
+      await importBackupFile(user, {
+        includeKeysInBackup: true,
+        savedAccounts: {
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_backup'),
+        },
+      });
+      const clickPromise = user.click(screen.getByRole('button', { name: 'dataManagementPanel.merge-import' }));
+
+      // 核对挂起期间本机为账号 3 保存新凭据（当前账号仍是 alice，模拟另一入口的保存）
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      useAppStore.setState({
+        savedAccounts: {
+          ...useAppStore.getState().savedAccounts,
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_local_new'),
+        },
+      });
+      resolveVerify(true);
+      await clickPromise;
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+      // 本机在核对期间新增的凭据保留，绝不被核对前的字典快照覆盖
+      expect(useAppStore.getState().savedAccounts['3']?.githubToken).toBe('ghp_carol_local_new');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('merges AI/WebDAV configs, categories and asset filters from live state after the PAT check wait (R12 ISSUE-2)', async () => {
+    // 等待备份账号 PAT 校验期间，本机新增的四类配置不得被核对前的快照覆盖：
+    // merge 提交时必须读取实时 state 再合并（与 finding #8 的仓库/Release 同法）。
+    let resolveVerify: (value: boolean) => void = () => {};
+    const fetchMock = vi.fn().mockImplementation(() => new Promise((resolve) => {
+      resolveVerify = (value: boolean) => resolve({
+        ok: value,
+        json: async () => ({ id: 3, login: 'carol' }),
+      });
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const user = userEvent.setup();
+      await importBackupFile(user, {
+        includeKeysInBackup: true,
+        savedAccounts: {
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_backup'),
+        },
+        aiConfigs: [{
+          id: 'backup-ai', name: 'Backup AI', baseUrl: 'https://backup.example', apiKey: 'sk-backup', model: 'gpt', isActive: false,
+        }],
+        webdavConfigs: [{
+          id: 'backup-webdav', name: 'Backup WebDAV', url: 'https://dav.example', username: 'u', password: 'p', path: '/', isActive: false,
+        }],
+        customCategories: [category('backup-cat', 'Backup Category')],
+        assetFilters: [{ id: 'backup-filter', name: 'Backup Filter', keywords: ['setup'] }],
+      });
+      const clickPromise = user.click(screen.getByRole('button', { name: 'dataManagementPanel.merge-import' }));
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      useAppStore.setState({
+        aiConfigs: [...useAppStore.getState().aiConfigs, {
+          id: 'local-ai', name: 'Local AI', baseUrl: 'https://local.example', apiKey: 'sk-local', model: 'gpt', isActive: false,
+        }],
+        webdavConfigs: [...useAppStore.getState().webdavConfigs, {
+          id: 'local-webdav', name: 'Local WebDAV', url: 'https://local.example', username: 'u', password: 'p', path: '/', isActive: false,
+        }],
+        customCategories: [...useAppStore.getState().customCategories, category('local-cat', 'Local Category')],
+        assetFilters: [...useAppStore.getState().assetFilters, { id: 'local-filter', name: 'Local Filter', keywords: ['local'] }],
+      });
+      resolveVerify(true);
+      await clickPromise;
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+      const state = useAppStore.getState();
+      // 核对期间本机新增项保留，备份项并入
+      expect(state.aiConfigs.map(c => c.id)).toEqual(expect.arrayContaining(['local-ai', 'backup-ai']));
+      expect(state.webdavConfigs.map(c => c.id)).toEqual(expect.arrayContaining(['local-webdav', 'backup-webdav']));
+      expect(state.customCategories.map(c => c.id)).toEqual(expect.arrayContaining(['local-cat', 'backup-cat']));
+      expect(state.assetFilters.map(f => f.id)).toEqual(expect.arrayContaining(['local-filter', 'backup-filter']));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reports import failure when the imported credentials cannot be persisted (R12 finding 11)', async () => {
+    // gh-accounts.enc 写入失败：导入的已验证 PAT 重启后会丢失——不得报告成功，
+    // 已写入内存的数据保留（重新导入可幂等重试）。
+    ghAccountSecretsMocks.syncGhAccountTokensFromState.mockResolvedValueOnce(false);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 3, login: 'carol' }),
+    }));
+    try {
+      const user = userEvent.setup();
+      await importBackupAndClick(user, {
+        includeKeysInBackup: true,
+        savedAccounts: {
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_backup'),
+        },
+      }, 'dataManagementPanel.merge-import');
+
+      expect(await screen.findByText('dataManagementPanel.import-failed-please-try-again')).toBeInTheDocument();
+      // 内存中的已验证凭据保留（不因落盘失败回滚），重启前仍可使用
+      expect(useAppStore.getState().savedAccounts['3']?.githubToken).toBe('ghp_carol_backup');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('aborts the remaining import writes when the session changes while persisting imported credentials (R12 audit)', async () => {
+    // 审计补强：确认导入后等待 gh-accounts.enc 写入期间也可能切号（无界面等待）——
+    // 写入完成返回后必须复核会话，绝不再把备份的仓库/工作区写进新会话上下文。
+    let resolvePersist: (value: boolean) => void = () => {};
+    ghAccountSecretsMocks.syncGhAccountTokensFromState.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => { resolvePersist = resolve; }),
+    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 3, login: 'carol' }),
+    }));
+    try {
+      const user = userEvent.setup();
+      await importBackupFile(user, {
+        activeAccountId: '1',
+        includeKeysInBackup: true,
+        repositories: [repo(77, 'should-not-be-imported')],
+        savedAccounts: {
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_backup'),
+        },
+      });
+      const clickPromise = user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
+      await waitFor(() => expect(ghAccountSecretsMocks.syncGhAccountTokensFromState).toHaveBeenCalledOnce());
+
+      // 安全存储写入挂起期间同账号换凭据（会话代次递增、账号 ID 不变）
+      useAppStore.setState({
+        savedAccounts: {
+          ...useAppStore.getState().savedAccounts,
+          '1': savedAccount('1', userA, 'ghp_rotated'),
+        },
+      });
+      expect(useAppStore.getState().switchAccount('1')).toBe(true);
+      resolvePersist(true);
+      await clickPromise;
+
+      expect(await screen.findByText('useBackupActions.account-changed-during-restore')).toBeInTheDocument();
+      // 后续写入（仓库替换）未执行：备份仓库绝不落入新会话
+      expect(useAppStore.getState().repositories.some((r: Repository) => r.id === 77)).toBe(false);
+      // 实时仓库未被替换
+      expect(useAppStore.getState().repositories[0].ai_summary).toBe('alice-live');
     } finally {
       vi.unstubAllGlobals();
     }

@@ -40,6 +40,8 @@ interface MockDbOptions {
   globalTokenRow?: { value: string };
   /** accounts 表列表（readAccountRows 的 .all） */
   accountsRows?: Array<Record<string, unknown>>;
+  /** 分区枚举（collectNonDefaultPartitionIds）返回的真实账号分区 ID */
+  partitionAccountIds?: string[];
   /** accounts 表按绑定账号 ID 的定向 get（readScopedToken 的副本来源） */
   accountRows?: Record<string, Record<string, unknown> | undefined>;
   /** account_settings.github_token 定向行，按绑定账号 ID 返回；键缺失 = 缺行 */
@@ -49,16 +51,27 @@ interface MockDbOptions {
 }
 
 /**
- * 按 SQL 形态分发的轻量 DB mock：accounts 列表 / account_settings 定向 get /
- * account_settings 凭据列表（A18 合并）/ accounts 定向 get / 全局 settings。
+ * 按 SQL 形态分发的轻量 DB mock：accounts 列表 / 分区枚举 / account_settings
+ * 定向 get / account_settings 凭据列表（A18 合并）/ accounts 定向 get / 全局 settings。
  * R2-A27：定向查询按第一个绑定参数（绑定账号 ID）返回数据——同一替身可为
  * 多个账号分别配置缺行 / 显式 null / 有效凭据。
+ * R12：分区枚举与 accountsRows 保持一致，路由才能走真实的多账号解析路径。
  */
 function makeMockDb(options: MockDbOptions = {}) {
   return {
     prepare: (sql: string) => {
       if (sql.includes('FROM accounts ORDER BY')) {
         return { all: () => options.accountsRows ?? [], get: () => undefined };
+      }
+      // 分区枚举查询（collectNonDefaultPartitionIds）：accounts / repositories /
+      // releases / categories / account_settings 五条。A18 的凭据合并查询同样
+      // 含 "account_id != 'default'"，用 SELECT 形态区分。行形态与真实 DB 一致
+      // （{ account_id } 对象）。
+      if (
+        sql.includes("account_id != 'default'")
+        && (sql.includes('SELECT DISTINCT account_id FROM') || sql.includes('SELECT account_id FROM accounts'))
+      ) {
+        return { all: () => (options.partitionAccountIds ?? []).map((id) => ({ account_id: id })), get: () => undefined };
       }
       if (sql.includes('account_settings') && sql.includes("account_id != 'default'")) {
         return { all: () => options.scopedCredentialRows ?? [], get: () => undefined };
@@ -108,11 +121,15 @@ describe('authRestore route (POST /api/sync/auth)', () => {
     expect(res.body).toMatchObject({ github_token: null });
   });
 
-  it('returns the backend account list when the accounts table holds rows (A36: distinct credential sources)', async () => {
-    // A36：全局凭据与账号凭据解密为不同值——顶层（default 分区回退全局）与
-    // accounts[0]（账号自身凭据）分别断言。
+  it('requires account selection for an unclaimed sole partition while keeping its own credential listed (A36 + R12)', async () => {
+    // A36：全局凭据与账号凭据解密为不同值，账号列表仍按账号自身凭据解析。
+    // R12：分区枚举替身与 accountsRows 保持一致——账号 1001 是唯一真实分区。
+    // 未认领且无活跃账号的无头恢复不得返回全局 PAT，也不得返回空选择列表：
+    // account_selection_required 为 true、顶层 Token 为 null，账号列表仍包含
+    // 1001 的独立凭据。纯 default 夹具（无分区）的全局 PAT 断言保留在上方用例。
     getDbMock.mockReturnValue(makeMockDb({
       globalTokenRow: { value: 'encrypted-global' },
+      partitionAccountIds: ['1001'],
       accountsRows: [{
         account_id: '1001',
         user_json: JSON.stringify({ id: 1001, login: 'alice', avatar_url: 'https://x/a.png' }),
@@ -124,13 +141,58 @@ describe('authRestore route (POST /api/sync/auth)', () => {
     }));
 
     const res = await request(createTestApp()).post('/api/sync/auth').expect(200);
-    expect(res.body.github_token).toBe('plain-global-token');
+    expect(res.body.github_token).toBeNull();
+    expect(res.body.account_selection_required).toBe(true);
     expect(res.body.accounts).toHaveLength(1);
     expect(res.body.accounts[0]).toMatchObject({
       accountId: '1001',
       githubToken: 'plain-account-token',
     });
     expect(res.body.accounts[0].user).toMatchObject({ login: 'alice' });
+  });
+
+  it('lists partition-only accounts as restore candidates without exposing the global token (R12)', async () => {
+    // 升级后唯一真实账号 111 已同步仓库但还没有资料或分区凭据：恢复需要显式
+    // 选择时不得返回空选择列表——111 作为候选出现（user / token 为 null，由
+    // 客户端走 PAT 设置 / 身份回查），全局 PAT 绝不分配给未验证的账号；
+    // 非数字形态的分区 ID 不作为恢复候选。
+    getDbMock.mockReturnValue(makeMockDb({
+      globalTokenRow: { value: 'encrypted-global' },
+      partitionAccountIds: ['111', 'not-numeric'],
+    }));
+
+    const res = await request(createTestApp()).post('/api/sync/auth').expect(200);
+    expect(res.body.account_selection_required).toBe(true);
+    expect(res.body.github_token).toBeNull();
+    expect(res.body.accounts).toHaveLength(1);
+    expect(res.body.accounts[0]).toEqual({
+      accountId: '111',
+      user: null,
+      githubToken: null,
+      addedAt: null,
+      lastUsedAt: null,
+    });
+  });
+
+  it('converts the token-only placeholder identity to user null so clients re-resolve via GitHub (R12)', async () => {
+    // token-only 保存写入仅含 id 的占位 user_json：恢复列表把它转换为
+    // user: null——客户端因缺少 login 拒绝条目、又因 user 非 null 跳过 PAT
+    // 身份回查的死角不再存在。
+    getDbMock.mockReturnValue(makeMockDb({
+      partitionAccountIds: ['333'],
+      accountsRows: [{
+        account_id: '333',
+        user_json: JSON.stringify({ id: 333 }),
+        github_token_encrypted: 'encrypted-token',
+        added_at: '2026-01-01T00:00:00Z',
+        last_used_at: '2026-01-02T00:00:00Z',
+      }],
+      accountRows: { '333': { github_token_encrypted: 'encrypted-token' } },
+    }));
+
+    const res = await request(createTestApp()).post('/api/sync/auth').expect(200);
+    expect(res.body.accounts).toHaveLength(1);
+    expect(res.body.accounts[0]).toMatchObject({ accountId: '333', user: null, githubToken: 'github-token' });
   });
 
   it('prefers the account_settings credential for the targeted restore and the account list (A35: present)', async () => {

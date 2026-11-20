@@ -7,6 +7,7 @@ import {
   claimLegacyDefaultIfNeeded,
   getLegacyDefaultClaimedBy,
   resolveWritableAccountScope,
+  collectNonDefaultPartitionIds,
 } from '../db/accountScope.js';
 
 const router = Router();
@@ -73,6 +74,19 @@ function readAccountRows(db: ReturnType<typeof getDb>): AccountEntry[] {
     if (typeof row.user_json === 'string' && row.user_json) {
       try { user = JSON.parse(row.user_json); } catch { user = null; }
     }
+    // Issue #612 R12：token-only 凭据保存的占位身份（upsertAccountRow 写入的
+    // 仅含 id 的 user_json）不能作为恢复条目的资料——客户端会因缺少 login 拒绝
+    // 该条目，又因 user 非 null 跳过 PAT 身份回查，导致凭据已保存却永远无法
+    // 出现在恢复列表。转换为 user: null，让客户端复用现有的 GitHub 身份回查。
+    if (
+      user !== null
+      && typeof user === 'object'
+      && !Array.isArray(user)
+      && Object.keys(user as Record<string, unknown>).length === 1
+      && 'id' in (user as Record<string, unknown>)
+    ) {
+      user = null;
+    }
     return {
       accountId: String(row.account_id),
       user,
@@ -112,6 +126,27 @@ function readAccountRows(db: ReturnType<typeof getDb>): AccountEntry[] {
     }
   } catch {
     // 轻量 stub 缺 account_settings 表时跳过合并
+  }
+
+  // Issue #612 R12：只有分区数据、还没有资料或分区凭据的账号（升级后首个带
+  // 账号头的同步先于资料/凭据保存完成）也要出现在恢复候选中——否则恢复需要
+  // 显式选择账号时（account_selection_required）登录页没有可选项，也无法进入
+  // PAT 设置步骤。绝不把全局 PAT 分配给这些未验证的账号（githubToken 保持
+  // null，由客户端走 PAT 设置 / 身份回查流程）。
+  try {
+    for (const partitionId of collectNonDefaultPartitionIds(db)) {
+      if (!/^\d+$/.test(partitionId) || known.has(partitionId)) continue;
+      known.add(partitionId);
+      entries.push({
+        accountId: partitionId,
+        user: null,
+        githubToken: null,
+        addedAt: null,
+        lastUsedAt: null,
+      });
+    }
+  } catch {
+    // 轻量 stub 缺分区表时跳过合并
   }
   return entries;
 }

@@ -776,8 +776,12 @@ export class GitHubListsApiService {
    * 将某仓库（itemId 为 GraphQL node id）加入指定 list 集合。
    * 注意：该操作会整体替换仓库所属的 list 集合（覆盖语义）。
    * 传入空数组表示将该仓库从所有 list 中移除（用于清理过期成员关系）。
+   *
+   * signal（第 12 轮审计修复）：调用方会话失效（切换账号后同账号新一轮推送
+   * 取代旧任务）时中止——重试在尝试/退避边界停止，可重放的整集替换绝不以
+   * 旧成员集合覆盖新推送的结果。
    */
-  async updateUserListsForItem(itemId: string, listIds: string[]): Promise<void> {
+  async updateUserListsForItem(itemId: string, listIds: string[], signal?: AbortSignal): Promise<void> {
     await this.request<{ updateUserListsForItem: { clientMutationId: string | null } }>(
       `mutation($itemId: ID!, $listIds: [ID!]!) {
         updateUserListsForItem(input: { itemId: $itemId, listIds: $listIds }) {
@@ -787,7 +791,7 @@ export class GitHubListsApiService {
       { itemId, listIds },
       // 整集替换语义（服务端按集合去重）：无论重放多少次，最终成员集合相同，
       // 因此未知结果后可安全重放，与 query 一致。
-      { replayableMutation: true }
+      { replayableMutation: true, signal }
     );
   }
 

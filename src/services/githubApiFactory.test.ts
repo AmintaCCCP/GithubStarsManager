@@ -98,6 +98,21 @@ describe('githubApiFactory routeMode', () => {
     expect(mocks.setBackendAccountId).toHaveBeenCalledWith('42');
   });
 
+  it('passes an explicit accountId through for the lists factory instead of the store user (round-12 audit fix)', () => {
+    // 显式 accountId 不得回退到 Store 用户 '42'——工厂若忽略 options.accountId，
+    // 显式账号的 Lists 写入会被错误归属到当前登录账号。
+    mocks.backendUrlGet.mockReturnValue('http://backend/api');
+    createGitHubListsApiService('token', { accountId: '17' });
+    expect(mocks.setBackendAccountId).toHaveBeenCalledWith('17');
+  });
+
+  it('passes an explicit null accountId through for the lists factory', () => {
+    // 显式 null（无归属账号）同样按原样传递，不回退到 Store 用户。
+    mocks.backendUrlGet.mockReturnValue('http://backend/api');
+    createGitHubListsApiService('token', { accountId: null });
+    expect(mocks.setBackendAccountId).toHaveBeenCalledWith(null);
+  });
+
   it('skips backend URL for the lists factory in browser mode', () => {
     mocks.routeMode = 'browser';
     mocks.backendUrlGet.mockReturnValue('http://backend/api');

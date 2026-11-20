@@ -898,6 +898,14 @@ ipcMain.handle('x-auth:clear', async () => {
 // 审计修复（B7/CWE-922）：GitHub 账号 Token 只经 safeStorage 加密文件
 //（gh-accounts.enc）持久化，浏览器持久化分片不再保存明文 PAT。
 ipcMain.handle('gh-accounts:save', async (_event, tokens) => {
+  // 第 12 轮审计修复：渲染进程参数不可信——preload 转发的 undefined（渲染端
+  // 未传映射）不得按空映射处理：存储函数会把 undefined 归一化为空映射并删除
+  // 磁盘上的全部账号 PAT。主进程校验参数：缺少令牌映射（undefined/null）拒绝
+  // 保存；有效映射与显式空对象（清空语义）保持现有保存行为。
+  if (tokens === undefined || tokens === null) {
+    console.log('[gh-accounts:save] result: FAIL: missing token map');
+    return { success: false, error: 'gh-accounts.save requires a token map' };
+  }
   const result = saveEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, tokens);
   console.log('[gh-accounts:save] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
   return result;

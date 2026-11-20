@@ -113,6 +113,23 @@ describe('useLoginActions', () => {
     expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
   });
 
+  it('rejects a targeted restore whose token belongs to a different account (R12 finding 8)', async () => {
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      github_token: 'ghp_other',
+      active_account_id: '2',
+      accounts: [],
+    }), { status: 200 }));
+    // 服务端返回的 Token 实际属于账号 1（用户选中的是账号 2）
+    mocks.getCurrentUser.mockResolvedValueOnce({ id: 1, login: 'octocat' });
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example', { accountId: '2' }))
+      .resolves.toEqual({ status: 'restored-token-invalid' });
+
+    // 不匹配时绝不把另一个账号当作已连接用户返回，也不持久化候选 URL
+    expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
+  });
+
   it('reports the restore ambiguity with selectable accounts instead of github-token-required (handoff 2)', async () => {
     // server/src/routes/authRestore.ts A19：无账号头恢复无法唯一确定目标分区时，
     // 服务端返回 account_selection_required: true + accounts + 空 github_token——
@@ -145,6 +162,8 @@ describe('useLoginActions', () => {
       active_account_id: '2',
       accounts: [],
     }), { status: 200 }));
+    // R12（finding 8）：定向恢复要求 Token 身份属于用户选中的账号
+    mocks.getCurrentUser.mockResolvedValueOnce({ id: 2, login: 'bob' });
     const { result } = renderHook(() => useLoginActions());
 
     await expect(result.current.restoreBackendSession('https://backend.example', { accountId: '2' }))

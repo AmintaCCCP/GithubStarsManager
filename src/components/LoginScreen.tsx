@@ -14,11 +14,9 @@ import {
   accountIdKey,
   captureAccountWorkspace,
   getAccountSessionGeneration,
-  workspaceHasData,
+  workspaceHasRetainableData,
   type AccountWorkspace,
-  type WorkspaceDataCandidate,
 } from '../store/helpers/accountWorkspace';
-import { normalizeReleaseSourceSettings } from '../utils/releaseSources';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { ConfirmDialog } from './ui/ConfirmDialog';
@@ -64,24 +62,6 @@ const HEATMAP_CELLS = (() => {
   }
   return cells;
 })();
-
-// 审计修复：workspaceHasData 只覆盖列表类内容（仓库/Gist/发布/复刻/分类）。
-// 仅含发行版订阅、自定义发行版来源或已读状态（readReleases/readForks）的
-// 工作区此前被判为「空」，两个恢复入口会跳过覆盖确认，后端拉取会无声替换
-// 这些本地归档。完整快照判定补充订阅、来源与已读状态；默认来源设置与空
-// 集合仍视为空工作区。
-const workspaceSnapshotHasData = (workspace: WorkspaceDataCandidate | null | undefined): boolean => {
-  if (!workspace) return false;
-  if (workspaceHasData(workspace)) return true;
-  const countOf = (value: Set<number> | number[] | undefined): number => (
-    value instanceof Set ? value.size : value?.length ?? 0
-  );
-  if (countOf(workspace.releaseSubscriptions) > 0) return true;
-  if (countOf(workspace.readReleases) > 0) return true;
-  if (countOf(workspace.readForks) > 0) return true;
-  const settings = normalizeReleaseSourceSettings(workspace.releaseSourceSettings ?? null);
-  return JSON.stringify(settings) !== JSON.stringify(normalizeReleaseSourceSettings(null));
-};
 
 function LoginCardPattern() {
   return (
@@ -378,6 +358,9 @@ export const LoginScreen: React.FC = () => {
     // LoginScreen 保持挂载（isAuthenticated 不提前置 true），失败时错误
     // 显示在当前登录页。
     let loginCommitted = false;
+    // R12：其余账号登记在冻结窗口结束后进行——记录待登记列表，runConnect 内
+    // 提交登录后填充。
+    let pendingRegistrationAccounts: BackendAuthRestoreAccount[] = [];
     // 审计修复（R2-B10）：拉取尚未开始（如候选返回 unauthorized 在归档前抛错）
     // 时绝不丢弃顶层工作区——里面可能是未归档的旧版顶层缓存或活跃账号实时
     // 工作区（自定义分类/顺序无法从 GitHub 重同步）。拉取开始前捕获顶层
@@ -447,7 +430,7 @@ export const LoginScreen: React.FC = () => {
         releases: liveState.releases,
         forks: liveState.forks,
         // 审计修复：订阅/来源设置/已读状态也属于工作区数据——仅含发行版订阅
-        // 或自定义来源的实时工作区同样要触发覆盖确认（workspaceSnapshotHasData）。
+        // 或自定义来源的实时工作区同样要触发覆盖确认（workspaceHasRetainableData）。
         releaseSubscriptions: liveState.releaseSubscriptions,
         releaseSourceSettings: liveState.releaseSourceSettings,
         readReleases: liveState.readReleases,
@@ -461,8 +444,8 @@ export const LoginScreen: React.FC = () => {
       const parkedWorkspace = nextAccountId ? liveState.accountWorkspaces[nextAccountId] : undefined;
       const liveBelongsToTarget = !!nextAccountId
         && accountIdKey(liveState.user) === nextAccountId
-        && workspaceSnapshotHasData(liveWorkspace);
-      const targetHasParkedData = workspaceSnapshotHasData(parkedWorkspace);
+        && workspaceHasRetainableData(liveWorkspace);
+      const targetHasParkedData = workspaceHasRetainableData(parkedWorkspace);
 
       const startPull = async () => {
         prePullWorkspace = captureAccountWorkspace(useAppStore.getState());
@@ -491,7 +474,14 @@ export const LoginScreen: React.FC = () => {
         loginCommitted = true;
       };
 
-      if (liveBelongsToTarget || targetHasParkedData) {
+      // 审计修复（R12）：升级后的登录页可能没有 user，但顶层仍保留旧版自定义
+      // 分类等无法从 GitHub 重同步的未归属缓存。此时目标账号无归档数据，此前
+      // 不经确认直接清空顶层并拉取——拉取成功后 prePullWorkspace 不会恢复，
+      // 旧分类永久丢失。顶层无主数据存在时同样先请用户明确确认；用户选择
+      // 「保留本地」时原样保留（显式确认的归属，绝不自动归并），没有旧缓存
+      // 时仍直接拉取。
+      const topLevelHasUnownedLegacyCache = !liveState.user && workspaceHasRetainableData(liveWorkspace);
+      if (liveBelongsToTarget || targetHasParkedData || topLevelHasUnownedLegacyCache) {
         // Show conflict dialog and wait for user decision
         const overwrite = await new Promise<boolean>((resolve) => {
           conflictResolveRef.current = resolve;
@@ -503,9 +493,14 @@ export const LoginScreen: React.FC = () => {
         if (overwrite) {
           await startPull();
         } else {
-          // 「保留本地」：跳过拉取并直接提交工作区与登录态；只保留 B 自己的
-          // 快照——park 无法归档的无主顶层残留不随登录提交给 B（B14）。
-          discardPartialLoginWorkspace();
+          // 「保留本地」：跳过拉取并直接提交工作区与登录态。目标账号有自己的
+          // 归档快照时，清掉 park 未能归档的无主残留（park 在确认前已执行，
+          // 实时工作区此时已归档进目标账号快照），让 setUser 恢复 B 自己的
+          // 快照（B14）；目标账号无归档且顶层是用户显式要求保留的无主旧版缓存
+          // 时原样保留——绝不能在用户选择「保留本地」后仍丢弃这些数据。
+          if (targetHasParkedData) {
+            discardPartialLoginWorkspace();
+          }
           setGitHubToken(result.githubToken);
           setUser(result.user);
           loginCommitted = true;
@@ -518,20 +513,8 @@ export const LoginScreen: React.FC = () => {
         await startPull();
       }
 
-      // 登记后端保存的全部有效账号（Issue #611 审计修复）：与
-      // tryRestoreAuthFromBackend / addAccountFromBackend 共用同一过滤规则，
-      // 否则新设备经登录页连接后端后，账号下拉菜单只显示当前账号。
-      // R2-C12：user:null 的条目用其分区 PAT 向 GitHub /user 核对归属后补齐
-      // 完整身份，核对失败/不一致的条目拒绝登记。
-      // 登记循环进入前记录会话代次：等待 GitHub /user 校验期间若用户退出或切换账号，
-      // 必须立即停止登记剩余条目，防止已清除的 PAT 被重新写入 Store 和安全存储。
-      const registerSessionGeneration = getAccountSessionGeneration();
-      for (const account of result.accounts ?? []) {
-        const normalizedAccount = await normalizeBackendRestoreAccount(account);
-        if (getAccountSessionGeneration() !== registerSessionGeneration) break;
-        if (!normalizedAccount) continue;
-        upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
-      }
+      // R12：待登记账号列表交给冻结窗口结束后的独立登记环节（见 try 块）。
+      pendingRegistrationAccounts = result.accounts ?? [];
     };
 
     try {
@@ -539,8 +522,28 @@ export const LoginScreen: React.FC = () => {
       // 审计修复（R2-B12）：登录提交完成后才持久化候选后端 URL——进入令牌
       // 配置步骤（未提交登录）或登记账号环节抛错时不持久化，严格仓库拉取
       // 失败保留原持久化 URL。
+      // R12：持久化必须先于其余账号登记执行——登记要等待各账号的 GitHub
+      // /user 身份校验（每账号最长 15s），若等登记结束才持久化，界面已显示
+      // 登录成功而地址仍未落盘，用户在校验等待期间刷新/退出后下次启动仍读
+      // 旧地址。此刻冻结窗口已释放、登录态已提交，保存为同步写即时完成。
       if (loginCommitted) {
         rememberActiveBackendUrl();
+      }
+      // 登记后端保存的全部有效账号（Issue #611 审计修复）：与
+      // tryRestoreAuthFromBackend / addAccountFromBackend 共用同一过滤规则，
+      // 否则新设备经登录页连接后端后，账号下拉菜单只显示当前账号。
+      // R2-C12：user:null 的条目用其分区 PAT 向 GitHub /user 核对归属后补齐
+      // 完整身份，核对失败/不一致的条目拒绝登记。
+      // R12：登记是登录提交后的独立工作，不再阻塞候选后端地址的持久化；
+      // 登记循环进入前记录会话代次：等待 GitHub /user 校验期间若用户退出或
+      // 切换账号，必须立即停止登记剩余条目，防止已清除的 PAT 被重新写入
+      // Store 和安全存储。
+      const registerSessionGeneration = getAccountSessionGeneration();
+      for (const account of pendingRegistrationAccounts) {
+        const normalizedAccount = await normalizeBackendRestoreAccount(account);
+        if (getAccountSessionGeneration() !== registerSessionGeneration) break;
+        if (!normalizedAccount) continue;
+        upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
       }
     } catch (error) {
       // 审计修复（R2-B7）：先还原持久化 URL 再复原连接——复原连接的自动探测
@@ -626,9 +629,13 @@ export const LoginScreen: React.FC = () => {
       };
       const liveBelongsToTarget = !!nextAccountId
         && accountIdKey(liveState.user) === nextAccountId
-        && workspaceSnapshotHasData(currentWorkspace);
-      const targetHasParkedData = workspaceSnapshotHasData(parkedWorkspace);
-      const localHasData = liveBelongsToTarget || targetHasParkedData;
+        && workspaceHasRetainableData(currentWorkspace);
+      const targetHasParkedData = workspaceHasRetainableData(parkedWorkspace);
+      // 审计修复（R12）：顶层残留的无主旧版缓存（park 未能归档——登录页无 user
+      // 时 park 为空操作）同样属于本地数据，清空前必须请用户确认；「保留本地」
+      // 且目标账号无归档时原样保留（同 handleBackendConnect）。
+      const topLevelHasUnownedLegacyCache = !liveState.user && workspaceHasRetainableData(currentWorkspace);
+      const localHasData = liveBelongsToTarget || targetHasParkedData || topLevelHasUnownedLegacyCache;
       let overwrite = true;
       if (localHasData) {
         overwrite = await new Promise<boolean>((resolve) => {
@@ -657,8 +664,11 @@ export const LoginScreen: React.FC = () => {
             },
           }));
         }
-      } else if (!liveBelongsToTarget) {
-        // 「保留本地」：跳过拉取，仅在顶层不属于目标账号时清理无主残留，让 setUser 恢复目标归档。
+      } else if (!liveBelongsToTarget && targetHasParkedData) {
+        // 「保留本地」：跳过拉取；仅当目标账号确有归档快照要恢复时才清理
+        // park 未能归档的无主残留，让 setUser 恢复目标归档。目标账号无归档
+        // 且顶层是用户显式要求保留的无主旧版缓存时原样保留——绝不能在用户
+        // 选择「保留本地」后仍丢弃这些数据。
         discardPartialLoginWorkspace();
       }
       setGitHubToken(githubToken);

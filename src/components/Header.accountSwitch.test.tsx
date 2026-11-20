@@ -42,6 +42,9 @@ const mocks = vi.hoisted(() => ({
   logoutCurrentAccount: vi.fn(async () => true),
   addAccountWithToken: vi.fn(),
   addAccountFromBackend: vi.fn(),
+  // R12：Header 在渲染期读取当前账号的待对齐标记（单账号重试入口）——
+  // 默认无标记，待对齐用例可改写返回值
+  hasPendingBackendCredentialAlign: vi.fn((): boolean => false),
 }));
 
 vi.mock('../hooks/useDialog', () => ({
@@ -49,6 +52,7 @@ vi.mock('../hooks/useDialog', () => ({
 }));
 
 vi.mock('../features/lifecycle/hooks/useAccountSwitchActions', () => ({
+  hasPendingBackendCredentialAlign: mocks.hasPendingBackendCredentialAlign,
   useAccountSwitchActions: () => ({
     isSwitching: false,
     switchToAccount: mocks.switchToAccount,
@@ -92,6 +96,7 @@ beforeEach(() => {
   mocks.confirm.mockResolvedValue(true);
   mocks.switchToAccount.mockResolvedValue({ ok: true });
   mocks.logoutCurrentAccount.mockResolvedValue(true);
+  mocks.hasPendingBackendCredentialAlign.mockReturnValue(false);
   vi.mocked(useAppStore).mockImplementation(((
     selector?: (state: typeof baseState) => unknown,
   ) => (selector ? selector(baseState) : baseState)) as typeof useAppStore);
@@ -110,6 +115,31 @@ describe('Header account switcher', () => {
     expect(screen.getByText('Alice')).toBeTruthy();
     // 独立的「添加账号」图标入口
     expect(screen.getByRole('button', { name: 'header.add-account' })).toBeTruthy();
+    unmount();
+  });
+
+  // R12：单账号快捷登录后端凭据对齐失败时，hook 保留待对齐标记——切换菜单
+  // 不渲染（单账号），用户必须有重试入口。当前账号带待对齐标记时提供重试
+  // 按钮，复用 handleSwitchAccount 重新走后端对齐（文案键
+  // header.retry-credential-alignment 已在 10 个 locale 落地）。
+  it('shows a credential-alignment retry entry for a single account with a pending align marker (R12)', async () => {
+    baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    mocks.hasPendingBackendCredentialAlign.mockReturnValue(true);
+    const { unmount } = render(<Header />);
+
+    const retryButton = screen.getByRole('button', { name: 'header.retry-credential-alignment' });
+    fireEvent.click(retryButton);
+    await waitFor(() => {
+      expect(mocks.switchToAccount).toHaveBeenCalledWith('1');
+    });
+    unmount();
+  });
+
+  it('hides the credential-alignment retry entry for a single account without a pending align marker (R12)', () => {
+    baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    const { unmount } = render(<Header />);
+
+    expect(screen.queryByRole('button', { name: 'header.retry-credential-alignment' })).not.toBeInTheDocument();
     unmount();
   });
 

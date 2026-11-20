@@ -41,7 +41,8 @@
     "failed": "Échec de l’ajout",
     "starred": "Étoile ajoutée",
     "check-name": "Vérifiez ce nom",
-    "no-description": "Aucune description"
+    "no-description": "Aucune description",
+    "session-changed": "Le compte a changé. Relancez l'aperçu des liens avant d'ajouter des étoiles."
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Impossible d'appliquer les résultats du plugin",
@@ -247,7 +248,11 @@
     "unstar": "AnnulerStar",
     "successfully-unstarred": "Étoile annulée avec succès",
     "failed-to-unstar-repository-please-check-your-ne": "Échec de l'annulation de Star, veuillez vérifier la connexion réseau ou vous reconnecter.",
-    "similar-results-may-be-incomplete-the-dens": "Les dépôts similaires peuvent être incomplets : l’index de vecteurs dense est indisponible. ({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "Les dépôts similaires peuvent être incomplets : l’index de vecteurs dense est indisponible. ({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "Les dépôts similaires peuvent être incomplets : le worker de vecteurs ne prend pas en charge le rappel par compte. Déployez le worker Cloudflare fourni puis réessayez.",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "Les dépôts similaires peuvent être incomplets : l'index de métadonnées accountId des vecteurs n'est pas prêt. Créez et vérifiez l'index de métadonnées accountId, complétez les vecteurs existants et activez ACCOUNT_METADATA_INDEXED dans le déploiement.",
+    "dense-index-unavailable-reason-status-failed": "Les dépôts similaires peuvent être incomplets : la vérification de l'état de l'index de vecteurs a échoué. Veuillez réessayer plus tard.",
+    "dense-index-unavailable-reason-needs-backfill": "Les dépôts similaires peuvent être incomplets : l'index de vecteurs n'est pas prêt pour le rappel par compte. Reconstruisez l'index dans les paramètres de recherche de vecteurs pour le compte actuel."
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Veuillez d'abord configurer le jeton GitHub dans les paramètres ou vous connecter au service backend.",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "La synchronisation de la liste a échoué, l'entrepôt étoile a été synchronisé. Veuillez réessayer plus tard ou vérifier les autorisations du jeton GitHub (nécessite la portée de l'utilisateur).",
     "sync-completed-found-newrepocount-new-repositori": "Synchronisation terminée ! {{newRepoCount}} nouveaux dépôts trouvés.",
     "sync-completed-all-repositories-are-up-to-date": "Synchronisation terminée ! Tous les référentiels sont à jour.",
+    "sync-completed-backend-write-failed": "Les étoiles ont été mises à jour, mais l'écriture sur le backend a échoué. Les données locales sont conservées et la synchronisation sera réessayée automatiquement.",
     "github-token-has-expired-or-is-invalid-please-lo": "Le jeton GitHub a expiré ou n'est pas valide, veuillez vous reconnecter.",
     "sync-failed-please-check-your-network-connection": "La synchronisation a échoué, veuillez vérifier votre connexion réseau ou réessayer plus tard.",
     "list-sync-new-categories_one": " ({{count}} nouvelle catégorie créée)",

@@ -65,7 +65,14 @@ const LEGACY_REPOSITORY_MERGE_COLUMNS: ReadonlyArray<{
     expression: (source) => `CASE WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE(${source}, analyzed_at) ELSE analyzed_at END`,
   },
   { column: 'custom_description', expression: (source) => `COALESCE(custom_description, ${source})` },
-  { column: 'custom_tags', expression: (source) => `COALESCE(custom_tags, ${source})` },
+  {
+    column: 'custom_tags',
+    // Issue #612 R12：写入路由对缺省 custom_tags 落 '[]'（与 NULL 同义的「未设置」
+    // 占位）。合并规则把目标的 '[]' 视为未设置：旧行的自定义标签不因目标的空数组
+    // 占位而丢失（与 ai_tags 的合并语义一致）。「未提供」与「显式清空」在快照
+    // 通道无法区分，统一按未设置处理。
+    expression: (source) => `CASE WHEN custom_tags IS NULL OR custom_tags = '[]' THEN COALESCE(${source}, custom_tags) ELSE custom_tags END`,
+  },
   { column: 'custom_category', expression: (source) => `COALESCE(custom_category, ${source})` },
   {
     column: 'category_locked',
@@ -206,8 +213,9 @@ export function resolveActiveAccountScope(db: Database.Database): string {
 /**
  * 收集所有非 'default' 分区的账号 ID（覆盖 accounts / repositories / releases /
  * categories / account_settings）。逐表查询以兼容单元测试的轻量 DB stub。
+ * 导出供恢复候选（authRestore）等需要枚举分区归属的场景使用。
  */
-function collectNonDefaultPartitionIds(db: Database.Database): Set<string> {
+export function collectNonDefaultPartitionIds(db: Database.Database): Set<string> {
   const ids = new Set<string>();
   const queries = [
     "SELECT account_id FROM accounts WHERE account_id != 'default'",
@@ -264,6 +272,15 @@ export function resolveWritableAccountScope(
     // 且确实仅剩一个分区时保留兼容路径。
     if (hasPendingDefaultPartitionData(db)) return { ok: false };
     if (isLegacyClaimPending(db) && !validActive) return { ok: false };
+    // Issue #612 R12：升级库残留的旧全局凭据（github_token / legacy 快照）证明存在
+    // 身份未知的旧数据所有者——唯一真实分区只有在其本身就是已确认的旧数据所有者
+    // （legacy_default_claimed_by）时才可承接无头写入。否则升级前 A 的全局 PAT +
+    // 后登录的 B（唯一分区 / 活跃账号）会让 A 的旧客户端无头全量快照写进 B 分区
+    // 并按 isFullSync 误删 B 的数据。纯 default 库（无真实分区）与已验证认领者的
+    // 兼容路径保持不变。
+    if (hasLegacyGlobalCredential(db) && getLegacyDefaultClaimedBy(db) !== sole) {
+      return { ok: false };
+    }
     return { ok: true, accountId: sole };
   }
   return { ok: true, accountId: validActive ?? DEFAULT_SCOPE };
@@ -436,6 +453,16 @@ function hasLegacyGlobalAccountSettings(db: Database.Database): boolean {
 }
 
 /**
+ * 库中是否仍存在「旧全局凭据」（全局 settings.github_token，或 v4 固化的
+ * legacy_default_github_token 快照）。这类凭据属于升级前的旧数据所有者、身份
+ * 未知：无头写入不能仅凭「唯一真实分区 / 活跃账号」推断归属（Issue #612 R12）。
+ */
+function hasLegacyGlobalCredential(db: Database.Database): boolean {
+  return readSetting(db, 'github_token') !== null
+    || readSetting(db, 'legacy_default_github_token') !== null;
+}
+
+/**
  * default 分区是否仍存在「归属未确立」的待认领数据（认领未发生且分区里有行，
  * 或全局 settings 表中存在旧版账号级设置）。
  * Issue #612 A4：无头导入的外部 default 工作区绝不能写进这种分区——否则外部
@@ -443,15 +470,6 @@ function hasLegacyGlobalAccountSettings(db: Database.Database): boolean {
  */
 export function hasPendingDefaultPartitionData(db: Database.Database): boolean {
   return isLegacyClaimPending(db) && (hasDefaultPartitionRows(db) || hasLegacyGlobalAccountSettings(db));
-}
-
-/**
- * 是否存在至少一个真实（非 default）账号分区。
- * 用于 default 分区向量查询判断是否需要发送 accountId 范围过滤，避免共存的真实账号
- * 高分向量占满 topK。
- */
-export function hasAnyNonDefaultPartition(db: Database.Database): boolean {
-  return collectNonDefaultPartitionIds(db).size > 0;
 }
 
 /**
@@ -1152,7 +1170,11 @@ export function claimLegacyDefaultWithAdminConfirmation(
  */
 export function accountScopeMiddleware(req: Request, _res: import('express').Response, next: import('express').NextFunction): void {
   // 健康检查必须零副作用：不校验 GitHub、不迁移数据、不改账号状态。
-  if (req.path === '/health' || req.path === '/health/') {
+  // Issue #612 R12：Express 默认大小写不敏感路由（/api/Health 同样命中健康
+  // 路由），认领跳过判定必须与路由的匹配规则一致——所有能匹配健康路由的
+  // 路径都不得等待身份校验或触发迁移。
+  const lowerPath = req.path.toLowerCase();
+  if (lowerPath === '/health' || lowerPath === '/health/') {
     next();
     return;
   }

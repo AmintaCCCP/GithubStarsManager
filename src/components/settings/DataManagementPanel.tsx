@@ -10,7 +10,7 @@ import { telegramStorage } from '../../services/telegramStorage';
 import { abortXTweetSync } from '../../services/xTweetService';
 import { abortTelegramSync } from '../../services/telegramService';
 import { clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
-import { clearGhAccountTokens } from '../../store/persistence/ghAccountSecrets';
+import { clearGhAccountTokens, syncGhAccountTokensFromState } from '../../store/persistence/ghAccountSecrets';
 import { normalizeAssetFilters } from '../../utils/assetFilters';
 import {
   AlertDialog,
@@ -63,6 +63,7 @@ import {
   accountIdKey,
   captureAccountWorkspace,
   emptyAccountWorkspace,
+  getAccountSessionGeneration,
   normalizeAccountWorkspaces,
   normalizeSavedAccounts,
 } from '../../store/helpers/accountWorkspace';
@@ -268,6 +269,9 @@ const IMPORT_KEY_ALIASES: Record<string, string> = {
   readForks: 'repositories',
   syncMode: 'repositories',
   syncModeConfigured: 'repositories',
+  // 审计修复（R12）：分类映射随导出写在顶层（exportData 的 customCategories
+  // 分支），仅含顶层 categoryListIdMap 的备份同样要解析出 customCategories 类型
+  categoryListIdMap: 'customCategories',
 };
 
 // 工作区字段 → 导入类型映射：与导出端 trimWorkspacesForSelectedTypes 的
@@ -302,11 +306,20 @@ const workspaceFieldCarriesData = (field: string, value: unknown): boolean => {
 };
 
 const resolveImportTypes = (data: ExportData['data']): string[] => {
-  const present = Array.from(new Set(
-    IMPORT_DATA_KEYS
-      .filter((key) => data[key] !== undefined)
-      .map((key) => IMPORT_KEY_ALIASES[key] ?? key)
-  ));
+  // 审计修复（R12）：别名源键（gists/starredGists/forks/readForks/syncMode/
+  // syncModeConfigured/categoryListIdMap）不在 IMPORT_DATA_KEYS 中——此前只
+  // 遍历 IMPORT_DATA_KEYS，仅含顶层 gists（或仅含 categoryListIdMap）的备份
+  // 解析不出任何导入类型，合并与替换都会跳过这些数据却报告成功。改为遍历
+  // 备份实际携带的顶层键：命中导入键或别名表即解析出对应类型；缺失字段与
+  // 显式空数组的既有语义不变（按字段存在性判定，空数组仍解析出类型）。
+  const present = new Set<string>();
+  for (const key of Object.keys(data)) {
+    if (key in IMPORT_KEY_ALIASES) {
+      present.add(IMPORT_KEY_ALIASES[key]);
+    } else if ((IMPORT_DATA_KEYS as readonly string[]).includes(key)) {
+      present.add(key);
+    }
+  }
   // 审计修复：部分备份只有 activeAccountId + accountWorkspaces 内嵌字段（顶层
   // 键全缺）——此前返回空类型集合，合并路径会过滤掉该账号仓库却仍报告导入
   // 成功，替换路径同样拿不到类型。按原始（规范化前）工作区对象实际携带数据
@@ -320,23 +333,44 @@ const resolveImportTypes = (data: ExportData['data']): string[] => {
       for (const [field, importType] of WORKSPACE_FIELD_IMPORT_TYPES) {
         if (Object.prototype.hasOwnProperty.call(record, field)
           && workspaceFieldCarriesData(field, record[field])) {
-          present.push(importType);
+          present.add(importType);
         }
       }
     }
   }
   if (UI_SETTINGS_DATA_KEYS.some((key) => data[key] !== undefined)) {
-    present.push('uiSettings');
+    present.add('uiSettings');
   }
-  return Array.from(new Set(present));
+  return Array.from(present);
 };
 
 // 按条目 id 去重合并（与 mergeWorkspacesById 的 mergeList 同一语义：本机已有
 // 条目保留，仅追加本地没有的新条目）。同账号 merge 顶层 Gist/Fork 合并使用。
+// 审计修复（R12）：接受一条导入记录后必须把其 ID 登记进去重集合——同一份
+// 备份含两条相同 ID 的记录时，此前两条都会通过过滤进入实时列表与工作区快照；
+// 登记后仅保留第一条（本机已有条目不受影响）。
 const mergeListById = <T extends { id: unknown }>(localList: T[], incomingList: T[]): T[] => {
   const existingIds = new Set(localList.map(item => String(item?.id)));
-  const added = incomingList.filter(item => !existingIds.has(String(item?.id)));
+  const added: T[] = [];
+  for (const item of incomingList) {
+    const id = String(item?.id);
+    if (existingIds.has(id)) continue;
+    existingIds.add(id);
+    added.push(item);
+  }
   return [...localList, ...added];
+};
+
+/**
+ * 导入写入前对 Gist/Fork 对象数组条目的逐项校验（审计修复 R12，与 WebDAV
+ * 恢复路径 useBackupActions 的 backupGistEntriesAreValid 同一规则）：null/
+ * 非对象条目会在渲染视图时抛 TypeError（消费者直接读取条目属性），且持久化
+ * 读取同样不过滤空条目，重启后问题仍会出现。gists / starredGists / forks
+ * 共用同一结构校验；缺失字段与显式 [] 的语义由调用方保留。
+ */
+const importedListEntriesAreValid = (value: unknown): boolean => {
+  if (!Array.isArray(value)) return false;
+  return value.every((entry) => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry));
 };
 
 export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) => {
@@ -397,7 +431,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     isOpen: boolean;
     fileName: string;
     openedAccountId: string | null;
-  }>({ data: null, isOpen: false, fileName: '', openedAccountId: null });
+    // 审计修复（R12）：打开预览时的会话代次——同账号更换凭据（切出又切回、
+    // 同账号换证）只递增代次不改账号 ID，仅核对账号 ID 拦不住旧预览继续导入。
+    openedSessionGeneration: number | null;
+  }>({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
   const exportItems = useMemo(() => [
     { key: 'repositories', label: t('dataManagementPanel.repositories') },
     { key: 'releases', label: t('dataManagementPanel.releases') },
@@ -875,6 +912,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           isOpen: true,
           fileName: file.name,
           openedAccountId: accountIdKey(useAppStore.getState().user),
+          openedSessionGeneration: getAccountSessionGeneration(),
         });
       } catch {
         showError(t('dataManagementPanel.failed-to-parse-file-ensure-it-is-a-valid-json-f'));
@@ -887,11 +925,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const importData = useCallback(async (selectedTypes: string[], mode: 'merge' | 'replace') => {
     if (!importPreview.data) return;
 
+    // 审计修复（R12）：确认导入时除账号 ID 外一并复核打开预览时的会话代次
+    // ——同账号更换凭据（切出又切回、同账号换证）只递增代次不改账号 ID，
+    // 仅核对账号 ID 会放行旧预览的替换导入，覆盖重新激活账号的工作区。
+    const openedSessionGeneration = importPreview.openedSessionGeneration;
     const currentAccountIdAtImport = accountIdKey(useAppStore.getState().user);
-    if (importPreview.openedAccountId !== currentAccountIdAtImport) {
-      addLog(t('dataManagementPanel.import-data'), false, 'account changed while import preview was open');
+    if (importPreview.openedAccountId !== currentAccountIdAtImport
+      || getAccountSessionGeneration() !== openedSessionGeneration) {
+      addLog(t('dataManagementPanel.import-data'), false, 'session changed while import preview was open');
       showError(t('useBackupActions.account-changed-during-restore'));
-      setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
+      setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
       return;
     }
 
@@ -987,6 +1030,25 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         const value = importedData[field];
         if (value === undefined) continue;
         if ((value as unknown[]).some((item) => !item || typeof item !== 'object' || Array.isArray(item))) {
+          addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)} entry`);
+          showError(t('dataManagementPanel.invalid-backup-file-format'));
+          return;
+        }
+      }
+      // 审计修复（R12）：Gist/Fork 列表条目会在替换/合并路径被整体写入实时
+      // 状态与工作区快照——含 null 条目的数组此前能通过数组校验，替换模式先
+      // 写入仓库，再把 null 写进 gists/gistSearchResults，消费者（gistUtils 等）
+      // 直接读取条目属性时抛 TypeError。在首次写入前逐项校验条目结构（非空
+      // 对象，与 WebDAV 恢复路径同一规则）；缺失字段与显式 [] 语义不变。
+      const objectListImportFields: Array<keyof ExportData['data']> = [
+        'gists',
+        'starredGists',
+        'forks',
+      ];
+      for (const field of objectListImportFields) {
+        const value = importedData[field];
+        if (value === undefined) continue;
+        if (!importedListEntriesAreValid(value)) {
           addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)} entry`);
           showError(t('dataManagementPanel.invalid-backup-file-format'));
           return;
@@ -1214,42 +1276,66 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       // savedAccounts 合并：仅当本机无凭证且备份包含非空白真实密钥时采用导入 Token，
       // 绝不用未验证或空白的备份 PAT 覆盖本机已有的有效凭证；先计算并校验工作区后再提交。
+      // 审计修复（R12）：备份 PAT 身份核对需要等待网络（每账号最长 15s），等待
+      // 期间本机可能新增/更新同账号凭据。核对阶段只收集「已通过身份核对的备份
+      // PAT」，不基于核对前的 savedAccounts 构造待提交映射；提交时基于最新的
+      // savedAccounts 重新合并（mergeVerifiedSavedAccounts）：本机已有凭据（含
+      // 核对等待期间新增）一律保留，仅在本机无凭据时采用已验证的备份 PAT。
       const hasImportedSavedAccounts = !!importedData.savedAccounts
         && typeof importedData.savedAccounts === 'object';
-      const pendingSavedAccounts = hasImportedSavedAccounts
-        ? await (async () => {
-            const normalizedSaved = normalizeSavedAccounts(importedData.savedAccounts);
-            const mergedSaved = { ...useAppStore.getState().savedAccounts };
-            for (const [id, account] of Object.entries(normalizedSaved)) {
-              const local = mergedSaved[id];
-              const hasRealBackupToken = wasIncluded
-                && isRealSecret(account.githubToken)
-                && account.githubToken.trim().length > 0;
-              let token = local?.githubToken ?? '';
-              if (!local?.githubToken && hasRealBackupToken) {
-                const identityVerified = await verifyBackupPATIdentity(account.githubToken, id);
-                if (identityVerified) {
-                  token = account.githubToken;
-                }
-              }
-              mergedSaved[id] = {
-                ...(local ?? account),
-                ...account,
-                githubToken: token,
-              };
-            }
-            return mergedSaved;
-          })()
+      const importedSavedAccounts = hasImportedSavedAccounts
+        ? normalizeSavedAccounts(importedData.savedAccounts)
         : null;
-      if (hasImportedSavedAccounts
-        && accountIdKey(useAppStore.getState().user) !== currentAccountIdAtImport) {
-        // 核对备份 PAT 身份期间账号已切换：放弃本次导入，避免把备份凭据与
-        // 数据写进新会话上下文。
-        addLog(t('dataManagementPanel.import-data'), false, 'account changed during import');
+      const verifiedBackupTokens: Record<string, string> = {};
+      if (importedSavedAccounts) {
+        const preVerificationSaved = useAppStore.getState().savedAccounts;
+        for (const [id, account] of Object.entries(importedSavedAccounts)) {
+          const hasRealBackupToken = wasIncluded
+            && isRealSecret(account.githubToken)
+            && account.githubToken.trim().length > 0;
+          if (!preVerificationSaved[id]?.githubToken && hasRealBackupToken) {
+            const identityVerified = await verifyBackupPATIdentity(account.githubToken, id);
+            if (identityVerified) {
+              verifiedBackupTokens[id] = account.githubToken;
+            }
+          }
+        }
+      }
+      // 提交时刻基于最新 savedAccounts 合并：本机凭据优先，其次已验证的备份 PAT。
+      const mergeVerifiedSavedAccounts = (): Record<string, SavedAccount> | null => {
+        if (!importedSavedAccounts) return null;
+        const latestSaved = { ...useAppStore.getState().savedAccounts };
+        for (const [id, account] of Object.entries(importedSavedAccounts)) {
+          const local = latestSaved[id];
+          latestSaved[id] = {
+            ...(local ?? account),
+            ...account,
+            githubToken: local?.githubToken || verifiedBackupTokens[id] || '',
+          };
+        }
+        return latestSaved;
+      };
+      const abortIfSessionChangedDuringImport = (reason: string): boolean => {
+        if (accountIdKey(useAppStore.getState().user) === currentAccountIdAtImport
+          && getAccountSessionGeneration() === openedSessionGeneration) {
+          return false;
+        }
+        addLog(t('dataManagementPanel.import-data'), false, reason);
         showError(t('useBackupActions.account-changed-during-restore'));
-        setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
+        setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
+        return true;
+      };
+      if (hasImportedSavedAccounts
+        && abortIfSessionChangedDuringImport('session changed during import')) {
+        // 核对备份 PAT 身份期间账号已切换或会话代次变化（切出又切回同一账号、
+        // 同账号更换凭据）：放弃本次导入，避免把备份凭据与数据写进新会话上下文。
         return;
       }
+
+      // 审计修复（R12）：gh-accounts.enc 写入失败时不报告导入成功——savedAccounts
+      // 的持久化分片剥除 githubToken，导入的已验证 PAT 重启后会丢失；已写入
+      // 内存的数据保留，向用户显示失败提示（详见末尾结果处理）。
+      let ghAccountPersistFailed = false;
 
       if (mode === 'replace') {
         // 工作区字典合并（replace）：逐账号按所选类型只替换已选字段，保留
@@ -1262,8 +1348,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               selectedTypes,
             )
           : null;
-        if (pendingSavedAccounts) {
-          useAppStore.setState({ savedAccounts: pendingSavedAccounts });
+        const committedSavedAccounts = mergeVerifiedSavedAccounts();
+        if (committedSavedAccounts) {
+          useAppStore.setState({ savedAccounts: committedSavedAccounts });
+          // 审计修复（R12）：等待加密凭据文件写入完成（幂等同步全量 Token 映射），
+          // 失败时按 false 记录并在导入结束处拒绝报告成功。
+          ghAccountPersistFailed = !(await syncGhAccountTokensFromState(useAppStore.getState()));
+          // 审计补强（R12 竞态）：等待安全存储写入期间同样可能切号——复核会话后
+          // 再执行后续工作区/实时状态写入，绝不把备份数据写进新会话上下文。
+          if (abortIfSessionChangedDuringImport('session changed while persisting imported credentials')) return;
         }
         if (nextReplacedWorkspaces) {
           useAppStore.setState({ accountWorkspaces: nextReplacedWorkspaces });
@@ -1467,8 +1560,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           setBackendApiSecret(importedData.backendApiSecret);
         }
       } else {
-        if (pendingSavedAccounts) {
-          useAppStore.setState({ savedAccounts: pendingSavedAccounts });
+        const committedSavedAccounts = mergeVerifiedSavedAccounts();
+        if (committedSavedAccounts) {
+          useAppStore.setState({ savedAccounts: committedSavedAccounts });
+          // 审计修复（R12）：同替换模式——等待 gh-accounts.enc 写入完成，失败时
+          // 不报告导入成功。
+          ghAccountPersistFailed = !(await syncGhAccountTokensFromState(useAppStore.getState()));
+          if (abortIfSessionChangedDuringImport('session changed while persisting imported credentials')) return;
         }
         // 工作区字典合并（merge）：逐账号按所选类型过滤并按 id 去重合并，保留本机独有账号与未选字段
         if (hasImportedWorkspaces) {
@@ -1534,9 +1632,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             archiveTopLevelToBackupAccountOnce('merge');
           } else {
             if (validatedImportRepositories !== undefined) {
-              const existingIds = new Set(store.repositories.map(r => r.id));
+              // 审计修复（R12）：合并基于 PAT 核对等待后的实时状态——核对期间
+              // 本机新增的仓库不得被核对前的旧快照覆盖；用实时值保留本机新增
+              // 条目，仅追加备份中的新条目。
+              const liveForRepoMerge = useAppStore.getState();
+              const existingIds = new Set(liveForRepoMerge.repositories.map(r => r.id));
               const newRepos = validatedImportRepositories.filter(r => !existingIds.has(r.id));
-              store.setRepositories([...store.repositories, ...newRepos]);
+              store.setRepositories([...liveForRepoMerge.repositories, ...newRepos]);
             }
             // 审计修复：旧版单账号备份没有 accountWorkspaces，Gist/Fork 等只
             // 存在于顶层——此前同账号 merge 分支只合并仓库，收尾只保存实时
@@ -1563,39 +1665,50 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           if (backupTargetsOtherAccount) {
             archiveTopLevelToBackupAccountOnce('merge');
           } else {
-            const existingIds = new Set(store.releases.map(r => r.id));
+            // 审计修复（R12）：同仓库合并——基于核对等待后的实时状态合并，
+            // 保留等待期间本机新增的 Release。
+            const liveForReleaseMerge = useAppStore.getState();
+            const existingIds = new Set(liveForReleaseMerge.releases.map(r => r.id));
             const newReleases = importedData.releases.filter(r => !existingIds.has(r.id));
-            store.setReleases([...store.releases, ...newReleases]);
+            store.setReleases([...liveForReleaseMerge.releases, ...newReleases]);
           }
         }
         if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
-          const existingIds = new Set(store.aiConfigs.map(c => c.id));
+          // 审计修复（R12 ISSUE-2）：合并基于 PAT 核对等待后的实时状态——等待
+          // 期间本机新增的 AI 配置不得被核对前的旧快照覆盖。
+          const liveForAiConfigMerge = useAppStore.getState();
+          const existingIds = new Set(liveForAiConfigMerge.aiConfigs.map(c => c.id));
           const newConfigs = importedData.aiConfigs
             .filter(c => !existingIds.has(c.id))
             .map(cfg => ({
               ...cfg,
               apiKey: wasIncluded && isRealSecret(cfg.apiKey) ? cfg.apiKey : ''
             }));
-          store.setAIConfigs([...store.aiConfigs, ...newConfigs]);
+          liveForAiConfigMerge.setAIConfigs([...liveForAiConfigMerge.aiConfigs, ...newConfigs]);
         }
         if (selectedTypes.includes('webdavConfigs') && importedData.webdavConfigs) {
-          const existingIds = new Set(store.webdavConfigs.map(c => c.id));
+          // 审计修复（R12 ISSUE-2）：同 AI 配置——合并基底必须是提交时刻的实时值。
+          const liveForWebdavMerge = useAppStore.getState();
+          const existingIds = new Set(liveForWebdavMerge.webdavConfigs.map(c => c.id));
           const newConfigs = importedData.webdavConfigs
             .filter(c => !existingIds.has(c.id))
             .map(cfg => ({
               ...cfg,
               password: wasIncluded && isRealSecret(cfg.password) ? cfg.password : ''
             }));
-          store.setWebDAVConfigs([...store.webdavConfigs, ...newConfigs]);
+          liveForWebdavMerge.setWebDAVConfigs([...liveForWebdavMerge.webdavConfigs, ...newConfigs]);
         }
         if (selectedTypes.includes('customCategories')) {
           if (backupTargetsOtherAccount) {
             archiveTopLevelToBackupAccountOnce('merge');
           } else if (importedData.customCategories) {
-            const existingIds = new Set(store.customCategories.map(c => c.id));
+            // 审计修复（R12 ISSUE-2）：分类合并同样读取实时状态，保留核对期间
+            // 本机新增的分类。
+            const liveForCategoryMerge = useAppStore.getState();
+            const existingIds = new Set(liveForCategoryMerge.customCategories.map(c => c.id));
             const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
             useAppStore.setState({
-              customCategories: [...store.customCategories, ...newCategories]
+              customCategories: [...liveForCategoryMerge.customCategories, ...newCategories]
             });
           }
           if (!backupTargetsOtherAccount && importedData.categoryListIdMap) {
@@ -1628,10 +1741,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('assetFilters') && Array.isArray(importedData.assetFilters)) {
-          const existingIds = new Set(store.assetFilters.map(f => f.id));
+          // 审计修复（R12 ISSUE-2）：资产筛选合并读取实时状态，保留等待期间
+          // 本机新增的筛选器。
+          const liveForAssetFilterMerge = useAppStore.getState();
+          const existingIds = new Set(liveForAssetFilterMerge.assetFilters.map(f => f.id));
           const newFilters = normalizeAssetFilters(importedData.assetFilters)
             .filter(f => !existingIds.has(f.id));
-          useAppStore.setState({ assetFilters: [...store.assetFilters, ...newFilters] });
+          useAppStore.setState({ assetFilters: [...liveForAssetFilterMerge.assetFilters, ...newFilters] });
         }
         if (selectedTypes.includes('discoveryRepos')) {
           const currentStore = useAppStore.getState();
@@ -1698,21 +1814,23 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             // 不改写当前账号实时状态（避免实时快照把它们存进当前账号工作区）
             archiveSubscriptionsToBackupAccount('merge');
           } else {
+            // 审计修复（R12）：Release 合并所用的列表与设置基于核对等待后的
+            // 实时状态——等待期间本机新增的订阅/来源/已读状态不得被旧快照覆盖。
+            const liveForSubsMerge = useAppStore.getState();
             if (importedData.releaseSubscriptions) {
-              const existingSubs = store.releaseSubscriptions;
+              const existingSubs = liveForSubsMerge.releaseSubscriptions;
               const newSubs = new Set([...Array.from(existingSubs), ...importedData.releaseSubscriptions]);
               useAppStore.setState({ releaseSubscriptions: newSubs });
             }
             if (importedData.releaseSourceSettings) {
               store.setReleaseSourceSettings(mergeReleaseSourceSettings(
-                store.releaseSourceSettings,
+                liveForSubsMerge.releaseSourceSettings,
                 normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
               ));
             }
             if (importedData.readReleases) {
-              const currentReadReleases = useAppStore.getState().readReleases;
               useAppStore.setState({
-                readReleases: new Set([...currentReadReleases, ...importedData.readReleases]),
+                readReleases: new Set([...Array.from(liveForSubsMerge.readReleases), ...importedData.readReleases]),
               });
             }
           }
@@ -1861,6 +1979,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         });
       }
 
+      // 审计修复（R12）：gh-accounts.enc 写入失败时不报告导入成功（导入的已验证
+      // PAT 只存在于内存会话，重启后丢失）；已写入内存的数据保留，改为失败提示
+      // 并允许用户重新导入触发幂等重试。
+      if (ghAccountPersistFailed) {
+        addLog(t('dataManagementPanel.import-data'), false, 'gh-accounts credential persistence failed');
+        showError(t('dataManagementPanel.import-failed-please-try-again'));
+        setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
+        return;
+      }
+
       // 如果导入的数据包含屏蔽的密钥，提示用户
       if (hasMaskedBackupSecrets(importedData)) {
         showSuccess(t('dataManagementPanel.data-imported-successfully-some-secrets-were-mas'));
@@ -1869,7 +1997,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
 
       addLog(t('dataManagementPanel.import-data'), true);
-      setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
+      setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
     } catch (error) {
       addLog(t('dataManagementPanel.import-data'), false, String(error));
       showError(t('dataManagementPanel.import-failed-please-try-again'));
@@ -2004,6 +2132,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     // 不提示成功），用户重试时清理幂等重跑即可续清残留
     const pendingStorages: string[] = [];
     try {
+      // 审计修复（R12）：桌面端加密凭据文件（gh-accounts.enc）必须最先清理——
+      // 此前它在应用快照与独立缓存全部删除之后执行，一旦失败，持久化数据已被
+      // 删除而页面仍显示旧的内存状态，只提示重试；用户此时关闭应用将无法找回
+      // 已删除的快照。前置后失败即「尚未删除任何数据」，重试天然幂等；后续
+      // 步骤的部分失败仍经 pendingStorages 记录剩余待清项（已完成步骤不再
+      // 重跑），继续支持幂等续清。
+      try {
+        await clearGhAccountTokens();
+      } catch (e) {
+        pendingStorages.push('GitHub account credentials');
+        throw e;
+      }
       // 先清除存储，确保存储清除成功后再重置状态
       // 这样可以避免状态已重置但存储清除失败导致的数据不一致
       try {
@@ -2039,15 +2179,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         await clearEncryptedXAuthViaDesktop();
       } catch {
         // 忽略桌面端清理失败
-      }
-
-      // 审计修复（自审计补充 / R11）：通过串行队列清除桌面端加密保存的 GitHub 账号凭证文件
-      // （gh-accounts.enc），失败时纳入 pendingStorages 允许用户重试，绝不报告全部数据已删除。
-      try {
-        await clearGhAccountTokens();
-      } catch (e) {
-        pendingStorages.push('GitHub account credentials');
-        throw e;
       }
 
       // 审计修复（C51）：清除账号级待推状态——gsm.pendingSyncAccounts /
@@ -2790,7 +2921,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           open={importPreview.isOpen}
           onOpenChange={(open) => {
             if (!open && !isImporting) {
-              setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null });
+              setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
             }
           }}
         >
@@ -2861,7 +2992,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               <DialogFooter className="pt-4">
                 <Button
                   variant="outline"
-                  onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null })}
+                  onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null })}
                   disabled={isImporting}
                   className="flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                 >

@@ -223,7 +223,9 @@ const MESSAGES = {
       '   客户端没有「读取并原样重传历史向量」的接口，无法重新分析的仓库在恢复分析状态前',
       '   不会被账号过滤查询召回。详见 cloudflare-worker/README.md 多账号一节。）',
       '• 启用前用「账号过滤查询」做冒烟检查，并用全量枚举核对回填覆盖（不要只测 Worker 连通性；',
-      '  单账号查询命中只能证明过滤生效，不能证明全量回填完成）。',
+      '  查询命中只能证明过滤生效；枚举未发现纯数字 legacy ID 只是必要条件——覆盖验收仍以',
+      '  「元数据索引创建后逐项成功重写记录与各账号预期仓库集合核对」为准，任何已观察到的',
+      '  缺口（含采样中缺少 accountId 的向量）都会使验证失败）。',
       '• ⚠️ 绝不能按客户端本机账号数量推断索引归属；部署默认值保持 false。',
     ],
     acct_confirm_prompt: '是否已创建 accountId 元数据索引并完成存量向量回填（启用账号过滤）？',
@@ -234,8 +236,9 @@ const MESSAGES = {
     acct_verify_no_vectors: '   - 索引暂无向量可采样，无法确认 accountId 元数据索引与回填状态。',
     acct_verify_ownership_failed: '❌ 账号归属校验失败：账号过滤查询返回的结果中混入了其他账号（或缺少 accountId 元数据）的向量，账号过滤未真正生效。',
     acct_verify_negative_control_failed: '❌ 负向对照失败：用确认无数据的账号执行过滤查询仍返回了结果——部署的 Worker 忽略了 accountId 过滤参数（可能仍是旧版实现），验证不通过。',
-    acct_verify_coverage_confirmed: '✅ 回填覆盖已确认：全量枚举 {total} 条向量 ID，未发现未回填的 legacy 向量（纯数字 ID）。',
-    acct_verify_coverage_legacy_found: '⚠️ 回填覆盖未完成：全量枚举 {total} 条向量 ID，发现 {count} 条 legacy 向量（纯数字 ID，缺少 accountId 元数据），启用账号过滤后它们将无法召回。',
+    acct_verify_coverage_confirmed: '✅ 回填覆盖已确认：全量枚举 {total} 条向量 ID，未发现未回填的 legacy 向量（纯数字 ID），采样中也未观察到缺少 accountId 元数据的缺口。',
+    acct_verify_coverage_legacy_found: '⚠️ 回填覆盖未完成：全量枚举 {total} 条向量 ID，发现 {count} 条 legacy 向量（纯数字 ID，缺少 accountId 元数据），启用账号过滤后它们将无法召回。任何纯数字 ID 都会使覆盖验证失败：请先核实归属并确认替代向量可召回后手动删除（见 README 步骤 4），否则只能以未验证模式强制启用。',
+    acct_verify_coverage_sample_legacy: '⚠️ 回填覆盖未确认：采样已观察到 {count} 条缺少 accountId 元数据的向量，它们无法被账号过滤召回（带账号前缀的 ID 不能证明向量已带 accountId 元数据或已进入元数据索引；元数据索引创建前写入的向量需重写后才会被收录）。完整枚举未发现纯数字 ID 也不能否定该观察，请先补完回填再重新部署验证。',
     acct_verify_coverage_unverified: '⚠️ 回填覆盖未验证：全量枚举不可用（{reason}）。采样查询（≤50 条）只能证明过滤生效，不能证明全量回填完成；请通过回填记录或手动执行 `npx wrangler vectorize list-vectors {index}` 核对所有预期向量后，再依赖账号过滤。',
     acct_verify_failed: '⚠️ 回填验证请求失败: {err}',
     acct_verify_rollback_prompt: '验证未通过，是否立即回滚 ACCOUNT_METADATA_INDEXED 为 false（避免向量检索静默为空）？',
@@ -411,7 +414,9 @@ const MESSAGES = {
       '   the client has no "read & re-upload original vector" interface, so repos that cannot be re-analyzed stay unrecallable by',
       '   account-filtered queries until then. See the README multi-account section.)',
       '• Before enabling, run an account-filtered query as a smoke check AND confirm coverage by full enumeration (not just a connectivity',
-      '  test; a single-account query hit only proves the filter works, not that the full backfill is complete).',
+      '  test; a query hit only proves the filter works; enumeration finding no numeric-only IDs is necessary but not sufficient — the',
+      '  acceptance basis stays per-vector successful rewrite records (after metadata index creation) reconciled with each account\'s',
+      '  expected repo set, and any observed gap (including sampled vectors missing accountId) fails verification).',
       '• ⚠️ Never infer index ownership from the number of local client accounts; the deployment default stays false.',
     ],
     acct_confirm_prompt: 'Has the accountId metadata index been created AND legacy vectors backfilled (enable account filtering)?',
@@ -422,8 +427,9 @@ const MESSAGES = {
     acct_verify_no_vectors: '   - No vectors sampled yet; cannot verify accountId metadata index or backfill status.',
     acct_verify_ownership_failed: '❌ Ownership check failed: account-filtered results include vectors from other accounts (or missing accountId metadata); the filter is not actually scoping.',
     acct_verify_negative_control_failed: '❌ Negative control failed: a filtered query with an account confirmed to have no data still returned matches — the deployed Worker ignores the accountId filter (likely a legacy implementation). Verification failed.',
-    acct_verify_coverage_confirmed: '✅ Backfill coverage confirmed: enumerated {total} vector IDs; no legacy (numeric-only ID) vectors remain.',
-    acct_verify_coverage_legacy_found: '⚠️ Backfill coverage incomplete: enumerated {total} vector IDs and found {count} legacy vectors (numeric-only IDs, missing accountId metadata); they would be unrecallable under account filtering.',
+    acct_verify_coverage_confirmed: '✅ Backfill coverage confirmed: enumerated {total} vector IDs; no legacy (numeric-only ID) vectors remain and no sampled vector was observed missing accountId metadata.',
+    acct_verify_coverage_legacy_found: '⚠️ Backfill coverage incomplete: enumerated {total} vector IDs and found {count} legacy vectors (numeric-only IDs, missing accountId metadata); they would be unrecallable under account filtering. Any numeric-only ID fails coverage verification: retire the copies after verifying ownership and that the replacement vectors are recallable (see README step 4), or enable only in the unverified forced-keep mode.',
+    acct_verify_coverage_sample_legacy: '⚠️ Backfill coverage NOT confirmed: the sampled query observed {count} vector(s) missing accountId metadata; they are unrecallable under account filtering (an account-prefixed ID does not prove the vector carries accountId metadata or was re-written into the metadata index; vectors written before index creation must be re-upserted to be filterable). Full enumeration finding no numeric-only IDs cannot refute this observation. Finish the backfill, then re-deploy and re-verify.',
     acct_verify_coverage_unverified: '⚠️ Backfill coverage NOT verified: full enumeration unavailable ({reason}). The sampled query (≤50 results) only proves the filter works, not full backfill; reconcile expected vectors via backfill records or `npx wrangler vectorize list-vectors {index}` before relying on account filtering.',
     acct_verify_failed: '⚠️ Backfill verification request failed: {err}',
     acct_verify_rollback_prompt: 'Verification did not pass. Roll back ACCOUNT_METADATA_INDEXED to false now (to avoid silent empty recall)?',
@@ -1206,9 +1212,12 @@ function deployWorker(accountMetadataIndexed = false) {
  *      才判定过滤生效（Vectorize 缺少元数据索引时会静默返回空 matches 而非报错）；
  *    - 负向对照：用确认无任何数据的哨兵账号执行同一查询，结果必须为空——忽略
  *      accountId 过滤参数的旧版 Worker 会原样返回未过滤结果，无法通过该检查。
- * 3) 回填覆盖核对（R2 review）：查询命中只能证明「过滤生效」，≤50 条采样不能证明
- *    全量回填完成。用 `wrangler vectorize list-vectors` 全量枚举向量 ID 并统计
- *    纯数字 legacy ID：为 0 才算覆盖已确认；枚举不可用时明确报告「覆盖未验证」。
+ * 3) 回填覆盖核对（R2 review / R12 review）：查询命中只能证明「过滤生效」，≤50 条
+ *    采样不能证明全量回填完成。覆盖判定先处理采样中已观察到的缺口：采样结果缺少
+ *    accountId 元数据的向量（无论 ID 是否带账号前缀）都是已知回填缺口——完整枚举
+ *    成功也不得据此确认覆盖。再用 `wrangler vectorize list-vectors` 全量枚举向量 ID
+ *    并统计纯数字 legacy ID：枚举完整读到末页且为 0 才算覆盖已确认；枚举不可用或
+ *    达到分页上限仍未读到末页时明确报告「覆盖未验证」。
  * 返回 { ok, filterActive, coverageConfirmed, reason? } 供调用方决定是否回滚：
  *   - ok：验证整体通过（过滤生效，且未观察到回填缺口）；
  *   - coverageConfirmed：回填覆盖是否经全量枚举核对确认（采样无法确认覆盖）。
@@ -1238,9 +1247,9 @@ function listVectorIdsPage(indexName, cursor) {
 
 /**
  * 全量枚举 Vectorize 索引的向量 ID（wrangler vectorize list-vectors，游标分页），
- * 用于回填覆盖核对（R2 review）。返回 { ok, total?, legacyCount?, reason? }；
- * wrangler 不可用 / 命令失败 / 输出异常时 ok=false——调用方据此明确报告
- * 「覆盖未验证」，绝不把采样结果当作覆盖证明。
+ * 用于回填覆盖核对（R2 review / R12 review）。返回 { ok, total?, legacyCount?, reason? }；
+ * wrangler 不可用 / 命令失败 / 输出异常 / 达到分页上限仍未读到末页时 ok=false——
+ * 调用方据此明确报告「覆盖未验证」，绝不把采样或部分枚举结果当作覆盖证明。
  */
 function enumerateVectorIds(indexName) {
   try {
@@ -1249,6 +1258,9 @@ function enumerateVectorIds(indexName) {
     let cursor;
     // 分页安全上限（1000/页 × 500 页）：超出按枚举失败处理，避免游标异常死循环。
     const MAX_ENUM_PAGES = 500;
+    // R12 review：是否明确读到末页。达到页数上限仍有 nextCursor 时枚举不完整，
+    // 必须按枚举失败处理——否则第 501 页才出现的 legacy 向量会被漏检，覆盖被误判。
+    let reachedEnd = false;
     for (let page = 0; page < MAX_ENUM_PAGES; page++) {
       const data = listVectorIdsPage(indexName, cursor);
       if (!data || !Array.isArray(data.vectors)) return { ok: false, reason: 'list_failed' };
@@ -1258,8 +1270,15 @@ function enumerateVectorIds(indexName) {
       }
       const rawNext = data && data.nextCursor;
       const next = typeof rawNext === 'string' && rawNext ? rawNext : undefined;
-      if (!next) break;
+      if (!next) {
+        reachedEnd = true;
+        break;
+      }
       cursor = next;
+    }
+    if (!reachedEnd) {
+      // 达到分页上限仍有后续游标：本次枚举不完整，按枚举失败处理（覆盖未验证）。
+      return { ok: false, reason: 'page_limit_exceeded' };
     }
     if (ids.size === 0) {
       // 采样查询能命中向量而枚举结果为空：快照矛盾，按枚举失败处理。
@@ -1409,8 +1428,19 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions, inde
 
     console.log(c.green(t('acct_verify_index_active')));
 
-    // 4) 回填覆盖核对（R2 review）：≤50 条采样不能证明全量回填完成——用 wrangler
-    //    全量枚举向量 ID 核对 legacy 向量是否清零；枚举不可用时明确报告「覆盖未验证」。
+    // 4) 回填覆盖核对（R2 review / R12 review）：≤50 条采样不能证明全量回填完成——
+    //    用 wrangler 全量枚举向量 ID 核对 legacy 向量是否清零；枚举不可用时明确
+    //    报告「覆盖未验证」。覆盖判定顺序（R12 review）：先处理采样中已观察到的
+    //    回填缺口——采样结果中缺少 accountId 元数据的向量（无论 ID 是否带账号前缀）
+    //    都不可能被账号过滤召回（带账号前缀的 ID 不能证明向量已带 accountId 元数据
+    //    或已进入元数据索引；元数据索引创建前写入的向量必须重写后才会被过滤收录），
+    //    因此即使完整枚举成功、未发现纯数字 ID，也不得返回 coverageConfirmed: true。
+    if (legacyCount > 0) {
+      // 采样已观察到缺少 accountId 元数据的向量 → 已知回填缺口，先于枚举判定：
+      // 枚举结果不能否定采样直接观察到的缺口（fail-fast，避免长时间全量枚举）。
+      console.warn(c.yellow(t('acct_verify_coverage_sample_legacy', { count: legacyCount })));
+      return { ok: false, filterActive: true, coverageConfirmed: false, reason: 'legacy_present' };
+    }
     const enumeration = enumerateVectorIds(indexName);
     if (enumeration.ok) {
       if (enumeration.legacyCount > 0) {
@@ -1419,10 +1449,6 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions, inde
       }
       console.log(c.green(t('acct_verify_coverage_confirmed', { total: enumeration.total })));
       return { ok: true, filterActive: true, coverageConfirmed: true };
-    }
-    if (legacyCount > 0) {
-      // 枚举不可用，但采样已观察到 legacy 向量 → 回填存在已知缺口。
-      return { ok: false, filterActive: true, coverageConfirmed: false, reason: 'legacy_present' };
     }
     console.warn(c.yellow(t('acct_verify_coverage_unverified', { reason: enumeration.reason || 'unknown', index })));
     // 过滤生效且采样未发现 legacy：保留过滤标记（部署方已显式确认回填），

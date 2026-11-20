@@ -51,7 +51,8 @@ const makeIndexClient = () => ({
   embed: vi.fn(async (texts: string[]) => texts.map((_, i) => vec(i))),
 }) as unknown as Parameters<typeof indexAllRepos>[1];
 
-const makeVectorService = () => ({
+const makeVectorService = (workerId?: string) => ({
+  ...(workerId ? { workerId } : {}),
   upsert: vi.fn(async (vectors: Array<{ id: string }>) => ({ upserted: vectors.length })),
 }) as unknown as Parameters<typeof indexAllRepos>[2];
 
@@ -629,7 +630,9 @@ describe('indexAllRepos account-scope migration (audit fix)', () => {
   });
 
   it('restores the incremental path (no re-embedding of unchanged repos) after migration completes', async () => {
-    window.localStorage.setItem(MIGRATION_KEY, JSON.stringify(['42']));
+    // 第 12 轮：迁移记录改为「账号 → Worker 身份」映射；'' 表示未绑定 Worker
+    // 身份的记录（老调用方/测试桩的回退语义：仅按账号判断视为已迁移）。
+    window.localStorage.setItem(MIGRATION_KEY, JSON.stringify({ '42': '' }));
     const repos = [makeRepository(1), makeRepository(2, { vector_indexed_at: undefined })];
     const client = makeIndexClient();
     const vectorService = makeVectorService();
@@ -720,5 +723,78 @@ describe('indexAllRepos account-scope migration (audit fix)', () => {
     expect(result.indexedRepoIds).toEqual([]);
     expect(isAccountScopeMigrationDone('42')).toBe(false);
     expect(isAccountScopeMigrationDone(null)).toBe(true);
+  });
+
+  it('treats the account as unmigrated again when the vector worker changes (round-12 audit fix)', async () => {
+    // 迁移完成记录绑定 Worker：账号在 W1 完成迁移后切到 W2，增量索引必须重新
+    // 按全量候选补写——否则 W2 上内容未变化的仓库会被 needsReindex 排除，其
+    // 账号范围向量永远不会写入 W2，语义搜索静默缺结果。
+    window.localStorage.setItem(MIGRATION_KEY, JSON.stringify({ '42': 'https://w1.example.com' }));
+    // W1：已迁移，增量路径沿用（只有未索引的新仓库入列）
+    const result1 = await indexAllRepos(
+      [makeRepository(2, { vector_indexed_at: undefined })],
+      makeIndexClient(),
+      makeVectorService('https://w1.example.com'),
+      {
+        incremental: true,
+        formatVersion: EMBEDDING_FORMAT_VERSION,
+        currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+        indexMode: 'description',
+        accountId: '42',
+      },
+    );
+    expect(result1.indexedRepoIds).toEqual([2]);
+
+    // 切到 W2：旧记录不再豁免，重新按全量候选补写带账号前缀的向量
+    const w2Service = makeVectorService('https://w2.example.com');
+    const result2 = await indexAllRepos([makeRepository(1), makeRepository(2)], makeIndexClient(), w2Service, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+    const upsertedIds = (w2Service.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
+    expect(upsertedIds).toEqual([buildAccountScopedVectorId('42', 1), buildAccountScopedVectorId('42', 2)]);
+    // W2 完成范围上传后恢复增量路径
+    expect(result2.indexedRepoIds).toEqual([1, 2]);
+    expect(isAccountScopeMigrationDone('42', 'https://w2.example.com')).toBe(true);
+  });
+
+  it('records account-scope migration completion after a successful full rebuild (round-12 audit fix)', async () => {
+    // 全量重建成功后同样记录迁移完成——否则下一次增量索引仍强制按全量候选
+    // 重选全部仓库，未变化仓库被重复嵌入计费。
+    const client = makeIndexClient();
+    const vectorService = makeVectorService('https://worker.example.com');
+
+    const result = await indexAllRepos([makeRepository(1), makeRepository(2)], client, vectorService, {
+      incremental: false,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    expect(result.indexedRepoIds).toEqual([1, 2]);
+    expect(isAccountScopeMigrationDone('42', 'https://worker.example.com')).toBe(true);
+  });
+
+  it('keeps migration unrecorded when a full rebuild fails a legacy-indexed candidate', async () => {
+    // 保留既有保护：旧索引候选失败时不记录完成（下次运行继续补写）。
+    const repos = [makeRepository(1), makeRepository(2)];
+    const failingClient = {
+      embed: vi.fn(async () => [null, vec(2)]),
+    } as unknown as Parameters<typeof indexAllRepos>[1];
+    const vectorService = makeVectorService('https://worker.example.com');
+
+    await indexAllRepos(repos, failingClient, vectorService, {
+      incremental: false,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    expect(isAccountScopeMigrationDone('42', 'https://worker.example.com')).toBe(false);
   });
 });

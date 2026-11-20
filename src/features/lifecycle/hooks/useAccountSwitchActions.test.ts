@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { getAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccountWorkspace, Repository } from '../../../types';
 
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   restoreBackendSession: vi.fn(),
   authenticateWithGitHub: vi.fn(),
   refreshMcpElectronBridge: vi.fn(),
+  abortActiveAnalysisJobs: vi.fn(),
 }));
 
 vi.mock('../../../services/autoSync', async (importOriginal) => {
@@ -42,6 +44,9 @@ vi.mock('../../../services/backendAdapter', async (importOriginal) => {
   return { ...actual, backend: mocks.backend };
 });
 vi.mock('../../../services/mcpElectronBridge', () => ({ refreshMcpElectronBridge: mocks.refreshMcpElectronBridge }));
+vi.mock('../../repositories/hooks/analysisJobRegistry', () => ({
+  abortActiveAnalysisJobs: mocks.abortActiveAnalysisJobs,
+}));
 vi.mock('./useLoginActions', () => ({
   useLoginActions: () => ({
     restoreBackendSession: mocks.restoreBackendSession,
@@ -56,7 +61,7 @@ vi.mock('./useLoginActions', () => ({
 import { useAppStore } from '../../../store/useAppStore';
 import { hasPendingAccountSync, startAutoSync, stopAutoSync } from '../../../services/autoSync';
 import type { GitHubUser } from '../../../types';
-import { useAccountSwitchActions } from './useAccountSwitchActions';
+import { useAccountSwitchActions, hasPendingBackendCredentialAlign, resetPendingBackendCredentialAlignForTest } from './useAccountSwitchActions';
 
 // 恢复真实 Store：全局 setup.ts 将 ../store/useAppStore mock 成了选择器桩，
 // 而本测试需要驱动真实的多账号切换编排。
@@ -107,6 +112,7 @@ const workspaceOf = (repoId: number): AccountWorkspace => ({
 describe('useAccountSwitchActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetPendingBackendCredentialAlignForTest();
     mocks.backend.isAvailable = false;
     mocks.backend.backendUrl = null;
     mocks.syncFromBackend.mockResolvedValue(undefined);
@@ -195,6 +201,7 @@ describe('useAccountSwitchActions', () => {
     });
     mocks.authenticateWithGitHub.mockResolvedValue(userA);
     mocks.backend.isAvailable = true;
+    const generationBefore = getAccountSessionGeneration();
 
     const { result } = renderHook(() => useAccountSwitchActions());
     let outcome;
@@ -203,6 +210,8 @@ describe('useAccountSwitchActions', () => {
     });
 
     expect(outcome).toEqual({ ok: true, user: userA });
+    // R12 finding 16：同账号提交不同 PAT 必须推进会话代次（旧凭据在途任务失效）
+    expect(getAccountSessionGeneration()).toBe(generationBefore + 1);
     expect(useAppStore.getState().githubToken).toBe('ghp_a2');
     expect(useAppStore.getState().savedAccounts['1']?.githubToken).toBe('ghp_a2');
     expect(useAppStore.getState().savedAccounts['1']?.addedAt).toBe('t0');
@@ -217,6 +226,46 @@ describe('useAccountSwitchActions', () => {
       user_profile: userA,
     });
     expect(mocks.refreshMcpElectronBridge).toHaveBeenCalled();
+  });
+
+  it('does not advance the session generation when the same PAT is re-submitted (R12 finding 16)', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't0', lastUsedAt: 't' } },
+    });
+    mocks.authenticateWithGitHub.mockResolvedValue(userA);
+    mocks.backend.isAvailable = true;
+    const generationBefore = getAccountSessionGeneration();
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    await act(async () => {
+      await result.current.addAccountWithToken('ghp_a');
+    });
+
+    // 重复提交相同 PAT 不中止当前任务
+    expect(getAccountSessionGeneration()).toBe(generationBefore);
+  });
+
+  it('aborts dependent analysis jobs before committing the candidate backend (R12 finding 6)', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
+    });
+    mocks.restoreBackendSession.mockResolvedValue({ status: 'unauthorized' });
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    await act(async () => {
+      await result.current.addAccountFromBackend('https://candidate.example', 'secret');
+    });
+
+    expect(mocks.abortActiveAnalysisJobs).toHaveBeenCalledTimes(1);
+    // 必须在候选连接（restoreBackendSession 提交 URL）之前中止
+    expect(mocks.abortActiveAnalysisJobs.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.restoreBackendSession.mock.invocationCallOrder[0]);
   });
 
   it('archives the current account before switching to a newly added one', async () => {
@@ -373,6 +422,7 @@ describe('useAccountSwitchActions', () => {
 describe('useAccountSwitchActions audit fixes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetPendingBackendCredentialAlignForTest();
     mocks.backend.isAvailable = false;
     mocks.backend.backendUrl = null;
     mocks.syncFromBackend.mockResolvedValue(undefined);
@@ -408,20 +458,24 @@ describe('useAccountSwitchActions audit fixes', () => {
     const first = renderHook(() => useAccountSwitchActions());
     const second = renderHook(() => useAccountSwitchActions());
     const pendingSwitch = first.result.current.switchToAccount('2');
-    await act(async () => { await Promise.resolve(); });
-    expect(mocks.authenticateWithGitHub).not.toHaveBeenCalled();
+    // R12（finding 17）：断言失败也必须放行挂起的生产流程，否则模块级切换锁
+    // 不会释放，后续用例会以 switch-in-progress 失败。
+    try {
+      await act(async () => { await Promise.resolve(); });
+      expect(mocks.authenticateWithGitHub).not.toHaveBeenCalled();
 
-    // 另一 Hook 实例（模拟 AddAccountModal）的添加流程被共享锁拒绝
-    let secondOutcome;
-    await act(async () => {
-      secondOutcome = await second.result.current.addAccountWithToken('ghp_c');
-    });
-    expect(secondOutcome).toEqual({ ok: false, error: 'switch-in-progress' });
-
-    await act(async () => {
-      releasePrepare();
-      await pendingSwitch;
-    });
+      // 另一 Hook 实例（模拟 AddAccountModal）的添加流程被共享锁拒绝
+      let secondOutcome;
+      await act(async () => {
+        secondOutcome = await second.result.current.addAccountWithToken('ghp_c');
+      });
+      expect(secondOutcome).toEqual({ ok: false, error: 'switch-in-progress' });
+    } finally {
+      await act(async () => {
+        releasePrepare();
+        await pendingSwitch;
+      });
+    }
     expect(useAppStore.getState().user?.login).toBe('bob');
     // 流程结束后锁必须释放：其他实例可以立即启动下一个流程
     mocks.prepareForAccountSwitch.mockResolvedValue(undefined);
@@ -446,20 +500,23 @@ describe('useAccountSwitchActions audit fixes', () => {
 
     const { result } = renderHook(() => useAccountSwitchActions());
     const pending = result.current.addAccountWithToken('ghp_b');
-    await act(async () => { await Promise.resolve(); });
-    // 校验等待期间：忙碌状态置位，重复提交被拒绝，账号 A 未被归档
-    expect(result.current.isSwitching).toBe(true);
-    let repeatOutcome;
-    await act(async () => {
-      repeatOutcome = await result.current.addAccountWithToken('ghp_b');
-    });
-    expect(repeatOutcome).toEqual({ ok: false, error: 'switch-in-progress' });
-    expect(useAppStore.getState().user?.login).toBe('alice');
-
-    await act(async () => {
-      releaseAuth(userB);
-      await pending;
-    });
+    // R12（finding 17）：断言失败也必须放行挂起的校验流程（释放共享锁）
+    try {
+      await act(async () => { await Promise.resolve(); });
+      // 校验等待期间：忙碌状态置位，重复提交被拒绝，账号 A 未被归档
+      expect(result.current.isSwitching).toBe(true);
+      let repeatOutcome;
+      await act(async () => {
+        repeatOutcome = await result.current.addAccountWithToken('ghp_b');
+      });
+      expect(repeatOutcome).toEqual({ ok: false, error: 'switch-in-progress' });
+      expect(useAppStore.getState().user?.login).toBe('alice');
+    } finally {
+      await act(async () => {
+        releaseAuth(userB);
+        await pending;
+      });
+    }
     expect(useAppStore.getState().user?.login).toBe('bob');
     expect(result.current.isSwitching).toBe(false);
   });
@@ -717,18 +774,21 @@ describe('useAccountSwitchActions audit fixes', () => {
       await act(async () => {
         pendingSwitch = result.current.switchToAccount('1');
       });
-      await act(async () => { await Promise.resolve(); });
-      // 补推已启动（归属发起账号 A）；补推完成前拉取绝不能开始
-      expect(mocks.syncToBackend).toHaveBeenCalledTimes(1);
-      expect(pushesAtSync[0]?.login).toBe('alice');
-      expect(pushesAtSync[0]?.categoryOrder).toContain('edited-during-restore');
-      expect(mocks.syncFromBackend).toHaveBeenCalledTimes(pullsAfterRestore);
-
-      // 补推完成后：当前切换阶段恰好发起一次拉取
-      await act(async () => {
-        releasePush?.();
-        await pendingSwitch;
-      });
+      // R12（finding 17）：断言失败也必须放行挂起的补推（释放共享锁）
+      try {
+        await act(async () => { await Promise.resolve(); });
+        // 补推已启动（归属发起账号 A）；补推完成前拉取绝不能开始
+        expect(mocks.syncToBackend).toHaveBeenCalledTimes(1);
+        expect(pushesAtSync[0]?.login).toBe('alice');
+        expect(pushesAtSync[0]?.categoryOrder).toContain('edited-during-restore');
+        expect(mocks.syncFromBackend).toHaveBeenCalledTimes(pullsAfterRestore);
+      } finally {
+        // 补推完成后：当前切换阶段恰好发起一次拉取
+        await act(async () => {
+          releasePush?.();
+          await pendingSwitch;
+        });
+      }
       expect(mocks.syncFromBackend).toHaveBeenCalledTimes(pullsAfterRestore + 1);
     } finally {
       stopAutoSync(unsubscribe);
@@ -865,6 +925,54 @@ describe('useAccountSwitchActions audit fixes', () => {
 
     expect(outcome).toEqual({ ok: false, error: 'backend-credential-sync-failed' });
     expect(useAppStore.getState().user?.login).toBe('bob');
+  });
+
+  it('treats active_account_update_skipped as an incomplete switch and allows retry (R12 ISSUE-1)', async () => {
+    // 服务端契约：PAT 校验等待期间另一设备的切换抢先时返回
+    // active_account_update_skipped。本地已切到目标账号，但后端活跃账号仍指向
+    // 其他账号——必须返回失败（不报告成功）并登记待对齐标记；同账号重试不得
+    // 被早退短路，重试成功后清除标记。
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't0', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't0', lastUsedAt: 't' },
+      },
+      accountWorkspaces: { '2': workspaceOf(2) },
+      repositories: [],
+      searchResults: [],
+    });
+    mocks.backend.isAvailable = true;
+    mocks.backend.syncSettings.mockResolvedValueOnce({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: true,
+    });
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.switchToAccount('2');
+    });
+
+    expect(outcome).toEqual({ ok: false, error: 'backend-credential-sync-failed' });
+    // 本地切换已提交，但后端对齐未完成 → 待对齐标记允许用户重试
+    expect(useAppStore.getState().user?.login).toBe('bob');
+    expect(hasPendingBackendCredentialAlign('2')).toBe(true);
+
+    // 重试：待对齐标记使同账号早退失效，再次执行后端对齐并清除标记
+    mocks.backend.syncSettings.mockResolvedValueOnce({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
+    });
+    await act(async () => {
+      outcome = await result.current.switchToAccount('2');
+    });
+    expect(outcome).toEqual({ ok: true });
+    expect(hasPendingBackendCredentialAlign('2')).toBe(false);
   });
 
   it('flushes the current account before removing it (even when target === current)', async () => {

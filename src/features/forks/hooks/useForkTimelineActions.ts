@@ -9,6 +9,7 @@ import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { logger } from '../../../services/logger';
 import { useDialog } from '../../../hooks/useDialog';
 import { useAuthSessionGeneration, type AuthSessionGeneration } from '../../../hooks/useAuthSessionGeneration';
+import { getAccountSessionGeneration, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 
 interface SyncModalState {
   isOpen: boolean;
@@ -158,7 +159,10 @@ export const useForkTimelineActions = () => {
     const refreshRequest = { id: ++refreshRequestIdRef.current, session: requestSession };
     refreshRequestRef.current = refreshRequest;
     const startTime = Date.now();
-    state.setForkIsRefreshing(true);
+    // 交接项 2（R12）：刷新标志携带发起会话身份（账号 + 会话代次），过期
+    // finally 不得清除新账号/新凭据会话正在进行的刷新标志。
+    const refreshOwner = { accountId: peekCurrentAccountId(), generation: getAccountSessionGeneration() };
+    state.setForkIsRefreshing(true, refreshOwner);
     try {
       const api = createGitHubApiService(state.githubToken);
       const isPersonalOwner = isSameGitHubLogin(ownerLogin, personalOwnerLogin);
@@ -267,7 +271,7 @@ export const useForkTimelineActions = () => {
     } finally {
       if (refreshRequestRef.current?.id === refreshRequest.id) {
         refreshRequestRef.current = null;
-        state.setForkIsRefreshing(false);
+        state.setForkIsRefreshing(false, refreshOwner);
       }
     }
   }, [captureSession, isCurrentSession, state, personalOwnerLogin, t, toast]);

@@ -49,6 +49,19 @@ export class GistDetailSessionSwitchedError extends Error {
 }
 
 /**
+ * 按 ID 原位修改星标字段（R12 审计修复）：迟到的取消星标响应不得用发起时的
+ * 旧对象覆盖期间发生的编辑（描述/文件等），只允许改 `starred`。返回原数组
+ * 引用表示没有变化。
+ */
+const patchGistStarred = (gists: Gist[], gistId: string, starred: boolean): Gist[] => {
+  const index = gists.findIndex((gist) => gist.id === gistId);
+  if (index === -1 || gists[index].starred === starred) return gists;
+  const next = [...gists];
+  next[index] = { ...next[index], starred };
+  return next;
+};
+
+/**
  * 审计修复：切号期间远端操作已成功的 Gist 变更（删除/取消星标/编辑）必须
  * 反映到发起账号的工作区，否则切回该账号时归档快照会把旧状态换入实时列表，
  * 与 GitHub 不一致。沿用账号工作区生命周期的安全更新路径（与
@@ -60,16 +73,37 @@ export class GistDetailSessionSwitchedError extends Error {
  */
 const applyRemoteGistChangeToOwnerSession = (
   ownerAccountId: string | null,
-  change: { type: 'update'; gist: Gist } | { type: 'delete'; gistId: string },
+  change:
+    | { type: 'update'; gist: Gist }
+    | { type: 'delete'; gistId: string }
+    | { type: 'star'; gistId: string; starred: boolean }
+    | { type: 'create'; gist: Gist },
 ): void => {
   if (!ownerAccountId || typeof useAppStore.setState !== 'function') return;
   if (isCurrentAccount(ownerAccountId)) {
     withAccountSwitchGuardSync(() => {
       if (change.type === 'delete') {
         useAppStore.getState().deleteGist(change.gistId);
-      } else {
-        useAppStore.getState().updateGist(change.gist);
+        return;
       }
+      if (change.type === 'star') {
+        // 只改星标字段：读取实时最新条目，绝不写回发起时的旧快照
+        useAppStore.setState((state) => ({
+          gists: patchGistStarred(state.gists, change.gistId, change.starred),
+          starredGists: patchGistStarred(state.starredGists, change.gistId, change.starred),
+          gistSearchResults: patchGistStarred(state.gistSearchResults, change.gistId, change.starred),
+        }));
+        return;
+      }
+      if (change.type === 'create') {
+        // 新建补写：按 ID 插入发起账号自己的 gist 列表（不覆盖已有条目）
+        useAppStore.setState((state) => {
+          if (state.gists.some((gist) => gist.id === change.gist.id)) return state;
+          return { gists: [change.gist, ...state.gists] };
+        });
+        return;
+      }
+      useAppStore.getState().updateGist(change.gist);
     });
     return;
   }
@@ -89,7 +123,29 @@ const applyRemoteGistChangeToOwnerSession = (
           },
         };
       }
-      // 编辑/取消星标：按 ID 原位替换；条目不在快照中时跳过（绝不无中生有，
+      if (change.type === 'star') {
+        // 迟到的取消星标：只改最新条目的星标字段，保留期间发生的编辑内容
+        const gists = patchGistStarred(parked.gists, change.gistId, change.starred);
+        const starredGists = patchGistStarred(parked.starredGists, change.gistId, change.starred);
+        if (gists === parked.gists && starredGists === parked.starredGists) return state;
+        return {
+          accountWorkspaces: {
+            ...state.accountWorkspaces,
+            [ownerAccountId]: { ...parked, gists, starredGists },
+          },
+        };
+      }
+      if (change.type === 'create') {
+        // 切号期间创建成功：按 ID 插入发起账号归档（已在列表则保持原条目）
+        if (parked.gists.some((gist) => gist.id === change.gist.id)) return state;
+        return {
+          accountWorkspaces: {
+            ...state.accountWorkspaces,
+            [ownerAccountId]: { ...parked, gists: [change.gist, ...parked.gists] },
+          },
+        };
+      }
+      // 编辑：按 ID 原位替换；条目不在快照中时跳过（绝不无中生有，
       // 也绝不把更新条目前置插入——那是「新增」语义，不属于本路径）。
       const replaceById = (gists: Gist[]): Gist[] => {
         const index = gists.findIndex((gist) => gist.id === change.gist.id);
@@ -122,6 +178,12 @@ export const useGistActions = () => {
   // 不变、下方 effect 不执行，而 finally 的会话检查又会跳过清理——没有请求身份
   // 记录时同步按钮会永久禁用。每次刷新登记唯一身份，仅最新请求可复位状态。
   const refreshRunRef = useRef(0);
+  // 分析标记归属（R12 审计修复）：同账号换凭据会推进会话代次但账号不变，
+  // 旧任务的 finally 若只看代次会跳过清理，Gist 永久显示「分析中」。为每个
+  // Gist 记录设置标记的任务身份：只有仍持有该标记的任务才能清除它——新会话
+  // 刚为同一 Gist 设置的标记不会被旧任务误清。
+  const analysisRunRef = useRef(0);
+  const analysisMarkerOwnersRef = useRef(new Map<string, number>());
   const currentUserId = useAppStore((s) => s.user?.id ?? null);
   // 切换账号时立即清除旧会话残留的刷新状态，避免新账号的刷新按钮被禁用
   useEffect(() => {
@@ -136,6 +198,24 @@ export const useGistActions = () => {
     [analyzingGistIds],
   );
   const t = useT('gists');
+
+  /**
+   * 分析标记的取得/释放（R12）：标记按任务身份归属。释放只允许标记的当前
+   * 持有者执行——同账号换凭据推进代次后，旧任务仍能清掉自己留下的标记；
+   * 新会话为同一 Gist 重新设置的标记不会被旧任务误清。
+   */
+  const beginAnalysisMarker = useCallback((gistId: string) => {
+    const token = ++analysisRunRef.current;
+    analysisMarkerOwnersRef.current.set(gistId, token);
+    state.setAnalyzingGist(gistId, true);
+    return token;
+  }, [state]);
+
+  const endAnalysisMarker = useCallback((gistId: string, token: number) => {
+    if (analysisMarkerOwnersRef.current.get(gistId) !== token) return;
+    analysisMarkerOwnersRef.current.delete(gistId);
+    state.setAnalyzingGist(gistId, false);
+  }, [state]);
 
   const refreshGists = useCallback(async () => {
     if (!state.githubToken) {
@@ -254,7 +334,7 @@ export const useGistActions = () => {
     const concurrency = activeConfig.concurrency && activeConfig.concurrency > 1 ? activeConfig.concurrency : 1;
     const analyzeOne = async (gist: Gist) => {
       if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
-      state.setAnalyzingGist(gist.id, true);
+      const markerToken = beginAnalysisMarker(gist.id);
       try {
         const detail = await api.getGistForAnalysis(gist.id, gist);
         // 发送内容给 AI 前复核：切号后绝不把旧账号的私有 Gist 正文发给 AI
@@ -268,11 +348,12 @@ export const useGistActions = () => {
         state.updateGist({ ...gist, analyzed_at: new Date().toISOString(), analysis_failed: true, analysis_error: error instanceof Error ? error.message : String(error) });
         failed++;
       } finally {
-        // 分析标记清理只作用于发起账号仍是当前账号的场景：切号后 setAnalyzingGist
-        // 作用于新账号工作区，会误清新账号同 ID Gist 的分析标记（分析中标记不
-        // 入工作区快照，无需对归档工作区做额外清理）。
-        if (isCurrentAccountSession(jobAccountId, jobGeneration)) {
-          state.setAnalyzingGist(gist.id, false);
+        // 标记按任务身份归属（R12）：同一账号换凭据（代次推进、账号不变）也
+        // 必须清理旧任务自己留下的标记，否则 Gist 永久显示「分析中」；新会话
+        // 为同一 Gist 重新设置的标记（新 token）不会被旧任务误清。切到其他
+        // 账号时不清理（新账号工作区的同 ID 标记与旧任务无关）。
+        if (isCurrentAccount(jobAccountId)) {
+          endAnalysisMarker(gist.id, markerToken);
         }
       }
     };
@@ -286,7 +367,7 @@ export const useGistActions = () => {
     } finally {
       setIsAnalyzingAll(false);
     }
-  }, [state, t, toast, confirm]);
+  }, [beginAnalysisMarker, endAnalysisMarker, state, t, toast, confirm]);
 
   const fetchGistDetail = useCallback(async (gist: Gist): Promise<Gist | null> => {
     if (!state.githubToken) return null;
@@ -348,7 +429,16 @@ export const useGistActions = () => {
         return;
       }
       const created = await api.createGist(input as GistCreateInput);
-      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        // 审计修复（R12）：远端创建已按发起账号完成（不可撤销）——按 ID 补写
+        // 发起账号的工作区（实时或归档），否则切回后归档列表缺少新 Gist；
+        // 不显示旧会话的成功提示，也不触碰当前账号的列表。
+        applyRemoteGistChangeToOwnerSession(
+          startedAccountId,
+          { type: 'create', gist: { ...created, last_edited: new Date().toISOString() } },
+        );
+        return;
+      }
       state.updateGist({ ...created, last_edited: new Date().toISOString() });
       toast(t('useGistActions.gist-created'), 'success');
     } catch (error) {
@@ -398,7 +488,7 @@ export const useGistActions = () => {
     }
     if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
 
-    state.setAnalyzingGist(gist.id, true);
+    const markerToken = beginAnalysisMarker(gist.id);
     try {
       const githubApi = createGitHubApiService(state.githubToken);
       const detail = await githubApi.getGistForAnalysis(gist.id, gist);
@@ -413,12 +503,13 @@ export const useGistActions = () => {
       state.updateGist(applyGistAnalysisFailure(gist, error instanceof Error ? error.message : String(error), new Date().toISOString()));
       toast(t('useGistActions.gist-ai-analysis-failed'), 'error');
     } finally {
-      // 与批量分析一致：分析标记清理只作用于发起账号仍是当前账号的工作区
-      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
-        state.setAnalyzingGist(gist.id, false);
+      // 与批量分析一致（R12）：同账号换凭据后旧任务仍清理自己留下的标记；
+      // 切到其他账号时不清理（新账号同 ID 标记与旧任务无关）。
+      if (isCurrentAccount(startedAccountId)) {
+        endAnalysisMarker(gist.id, markerToken);
       }
     }
-  }, [state, t, toast, confirm]);
+  }, [beginAnalysisMarker, endAnalysisMarker, state, t, toast, confirm]);
 
   const unstarGist = useCallback(async (gist: Gist, onUnstarred?: (gistId: string) => void) => {
     if (!state.githubToken) return;
@@ -443,11 +534,12 @@ export const useGistActions = () => {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         // 审计修复：远端取消星标已按发起账号完成（不可撤销）——发起账号的
         // 工作区（实时或归档）必须同步该结果，切回后列表才与 GitHub 一致。
-        applyRemoteGistChangeToOwnerSession(startedAccountId, { type: 'update', gist: { ...gist, starred: false } });
+        // R12：只改星标字段，绝不写回发起时的旧对象（期间可能已被编辑）。
+        applyRemoteGistChangeToOwnerSession(startedAccountId, { type: 'star', gistId: gist.id, starred: false });
         return;
       }
       onUnstarred?.(gist.id);
-      state.updateGist({ ...gist, starred: false });
+      applyRemoteGistChangeToOwnerSession(startedAccountId, { type: 'star', gistId: gist.id, starred: false });
       toast(t('useGistActions.unstarred'), 'success');
     } catch {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;

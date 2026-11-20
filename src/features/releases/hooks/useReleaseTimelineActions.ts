@@ -7,6 +7,7 @@ import {
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
+import { getLastReadReleasesWrite } from '../../../store/helpers/readReleasesWrites';
 import { selectReleaseTimelineState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
@@ -150,7 +151,8 @@ export const useReleaseTimelineActions = () => {
     let addedByAction = new Set<number>();
     let optimisticReadReleases = new Set<number>();
     // 跟踪请求期间是否发生过整体替换（如备份恢复/后端同步替换了 readReleases，
-    // 即使新集合恰好包含旧 ID 也意味着本次乐观更新已失去所有权）。
+    // 即使新集合恰好包含旧 ID 也意味着本次乐观更新已失去所有权）。判定依据是
+    // store 侧登记的写入来源/版本，而不是集合差值（R12 finding 2）。
     let ownershipLostByBulkReplace = false;
     let unsubscribeReadWatcher: (() => void) | null = null;
     const rollbackReadReleases = (current: Iterable<number>): Set<number> | null => {
@@ -199,9 +201,16 @@ export const useReleaseTimelineActions = () => {
           if (nextState.user?.id !== prevState.user?.id) return;
           if (peekCurrentAccountId() !== startedAccountId) return;
           if (nextState.readReleases === prevState.readReleases) return;
-          const isSingleIncrementalAdd = nextState.readReleases.size === prevState.readReleases.size + 1
-            && Array.from(prevState.readReleases).every(id => nextState.readReleases.has(id));
-          if (!isSingleIncrementalAdd) {
+          // R12 finding 2：按 store 侧登记的「写入来源 + 集合引用」判断回滚
+          // 所有权，不再按集合差值猜测。备份整组替换（未经 store action 的
+          // 原始 setState）即使恰好新增 1 个 ID 也会因引用不匹配被识别为整组
+          // 替换；只有 markReleaseAsRead 登记的单条已读写入（含 latest 模式
+          // 同仓库多条）才视为并发单条已读，保留本次乐观更新的回滚所有权。
+          const write = getLastReadReleasesWrite();
+          const isTrackedSingleRead = write !== null
+            && write.next === nextState.readReleases
+            && write.source === 'single-read';
+          if (!isTrackedSingleRead) {
             ownershipLostByBulkReplace = true;
           }
         });
@@ -333,8 +342,13 @@ export const useReleaseTimelineActions = () => {
     const removedReadReleaseIds = new Set(
       Array.from(useAppStore.getState().readReleases).filter(id => removedReleaseIds.has(id)),
     );
+    // R12（finding 20）：只记录删除前确实处于展开状态的仓库——原本收起的仓库
+    // 不得因失败回滚被展开。
+    const expandedBeforeDelete = useAppStore.getState().releaseExpandedRepositories;
     const removedExpandedRepoIds = new Set(
-      removedReleasesSnapshot.map(item => item.repository.id),
+      removedReleasesSnapshot
+        .map(item => item.repository.id)
+        .filter(repoId => expandedBeforeDelete.has(repoId)),
     );
     if (!stillActive) state.removeReleasesByRepoFullName(releaseRepo.full_name);
     try {

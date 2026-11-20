@@ -2,7 +2,15 @@
 import { logger } from '../../services/logger';
 import { WATCH_CUSTOM_RELEASE_SOURCE_ID, normalizeReleaseSourceSettings, normalizeRepoKey } from '../../utils/releaseSources';
 import type { AppStoreSlice } from '../types';
-import { shouldPreserveExisting } from '../helpers/accountWorkspace';
+import { accountIdKey, getAccountSessionGeneration, shouldPreserveExisting } from '../helpers/accountWorkspace';
+import { recordReadReleasesWrite } from '../helpers/readReleasesWrites';
+import { useAppStore } from '../useAppStore';
+
+/**
+ * Fork 刷新标志的会话归属（B4 fork，第 12 轮审计修复）：setForkIsRefreshing(true)
+ * 时记录发起账号与会话代次，finally 清理按归属校验（见 setForkIsRefreshing）。
+ */
+let _forkRefreshOwner: { accountId: string | null; generation: number } | null = null;
 
 export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setReleases'
@@ -65,6 +73,9 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
         const nextReadReleases = new Set(
           Array.from(state.readReleases).filter(releaseId => !updatedIds.has(releaseId))
         );
+        // R12 finding 2：登记派生写入来源（内容更新裁剪已读集合），订阅方据此
+        // 判定乐观操作是否仍拥有回滚所有权。
+        recordReadReleasesWrite('prune', nextReadReleases);
         return { releases: merged, readReleases: nextReadReleases };
       }),
       toggleReleaseSubscription: (repoId) => set((state) => {
@@ -94,6 +105,7 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
         );
         const nextExpandedRepos = new Set(state.releaseExpandedRepositories);
         nextExpandedRepos.delete(repoId);
+        recordReadReleasesWrite('prune', nextReadReleases);
         return {
           releases: filteredReleases,
           readReleases: nextReadReleases,
@@ -111,9 +123,13 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
         );
         const nextExpandedRepos = new Set(state.releaseExpandedRepositories);
         removedRepoIds.forEach(repoId => nextExpandedRepos.delete(repoId));
+        const nextReadReleases = new Set(
+          Array.from(state.readReleases).filter(releaseId => remainingReleaseIds.has(releaseId))
+        );
+        recordReadReleasesWrite('prune', nextReadReleases);
         return {
           releases: filteredReleases,
-          readReleases: new Set(Array.from(state.readReleases).filter(releaseId => remainingReleaseIds.has(releaseId))),
+          readReleases: nextReadReleases,
           releaseExpandedRepositories: nextExpandedRepos,
         };
       }),
@@ -223,6 +239,10 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
             )
           : state.releases;
 
+        // R12 finding 2：单条已读是唯一允许乐观 mark-all 回滚「保留并发新增」
+        // 的写入来源；latest 模式连同同仓库其余 release 一并标记也属于单次
+        // 用户已读操作。
+        recordReadReleasesWrite('single-read', newReadReleases);
         return { readReleases: newReadReleases, releases };
       }),
       // 资产级已读：仅从 release.updated_asset_ids 移除该资产 id，不动 readReleases/is_read。
@@ -253,6 +273,7 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
             ...(hasBadges ? { updated_asset_ids: [] } : {}),
           };
         });
+        recordReadReleasesWrite('mark-all', allReleaseIds);
         return { readReleases: allReleaseIds, releases };
       }),
 
@@ -302,5 +323,42 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
         return { forkExpandedRepositories: newSet };
       }),
       setForkExpandedRepositories: (forkExpandedRepositories) => set({ forkExpandedRepositories }),
-      setForkIsRefreshing: (forkIsRefreshing) => set({ forkIsRefreshing }),
+      setForkIsRefreshing: (forkIsRefreshing, owner) => set(() => {
+        // B4（fork，第 12 轮审计修复）：Fork 刷新标志的会话归属校验，语义与
+        // preferenceSlice 的 setReleaseIsRefreshing 一致——发起刷新时记录
+        // (账号, 会话代次)；finally 清理携带发起时身份，仅当身份仍是当前持有者
+        // 才清除；无 owner 的清理按当前账号/代次复核。旧账号的过期 finally
+        // 不得清除新账号正在进行的刷新标志；账号切换时的标志复位由
+        // switchAccount/logout 的会话拆除负责。
+        if (forkIsRefreshing) {
+          _forkRefreshOwner = owner ?? null;
+          return { forkIsRefreshing: true };
+        }
+        if (owner) {
+          if (_forkRefreshOwner
+            && _forkRefreshOwner.accountId === owner.accountId
+            && _forkRefreshOwner.generation === owner.generation) {
+            _forkRefreshOwner = null;
+            return { forkIsRefreshing: false };
+          }
+          return {};
+        }
+        if (_forkRefreshOwner) {
+          let currentUser: { id: number } | null = null;
+          try {
+            const store = useAppStore as unknown as { getState?: () => { user: { id: number } | null } };
+            currentUser = typeof store.getState === 'function' ? (store.getState()?.user ?? null) : null;
+          } catch {
+            currentUser = null;
+          }
+          const sameAccount = _forkRefreshOwner.accountId === accountIdKey(currentUser);
+          const sameGeneration = _forkRefreshOwner.generation === getAccountSessionGeneration();
+          if (!sameAccount || !sameGeneration) {
+            // 过期清理：发起刷新的账号/会话已被切换，不得清除当前账号的刷新状态
+            return {};
+          }
+          _forkRefreshOwner = null;
+        }
+        return { forkIsRefreshing: false };
+      }),
 });

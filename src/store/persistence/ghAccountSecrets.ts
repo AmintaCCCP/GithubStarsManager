@@ -19,6 +19,8 @@
  * 不会被抹掉。
  */
 
+import { forgetV19MigrationInputs } from './v19MigrationInputs';
+
 const GH_ACCOUNT_ID_PATTERN = /^\d{1,20}$/;
 /** GitHub Token 为可打印 ASCII（classic 与 fine-grained 均如此），禁止控制字符。 */
 const GH_TOKEN_PATTERN = /^[\x21-\x7E]{1,512}$/;
@@ -127,6 +129,13 @@ export const isGhAccountTokensFullyLoaded = (): boolean => ghAccountTokensFullyL
 /** 供调用方/测试检查是否存在尚未落盘的账号凭据删除请求（可用于重试提示）。 */
 export const hasPendingGhAccountSecretRemovals = (): boolean => pendingRemovedAccountIds.size > 0;
 
+/**
+ * 尚未落盘的显式删除账号列表（跨重启持久化）。持久化层据此在重建 v19 迁移
+ * 输入 / 回填运行时 Token 时屏蔽这些账号——登出/移除后即使分片写入是陈旧的，
+ * 旧 PAT 也不得被重新收作迁移输入或一键恢复来源。
+ */
+export const getPendingGhAccountSecretRemovalIds = (): string[] => Array.from(pendingRemovedAccountIds);
+
 /** 丢弃非法键（非数字 ID）与非法值（空/超长/含控制字符）的条目。 */
 const sanitizeTokenMap = (tokens: GhAccountTokenMap | null | undefined): GhAccountTokenMap => {
   const result: GhAccountTokenMap = {};
@@ -190,25 +199,47 @@ export const loadGhAccountTokens = (): Promise<GhAccountsLoadResult> =>
  *   再删除显式移除列表及之前保存失败残留的 pendingRemovedAccountIds；
  * - 磁盘镜像未知（尚未成功读取）⇒ 先读后写；读取失败则中止写入，绝不以
  *   部分映射覆写磁盘；
- * - 保存成功后才清除已应用的 pendingRemovedAccountIds；抛错时磁盘与待删列表均保留。
+ * - 保存成功后才清除已应用的 pendingRemovedAccountIds；抛错时磁盘与待删列表均保留；
+ * - 本次保存为带待删标记的账号写入新 Token（替换）时，候选映射保留新值，
+ *   但标记取消同样延迟到写入确认——替换失败时旧 PAT 仍被屏蔽（第 12 轮审计修复）。
  */
 export const saveGhAccountTokens = (
   tokens: GhAccountTokenMap,
   removedAccountIds: string[] = [],
-): Promise<void> => enqueueGhAccountsOp(async () => {
+): Promise<void> => {
+  // ISSUE-1(C)：显式删除（登出/移除账号）必须在任何后续持久化之前让该账号的
+  // 迁移输入失效——否则 partialize 会把旧 PAT 回填进分片，登录页可凭旧记录
+  // 一键恢复已退出的账号。即使本次写入失败也必须生效（待删标记继续屏蔽磁盘旧值）。
+  forgetV19MigrationInputs(removedAccountIds);
+  return enqueueGhAccountsOp(async () => {
   const bridge = getBridge();
   if (!bridge) return;
   const sanitized = sanitizeTokenMap(tokens);
-  // 记录本次显式删除；若本次又为同一账号写入了有效 Token，则取消其待删标记。
-  for (const accountId of Object.keys(sanitized)) {
-    pendingRemovedAccountIds.delete(accountId);
-  }
+  // 记录本次显式删除并立即持久化：写入失败（含进程退出）时旧 PAT 的屏蔽
+  // 标记必须已经生效，重启后水化读取不会把它回填进会话。
   for (const accountId of removedAccountIds) {
     if (GH_ACCOUNT_ID_PATTERN.test(accountId)) {
       pendingRemovedAccountIds.add(accountId);
     }
   }
   persistPendingRemovals(pendingRemovedAccountIds);
+  // 第 12 轮审计修复：本次保存又为同账号写入了有效 Token 时，候选映射允许
+  // 新 PAT 替换旧值（该账号不进入本次删除列表；若同一次调用还显式列出了该
+  // 账号，仍按删除处理），但其待删标记的取消延迟到加密写入确认成功之后——
+  // 若替换也失败，磁盘上的旧 PAT 未变且屏蔽标记仍在（下次启动不会把已删除
+  // 账号的旧 PAT 回填进会话）；替换成功则新 PAT 可正常加载。待删标记的变更
+  // 绝不先于 bridge.save() 提交。
+  const explicitlyRemoved = new Set(
+    removedAccountIds.filter((accountId) => GH_ACCOUNT_ID_PATTERN.test(accountId)),
+  );
+  const replacedAccounts = new Set<string>();
+  for (const accountId of Object.keys(sanitized)) {
+    // 显式删除优先：同一次保存既要求删除又提供了新 Token 时按删除处理
+    //（与第 11 轮及更早的语义一致），绝不把新 Token 写回被删除的账号。
+    if (pendingRemovedAccountIds.has(accountId) && !explicitlyRemoved.has(accountId)) {
+      replacedAccounts.add(accountId);
+    }
+  }
   let base: GhAccountTokenMap;
   if (knownDiskTokens) {
     base = { ...knownDiskTokens };
@@ -221,7 +252,10 @@ export const saveGhAccountTokens = (
     base = disk.status === 'loaded' ? { ...disk.tokens } : {};
   }
   const payload: GhAccountTokenMap = { ...base, ...sanitized };
-  const appliedRemovals = Array.from(pendingRemovedAccountIds);
+  // 应用的删除 = 全部待删标记 − 本次被新 PAT 替换的账号（显式删除与同账号
+  // 重授权同时出现时，删除优先——与既有语义一致）。
+  const appliedRemovals = Array.from(pendingRemovedAccountIds)
+    .filter((accountId) => !replacedAccounts.has(accountId));
   for (const accountId of appliedRemovals) {
     delete payload[accountId];
   }
@@ -229,13 +263,23 @@ export const saveGhAccountTokens = (
   if (!result.success) {
     throw new Error(result.error ?? 'gh-accounts save failed');
   }
+  // 加密写入确认成功后才提交待删标记变更：已删除项与被替换项一并清除。
   for (const accountId of appliedRemovals) {
+    pendingRemovedAccountIds.delete(accountId);
+  }
+  for (const accountId of replacedAccounts) {
     pendingRemovedAccountIds.delete(accountId);
   }
   persistPendingRemovals(pendingRemovedAccountIds);
   knownDiskTokens = { ...payload };
   ghAccountTokensFullyLoaded = true;
-});
+  // ISSUE-1：本次成功写入的账号不再需要跨重启保留旧迁移输入（新值已在磁盘）。
+  // 只删除实际写入的账号——同一队列中其他账号的迁移保存失败时其输入不受影响。
+  forgetV19MigrationInputs(
+    Object.keys(sanitized).filter((accountId) => !appliedRemovals.includes(accountId)),
+  );
+  });
+};
 
 /** 清除桌面端安全存储中的全部账号 Token（成功后磁盘状态已知为空）。 */
 export const clearGhAccountTokens = (): Promise<void> => enqueueGhAccountsOp(async () => {

@@ -181,7 +181,12 @@ const migrations: Record<number, (db: Database.Database) => void> = {
         -- Issue #612 审计：空字符串 / 仅含空白的 id 与 NULL 同样处理——否则旧
         -- 备份（基线导入原样写 ''）留下的空 id 分类在 v4 无法被
         -- PUT/DELETE /api/categories/:id 匹配（空路径段），既不能编辑也不能删除。
-        SELECT 'default', CASE WHEN TRIM(COALESCE(id, '')) = '' THEN 'legacy-category-' || rowid || '-' || lower(hex(randomblob(8))) ELSE id END, name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
+        -- Issue #612 R12：空白判定与备份导入器的 JavaScript trim() 保持一致——
+        -- SQLite 单参数 TRIM 只删空格（U+0020），制表符等 ASCII 空白要用双参数
+        -- TRIM(X, Y) 显式列出（' ' + char(9,10,11,12,13)），否则仅含制表符的旧 id
+        -- 在迁移中被保留、在备份导入中被判缺失重新生成，同一记录在两条路径下
+        -- 得到不同的 ID。
+        SELECT 'default', CASE WHEN TRIM(COALESCE(id, ''), ' ' || char(9) || char(10) || char(11) || char(12) || char(13)) = '' THEN 'legacy-category-' || rowid || '-' || lower(hex(randomblob(8))) ELSE id END, name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
         FROM categories;
 
         DROP TABLE categories;

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../../../types';
 import { useVectorSearchActions, type VectorIndexDraft } from './useVectorSearchActions';
 import { useAppStore } from '../../../store/useAppStore';
+import { EMBEDDING_FORMAT_VERSION } from '../../../services/vectorSearchService';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
@@ -21,12 +22,18 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../../store/useAppStore', () => ({
-  EMBEDDING_FORMAT_VERSION: 3,
-  LEGACY_EMBEDDING_FORMAT_VERSION: 1,
-  isKnownEmbeddingFormatVersion: (value: unknown) => value === 1 || value === 2 || value === 3 || value === 4,
-  useAppStore: mocks.useAppStore,
-}));
+// R12（finding 26）：格式版本常量必须来自真实实现，测试替身不再各自硬编码
+// （旧替身接受 4 而真实上限是 3，导致「当前版本」用例实际验证了非法版本）。
+vi.mock('../../../store/useAppStore', async () => {
+  const schema = await import('../../../store/schema');
+  const vector = await import('../../../services/vectorSearchService');
+  return {
+    EMBEDDING_FORMAT_VERSION: vector.EMBEDDING_FORMAT_VERSION,
+    LEGACY_EMBEDDING_FORMAT_VERSION: schema.LEGACY_EMBEDDING_FORMAT_VERSION,
+    isKnownEmbeddingFormatVersion: schema.isKnownEmbeddingFormatVersion,
+    useAppStore: mocks.useAppStore,
+  };
+});
 
 // 审计修复（R5）：清理删除的授权核对依赖后端权威快照——useVectorSearchActions
 // 仅在后端可用且快照核对通过时才执行 cleanup，测试必须提供同一契约。
@@ -36,9 +43,9 @@ vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
   return {
     // 保留真实的账号隔离向量 ID 编解码工具（runIndex 的 cleanup keepIds 依赖）
     ...actual,
-    EMBEDDING_FORMAT_VERSION: 3,
     EmbeddingClient: class {},
     VectorSearchService: class {
+      workerId = 'https://worker.example.com';
       cleanup = mocks.cleanup;
       getStatus = mocks.vectorGetStatus;
       testConnection = mocks.vectorTestConnection;
@@ -49,7 +56,7 @@ vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
     selectIndexableRepos: (repos: Repository[], options: { incremental?: boolean; formatVersion?: number; currentFormatVersion?: number } = {}) => {
       let indexable = repos.filter((repo) => repo.analyzed_at && !repo.analysis_failed);
       if (options.incremental) {
-        const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? 3);
+        const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? actual.EMBEDDING_FORMAT_VERSION);
         indexable = indexable.filter((repo) => mocks.needsReindex(repo, formatVersionChanged));
       }
       const seen = new Set<number>();
@@ -158,13 +165,37 @@ describe('useVectorSearchActions', () => {
     await act(async () => { await result.current.rebuildIndex(draft); });
 
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
-    const expectedCleanupOptions = { accountPrefix: '1', includeLegacy: false, signal: expect.any(AbortSignal) };
-    expect(mocks.cleanup).toHaveBeenNthCalledWith(1, ['1', '2', '1:1', '1:2'], expectedCleanupOptions);
-    expect(mocks.cleanup).toHaveBeenNthCalledWith(2, ['1', '2', '1:1', '1:2'], expectedCleanupOptions);
+    // R12：破坏性清理已停用，上传结果（含排除项）一律保留
+    expect(mocks.cleanup).not.toHaveBeenCalled();
     expect(mocks.updateRepositoriesMetadata).not.toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ id: 2 }),
     ]));
     expect(mocks.setVectorSearchStatus).toHaveBeenLastCalledWith(expect.objectContaining({ vectorCount: 2 }));
+  });
+
+  it('stamps migration backfills with the license of the actually uploaded copy (R12 finding 14)', async () => {
+    // 该账号尚未在当前 Worker 完成账号范围迁移：indexAllRepos 忽略增量过滤、
+    // 全量补写；打戳候选必须复现同一判定，用实际副本的许可证而不是空值。
+    storeState.vectorSearchConfig.embeddingFormatVersion = EMBEDDING_FORMAT_VERSION;
+    storeState.repositories = [{
+      ...repository,
+      id: 1,
+      license: 'MIT',
+      vector_indexed_at: '2026-08-01T00:00:00.000Z',
+      vector_indexed_license: 'Apache-2.0',
+    } as Repository];
+    mocks.needsReindex.mockReturnValue(false);
+    mocks.indexAllRepos.mockImplementation(async (_repos: unknown, _embedding: unknown, _vector: unknown, options: { onRepoIndexed?: (id: number) => void }) => {
+      options.onRepoIndexed?.(1);
+      return { indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] };
+    });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.incrementalIndex(draft); });
+
+    expect(mocks.updateRepositoriesMetadata).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 1, patch: expect.objectContaining({ vector_indexed_license: 'MIT' }) }),
+    ]);
   });
 
   it('counts unindexed repositories among eligible ones (migration forces all eligible)', () => {
@@ -174,8 +205,8 @@ describe('useVectorSearchActions', () => {
       { ...repository, id: 3, analyzed_at: undefined } as Repository,
       { ...repository, id: 4, analyzed_at: '2026-08-25T00:00:00.000Z', analysis_failed: true } as Repository,
     ];
-    // formatVersionChanged = true here (fixture embeddingFormatVersion 1 < 4):
-    // eligible repos count regardless of per-repo predicate args.
+    // fixture 的 embeddingFormatVersion 是 legacy(1) < 当前版本：需要迁移，
+    // eligible repos 全部计入（与 needsReindex 的逐仓谓词无关）。
     mocks.needsReindex.mockImplementation((repo: Repository) => repo.id !== 99);
     const { result } = renderHook(() => useVectorSearchActions());
     expect(result.current.unindexedRepoCount).toBe(2);
@@ -183,7 +214,7 @@ describe('useVectorSearchActions', () => {
   });
 
   it('excludes up-to-date repositories when no migration is pending', () => {
-    storeState.vectorSearchConfig.embeddingFormatVersion = 4;
+    storeState.vectorSearchConfig.embeddingFormatVersion = EMBEDDING_FORMAT_VERSION;
     storeState.repositories = [repository, { ...repository, id: 2 } as Repository];
     mocks.needsReindex.mockImplementation((repo: Repository) => repo.id === 2);
     const { result } = renderHook(() => useVectorSearchActions());
@@ -198,16 +229,17 @@ describe('useVectorSearchActions', () => {
     expect(result.current.unindexedRepoCount).toBe(0);
   });
 
-  it('treats an AbortError from cleanup as a cancelled index operation', async () => {
-    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
-    mocks.cleanup.mockImplementation((_ids: string[], options: { signal: AbortSignal }) => new Promise<void>((_, reject) => {
-      options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
-    }));
+  it('treats an AbortError from an aborted upload as a cancelled index operation', async () => {
+    mocks.indexAllRepos.mockImplementation((_repos: unknown, _embedding: unknown, _vector: unknown, options: { signal: AbortSignal }) => (
+      new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      })
+    ));
     const { result } = renderHook(() => useVectorSearchActions());
 
     let indexing!: Promise<void>;
     act(() => { indexing = result.current.rebuildIndex(draft); });
-    await waitFor(() => expect(mocks.cleanup).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.indexAllRepos).toHaveBeenCalledTimes(1));
     act(() => { result.current.abortIndexing(); });
     await act(async () => { await indexing; });
 
@@ -252,39 +284,33 @@ describe('useVectorSearchActions account switch guards', () => {
     };
   };
 
-  it('scopes vector cleanup to the active account while the index is shared across local accounts (new worker)', async () => {
+  it('never deletes vectors even when the index is shared across local accounts (R12: destructive cleanup disabled)', async () => {
     seedTwoAccounts();
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    // R5 审计修复：新版 Worker 按账号前缀删除——本机多账号也不再跳过 cleanup，
-    // 但只允许删除当前账号（id=1）前缀的向量；legacy 向量归属不明，绝不删除
-    expect(mocks.vectorGetStatus).toHaveBeenCalledTimes(1);
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '1:1'], {
-      accountPrefix: '1',
-      includeLegacy: false,
-      signal: expect.any(AbortSignal),
-    });
+    // R12（CodeRabbit Major）：同账号的其他设备可以绕过本后端向共享 Worker
+    // 上传向量，且 Worker 没有可验证的版本条件——keepIds 扫除无法证明安全，
+    // 一律跳过删除并保留上传结果（也不再探测 Worker 能力）。
+    expect(mocks.vectorGetStatus).not.toHaveBeenCalled();
+    expect(mocks.cleanup).not.toHaveBeenCalled();
     // 索引本身照常完成并更新本账号状态
     expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({ isIndexing: false }));
     expect(mocks.setVectorSearchStatus).toHaveBeenCalled();
   });
 
-  it('never deletes legacy vectors without ownership proof (single local account included)', async () => {
+  it('keeps legacy and account-scoped vectors after a full rebuild (R12)', async () => {
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    // 本机只有一个账号不能证明共享索引中的无前缀向量都属于它（另一台设备
-    // 可能仍在上传 legacy 形态），保留。
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '1:1'], {
-      accountPrefix: '1',
-      includeLegacy: false,
-      signal: expect.any(AbortSignal),
-    });
+    // 无前缀 legacy 向量的归属无法由客户端证明（另一台设备可能仍在上传），
+    // 删除请求整体停用后它们自然保留。
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({ isIndexing: false }));
   });
 
   it('skips vector cleanup when the worker does not advertise account-scoped deletion (old deployment)', async () => {
@@ -314,34 +340,30 @@ describe('useVectorSearchActions account switch guards', () => {
     expect(mocks.cleanup).not.toHaveBeenCalled();
   });
 
-  it('skips vector cleanup when the worker status probe fails', async () => {
+  it('keeps uploads even when the worker would report an error (no status probe, no cleanup)', async () => {
     mocks.vectorGetStatus.mockRejectedValue(new Error('worker unreachable'));
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
+    expect(mocks.vectorGetStatus).not.toHaveBeenCalled();
     expect(mocks.cleanup).not.toHaveBeenCalled();
-    // 探针失败只影响清理，索引结果照常落盘
+    // 索引结果照常落盘
     expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
       isIndexing: false,
       result: expect.objectContaining({ indexed: 1 }),
     }));
   });
 
-  it('still runs cleanup for a single-account index (control)', async () => {
+  it('keeps uploads for a single-account index too (R12 control)', async () => {
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    // R4 审计修复：keepIds 与索引中的实际向量 ID 形态一致——账号前缀形态
-    //（发起账号 id=1 → '1:1'）
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '1:1'], {
-      accountPrefix: '1',
-      includeLegacy: false,
-      signal: expect.any(AbortSignal),
-    });
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalled();
   });
 
   it('skips vector cleanup when no authoritative starred list is available (R5)', async () => {
@@ -424,9 +446,9 @@ describe('useVectorSearchActions account switch guards', () => {
     );
   });
 
-  it('keeps excluded repos in cleanup keepIds in both legacy and account-scoped forms (R4)', async () => {
-    // 排除项（已索引但分析缺失/失败）的存量向量可能是 legacy 或前缀形态：
-    // cleanup 按 keepIds 之外的 ID 物理删除，漏掉任一形态都会误删向量
+  it('never issues a keepIds sweep that could drop excluded repos (R12)', async () => {
+    // 排除项（已索引但分析缺失/失败）的存量向量可能是 legacy 或前缀形态；
+    // 删除请求整体停用后它们不再有被 keepIds 扫除的风险。
     storeState.repositories = [
       repository,
       { ...repository, id: 2, analyzed_at: undefined, analysis_failed: true, vector_indexed_at: '2026-08-01T00:00:00.000Z' } as Repository,
@@ -436,11 +458,7 @@ describe('useVectorSearchActions account switch guards', () => {
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '2', '1:1', '1:2'], {
-      accountPrefix: '1',
-      includeLegacy: false,
-      signal: expect.any(AbortSignal),
-    });
+    expect(mocks.cleanup).not.toHaveBeenCalled();
   });
 
   it('does not write indexing state into the new account after a mid-task switch', async () => {
@@ -486,10 +504,13 @@ describe('useVectorSearchActions account switch guards', () => {
     // 得以通过检查并覆盖新任务的运行状态/结果。这里以同账号连续两次
     // rebuildIndex 模拟任务取代：旧任务（已被新任务取消）不得写任何共享状态。
     const resolvers: Array<(value: { indexed: number; skipped: number; errors: number; indexedRepoIds: number[] }) => void> = [];
+    const aborts: number[] = [];
     mocks.indexAllRepos.mockImplementation((_repos: unknown, _embedding: unknown, _vector: unknown, options: { signal?: AbortSignal }) => (
       new Promise((resolve) => {
         resolvers.push(resolve);
-        options.signal?.addEventListener('abort', () => resolve({ indexed: 0, skipped: 0, errors: 1, indexedRepoIds: [] }));
+        // R12（finding 27）：中止只记录、不立即完成——旧任务必须在断言基线
+        // 之后才被放行，否则它的收尾写入可能发生在检查范围之外。
+        options.signal?.addEventListener('abort', () => { aborts.push(resolvers.length); });
       })
     ));
     const { result } = renderHook(() => useVectorSearchActions());
@@ -499,6 +520,8 @@ describe('useVectorSearchActions account switch guards', () => {
     await act(async () => { await Promise.resolve(); });
     let second!: Promise<void>;
     await act(async () => { second = result.current.rebuildIndex(draft); });
+    // 新任务已启动并中止了旧任务，但旧任务仍挂起
+    expect(aborts).toHaveLength(1);
     const writesBeforeOldResolves = mocks.setVectorIndexingState.mock.calls.length;
     // 先放行旧任务（新任务仍保持挂起），验证旧任务不得写入任何 isIndexing: false 或结果
     await act(async () => {

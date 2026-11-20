@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "Remove Saved Account",
     "remove-account-confirm-desc": "This only removes the saved sign-in credential for this account. Cached repositories and categories will be kept. Continue?",
     "account-switched": "Switched to @{{login}}",
-    "account-repo-count": "{{count}} repos"
+    "account-repo-count": "{{count}} repos",
+    "retry-credential-alignment": "Retry backend credential sync"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Pushing categories to lists"
@@ -1436,6 +1437,10 @@
     "confirm": "Add & Switch",
     "reauth-hint": "Please enter a valid GitHub token for @{{login}}",
     "account-mismatch": "This token belongs to a different GitHub account. Please sign in with the token of @{{login}}.",
-    "backend-credential-sync-failed": "The account was added, but the backend credential could not be updated. Please retry later."
+    "backend-credential-sync-failed": "Signed in to the account, but the backend credentials could not be updated. Please retry later from the account menu."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Logged out, but the device credential cleanup did not finish. The old credential stays masked and will be retried automatically on next launch.",
+    "active-account-update-skipped": "Another device changed the backend active account while this switch was in progress, so the backend was not switched to this account. Your local session is already on this account; retry from the account menu to align the backend."
   }
 }

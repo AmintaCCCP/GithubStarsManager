@@ -288,7 +288,8 @@ describe('pushCategoriesToLists 隐藏分类不参与回写', () => {
     await push();
 
     // 仓库加入 devtools list 的同时，保留其在隐藏分类 list（L_web）中的成员关系
-    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_web', 'L_new']);
+    // 第 12 轮：pushCategoriesToLists 为远端写入传入会话中止信号（第三参数）
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_web', 'L_new'], expect.anything());
   });
 });
 
@@ -315,7 +316,7 @@ describe('pushCategoriesToLists 仅推送选中分类', () => {
     expect(api.createUserList).toHaveBeenCalledTimes(1);
     expect(api.createUserList).toHaveBeenCalledWith('Alpha', true);
     expect(api.updateUserList).not.toHaveBeenCalled();
-    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev', 'L_new']);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev', 'L_new'], expect.anything());
     expect(state.categoryListIdMap).toEqual({ devtools: 'L_dev', 'custom-alpha': 'L_new' });
     expect(state.listsPush.error).toBeNull();
   });
@@ -335,7 +336,7 @@ describe('pushCategoriesToLists 仅推送选中分类', () => {
     await push(['custom-alpha']);
 
     expect(api.updateUserListsForItem).toHaveBeenCalledTimes(1);
-    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev']);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev'], expect.anything());
   });
 
   it('选中分类与未选分类共享同一 list 时，共享 list 的成员关系不被清理', async () => {

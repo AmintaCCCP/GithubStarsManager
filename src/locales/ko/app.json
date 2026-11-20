@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "저장된 계정 삭제",
     "remove-account-confirm-desc": "이 계정의 저장된 로그인 자격 증명만 제거됩니다. 캐시된 저장소와 카테고리는 유지됩니다. 계속하시겠습니까?",
     "account-switched": "@{{login}}(으)로 전환되었습니다",
-    "account-repo-count": "저장소 {{count}}개"
+    "account-repo-count": "저장소 {{count}}개",
+    "retry-credential-alignment": "백엔드 자격 증명 동기화 다시 시도"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "카테고리를 GitHub 목록에 동기화"
@@ -1436,6 +1437,10 @@
     "confirm": "추가 후 전환",
     "reauth-hint": "@{{login}} 계정의 유효한 GitHub 토큰을 다시 입력해 주세요",
     "account-mismatch": "이 토큰은 다른 GitHub 계정의 것입니다. @{{login}} 계정의 토큰으로 로그인해 주세요.",
-    "backend-credential-sync-failed": "계정이 추가되었지만 백엔드 자격 증명을 업데이트하지 못했습니다. 나중에 다시 시도하세요."
+    "backend-credential-sync-failed": "계정에 로그인했지만 백엔드 자격 증명을 업데이트하지 못했습니다. 나중에 계정 메뉴에서 다시 시도하세요."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "로그아웃되었지만 기기 자격 증명 정리가 완료되지 않았습니다. 이전 자격 증명은 계속 차단되며 다음 시작 시 자동으로 다시 시도됩니다.",
+    "active-account-update-skipped": "이 전환 중에 다른 기기가 백엔드의 활성 계정을 변경하여 백엔드가 이 계정으로 전환되지 않았습니다. 로컬 세션은 이미 이 계정을 사용 중입니다. 계정 메뉴에서 다시 시도하여 백엔드를 정렬하세요."
   }
 }

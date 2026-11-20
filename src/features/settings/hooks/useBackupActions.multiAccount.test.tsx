@@ -263,6 +263,95 @@ describe('useBackupActions multi-account (Issue #611)', () => {
     expect(state.isAuthenticated).toBe(true);
   });
 
+  it('parses account ids only from new-format names and recommends by actual backup time (R12 findings 11/23)', async () => {
+    // 当前账号 16：旧格式 `...-2026-11-16.json` 不能被当成账号 16 的备份
+    useAppStore.setState({
+      user: { ...userA, id: 16, login: 'pam' },
+      isAuthenticated: true,
+      savedAccounts: { '16': savedAccount('16', { ...userA, id: 16, login: 'pam' }, 'ghp_p') },
+    });
+    mocks.listFiles.mockResolvedValueOnce([
+      'github-stars-backup-2026-11-16.json',
+      'github-stars-backup-2026-11-20T10-00-00-000Z-2.json',
+    ]);
+    const { result } = renderHook(() => useBackupActions());
+    const listed = await result.current.listBackups();
+    // 无账号匹配：按实际时间推荐较新的 11-20 备份，而不是旧的 `-16.json`
+    expect(listed.recommended).toBe('github-stars-backup-2026-11-20T10-00-00-000Z-2.json');
+
+    // 同日：新版早晨备份 vs 旧版（时间未知 → 当日结束）→ 旧版视为更晚
+    mocks.listFiles.mockResolvedValueOnce([
+      'github-stars-backup-2026-11-16T08-00-00-000Z-2.json',
+      'github-stars-backup-2026-11-16.json',
+    ]);
+    const listedSameDay = await result.current.listBackups();
+    expect(listedSameDay.recommended).toBe('github-stars-backup-2026-11-16.json');
+  });
+
+  it('rejects gist entries whose file values are null (R12 finding 25)', async () => {
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: false,
+      activeAccountId: '1',
+      repositories: [],
+      releases: [],
+      customCategories: [],
+      gists: [{ id: 'g1', files: { 'README.md': null } }],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    // 无效 Gist 字段被拒绝并警示（不写入实时状态）
+    expect(useAppStore.getState().gists).toEqual([]);
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('Gist'), 'warning');
+  });
+
+  it('warns about rejected gist payloads when restoring another account archive (R12 finding 22)', async () => {
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: false,
+      activeAccountId: '2',
+      repositories: [repo(2, 'bob-top-level')],
+      releases: [],
+      customCategories: [],
+      gists: [null],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    // 跨账号归档：无效顶层 Gist 字段同样在结果提示中警示
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('Gist'), 'warning');
+  });
+
+  it('keeps a still-available default category selected when restoring an empty custom category list (R12 finding 24)', async () => {
+    useAppStore.setState({ selectedCategory: 'ai' });
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: false,
+      activeAccountId: '1',
+      repositories: [repo(1, 'alice-restored')],
+      releases: [],
+      customCategories: [],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    // 默认分类 ai 仍然可用（未隐藏）→ 选择保持不变，不重置为 all
+    expect(useAppStore.getState().selectedCategory).toBe('ai');
+  });
+
   it('keeps other parked workspaces intact when restoring a legacy 1.2 backup', async () => {
     mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
     mocks.downloadFile.mockResolvedValue(JSON.stringify({

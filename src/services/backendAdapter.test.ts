@@ -178,7 +178,71 @@ describe('syncSettings token 更新标志（server configs.ts 契约，审计修
     await expect(backend.syncSettings({ collapsedSidebarCategoryCount: 34 })).resolves.toEqual({
       tokenUpdateSkipped: true,
       tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
     });
+  });
+
+  it('surfaces token_update_superseded independently of token_update_skipped (round-12 audit fix)', async () => {
+    // tokenUpdateSuperseded 被固定为 false 的回归在此暴露：两个「凭据未更新」
+    // 结果必须能被独立验证。
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      token_update_skipped: false,
+      token_update_superseded: true,
+    }));
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: true,
+      activeAccountUpdateSkipped: false,
+    });
+  });
+
+  it('surfaces active_account_update_skipped (round-12 audit ISSUE-1)', async () => {
+    // 服务端在「更晚的切换抢先、本次活跃账号写入被跳过」时返回该标记；
+    // 适配器必须解析它，账号切换流程才能避免把并发冲突报告成成功。
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      updated: true,
+      token_update_skipped: false,
+      token_update_superseded: false,
+      active_account_update_skipped: true,
+    }));
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: true,
+    });
+  });
+
+  it('rejects when the response body exceeds the deadline instead of reporting success', async () => {    // 第 12 轮审计修复：正文读取超时不得被折叠成「两个标志均为 false 的成功
+    // 响应」——凭据对齐结论未知，必须按失败处理，保留调用方的待对齐状态。
+    vi.useFakeTimers();
+    try {
+      adapter._backendUrl = 'http://localhost:3000/api';
+      let deadlineSignal: AbortSignal | null = null;
+      vi.mocked(window.fetch).mockImplementation(async (_url, init) => {
+        deadlineSignal = (init as RequestInit | undefined)?.signal ?? null;
+        return {
+          ok: true,
+          status: 200,
+          json: () => new Promise((_resolve, reject) => {
+            deadlineSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+          }),
+          headers: { forEach: () => {} },
+        } as unknown as Response;
+      });
+
+      const pending = backend.syncSettings({});
+      const assertion = expect(pending).rejects.toThrow('Sync settings response body timed out');
+      await vi.advanceTimersByTimeAsync(30000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+      vi.mocked(window.fetch).mockReset();
+      adapter._backendUrl = null;
+    }
   });
 
   it('defaults missing flags to false (fully written)', async () => {
@@ -188,6 +252,7 @@ describe('syncSettings token 更新标志（server configs.ts 契约，审计修
     await expect(backend.syncSettings({})).resolves.toEqual({
       tokenUpdateSkipped: false,
       tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
     });
   });
 
@@ -203,6 +268,7 @@ describe('syncSettings token 更新标志（server configs.ts 契约，审计修
     await expect(backend.syncSettings({})).resolves.toEqual({
       tokenUpdateSkipped: false,
       tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
     });
   });
 

@@ -10,6 +10,7 @@ import {
   shouldPreserveExisting,
   switchAccountWorkspace,
   workspaceHasData,
+  workspaceHasRetainableData,
   type AccountWorkspace,
   type AccountWorkspaceSource,
 } from './accountWorkspace';
@@ -98,6 +99,44 @@ describe('workspaceHasData predicate', () => {
   });
 });
 
+describe('workspaceHasRetainableData predicate (ISSUE-1)', () => {
+  const customRepo = {
+    id: 1,
+    name: 'repo',
+    full_name: 'owner/custom-repo',
+    html_url: 'https://github.com/owner/custom-repo',
+    owner: { login: 'owner', avatar_url: '' },
+  };
+
+  it('treats subscriptions, read state and customized release sources as retainable data', () => {
+    expect(workspaceHasRetainableData(null)).toBe(false);
+    expect(workspaceHasRetainableData(emptyAccountWorkspace())).toBe(false);
+    expect(workspaceHasRetainableData({ releaseSubscriptions: new Set([1]) })).toBe(true);
+    expect(workspaceHasRetainableData({ readReleases: [2] })).toBe(true);
+    expect(workspaceHasRetainableData({ readForks: new Set([3]) })).toBe(true);
+    expect(workspaceHasRetainableData({
+      releaseSourceSettings: { ...defaultReleaseSourceSettings, customReleaseRepos: [customRepo] },
+    })).toBe(true);
+    // 默认来源设置与空集合仍视为空工作区；syncMode 单独存在也不构成数据。
+    expect(workspaceHasRetainableData({ releaseSourceSettings: defaultReleaseSourceSettings })).toBe(false);
+    expect(workspaceHasRetainableData({
+      syncMode: 'stars-and-lists' as const,
+      syncModeConfigured: true,
+    })).toBe(false);
+  });
+
+  it('keeps live top-level data on logged-out login when it only holds retainable non-list data', () => {
+    // ISSUE-1 场景：登录页「保留本地」依赖 setUser → switchAccountWorkspace 的
+    // 顶层保留分支；仅含 releaseSubscriptions 的无主缓存不得被空工作区覆盖。
+    const current = {
+      accountWorkspaces: {},
+      releaseSubscriptions: new Set([111, 222]),
+    } as unknown as AccountWorkspaceSource & { accountWorkspaces: Record<string, AccountWorkspace> };
+    const switched = switchAccountWorkspace(current, null, '42');
+    expect(switched.workspace).toBeNull();
+  });
+});
+
 describe('account workspace capture and restore', () => {
   it('round-trips repository analysis and category data', () => {
     const captured = captureAccountWorkspace(source());
@@ -151,7 +190,20 @@ describe('account workspace switching', () => {
   it('restores a parked snapshot when live lists are empty', () => {
     const parked = captureAccountWorkspace(source({ repositories: [repo(1)] }));
     const current = {
-      ...source({ repositories: [], lastSync: null, customCategories: [], categoryOrder: [], categoryListIdMap: {} }),
+      ...source({
+        repositories: [],
+        lastSync: null,
+        customCategories: [],
+        categoryOrder: [],
+        categoryListIdMap: {},
+        // 第 12 轮审计 ISSUE-1：订阅/已读/来源设置也属于可保留数据，
+        // 「live 为空」必须把这些字段一并清空才是真正的空工作区。
+        releaseSubscriptions: new Set<number>(),
+        readReleases: new Set<number>(),
+        readForks: new Set<number>(),
+        hiddenDefaultCategoryIds: [],
+        defaultCategoryOverrides: {},
+      }),
       accountWorkspaces: { '1': parked },
     };
     const result = switchAccountWorkspace(current, null, '1');

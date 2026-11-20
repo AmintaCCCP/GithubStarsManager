@@ -43,7 +43,21 @@ interface DenseOutcome {
   error?: string;
   /** 账号隔离范围未就绪（Worker 未建立 accountId 元数据索引）：稠密召回被跳过（C15）。 */
   indexUnavailable?: boolean;
+  /**
+   * 第 12 轮审计修复：稠密召回不可用的稳定原因代码——诊断字段不再承载面向
+   * 用户的英文文本，展示层（useRepositoryCardActions）按代码选择本地化文案。
+   * 与 vectorSearchPipeline 的 DenseQueryScopeResolution.reason 同源，缺省
+   * （兜底重建建议）为 'needs-backfill'。
+   */
+  reason?: DenseIndexUnavailableReason;
 }
+
+/**
+ * 稠密召回不可用的稳定原因代码（第 12 轮审计修复）：worker-unsupported /
+ * metadata-index-not-ready / status-failed / needs-backfill。展示层按代码
+ * 用 t() 渲染本地化提示，诊断字段不再包含面向用户的英文错误文本。
+ */
+export type DenseIndexUnavailableReason = 'worker-unsupported' | 'metadata-index-not-ready' | 'status-failed' | 'needs-backfill';
 
 /**
  * C15：稠密召回因账号隔离范围未就绪被跳过时的失败语义——不得当作成功的空
@@ -100,8 +114,16 @@ export interface SimilarRepositoryPipelineResult {
      * 审计修复：索引不可用的具体原因文本（与空结果错误路径同一组消息），
      * 随结果返回供调用方在非空结果时展示降级提示（结果可能不完整 + 恢复
      * 步骤），不再只保留在日志中。denseIndexUnavailable 为 false 时为 null。
+     * 第 12 轮起保留为诊断/日志字段：展示层应改用下方的稳定原因代码渲染
+     * 本地化文案，避免中文界面显示英文句子。
      */
     denseIndexUnavailableReason: string | null;
+    /**
+     * 第 12 轮审计修复：稠密召回不可用的稳定原因代码（与
+     * DenseQueryScopeResolution.reason 同源）。展示层按代码选择本地化文案；
+     * denseIndexUnavailable 为 false 时为 null。
+     */
+    denseIndexUnavailableReasonCode: DenseIndexUnavailableReason | null;
     timingsMs: Record<string, number>;
   };
 }
@@ -399,19 +421,21 @@ export async function runSimilarRepositoryPipeline(
     if (denseScope.skip) {
       // 审计修复（C15/R2-C26）：索引对当前账号不可用时按失败语义单独报告，
       // 绝不当作成功的空结果；提示按原因细分——部署不支持账号筛选的新版
-      // Worker、状态请求暂时失败、或索引确实需要回填重建。
-      const message = denseScope.reason === 'worker-unsupported'
+      // Worker、状态请求暂时失败、或索引确实需要回填重建。稳定原因代码随
+      // DenseOutcome 返回（第 12 轮），展示层按代码渲染本地化文案。
+      const reason: DenseIndexUnavailableReason = denseScope.reason ?? 'needs-backfill';
+      const message = reason === 'worker-unsupported'
         ? DENSE_INDEX_WORKER_UNSUPPORTED_ERROR
-        : denseScope.reason === 'metadata-index-not-ready'
+        : reason === 'metadata-index-not-ready'
           ? DENSE_INDEX_METADATA_NOT_READY_ERROR
-          : denseScope.reason === 'status-failed'
+          : reason === 'status-failed'
             ? DENSE_INDEX_STATUS_FAILED_ERROR
             : DENSE_INDEX_UNAVAILABLE_ERROR;
       logger.warn('vector-search', `${prefix} dense recall skipped: ${message}`, {
         accountId: options.accountIdScope?.accountId ?? null,
-        reason: denseScope.reason ?? 'needs-backfill',
+        reason,
       });
-      return { matches: [], success: false, error: message, indexUnavailable: true };
+      return { matches: [], success: false, error: message, indexUnavailable: true, reason };
     }
     let embeddingTimedOut = false;
     const embeddingStarted = Date.now();
@@ -577,11 +601,17 @@ export async function runSimilarRepositoryPipeline(
 
   // 审计修复：稠密召回被跳过的具体原因随结果返回（跳过路径的 DenseOutcome.error
   // 即 DENSE_INDEX_* 消息），供调用方在非空结果时提示「结果可能不完整」。
+  // 第 12 轮起同时返回稳定原因代码，展示层用 t() 按代码渲染本地化文案。
   const denseIndexUnavailable = !!(exactOutcome.indexUnavailable || profileOutcome.indexUnavailable);
   const denseIndexUnavailableReason = denseIndexUnavailable
     ? ((exactOutcome.indexUnavailable ? exactOutcome.error : null)
       ?? (profileOutcome.indexUnavailable ? profileOutcome.error : null)
       ?? DENSE_INDEX_UNAVAILABLE_ERROR)
+    : null;
+  const denseIndexUnavailableReasonCode = denseIndexUnavailable
+    ? ((exactOutcome.indexUnavailable ? exactOutcome.reason : null)
+      ?? (profileOutcome.indexUnavailable ? profileOutcome.reason : null)
+      ?? 'needs-backfill')
     : null;
 
   return {
@@ -602,6 +632,7 @@ export async function runSimilarRepositoryPipeline(
       fallback: finished.diagnostics.fallback,
       denseIndexUnavailable,
       denseIndexUnavailableReason,
+      denseIndexUnavailableReasonCode,
       timingsMs,
     },
   };

@@ -67,4 +67,24 @@ describe('loadPendingSyncAccounts legacy record migration (audit fix)', () => {
     expect(persisted[0][1]).toBe('https://persisted.test/api');
     expect(persisted[0][2]).toEqual(['categoryOrder']);
   });
+
+  it('merges dirty setting keys when the dirty-key record is listed first (order independence)', async () => {
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://persisted.test/api');
+    // 第 12 轮审计修复：有脏键的记录排在最前——迁移实现若始终保留最后一条
+    // 记录，此用例会失败（categoryOrder 脏键保护丢失）。
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([
+      ['77', 'https://persisted.test/api', ['categoryOrder']],
+      ['77'],
+    ]));
+
+    const { autoSync, backend } = await importFresh();
+    backend._backendUrl = 'https://persisted.test/api';
+    expect(autoSync.hasPendingAccountSync('77')).toBe(true);
+    const persisted = JSON.parse(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY) ?? '[]') as
+      Array<[string, string, string?]>;
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0][0]).toBe('77');
+    expect(persisted[0][1]).toBe('https://persisted.test/api');
+    expect(persisted[0][2]).toEqual(['categoryOrder']);
+  });
 });

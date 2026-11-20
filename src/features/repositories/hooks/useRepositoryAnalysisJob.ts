@@ -10,6 +10,7 @@ import {
 } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { AIAnalysisOptimizer, type AnalysisResult } from '../../../services/aiAnalysisOptimizer';
+import { registerActiveAnalysisJobAbort } from './analysisJobRegistry';
 import { AIService } from '../../../services/aiService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
@@ -102,6 +103,23 @@ export const useRepositoryAnalysisJob = ({
     }
   }, [setAnalysisProgress, setLoading]);
 
+  // 释放当前任务（卸载 / 切号 / 后端恢复前中止共用，R12 finding 6）：
+  // 中止优化器并复位本实例的运行标志，避免暂停中的旧任务残留 isRunning。
+  const releaseActiveJob = useCallback(() => {
+    optimizerRef.current?.abort();
+    optimizerRef.current = null;
+    isRunningRef.current = false;
+    isPausedRef.current = false;
+    stopRequestedRef.current = false;
+    if (mountedRef.current) {
+      setIsPaused(false);
+      setIsRunning(false);
+      setLoading(false);
+      setAnalysisProgress({ current: 0, total: 0 });
+      setProgress({ current: 0, total: 0 });
+    }
+  }, [setAnalysisProgress, setLoading]);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -115,6 +133,10 @@ export const useRepositoryAnalysisJob = ({
       setAnalysisProgress({ current: 0, total: 0 });
     };
   }, [setAnalysisProgress, setLoading]);
+
+  // R12 finding 6：候选后端恢复流程在提交候选连接前调用本登记表中止所有
+  // 挂载中的分析任务——旧连接上的 README/仓库标识绝不能被发往候选后端。
+  useEffect(() => registerActiveAnalysisJobAbort(releaseActiveJob), [releaseActiveJob]);
 
   // R2-C18：账号/凭据变化时主动释放旧优化器。切号后旧任务可能停在暂停/等待
   // 状态（不再收到 onResult），isRunningRef 残留 true 会阻塞新账号任务——不能
@@ -131,23 +153,12 @@ export const useRepositoryAnalysisJob = ({
       if (accountId === lastAccountId && generation === lastGeneration) return;
       lastAccountId = accountId;
       lastGeneration = generation;
-      optimizerRef.current?.abort();
-      optimizerRef.current = null;
-      isRunningRef.current = false;
-      isPausedRef.current = false;
-      stopRequestedRef.current = false;
-      if (mountedRef.current) {
-        setIsPaused(false);
-        // 审计修复：切号时立即复位 hook 返回的运行状态与进度——否则新账号
-        // 在旧任务退出并执行 finally 之前会短暂看到 A 的 isRunning/progress。
-        // finally 的会话检查保持不变：旧任务仍不得清掉 B 随后启动的任务状态。
-        setIsRunning(false);
-        setLoading(false);
-        setAnalysisProgress({ current: 0, total: 0 });
-        setProgress({ current: 0, total: 0 });
-      }
+      // 审计修复：切号时立即复位 hook 返回的运行状态与进度——否则新账号
+      // 在旧任务退出并执行 finally 之前会短暂看到 A 的 isRunning/progress。
+      // finally 的会话检查保持不变：旧任务仍不得清掉 B 随后启动的任务状态。
+      releaseActiveJob();
     });
-  }, [setAnalysisProgress, setLoading]);
+  }, [releaseActiveJob]);
 
   const pause = useCallback(() => {
     const optimizer = optimizerRef.current;

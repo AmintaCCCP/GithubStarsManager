@@ -312,15 +312,19 @@ describe('useBulkRepositoryActions account switch guards', () => {
         '1': {
           repositories: [first, second],
           releases: [
-            { repository: { id: 1 } } as unknown as import('../../../types').Release,
-            { repository: { id: 2 } } as unknown as import('../../../types').Release,
+            { id: 101, repository: { id: 1 } } as unknown as import('../../../types').Release,
+            { id: 102, repository: { id: 2 } } as unknown as import('../../../types').Release,
           ],
+          releaseSubscriptions: [1, 2],
+          readReleases: [101, 102, 999],
         },
         '2': {
           repositories: [otherAccountSameIdRepo, otherAccountRepo],
           releases: [
-            { repository: { id: 1 } } as unknown as import('../../../types').Release,
+            { id: 201, repository: { id: 1 } } as unknown as import('../../../types').Release,
           ],
+          releaseSubscriptions: [1],
+          readReleases: [201],
         },
       },
     } as typeof storeState;
@@ -351,11 +355,21 @@ describe('useBulkRepositoryActions account switch guards', () => {
     expect(calls).toBe(1);
     expect(outcome).toBe(false);
     expect(appliedPatches).toHaveLength(1);
-    const archivedA = (appliedPatches[0].accountWorkspaces as Record<string, { repositories: Repository[]; releases: Array<{ repository: { id: number } }> }>)['1'];
-    const archivedB = (appliedPatches[0].accountWorkspaces as Record<string, { repositories: Repository[]; releases: Array<{ repository: { id: number } }> }>)['2'];
+    type ArchivedWorkspace = {
+      repositories: Repository[];
+      releases: Array<{ repository: { id: number } }>;
+      releaseSubscriptions?: number[];
+      readReleases?: number[];
+    };
+    const archivedA = (appliedPatches[0].accountWorkspaces as Record<string, ArchivedWorkspace>)['1'];
+    const archivedB = (appliedPatches[0].accountWorkspaces as Record<string, ArchivedWorkspace>)['2'];
     // 首仓库及其 Release 从 A 归档移除，第二仓库保留
     expect(archivedA.repositories.map(r => r.id)).toEqual([2]);
     expect(archivedA.releases.map(rel => rel.repository.id)).toEqual([2]);
+    // R12（finding 21）：与 deleteRepository 同一清理规则——归档中的订阅与
+    // 已读索引同步清理（999 不属于剩余 Release，一并清理）
+    expect(archivedA.releaseSubscriptions).toEqual([2]);
+    expect(archivedA.readReleases).toEqual([102]);
     // B 归档中与 A 同 ID 的仓库 1 及其 Release 均完整保留
     expect(archivedB.repositories.map(r => r.id)).toEqual([1, 3]);
     expect(archivedB.releases.map(rel => rel.repository.id)).toEqual([1]);
@@ -366,6 +380,50 @@ describe('useBulkRepositoryActions account switch guards', () => {
     expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', 'https://backend-x.example/api');
     expect(mocks.markPendingAccountSync).not.toHaveBeenCalledWith('2', expect.anything());
     mocks.backend.backendUrl = null;
+  });
+
+  it('preserves a same-id repo re-starred during the switch and skips the pending deletion (R12 finding 0)', async () => {
+    const original = repository(1, { starred_at: '2026-01-01T00:00:00.000Z' });
+    const restarred = repository(1, { starred_at: '2026-03-01T00:00:00.000Z', full_name: 'owner/repository-1' });
+    storeState = {
+      ...storeState,
+      accountWorkspaces: {
+        '1': {
+          repositories: [restarred],
+          releases: [{ id: 101, repository: { id: 1 } } as unknown as import('../../../types').Release],
+          releaseSubscriptions: [1],
+          readReleases: [101],
+        },
+      },
+    } as typeof storeState;
+    const appliedPatches: Array<Record<string, unknown>> = [];
+    (mockUseAppStore as unknown as { setState: (updater: unknown) => void }).setState = vi.fn((updater: unknown) => {
+      const patch = typeof updater === 'function'
+        ? (updater as (state: typeof storeState) => Record<string, unknown>)(storeState)
+        : updater as Record<string, unknown>;
+      appliedPatches.push(patch);
+    });
+    mocks.unstarRepository.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    const { result } = renderActions();
+
+    let outcome: boolean | undefined;
+    await act(async () => {
+      outcome = await result.current.unstar([original]);
+    });
+
+    expect(outcome).toBe(false);
+    // 同 ID 记录在等待期间重新加星：归档完整保留，且不登记待删除/待补推
+    const parkedA = (storeState as unknown as {
+      accountWorkspaces: Record<string, { repositories: Repository[]; releases: Array<{ id: number }> }>;
+    }).accountWorkspaces['1'];
+    expect(parkedA.repositories.map(r => r.id)).toEqual([1]);
+    expect(parkedA.releases.map(rel => rel.id)).toEqual([101]);
+    expect(mocks.markPendingRepositoryDeletion).not.toHaveBeenCalled();
+    expect(mocks.markPendingAccountSync).not.toHaveBeenCalled();
+    expect(appliedPatches).toHaveLength(0);
   });
 
   it('deletes locally and syncs when the account never changed (control)', async () => {

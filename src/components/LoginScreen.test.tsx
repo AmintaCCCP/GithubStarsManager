@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
+import { defaultReleaseSourceSettings } from '../types';
 import { TooltipProvider } from './ui/tooltip';
 import { DialogProvider } from '../hooks/useDialog';
 import { useAppStore } from '../store/useAppStore';
@@ -22,8 +23,12 @@ const mocks = vi.hoisted(() => ({
   // 审计修复（测试覆盖）：可控的冻结窗口事件流——集成用例必须走与生产一致的
   // runWithBackendRestoreFrozen 路径，并断言拉取完成前冻结不释放
   freezeWindowEvents: [] as string[],
-  // 持久化调用时刻的登录态快照（R2-B12 回归：持久化必须发生在候选账号提交后）
-  persistenceSnapshots: [] as Array<{ isAuthenticated: boolean; userId: number | null }>,
+  // 冻结窗口当前是否打开（rememberActiveBackendUrl 保存时刻读取）
+  freezeWindowOpen: false,
+  // 持久化调用时刻的登录态快照（R2-B12 回归：持久化必须发生在候选账号提交后；
+  // R12 回归：持久化必须发生在冻结窗口关闭后——登记账号的 GitHub /user 校验
+  // 不得延迟地址落盘）
+  persistenceSnapshots: [] as Array<{ isAuthenticated: boolean; userId: number | null; freezeWindowOpen: boolean }>,
 }));
 
 // 快捷登录测试只替换 switchToAccount，其余动作（归档等）保持真实实现
@@ -66,10 +71,12 @@ vi.mock('../features/lifecycle/hooks/useLoginActions', async (importOriginal) =>
       // 确保集成用例走冻结路径且拉取完成前冻结不释放
       runWithBackendRestoreFrozen: async <T,>(fn: () => Promise<T>): Promise<T> => {
         mocks.freezeWindowEvents.push('frozen-open');
+        mocks.freezeWindowOpen = true;
         try {
           return await fn();
         } finally {
           mocks.freezeWindowEvents.push('frozen-close');
+          mocks.freezeWindowOpen = false;
         }
       },
       drainInFlightBackendPulls: mocks.drainInFlightBackendPulls,
@@ -173,12 +180,14 @@ describe('LoginScreen 后端登录', () => {
     mocks.getPersistedUrl.mockReset().mockReturnValue(null);
     mocks.persistUrl.mockReset();
     mocks.freezeWindowEvents.length = 0;
+    mocks.freezeWindowOpen = false;
     mocks.persistenceSnapshots.length = 0;
     mocks.rememberActiveBackendUrl.mockReset().mockImplementation(() => {
       const state = useAppStore.getState();
       mocks.persistenceSnapshots.push({
         isAuthenticated: state.isAuthenticated,
         userId: state.user?.id ?? null,
+        freezeWindowOpen: mocks.freezeWindowOpen,
       });
     });
     mocks.rollbackBackendConnection.mockReset().mockResolvedValue(undefined);
@@ -206,6 +215,10 @@ describe('LoginScreen 后端登录', () => {
       language: 'zh',
       currentView: 'repositories',
       selectedCategory: 'all',
+      releaseSubscriptions: new Set<number>(),
+      readReleases: new Set<number>(),
+      readForks: new Set<number>(),
+      releaseSourceSettings: { ...defaultReleaseSourceSettings },
     });
   });
 
@@ -529,7 +542,9 @@ describe('LoginScreen 后端登录', () => {
     expect(mocks.rememberActiveBackendUrl).toHaveBeenCalledOnce();
     // 审计修复（测试覆盖）：持久化调用时刻登录态已提交为候选账号——候选
     // URL 绝不在拉取前/身份提交前写入持久化。
-    expect(mocks.persistenceSnapshots).toEqual([{ isAuthenticated: true, userId: 3 }]);
+    expect(mocks.persistenceSnapshots).toEqual([
+      { isAuthenticated: true, userId: 3, freezeWindowOpen: false },
+    ]);
   });
 
   // 审计修复（R2-B5/B11）：取消候选后端设置时成对恢复原 URL 与原 API Key。
@@ -741,6 +756,10 @@ describe('LoginScreen 后端登录', () => {
     fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
     fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
 
+    // 审计修复（R12）：顶层存在无主旧版缓存（repo 703，无 user）时需先确认
+    // 丢弃——用户选择「使用后端数据」后才清空并拉取。
+    fireEvent.click(await screen.findByRole('button', { name: '使用后端数据' }));
+
     expect(await screen.findByRole('alert')).toHaveTextContent('sync failed');
     const state = useAppStore.getState();
     // 拉取写入的数据（repo 501）已被丢弃……
@@ -750,6 +769,80 @@ describe('LoginScreen 后端登录', () => {
     // 登录态未提交，拉取数据绝不归档为账号快照
     expect(state.user).toBeNull();
     expect(state.accountWorkspaces['9']?.repositories ?? []).toEqual([]);
+  });
+
+  // R12 审计补充（finding 0）：无 user 的未归属旧版缓存 + 目标账号无归档时
+  // 先弹覆盖确认；用户选择「保留本地」后必须原样保留这些数据（setUser 以
+  // 显式确认的归属提交，而不是清空后再拉取）。
+  it('保留本地时原样保留无主旧版缓存且不拉取目标账号数据', async () => {
+    useAppStore.setState({
+      user: null,
+      repositories: [],
+      customCategories: [{ id: 'cat-legacy', name: 'Legacy', icon: 'folder', keywords: [] }],
+    });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_restored',
+      user: { id: 9, login: 'octo-9' },
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    // 顶层存在无主旧版缓存（无 user）时必须先请用户确认
+    fireEvent.click(await screen.findByRole('button', { name: '保留本地' }));
+
+    await waitFor(() => expect(useAppStore.getState().user?.id).toBe(9));
+    const state = useAppStore.getState();
+    // 用户显式选择保留的旧版分类原样保留，绝不被清空
+    expect(state.customCategories.map((category) => category.id)).toContain('cat-legacy');
+    // 未触发拉取（保留本地跳过目标账号的远端数据）
+    expect(mocks.syncBackendData).not.toHaveBeenCalled();
+  });
+
+  // 第 12 轮审计 ISSUE-1（LOW 残余）：无主顶层缓存只含发行版订阅/已读/来源
+  // 设置时，「保留本地」也必须原样保留——此前 workspaceHasData 与登录页判定
+  // 不一致，setUser 会按空工作区覆盖并清空这些持久化数据。
+  it('保留本地时原样保留仅含发行版订阅与来源设置的无主缓存', async () => {
+    useAppStore.setState({
+      user: null,
+      repositories: [],
+      releaseSubscriptions: new Set([111, 222]),
+      readReleases: new Set([333]),
+      releaseSourceSettings: {
+        ...defaultReleaseSourceSettings,
+        customReleaseRepos: [{
+          id: 501,
+          name: 'custom-release',
+          full_name: 'owner/custom-release',
+          html_url: 'https://github.com/owner/custom-release',
+          owner: { login: 'owner', avatar_url: '' },
+        }],
+      },
+    });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_restored',
+      user: { id: 9, login: 'octo-9' },
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    // 仅含订阅等非列表数据同样触发覆盖确认（workspaceHasRetainableData）。
+    fireEvent.click(await screen.findByRole('button', { name: '保留本地' }));
+
+    await waitFor(() => expect(useAppStore.getState().user?.id).toBe(9));
+    const state = useAppStore.getState();
+    expect(Array.from(state.releaseSubscriptions)).toEqual([111, 222]);
+    expect(Array.from(state.readReleases)).toEqual([333]);
+    expect(state.releaseSourceSettings.customReleaseRepos.map((repo) => repo.full_name))
+      .toContain('owner/custom-release');
+    expect(mocks.syncBackendData).not.toHaveBeenCalled();
   });
 });
 
@@ -771,25 +864,56 @@ describe('LoginScreen 已保存账号快捷登录', () => {
 
   it('快捷登录后端凭据同步失败时经全局 toast 提示失败', async () => {
     useAppStore.setState({
-      savedAccounts: { '2': savedBob },
+      user: null,
+      githubToken: null,
       isAuthenticated: false,
+      hasHydrated: true,
+      backendApiSecret: null,
+      savedAccounts: { '2': savedBob },
+      accountWorkspaces: {},
+      repositories: [],
+      searchResults: [],
+      gists: [],
+      starredGists: [],
+      releases: [],
+      forks: [],
+      customCategories: [],
+      categoryOrder: [],
+      hiddenDefaultCategoryIds: [],
+      defaultCategoryOverrides: {},
+      categoryListIdMap: {},
+      lastSync: null,
+      language: 'zh',
+      currentView: 'repositories',
+      selectedCategory: 'all',
+      releaseSubscriptions: new Set<number>(),
+      readReleases: new Set<number>(),
+      readForks: new Set<number>(),
+      releaseSourceSettings: { ...defaultReleaseSourceSettings },
     });
-    switchActionMocks.switchToAccount.mockResolvedValue({
-      ok: false,
-      error: 'backend-credential-sync-failed',
+    // 审计修复（R12 测试覆盖）：经真实 App 渲染并按生产契约编排 mock——
+    // switchToAccount 先提交本地会话（App 卸载登录页），再做后端凭据对齐并
+    // 返回失败。此前直接挂载 LoginScreen 且 mock 不提交认证状态，失败返回时
+    // 登录页仍在，证明不了提示在登录页卸载后仍可见。
+    switchActionMocks.switchToAccount.mockImplementation(async () => {
+      useAppStore.getState().setGitHubToken(savedBob.githubToken);
+      useAppStore.getState().setUser(savedBob.user);
+      return { ok: false, error: 'backend-credential-sync-failed' };
     });
     render(
       <DialogProvider>
         <TooltipProvider>
-          <LoginScreen />
+          <App />
         </TooltipProvider>
       </DialogProvider>,
     );
 
     fireEvent.click(await screen.findByText(/@bob/));
 
-    // 复用 accountModal 的本地化提示（全局 DialogProvider 常驻，登录页卸载后仍可见）
-    expect(await screen.findByText('账号已添加，但后端凭据未能更新。请稍后重试。')).toBeInTheDocument();
+    // 登录页已卸载（App 主界面接管）：失败提示经全局 DialogProvider（常驻，
+    // 卸载后仍可见）展示，复用 accountModal 的本地化文案
+    expect(await screen.findByText('已登录该账号，但后端凭据未能更新。请稍后从账号菜单重试。')).toBeInTheDocument();
+    expect(useAppStore.getState().user?.login).toBe('bob');
     expect(switchActionMocks.switchToAccount).toHaveBeenCalledWith('2');
   });
 });
@@ -855,6 +979,12 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
       language: 'zh',
       currentView: 'repositories',
       selectedCategory: 'all',
+      // 第 12 轮审计 ISSUE-1：这些也是「可保留工作区数据」，跨用例必须复位，
+      // 否则前序用例的订阅/来源设置会让本路径误判本地有数据而弹出冲突确认。
+      releaseSubscriptions: new Set<number>(),
+      readReleases: new Set<number>(),
+      readForks: new Set<number>(),
+      releaseSourceSettings: { ...defaultReleaseSourceSettings },
     });
     render(
       <DialogProvider>
@@ -880,12 +1010,14 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
     mocks.getPersistedUrl.mockReset().mockReturnValue(null);
     mocks.persistUrl.mockReset();
     mocks.freezeWindowEvents.length = 0;
+    mocks.freezeWindowOpen = false;
     mocks.persistenceSnapshots.length = 0;
     mocks.rememberActiveBackendUrl.mockReset().mockImplementation(() => {
       const state = useAppStore.getState();
       mocks.persistenceSnapshots.push({
         isAuthenticated: state.isAuthenticated,
         userId: state.user?.id ?? null,
+        freezeWindowOpen: mocks.freezeWindowOpen,
       });
     });
     mocks.rollbackBackendConnection.mockReset().mockResolvedValue(undefined);
@@ -925,7 +1057,12 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
     expect(useAppStore.getState().githubToken).toBe('ghp_restored');
     // 冻结窗口在恢复流程结束后才释放；URL 持久化发生在登录提交与窗口关闭之后
     await waitFor(() => expect(mocks.freezeWindowEvents).toEqual(['frozen-open', 'frozen-close']));
-    expect(mocks.persistenceSnapshots).toEqual([{ isAuthenticated: true, userId: 9 }]);
+    // 审计修复（R12 测试覆盖）：mock 同时记录保存时刻的认证状态与冻结窗口
+    // 状态——区分「先关闭窗口再保存」与「先保存再关闭窗口」，验证保存发生时
+    // 冻结窗口已关闭（其余账号的 GitHub /user 登记不得延迟地址落盘）。
+    expect(mocks.persistenceSnapshots).toEqual([
+      { isAuthenticated: true, userId: 9, freezeWindowOpen: false },
+    ]);
     // Radix 模态（首次登录的「选择同步范围」）会把主界面标记为 aria-hidden，
     // 角色查询会忽略被遮罩内容——这里用文本断言验证装载边界。
     // 审计修复（R2-B16）：卸载断言检查后端登录表单的 API Key 输入框已从 DOM

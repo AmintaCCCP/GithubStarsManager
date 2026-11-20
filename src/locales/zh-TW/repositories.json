@@ -41,7 +41,8 @@
     "failed": "Star 失敗",
     "starred": "已成功加入星號",
     "check-name": "請核對這個名稱",
-    "no-description": "暫無描述"
+    "no-description": "暫無描述",
+    "session-changed": "帳號已切換，請重新預覽後再 Star。"
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "無法應用插件結果",
@@ -247,7 +248,11 @@
     "unstar": "取消Star",
     "successfully-unstarred": "已成功取消 Star",
     "failed-to-unstar-repository-please-check-your-ne": "取消 Star 失敗，請檢查網路連線或重新登入。",
-    "similar-results-may-be-incomplete-the-dens": "相似倉庫結果可能不完整：稠密向量索引不可用。({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "相似倉庫結果可能不完整：稠密向量索引不可用。({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "相似倉庫結果可能不完整：向量 Worker 不支援按帳號過濾召回。請部署隨附的 Cloudflare Worker 後重試。",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "相似倉庫結果可能不完整：向量 accountId 中繼資料索引尚未就緒。請建立並驗證 accountId 中繼資料索引、回填存量向量，並在部署中啟用 ACCOUNT_METADATA_INDEXED。",
+    "dense-index-unavailable-reason-status-failed": "相似倉庫結果可能不完整：向量索引狀態檢查失敗。請稍後重試。",
+    "dense-index-unavailable-reason-needs-backfill": "相似倉庫結果可能不完整：向量索引尚未就緒，無法按帳號召回。請在向量搜尋設定中為目前帳號重建索引。"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "請先在設定中設定 GitHub Token，或連線後端服務。",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "List 同步失敗，星標倉庫已同步。請稍後重試，或檢查 GitHub Token 權限（需 user scope）。",
     "sync-completed-found-newrepocount-new-repositori": "同步完成！發現 {{newRepoCount}} 個新倉庫。",
     "sync-completed-all-repositories-are-up-to-date": "同步完成！所有倉庫都是最新的。",
+    "sync-completed-backend-write-failed": "星標已更新，但寫入後端失敗。本機資料已保留，將自動重試後端同步。",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub token 已過期或無效，請重新登入。",
     "sync-failed-please-check-your-network-connection": "同步失敗，請檢查網路連線或稍後重試。",
     "list-sync-new-categories_one": "（新建 {{count}} 個分類）",

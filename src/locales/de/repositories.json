@@ -41,7 +41,8 @@
     "failed": "Markieren fehlgeschlagen",
     "starred": "Markiert",
     "check-name": "Diesen Namen prüfen",
-    "no-description": "Keine Beschreibung"
+    "no-description": "Keine Beschreibung",
+    "session-changed": "Das Konto wurde gewechselt. Bitte die Links erneut als Vorschau laden, bevor du sie markierst."
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Plugin-Ergebnisse können nicht angewendet werden",
@@ -247,7 +248,11 @@
     "unstar": "AbbrechenStar",
     "successfully-unstarred": "Star hat erfolgreich abgesagt",
     "failed-to-unstar-repository-please-check-your-ne": "Star konnte nicht abgebrochen werden. Bitte überprüfen Sie die Netzwerkverbindung oder melden Sie sich erneut an.",
-    "similar-results-may-be-incomplete-the-dens": "Ähnliche Repositorys sind möglicherweise unvollständig: Der dichte Vektorindex ist nicht verfügbar. ({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "Ähnliche Repositorys sind möglicherweise unvollständig: Der dichte Vektorindex ist nicht verfügbar. ({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "Ähnliche Repositorys sind möglicherweise unvollständig: Der Vektor-Worker unterstützt kontobezogenen Abruf nicht. Bitte das mitgelieferte Cloudflare-Worker-Deployment ausrollen und es erneut versuchen.",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "Ähnliche Repositorys sind möglicherweise unvollständig: Der AccountId-Metadatenindex der Vektorsuche ist nicht bereit. Bitte den AccountId-Metadatenindex anlegen und verifizieren, bestehende Vektoren zurückfüllen und ACCOUNT_METADATA_INDEXED im Deployment aktivieren.",
+    "dense-index-unavailable-reason-status-failed": "Ähnliche Repositorys sind möglicherweise unvollständig: Die Statusprüfung des Vektorindexes ist fehlgeschlagen. Bitte später erneut versuchen.",
+    "dense-index-unavailable-reason-needs-backfill": "Ähnliche Repositorys sind möglicherweise unvollständig: Der Vektorindex ist für kontobezogenen Abruf nicht bereit. Bitte den Index in den Vektorsuche-Einstellungen für das aktuelle Konto neu aufbauen."
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Bitte konfigurieren Sie zuerst GitHub Token in den Einstellungen oder stellen Sie eine Verbindung zum Backend-Dienst her.",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "Die Listensynchronisierung ist fehlgeschlagen. Das Star Warehouse wurde synchronisiert. Bitte versuchen Sie es später noch einmal oder überprüfen Sie die GitHub-Token-Berechtigungen (erfordert Benutzerbereich).",
     "sync-completed-found-newrepocount-new-repositori": "Synchronisierung abgeschlossen! {{newRepoCount}} neue Repositorys gefunden.",
     "sync-completed-all-repositories-are-up-to-date": "Synchronisierung abgeschlossen! Alle Repositories sind auf dem neuesten Stand.",
+    "sync-completed-backend-write-failed": "Die Sterne wurden aktualisiert, aber das Schreiben in das Backend ist fehlgeschlagen. Die lokalen Daten bleiben erhalten; die Backend-Synchronisierung wird automatisch erneut versucht.",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub-Token ist abgelaufen oder ungültig, bitte melden Sie sich erneut an.",
     "sync-failed-please-check-your-network-connection": "Die Synchronisierung ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung oder versuchen Sie es später erneut.",
     "list-sync-new-categories_one": " ({{count}} neue Kategorie erstellt)",

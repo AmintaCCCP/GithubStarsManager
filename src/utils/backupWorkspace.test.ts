@@ -385,6 +385,102 @@ describe('multi-account backup helpers (Issue #611)', () => {
     );
     expect(replaced['1'].forks).toEqual(workspace.forks);
   });
+
+  it('validates collection field types in live restore patches like the archived patch (round-12 audit fix)', () => {
+    // gists: null 会被 normalizeAccountWorkspaces 归一化成 []——仅凭字段存在就
+    // 写入实时补丁会把无效字段当成清空指令，清空当前账号的实时数据；实时恢复
+    // 与归档恢复（applyValidatedWorkspaceFields）必须对同一输入行为一致。
+    const workspace = {
+      ...workspaceOf([repo(1)]),
+      gists: [{ id: 'gist-1' } as never],
+      starredGists: [{ id: 'sg-1' } as never],
+      releases: [{ id: 7 } as never],
+      releaseSubscriptions: [7],
+      readReleases: [8],
+      customCategories: [{ id: 'cat-1', name: 'Cat', icon: 'star', keywords: [], isCustom: true } as never],
+      hiddenDefaultCategoryIds: ['x'],
+      categoryOrder: ['cat-1'],
+      defaultCategoryOverrides: { all: { name: 'All' } },
+      categoryListIdMap: { 'cat-1': 'list-1' },
+      releaseSourceSettings: {
+        enabledSourceIds: ['starred-release-subscription'],
+        watchCustomReleaseRepos: [],
+        customReleaseRepos: [],
+      } as AccountWorkspace['releaseSourceSettings'],
+    };
+
+    const selectedTypes = ['repositories', 'releases', 'releaseSubscriptions', 'customCategories'];
+    const patchWithInvalidFields = applyAccountWorkspaceForTypes(workspace, selectedTypes, {
+      repositories: [repo(1)],
+      gists: null,
+      starredGists: null,
+      releases: null,
+      releaseSubscriptions: null,
+      readReleases: null,
+      customCategories: null,
+      hiddenDefaultCategoryIds: null,
+      categoryOrder: null,
+      defaultCategoryOverrides: null,
+      categoryListIdMap: null,
+      releaseSourceSettings: null,
+    });
+    // 无效字段按「未提供」忽略（保留实时值），repositories 校验通过照常写入
+    expect(patchWithInvalidFields.repositories).toEqual([repo(1)]);
+    expect(patchWithInvalidFields.gists).toBeUndefined();
+    expect(patchWithInvalidFields.gistSearchResults).toBeUndefined();
+    expect(patchWithInvalidFields.starredGists).toBeUndefined();
+    expect(patchWithInvalidFields.releases).toBeUndefined();
+    expect(patchWithInvalidFields.releaseSubscriptions).toBeUndefined();
+    expect(patchWithInvalidFields.readReleases).toBeUndefined();
+    expect(patchWithInvalidFields.customCategories).toBeUndefined();
+    expect(patchWithInvalidFields.hiddenDefaultCategoryIds).toBeUndefined();
+    expect(patchWithInvalidFields.categoryOrder).toBeUndefined();
+    expect(patchWithInvalidFields.defaultCategoryOverrides).toBeUndefined();
+    expect(patchWithInvalidFields.categoryListIdMap).toBeUndefined();
+    expect(patchWithInvalidFields.releaseSourceSettings).toBeUndefined();
+
+    // 显式 [] 仍表示清空；显式 {} 仍是有效的映射清空
+    const emptyWorkspace = {
+      ...workspaceOf([]),
+      gists: [],
+      starredGists: [],
+      releases: [],
+      releaseSubscriptions: [],
+      readReleases: [],
+      customCategories: [],
+      hiddenDefaultCategoryIds: [],
+      categoryOrder: [],
+      defaultCategoryOverrides: {},
+      categoryListIdMap: {},
+      releaseSourceSettings: { enabledSourceIds: [], watchCustomReleaseRepos: [], customReleaseRepos: [] },
+    };
+    const patchWithEmpty = applyAccountWorkspaceForTypes(emptyWorkspace, selectedTypes, {
+      repositories: [],
+      gists: [],
+      starredGists: [],
+      releases: [],
+      releaseSubscriptions: [],
+      readReleases: [],
+      customCategories: [],
+      hiddenDefaultCategoryIds: [],
+      categoryOrder: [],
+      defaultCategoryOverrides: {},
+      categoryListIdMap: {},
+      releaseSourceSettings: { enabledSourceIds: [], watchCustomReleaseRepos: [], customReleaseRepos: [] },
+    });
+    expect(patchWithEmpty.gists).toEqual([]);
+    expect(patchWithEmpty.gistSearchResults).toEqual([]);
+    expect(patchWithEmpty.starredGists).toEqual([]);
+    expect(patchWithEmpty.releases).toEqual([]);
+    expect(patchWithEmpty.releaseSubscriptions).toEqual(new Set());
+    expect(patchWithEmpty.readReleases).toEqual(new Set());
+    expect(patchWithEmpty.customCategories).toEqual([]);
+    expect(patchWithEmpty.hiddenDefaultCategoryIds).toEqual([]);
+    expect(patchWithEmpty.categoryOrder).toEqual([]);
+    expect(patchWithEmpty.defaultCategoryOverrides).toEqual({});
+    expect(patchWithEmpty.categoryListIdMap).toEqual({});
+    expect(patchWithEmpty.releaseSourceSettings).toEqual({ enabledSourceIds: [], watchCustomReleaseRepos: [], customReleaseRepos: [] });
+  });
 });
 
 describe('hasMaskedBackupSecrets with unvalidated import payloads (audit fix)', () => {

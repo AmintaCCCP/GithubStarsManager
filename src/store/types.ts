@@ -269,7 +269,13 @@ export interface AppActions {
   setForkSearchQuery: (query: string) => void;
   toggleForkExpandedRepository: (repoId: number) => void;
   setForkExpandedRepositories: (repoIds: Set<number>) => void;
-  setForkIsRefreshing: (refreshing: boolean) => void;
+  /**
+   * B4（fork，第 12 轮审计修复）：Fork 刷新标志带会话归属校验（语义同
+   * setReleaseIsRefreshing）——发起刷新时传 owner 记录 (账号, 代次)，finally
+   * 清理必须携带同一 owner；无 owner 的清理仅在发起会话仍是当前会话时生效，
+   * 防止旧账号的过期 finally 清掉新账号正在进行的刷新标志。
+   */
+  setForkIsRefreshing: (refreshing: boolean, owner?: { accountId: string | null; generation: number }) => void;
 
   // Discovery actions
   setSelectedDiscoveryChannel: (channel: DiscoveryChannelId) => void;

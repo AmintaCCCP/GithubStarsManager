@@ -41,7 +41,8 @@
     "failed": "Star failed",
     "starred": "Starred",
     "check-name": "Check this name",
-    "no-description": "No description"
+    "no-description": "No description",
+    "session-changed": "The account changed. Preview the links again before starring."
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Failed to apply plugin result",
@@ -247,7 +248,11 @@
     "unstar": "Unstar",
     "successfully-unstarred": "Successfully unstarred",
     "failed-to-unstar-repository-please-check-your-ne": "Failed to unstar repository. Please check your network connection or login again.",
-    "similar-results-may-be-incomplete-the-dens": "Similar repositories may be incomplete: the dense vector index is unavailable. ({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "Similar repositories may be incomplete: the dense vector index is unavailable. ({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "Similar repositories may be incomplete: the vector worker does not support account-scoped recall. Deploy the bundled Cloudflare Worker and retry.",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "Similar repositories may be incomplete: the vector accountId metadata index is not ready. Create and verify the accountId metadata index, backfill existing vectors, and enable ACCOUNT_METADATA_INDEXED in the deployment.",
+    "dense-index-unavailable-reason-status-failed": "Similar repositories may be incomplete: the vector index status check failed. Please retry later.",
+    "dense-index-unavailable-reason-needs-backfill": "Similar repositories may be incomplete: the vector index is not ready for account-scoped recall. Rebuild the index in Vector Search settings for the current account."
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Configure a GitHub token in Settings or connect the backend service first.",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "List sync failed, starred repositories were synced. Retry later, or check the GitHub Token has the user scope.",
     "sync-completed-found-newrepocount-new-repositori": "Sync completed! Found {{newRepoCount}} new repositories.",
     "sync-completed-all-repositories-are-up-to-date": "Sync completed! All repositories are up to date.",
+    "sync-completed-backend-write-failed": "Stars were updated, but writing them to the backend failed. Local data is kept; the backend sync will be retried automatically.",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub token has expired or is invalid. Please login again.",
     "sync-failed-please-check-your-network-connection": "Sync failed. Please check your network connection or try again later.",
     "list-sync-new-categories_one": " ({{count}} new category created)",

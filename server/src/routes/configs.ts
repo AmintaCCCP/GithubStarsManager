@@ -577,8 +577,11 @@ router.get('/api/settings', (req, res) => {
       // legacy_default_owner_id 内嵌密文 JSON / 认领标记等）绝不过序列化边界，
       // 不得向任何账号返回凭据快照。
       if (INTERNAL_SETTING_KEYS.has(key)) continue;
-      if (!inheritLegacyScopedSettings && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
-        // 其他账号的账号级设置：对当前账号不可见。
+      if (!inheritLegacyScopedSettings && (ACCOUNT_SCOPED_SETTING_KEYS.has(key) || key === 'user_profile')) {
+        // 其他账号的账号级设置与旧全局资料：对当前账号不可见。user_profile 与
+        // 账号级键同属升级前的 default 存量——只有 default 分区与已验证的
+        // legacy 认领者可继承；其他真实账号的资料只来自其自身 accounts.user_json
+        //（下方合并），绝不回退到旧全局资料（Issue #612 R12）。
         continue;
       }
       let value = row.value as string | null;
@@ -628,6 +631,28 @@ router.get('/api/settings', (req, res) => {
           continue;
         }
         settings[row.key] = row.value;
+      }
+
+      // Issue #612 R12：真实账号的资料只来自本账号 accounts.user_json（覆盖
+      // 可能继承到的旧全局资料）；没有资料或仅有 token-only 占位身份时省略该
+      // 字段，绝不回退到属于其他账号的旧全局资料。
+      try {
+        const accountProfileRow = db.prepare('SELECT user_json FROM accounts WHERE account_id = ?')
+          .get(accountId) as { user_json: string | null } | undefined;
+        const userJson = typeof accountProfileRow?.user_json === 'string' ? accountProfileRow.user_json : '';
+        if (userJson) {
+          const parsedProfile = JSON.parse(userJson) as unknown;
+          const isPlaceholderOnlyId = parsedProfile !== null
+            && typeof parsedProfile === 'object'
+            && !Array.isArray(parsedProfile)
+            && Object.keys(parsedProfile as Record<string, unknown>).length === 1
+            && 'id' in (parsedProfile as Record<string, unknown>);
+          if (!isPlaceholderOnlyId) {
+            settings.user_profile = userJson;
+          }
+        }
+      } catch {
+        // 无法解析的资料与轻量 stub 缺 accounts 表都不进入响应
       }
     }
 
@@ -817,6 +842,9 @@ router.put('/api/settings', async (req, res) => {
     };
 
     let scopeChangedDuringWait = false;
+    // Issue #612 R12：更晚的账号切换抢先导致本次活跃账号写入被跳过时置位，
+    // 供客户端识别冲突 / 重试（不把这次请求报告为对齐成功）。
+    let activeWriteSkipped = false;
 
     const upsert = db.transaction(() => {
       // Issue #612 审计（798）：无账号头请求在事务写入任何设置前重新确认写入
@@ -915,12 +943,21 @@ router.put('/api/settings', async (req, res) => {
         );
         // 后台 Token 补写（只有 github_token，没有 user_profile）绝不能改写
         // 活跃账号；异步 PAT 校验期间若已发生较新的账号切换，也不得改回旧账号。
+        // Issue #612 R12：仅当活跃账号实际改变时推进活跃账号版本——同账号资料
+        // 刷新（活跃账号未变）不再 bump，避免使另一设备等待中的切换被误判失效；
+        // 版本确实因更晚的切换而变化且本次活跃账号写入被跳过时，单独在响应中
+        // 报告（active_account_update_skipped），绝不静默伪装成对齐成功。
         const activeRow = db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'")
           .get() as { value: string | null } | undefined;
         const activeChangedDuringWait = getActiveAccountVersion(db) !== activeAccountVersionBefore;
-        if (!activeChangedDuringWait && (accountPayload.userProfile !== undefined || !activeRow?.value)) {
+        const intendActiveWrite = accountPayload.userProfile !== undefined || !activeRow?.value;
+        if (intendActiveWrite && !activeChangedDuringWait) {
           globalStmt.run('active_account_id', accountId);
-          bumpActiveAccountVersion(db);
+          if (activeRow?.value !== accountId) {
+            bumpActiveAccountVersion(db);
+          }
+        } else if (intendActiveWrite && activeChangedDuringWait && activeRow?.value !== accountId) {
+          activeWriteSkipped = true;
         }
       }
     });
@@ -941,6 +978,7 @@ router.put('/api/settings', async (req, res) => {
       updated: true,
       ...(tokenVerificationFailed ? { token_update_skipped: true } : {}),
       ...(tokenWriteSuperseded ? { token_update_superseded: true } : {}),
+      ...(activeWriteSkipped ? { active_account_update_skipped: true } : {}),
     });
   } catch (err) {
     logger.errorFromError('configs.updateSettings', 'PUT /api/settings error', err);

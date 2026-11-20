@@ -214,10 +214,17 @@ export interface DenseQueryScopeResolution {
  *   Worker 400 或无过滤召回串入其他账号），否则走无 accountId 的兼容查询。
  *
  * R2-C23 实现选择：绝不以「本机只有一个已保存账号」推断无范围 legacy 向量
- * 的归属（共享索引可能仍有其他设备/旧客户端上传的向量）。单账号的稠密召回
- * 兼容通过 EMBEDDING_FORMAT_VERSION 升级触发的完整重建满足（重建后向量携带
- * accountId 元数据，/status 的 accountScopedCleanup 随之可用）；显式兼容
+ * 的归属（共享索引可能仍有其他设备/旧客户端上传的向量）。显式兼容
  * 开关只在索引归属已被独立确认时由调用方传入 allowLegacyUnscoped=true。
+ *
+ * 第 12 轮审计更正（原注释有误）：EMBEDDING_FORMAT_VERSION 升级触发的完整
+ * 重建本身并不能恢复单账号稠密召回——Worker /status 的 accountScopedCleanup
+ * 只读取部署变量 ACCOUNT_METADATA_INDEXED（cloudflare-worker/src/index.ts），
+ * 与索引内容无关；该变量保持 "false" 时，严格账号范围的查询会跳过稠密召回、
+ * 降级为本地词法检索（本文件下方 metadata-index-not-ready 分支）。恢复稠密
+ * 召回必须同时满足：创建 accountId 元数据索引、完成存量向量回填，并由部署
+ * 路径显式设置 ACCOUNT_METADATA_INDEXED=true。升级后的单账号是否可不经额外
+ * 部署即恢复稠密召回属未定的产品行为，不在本注释假设。
  */
 export async function resolveDenseQueryAccountScope(
   vectorService: Pick<VectorSearchService, 'query'> & Partial<Pick<VectorSearchService, 'getStatus'>>,

@@ -41,7 +41,8 @@
     "failed": "Falha ao favoritar",
     "starred": "Favoritado",
     "check-name": "Confira este nome",
-    "no-description": "Sem descrição"
+    "no-description": "Sem descrição",
+    "session-changed": "A conta mudou. Gere a prévia dos links novamente antes de favoritar."
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Não foi possível aplicar os resultados do plugin",
@@ -247,7 +248,11 @@
     "unstar": "CancelStar",
     "successfully-unstarred": "Estrela cancelada com sucesso",
     "failed-to-unstar-repository-please-check-your-ne": "Falha ao cancelar o Star, verifique a conexão de rede ou faça login novamente.",
-    "similar-results-may-be-incomplete-the-dens": "Os repositórios similares podem estar incompletos: o índice de vetores denso está indisponível. ({{v1}})"
+    "similar-results-may-be-incomplete-the-dens": "Os repositórios similares podem estar incompletos: o índice de vetores denso está indisponível. ({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "Os repositórios similares podem estar incompletos: o worker de vetores não oferece suporte à recuperação com escopo de conta. Implante o worker do Cloudflare incluído e tente novamente.",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "Os repositórios similares podem estar incompletos: o índice de metadados de accountId dos vetores não está pronto. Crie e verifique o índice de metadados de accountId, faça o preenchimento dos vetores existentes e ative o ACCOUNT_METADATA_INDEXED na implantação.",
+    "dense-index-unavailable-reason-status-failed": "Os repositórios similares podem estar incompletos: a verificação de status do índice de vetores falhou. Tente novamente mais tarde.",
+    "dense-index-unavailable-reason-needs-backfill": "Os repositórios similares podem estar incompletos: o índice de vetores não está pronto para a recuperação com escopo de conta. Reconstrua o índice nas configurações de pesquisa de vetor da conta atual."
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Configure primeiro o GitHub Token nas configurações ou conecte-se ao serviço de back-end.",
@@ -267,6 +272,7 @@
     "list-sync-failed-starred-repositories-were-synce": "A sincronização da lista falhou, o armazém estrela foi sincronizado. Tente novamente mais tarde ou verifique as permissões do GitHub Token (requer escopo do usuário).",
     "sync-completed-found-newrepocount-new-repositori": "Sincronização concluída! {{newRepoCount}} novos repositórios encontrados.",
     "sync-completed-all-repositories-are-up-to-date": "Sincronização concluída! Todos os repositórios estão atualizados.",
+    "sync-completed-backend-write-failed": "As estrelas foram atualizadas, mas a gravação no backend falhou. Os dados locais foram mantidos e a sincronização com o backend será tentada novamente de forma automática.",
     "github-token-has-expired-or-is-invalid-please-lo": "O token GitHub expirou ou é inválido, faça login novamente.",
     "sync-failed-please-check-your-network-connection": "Falha na sincronização. Verifique sua conexão de rede ou tente novamente mais tarde.",
     "list-sync-new-categories_one": " ({{count}} nova categoria criada)",

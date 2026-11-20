@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "Remover conta salva",
     "remove-account-confirm-desc": "Isso remove apenas a credencial de login salva desta conta. Os repositórios e categorias em cache serão mantidos. Continuar?",
     "account-switched": "Alterado para @{{login}}",
-    "account-repo-count": "{{count}} repositórios"
+    "account-repo-count": "{{count}} repositórios",
+    "retry-credential-alignment": "Repetir a sincronização de credenciais do backend"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Sincronize categorias com a lista do GitHub"
@@ -1436,6 +1437,10 @@
     "confirm": "Adicionar e trocar",
     "reauth-hint": "Insira um token do GitHub válido para @{{login}}",
     "account-mismatch": "Este token pertence a outra conta do GitHub. Entre com o token de @{{login}}.",
-    "backend-credential-sync-failed": "A conta foi adicionada, mas as credenciais do backend não puderam ser atualizadas. Tente novamente mais tarde."
+    "backend-credential-sync-failed": "A sessão foi iniciada na conta, mas as credenciais do backend não puderam ser atualizadas. Tente novamente mais tarde no menu de contas."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Sessão encerrada, mas a limpeza de credenciais do dispositivo não foi concluída. A credencial antiga permanece bloqueada e será repetida automaticamente na próxima inicialização.",
+    "active-account-update-skipped": "Outro dispositivo alterou a conta ativa do backend durante esta troca, então o backend não foi alterado para esta conta. A sessão local já está nesta conta; tente novamente no menu de contas para alinhar o backend."
   }
 }

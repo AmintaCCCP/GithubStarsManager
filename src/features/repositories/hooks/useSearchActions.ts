@@ -555,6 +555,9 @@ export const useSearchActions = (): SearchActions => {
     // 账号代次校验（Issue #611）：全量拉取耗时期间切号后丢弃结果，绝不覆盖新账号
     const startedAccountId = peekCurrentAccountId();
     const startedGeneration = getAccountSessionGeneration();
+    // R12（finding 15）：区分「星标已写入本地」与「后端写入失败」——本地星标
+    // 已更新时后端推送失败不得再报「同步失败请检查网络」。
+    let starredApplied = false;
     try {
       const githubApi = createGitHubApiService(githubToken);
       const newRepositories = await githubApi.getAllStarredRepositories();
@@ -640,7 +643,8 @@ export const useSearchActions = (): SearchActions => {
         return;
       }
       setRepositories(finalRepositories);
-      await forceSyncToBackend();
+      starredApplied = true;
+      const backendWriteSucceeded = await forceSyncToBackend();
 
       // 审计修复（C20）：推送完成后再写 lastSync 与提示前重新校验会话——
       // forceSyncToBackend 等待期间切号后，A 的同步结果绝不写进 B 的会话。
@@ -650,7 +654,11 @@ export const useSearchActions = (): SearchActions => {
 
       setLastSync(new Date().toISOString());
 
-      if (newRepoCount > 0) {
+      if (!backendWriteSucceeded) {
+        // R12（finding 15）：星标已更新，仅后端写入失败——提示保留本地结果的
+        // 专用文案，绝不误报为整体同步失败。
+        toast(t('useSearchActions.sync-completed-backend-write-failed'), 'warning');
+      } else if (newRepoCount > 0) {
         toast(t('useSearchActions.sync-completed-found-newrepocount-new-repositori', { newRepoCount: newRepoCount }), 'success');
       } else {
         toast(t('useSearchActions.sync-completed-all-repositories-are-up-to-date'), 'info');
@@ -663,7 +671,10 @@ export const useSearchActions = (): SearchActions => {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
-      if (error instanceof Error && error.message.includes('token')) {
+      if (starredApplied) {
+        // 本地星标已写入：失败只属于后端推送，提示专用文案并保留本地结果
+        toast(t('useSearchActions.sync-completed-backend-write-failed'), 'warning');
+      } else if (error instanceof Error && error.message.includes('token')) {
         toast(t('useSearchActions.github-token-has-expired-or-is-invalid-please-lo'), 'error');
       } else {
         toast(t('useSearchActions.sync-failed-please-check-your-network-connection'), 'error');

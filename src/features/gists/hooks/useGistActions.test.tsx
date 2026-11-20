@@ -61,8 +61,8 @@ const createStoreState = () => ({
   // 切号期间远端已成功的 Gist 变更按发起账号 ID 写回其归档工作区。
   user: { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' },
   githubToken: 'github-token' as string | null,
-  gists: [],
-  starredGists: [],
+  gists: [] as Gist[],
+  starredGists: [] as Gist[],
   accountWorkspaces: {} as Record<string, unknown>,
   gistSearchFilters: {
     query: '',
@@ -99,13 +99,13 @@ mockUseAppStore.mockImplementation((selector?: (state: typeof storeState) => unk
 (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
 // 审计修复：切号后远端已成功的 Gist 变更经 useAppStore.setState 写回发起账号
 // 的归档工作区——选择器桩补齐 setState（对象或 updater 两种形态）。
-(mockUseAppStore as unknown as { setState: (patch: unknown) => void }).setState = (patch: unknown) => {
+(mockUseAppStore as unknown as { setState: (patch: unknown) => void }).setState = vi.fn((patch: unknown) => {
   if (typeof patch === 'function') {
     Object.assign(storeState, (patch as (state: typeof storeState) => Partial<typeof storeState>)(storeState));
   } else {
     Object.assign(storeState, patch as Partial<typeof storeState>);
   }
-};
+});
 
 const gist: Gist = {
   id: 'gist-1',
@@ -225,15 +225,21 @@ describe('useGistActions card actions', () => {
 
     it('calls onUnstarred before the store update and toasts success', async () => {
       mocks.confirm.mockResolvedValue(true);
+      // R12：取消星标只改星标字段——列表中的最新条目可能已被编辑
+      storeState.gists = [{ ...gist, description: 'edited while unstarring' }];
+      storeState.starredGists = [{ ...gist }];
       const onUnstarred = vi.fn();
       const { result } = renderHook(() => useGistActions());
       await act(async () => { await result.current.unstarGist(gist, onUnstarred); });
 
       expect(mocks.unstarGist).toHaveBeenCalledWith('gist-1');
       const onUnstarredOrder = onUnstarred.mock.invocationCallOrder[0];
-      const updateOrder = storeState.updateGist.mock.invocationCallOrder[0];
-      expect(onUnstarredOrder).toBeLessThan(updateOrder);
-      expect(storeState.updateGist).toHaveBeenCalledWith({ ...gist, starred: false });
+      const setStateMock = (mockUseAppStore as unknown as {
+        setState: { mock: { invocationCallOrder: number[] } };
+      }).setState;
+      expect(onUnstarredOrder).toBeLessThan(setStateMock.mock.invocationCallOrder[0]);
+      expect(storeState.gists[0]).toEqual({ ...gist, description: 'edited while unstarring', starred: false });
+      expect(storeState.starredGists[0]).toEqual({ ...gist, starred: false });
       expect(mocks.toast).toHaveBeenCalledWith('已取消收藏', 'success');
     });
 
@@ -551,6 +557,66 @@ describe('useGistActions account switch guards', () => {
     const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string; files: Record<string, { size: number }> }> }> }).accountWorkspaces['1'];
     expect(parked.gists[0].id).toBe('gist-1');
     expect(parked.gists[0].files['a.ts'].size).toBe(gistDetail.files['a.ts'].size);
+  });
+
+  it('submitGist writes a created gist back to the parked owner archive after a switch (R12)', async () => {
+    const created = { ...gist, id: 'gist-new', description: 'created during switch' };
+    mocks.createGist.mockImplementation(async () => {
+      switchToB();
+      return created;
+    });
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [gist], starredGists: [] },
+    };
+    storeState.gists = [{ ...gist, id: 'b-gist' }];
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.submitGist({ description: 'created during switch' } as never, null); });
+
+    expect(mocks.createGist).toHaveBeenCalledTimes(1);
+    // 不显示旧会话的成功提示，也不写当前账号（B）的实时列表
+    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(storeState.gists.map(item => item.id)).toEqual(['b-gist']);
+    // 发起账号 A 的归档补入新 Gist（按 ID 插入，保留原条目）
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string }> }> }).accountWorkspaces['1'];
+    expect(parked.gists.map(item => item.id)).toEqual(['gist-new', 'gist-1']);
+  });
+
+  it('late unstar only patches the starred field and preserves edits made during the switch (R12)', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.unstarGist.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    // A 的归档在等待期间被编辑（描述更新），迟到的取消星标不得覆盖它
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [{ ...gist, description: 'edited later' }], starredGists: [{ ...gist, description: 'edited later' }] },
+    };
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.unstarGist(gist, vi.fn()); });
+
+    const parked = (storeState as unknown as {
+      accountWorkspaces: Record<string, { gists: Array<{ id: string; description: string; starred?: boolean }>; starredGists: Array<{ id: string; description: string; starred?: boolean }> }>;
+    }).accountWorkspaces['1'];
+    expect(parked.gists[0]).toEqual({ ...gist, description: 'edited later', starred: false });
+    expect(parked.starredGists[0]).toEqual({ ...gist, description: 'edited later', starred: false });
+  });
+
+  it('clears the analyzing marker after a same-account credential switch (R12)', async () => {
+    // 同账号换凭据：账号 ID 不变，只有会话代次推进
+    mocks.getGistForAnalysis.mockImplementation(async () => {
+      bumpAccountSessionGeneration();
+      return gistDetail;
+    });
+    mocks.getGistContentPreview.mockReturnValue('preview');
+    mocks.analyzeGist.mockResolvedValue('summary');
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.analyzeOne(gist); });
+
+    // 旧任务不得写入新会话的结果/提示，但必须清掉自己留下的「分析中」标记
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(storeState.setAnalyzingGist).toHaveBeenCalledTimes(2);
+    expect(storeState.setAnalyzingGist).toHaveBeenLastCalledWith('gist-1', false);
   });
 });
 

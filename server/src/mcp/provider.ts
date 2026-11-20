@@ -5,7 +5,6 @@ import { logger } from '../services/logger.js';
 import {
   resolveActiveAccountScope,
   getLegacyDefaultClaimedBy,
-  hasAnyNonDefaultPartition,
   getPartitionMeta,
   bumpAccountRevision,
 } from '../db/accountScope.js';
@@ -284,6 +283,72 @@ const VECTOR_BACKFILL_CHECKED_KEY = 'vector_account_backfill_checked';
 
 /** 诊断探测查询的 topK 上限（与 Worker /query 的 QUERY_TOPK_LIMIT 一致）。 */
 const VECTOR_PROBE_TOPK = 50;
+
+/**
+ * default 分区覆盖探测使用的阈值：保留合法的负 cosine/dot 分数，确保「索引里
+ * 是否存在该范围的向量」不会被相似度阈值影响（与 deploy.mjs 的覆盖探测一致）。
+ */
+const VECTOR_PROBE_THRESHOLD = -1e9;
+
+/**
+ * Issue #612 R12 审计 ISSUE-2：default 分区的元数据覆盖探测。
+ *
+ * Worker 的 ACCOUNT_METADATA_INDEXED 开启后，带 accountId='default' 的 /query
+ * 会按元数据过滤；索引建立前写入的存量向量（前端在未登录时上传、metadata
+ * 不含 accountId）不会出现在结果里——200 空结果是「未回填」，不是「无数据」。
+ * 本地 default 分区仍存在非空 vector_indexed_at 说明客户端确实上传过向量，
+ * 此时用独立探测（topK=上限、极低阈值、显式 accountId='default'）区分：
+ * - has_scoped_vectors：default 范围确有向量，空用户结果是阈值/相似度导致；
+ * - no_scoped_vectors：default 范围查不到任何向量，而本地记录有已索引仓库 →
+ *   覆盖未确认（未回填/索引丢失），必须返回迁移状态而不是静默空结果；
+ * - probe_failed：无法确认，同样不得静默返回空结果。
+ */
+async function probeDefaultPartitionScopedCoverage(
+  workerUrl: string,
+  queryHeaders: Record<string, string>,
+  queryVector: number[],
+): Promise<'has_scoped_vectors' | 'no_scoped_vectors' | 'probe_failed'> {
+  try {
+    const probeResult = await fetchWithBodyTimeout(
+      `${workerUrl}/query`,
+      {
+        method: 'POST',
+        headers: queryHeaders,
+        body: JSON.stringify({
+          vector: queryVector,
+          topK: VECTOR_PROBE_TOPK,
+          threshold: VECTOR_PROBE_THRESHOLD,
+          accountId: 'default',
+        }),
+      },
+      async (res) => {
+        if (!res.ok) return { ok: false as const };
+        const payload = (await res.json().catch(() => null)) as { matches?: unknown } | null;
+        return { ok: true as const, payload };
+      },
+    );
+    if (!probeResult.ok || !probeResult.payload || !Array.isArray(probeResult.payload.matches)) {
+      return 'probe_failed';
+    }
+    return probeResult.payload.matches.length > 0 ? 'has_scoped_vectors' : 'no_scoped_vectors';
+  } catch {
+    return 'probe_failed';
+  }
+}
+
+/** 本地 default 分区是否记录过已上传的向量（依据 vector_indexed_at 标记）。 */
+function hasIndexedDefaultPartitionRepositories(db: ReturnType<typeof getDb>): boolean {
+  try {
+    return Boolean(
+      db
+        .prepare("SELECT 1 AS one FROM repositories WHERE account_id = 'default' AND vector_indexed_at IS NOT NULL LIMIT 1")
+        .get(),
+    );
+  } catch {
+    // 轻量 stub 缺列/缺表时按「无本地索引标记」处理（保持旧行为）
+    return false;
+  }
+}
 
 /**
  * Issue #612 A25（R2-A11/A12/A13/A14 修订 + 审计 381 修订）：旧索引标记（v4 迁移 /
@@ -596,11 +661,15 @@ export async function vectorSearch(
 
   // Issue #612 R2-A12：default（无活跃账号）查询同样要向 Worker 提供能隔离
   // default 候选的范围（accountId='default' 过滤），避免其他账号候选占满
-  // topK 后被本地丢弃、共享索引中其他账号的 legacy 向量串入候选。仅当能确认
-  // 索引中无任何非 default 分区时才保留无范围兼容路径。
-  const workerScope = accountId !== 'default'
-    ? accountId
-    : (hasAnyNonDefaultPartition(db) ? 'default' : undefined);
+  // topK 后被本地丢弃。
+  // Issue #612 R12（审计修订）：本地分区数量无法推断远程共享 Worker 中向量的
+  // 归属——共享索引上其他部署遗留的无前缀向量同样存在，无范围兼容查询会把
+  // 其他部署的向量仅凭仓库 ID 匹配关联到本地仓库并参与打分。范围过滤必须在
+  // Worker 的 topK 计算前按已验证的元数据范围生效：default 查询一律发送
+  // accountId='default'；旧索引尚未回填元数据时 Worker 返回
+  // ACCOUNT_METADATA_NOT_INDEXED，走现有迁移状态（客户端携带 accountId 元数据
+  // 重新上传），绝不仅凭仓库 ID 匹配接受无前缀候选。
+  const workerScope = accountId;
   let queryResult:
     | { ok: false; status: number; text: string }
     | { ok: true; status: number; data: { matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }> } };
@@ -677,6 +746,26 @@ export async function vectorSearch(
           error: err instanceof Error ? err.message : String(err),
         });
       }
+    }
+  }
+  // Issue #612 R12 审计 ISSUE-2：default 分区不得在「元数据索引已启用但未回填/
+  // 覆盖未确认」时静默返回空结果。带 accountId='default' 的查询在旧向量缺少
+  // accountId 元数据时同样返回 200 空 matches；本地 default 分区存在已索引仓库
+  // 时先做独立探测区分「阈值导致的空结果」与「范围内没有任何向量」——后者
+  // （以及探测失败导致无法确认）按与 account_metadata_not_indexed 一致的迁移
+  // 状态返回，避免把未回填伪装成「没有相似仓库」。default 分区没有本地索引
+  // 标记时是真「无数据」，保持空结果。
+  if (
+    accountId === 'default'
+    && matches.length === 0
+    && hasIndexedDefaultPartitionRepositories(db)
+  ) {
+    const coverage = await probeDefaultPartitionScopedCoverage(workerUrl, queryHeaders, vector);
+    if (coverage !== 'has_scoped_vectors') {
+      logger.warn('mcp.vector', 'Default partition account metadata coverage unconfirmed', {
+        coverage,
+      });
+      return { available: false, reason: 'account_metadata_not_indexed' };
     }
   }
   const repos = loadAllRepositories(accountId);

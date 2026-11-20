@@ -178,6 +178,9 @@ describe('useSearchActions.aiSearch (vector pipeline)', () => {
       baseRepo({ id: 1, full_name: 'owner/low-star', stargazers_count: 1 }),
       baseRepo({ id: 2, full_name: 'owner/high-star', stargazers_count: 1000 }),
     ];
+    // R12（finding 15）：runSync 现在区分「本地星标已写入」与「后端写入失败」，
+    // 默认桩必须模拟真实成功返回值。
+    mocks.forceSyncToBackend.mockResolvedValue(true);
   });
 
   it('passes repositories, config and the outer signal to the pipeline, then preserves relevance order', async () => {
@@ -521,6 +524,8 @@ describe('useSearchActions.syncStars', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     setupStoreMocks();
+    // R12（finding 15）：后端写入结果参与提示分支选择，默认桩模拟推送成功
+    mocks.forceSyncToBackend.mockResolvedValue(true);
   });
 
   it('keeps the setRepositories → forceSyncToBackend → setLastSync order and applies lists', async () => {
@@ -1018,6 +1023,8 @@ describe('useSearchActions account switch guards', () => {
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.keywordSearch('foo', identity); });
 
+    // R12（finding 28）：先确认 AI 请求确实已发出（否则切号桩未执行，用例空转）
+    expect(mocks.searchRepositoriesWithSelection).toHaveBeenCalledTimes(1);
     expect(storeState.setSearchResults).not.toHaveBeenCalled();
     expect(storeState.setSearchFilters).not.toHaveBeenCalled();
   });
@@ -1031,6 +1038,8 @@ describe('useSearchActions account switch guards', () => {
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.keywordSearch('foo', identity); });
 
+    // R12（finding 28）：回退分支同样先确认 AI 请求已发出
+    expect(mocks.searchRepositoriesWithSelection).toHaveBeenCalledTimes(1);
     expect(storeState.setSearchResults).not.toHaveBeenCalled();
     expect(storeState.setSearchFilters).not.toHaveBeenCalled();
   });

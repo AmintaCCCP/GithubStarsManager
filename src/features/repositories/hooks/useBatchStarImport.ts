@@ -73,6 +73,9 @@ export function useBatchStarImport() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState('');
   const [translationsVisible, setTranslationsVisible] = useState(false);
+  // R12（finding 9）：预览结果必须绑定生成它的会话——切号后旧预览不得写回
+  // rows，也不得在当前账号下提交（否则会用 B 的 Token 为 A 选中的仓库加星）。
+  const [rowsOwner, setRowsOwner] = useState<{ accountId: string | null; generation: number } | null>(null);
   const busyRef = useRef(false);
 
   /** Clears the translation cache, failure message and visible-translation flag. */
@@ -100,6 +103,10 @@ export function useBatchStarImport() {
       setInputError(extracted.inputErrors[0].code);
       return;
     }
+    // R12（finding 9）：登记生成本次预览的会话；解析过程中或提交时任何切号
+    // 都会使这批结果整体失效。
+    const previewAccountId = peekCurrentAccountId();
+    const previewGeneration = getAccountSessionGeneration();
     const candidates = extracted.candidates.filter(candidate => candidate.status !== 'duplicate');
     setDuplicateCount(extracted.stats.duplicates);
     if (candidates.length === 0) {
@@ -113,12 +120,19 @@ export function useBatchStarImport() {
 
     busyRef.current = true;
     setIsResolving(true);
+    setRowsOwner({ accountId: previewAccountId, generation: previewGeneration });
     try {
       const api = createGitHubApiService(githubToken);
       const resolved: BatchStarRow[] = [];
       const canonicalNames = new Set<string>();
       let canonicalDuplicates = 0;
       for (let start = 0; start < candidates.length; start += RESOLVE_BATCH_SIZE) {
+        // 切号后立即丢弃整批预览结果（不得写入 rows）
+        if (!isCurrentAccountSession(previewAccountId, previewGeneration)) {
+          setRows([]);
+          setRowsOwner(null);
+          return;
+        }
         const batch = candidates.slice(start, start + RESOLVE_BATCH_SIZE);
         const batchRows = await Promise.all(batch.map(async (candidate): Promise<BatchStarRow> => {
           if (candidate.status === 'invalid') {
@@ -154,6 +168,11 @@ export function useBatchStarImport() {
           }
           if (canonicalName) canonicalNames.add(canonicalName);
           resolved.push(row);
+        }
+        if (!isCurrentAccountSession(previewAccountId, previewGeneration)) {
+          setRows([]);
+          setRowsOwner(null);
+          return;
         }
         setDuplicateCount(extracted.stats.duplicates + canonicalDuplicates);
         setRows([...resolved]);
@@ -195,6 +214,7 @@ export function useBatchStarImport() {
   const clearPreview = useCallback(() => {
     if (busyRef.current) return;
     setRows([]);
+    setRowsOwner(null);
     setInputError('');
     setSyncError('');
     setDuplicateCount(0);
@@ -262,6 +282,13 @@ export function useBatchStarImport() {
     const selected = rows.map((row, index) => ({ row, index }))
       .filter(({ row }) => row.status === 'ready' && row.selected && row.detail);
     if (selected.length === 0) return;
+    // R12（finding 9）：只允许提交由当前会话生成的预览——切号后（含 A→B→A）
+    // 旧预览不得用当前账号的 Token 为发起账号选中的仓库加星，也不得写入当前
+    // 账号的工作区。
+    if (!rowsOwner || !isCurrentAccountSession(rowsOwner.accountId, rowsOwner.generation)) {
+      setSyncError(makeT(language, 'repositories')('batchStar.session-changed'));
+      return;
+    }
 
     busyRef.current = true;
     setIsStarring(true);
@@ -328,7 +355,7 @@ export function useBatchStarImport() {
       busyRef.current = false;
       setIsStarring(false);
     }
-  }, [addRepository, githubToken, language, rows]);
+  }, [addRepository, githubToken, language, rows, rowsOwner]);
 
   return {
     rows, duplicateCount, inputError, isResolving, isStarring, syncError,

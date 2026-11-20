@@ -248,6 +248,35 @@ export const workspaceHasData = (workspace: WorkspaceDataCandidate | null | unde
   );
 };
 
+const DEFAULT_RELEASE_SOURCE_SETTINGS_KEY = JSON.stringify(
+  normalizeReleaseSourceSettings(defaultReleaseSourceSettings),
+);
+
+/**
+ * 统一「工作区是否有可保留数据」判定（第 12 轮审计 ISSUE-1 修复）。
+ *
+ * workspaceHasData 只覆盖列表类内容（仓库/Gist/发布/复刻/分类）；发行版订阅、
+ * 已读状态（readReleases/readForks）与用户自定义的发行版来源设置同样是分片里
+ * 的持久化数据。登录页的覆盖确认、`setUser` 的顶层数据保留路径（
+ * switchAccountWorkspace）与失败回滚的快照恢复必须共用这一判定——否则仅含
+ * 这些数据的无主缓存会被判为空工作区并静默清空（「保留本地」形同丢弃）。
+ * syncMode 单独存在仍视为空工作区（账号切换契约不变）。
+ */
+export const workspaceHasRetainableData = (
+  workspace: WorkspaceDataCandidate | null | undefined,
+): boolean => {
+  if (!workspace) return false;
+  if (workspaceHasData(workspace)) return true;
+  const countOf = (value: Set<number> | number[] | undefined): number => (
+    value instanceof Set ? value.size : value?.length ?? 0
+  );
+  if (countOf(workspace.releaseSubscriptions) > 0) return true;
+  if (countOf(workspace.readReleases) > 0) return true;
+  if (countOf(workspace.readForks) > 0) return true;
+  return JSON.stringify(normalizeReleaseSourceSettings(workspace.releaseSourceSettings ?? null))
+    !== DEFAULT_RELEASE_SOURCE_SETTINGS_KEY;
+};
+
 export const switchAccountWorkspace = (
   current: AccountWorkspaceSource & { accountWorkspaces: Record<string, AccountWorkspace> },
   previousAccountId: string | null,
@@ -261,10 +290,13 @@ export const switchAccountWorkspace = (
   if (previousAccountId === nextAccountId) {
     return { accountWorkspaces, workspace: null };
   }
-  // Logged-out login: keep live lists if they already hold data (backend
-  // restore wrote first). Direct switchAccount passes forceLoadTarget=true so
-  // it never inherits leftover top-level data from another session.
-  if (!options.forceLoadTarget && !previousAccountId && workspaceHasData(current)) {
+  // Logged-out login: keep live lists if they already hold retainable data
+  // (backend restore wrote first, or the user explicitly chose「保留本地」for an
+  // unowned legacy cache). ISSUE-1（第 12 轮）：判定必须与登录页共用
+  // workspaceHasRetainableData——仅含发行版订阅/已读/来源设置的工作区同样
+  // 不能被 applyAccountWorkspace(undefined) 清空。Direct switchAccount passes
+  // forceLoadTarget=true so it never inherits leftover top-level data.
+  if (!options.forceLoadTarget && !previousAccountId && workspaceHasRetainableData(current)) {
     return { accountWorkspaces, workspace: null };
   }
   return {

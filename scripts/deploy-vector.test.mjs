@@ -144,6 +144,62 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     );
   });
 
+  it('deploy.mjs rejects sample-observed backfill gaps before coverage confirmation (R12)', () => {
+    const src = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
+    // R12 review：采样观察到缺少 accountId 元数据的向量（无论 ID 是否带账号前缀）
+    // 都是已知回填缺口——覆盖判定必须先处理该缺口，即使完整枚举成功（未发现纯
+    // 数字 ID）也不得返回 coverageConfirmed: true（调用方就不会保存 verified: true）。
+    assert.match(
+      src,
+      /if \(legacyCount > 0\) \{[\s\S]{0,800}?acct_verify_coverage_sample_legacy[\s\S]{0,400}?reason: 'legacy_present'[\s\S]*?const enumeration = enumerateVectorIds\(indexName\);/,
+      'sample-observed gap must fail verification before enumeration-based coverage confirmation'
+    );
+    // 采样缺口失败结果绝不携带 coverageConfirmed: true / ok: true。
+    const gapBlock = src.match(/if \(legacyCount > 0\) \{[\s\S]{0,800}?reason: 'legacy_present' \};/);
+    assert.ok(gapBlock, 'sample-gap failure block must exist');
+    assert.ok(!gapBlock[0].includes('coverageConfirmed: true') && !gapBlock[0].includes('ok: true'),
+      'sample-gap failure must not report ok/coverageConfirmed as true');
+    // 新告警文案必须中英双语齐备。
+    assert.equal(
+      src.split('acct_verify_coverage_sample_legacy:').length - 1,
+      2,
+      'acct_verify_coverage_sample_legacy must exist in both zh and en dictionaries'
+    );
+  });
+
+  it('deploy.mjs enumeration fails when the pagination cap is hit before the last page (R12)', () => {
+    const src = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
+    // R12 review：达到分页上限仍有 nextCursor 时枚举不完整，必须按枚举失败处理；
+    // 只有明确读到末页（reachedEnd）才能返回 ok: true，正常读完的短分页不受影响。
+    assert.match(src, /let reachedEnd = false;/, 'enumeration must track whether it reached the last page');
+    assert.match(
+      src,
+      /if \(!next\) \{\s*\n\s*reachedEnd = true;\s*\n\s*break;\s*\n\s*\}/,
+      'loop must record reaching the last page when no cursor follows'
+    );
+    const limitFailIdx = src.indexOf("reason: 'page_limit_exceeded'");
+    const okReturnIdx = src.indexOf('return { ok: true, total: ids.size, legacyCount };');
+    assert.ok(limitFailIdx !== -1, 'page-limit exhaustion must map to an enumeration failure');
+    assert.ok(okReturnIdx !== -1, 'enumeration success return must exist');
+    assert.ok(limitFailIdx < okReturnIdx, 'enumeration success must only be reachable after the page-limit check');
+  });
+
+  it('README documents that any numeric-only legacy vector blocks verified enablement (R12 ISSUE-3)', () => {
+    const readme = fs.readFileSync(path.resolve(WORKER_DIR, 'README.md'), 'utf-8');
+    const deploySrc = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
+    // 行为（代码）为准：纯数字 ID 一律判定 legacy_present，覆盖验证失败/回滚。
+    assert.match(deploySrc, /function isLegacyVectorId\(id\) \{\s*\n\s*return \/\^\\d\+\$\/\.test\(id\);/, 'deploy must treat numeric-only IDs as legacy');
+    assert.ok(deploySrc.includes("reason: 'legacy_present'"), 'deploy must fail coverage on legacy IDs');
+    // README 必须给出与代码一致的、可执行的运维路径，而不是「保留副本无害」。
+    assert.ok(readme.includes('legacy_present'), 'README must name the deploy verification failure reason');
+    assert.ok(readme.includes('delete-vectors'), 'README must give the retire/delete command');
+    assert.ok(readme.includes('accountMetadataIndexVerified:false'), 'README must document the forced-keep unverified state');
+    assert.ok(readme.includes('覆盖未确认'), 'README must state the unverified-mode limitation');
+    assert.ok(readme.includes('先退役 legacy 副本'), 'README must state retiring legacy copies is the verified-enablement path');
+    assert.ok(!readme.includes('无法核实归属的副本建议保留——冗余副本不会被账号过滤查询召回，不影响正确性'),
+      'README must not claim keeping unverifiable legacy copies is harmless without the verification caveat');
+  });
+
   it('worker implementations do not call the unavailable Vectorize binding list()', () => {
     // 生产 Vectorize binding 不提供 list()（完整枚举只有 REST API / wrangler CLI），
     // 分页列举分支是不可达代码；清理只能采样并如实标注「未验证」。

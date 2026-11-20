@@ -247,7 +247,8 @@
     "remove-account-confirm-title": "移除已儲存的帳號",
     "remove-account-confirm-desc": "僅會移除該帳號的快速登入憑證，本機快取的儲存庫與分類仍會保留。確定要繼續嗎？",
     "account-switched": "已切換至 @{{login}}",
-    "account-repo-count": "{{count}} 個儲存庫"
+    "account-repo-count": "{{count}} 個儲存庫",
+    "retry-credential-alignment": "重試後端憑證對齊"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "同步分類到 GitHub list"
@@ -1436,6 +1437,10 @@
     "confirm": "新增並切換",
     "reauth-hint": "請為帳號 @{{login}} 重新輸入有效的 GitHub Token",
     "account-mismatch": "此 Token 屬於另一個 GitHub 帳號，請使用 @{{login}} 的 Token 登入。",
-    "backend-credential-sync-failed": "帳號已新增，但後端憑證未能更新。請稍後重試。"
+    "backend-credential-sync-failed": "已登入該帳號，但後端憑證未能更新。請稍後從帳號選單重試。"
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "已登出，但裝置端憑證清理未完成。舊憑證已被封鎖，將於下次啟動時自動重試。",
+    "active-account-update-skipped": "切換期間另一台裝置更改了後端的活躍帳號，後端未能切換到本帳號。本機工作階段已切換到該帳號；請從帳號選單重試以對齊後端。"
   }
 }

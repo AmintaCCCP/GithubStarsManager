@@ -153,6 +153,13 @@ export interface BackendAuthRestore {
 
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
 
+/**
+ * syncSettings 的整体截止时间（请求 + 响应正文读取，第 12 轮审计修复）：
+ * 与 fetchWithTimeout 的默认请求超时一致——正文读取在同一截止时间内完成，
+ * 超时按失败处理而不是折叠成成功响应。
+ */
+const SYNC_SETTINGS_DEADLINE_MS = 30000;
+
 const JSON_ARRAY_SETTING_KEYS = new Set([
   'hiddenDefaultCategoryIds',
   'categoryOrder',
@@ -517,6 +524,28 @@ class BackendAdapter {
   }
 
   /**
+   * fetchWithRetry 的瞬态错误判定（第 12 轮起与分页的 per-attempt deadline
+   * 重试共用）：AbortError、浏览器/undici 网络错误消息与常见连接重置码。
+   */
+  private static isRetryableNetworkError(error: Error | undefined): boolean {
+    if (!error) return false;
+    return (
+      error.name === 'AbortError' ||
+      // Browser messages: Chrome/Edge "Failed to fetch", Firefox "NetworkError...", Safari "Load failed"
+      error.message?.includes('Failed to fetch') ||
+      error.message?.includes('NetworkError') ||
+      error.message?.includes('Load failed') ||
+      // Node.js undici: message is "fetch failed", real code is in error.cause
+      error.message === 'fetch failed' ||
+      (error as { cause?: { code?: string } }).cause?.code === 'ECONNRESET' ||
+      (error as { cause?: { code?: string } }).cause?.code === 'ECONNREFUSED' ||
+      (error as { cause?: { code?: string } }).cause?.code === 'UND_ERR_SOCKET' ||
+      (error as { cause?: { code?: string } }).cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      (error as { cause?: { code?: string } }).cause?.code === 'UND_ERR_HEADERS_TIMEOUT'
+    );
+  }
+
+  /**
    * Retry wrapper with exponential backoff for transient network errors.
    * Covers browser fetch (Chrome/Firefox/Safari) and Node.js undici fetch.
    */
@@ -530,24 +559,55 @@ class BackendAdapter {
         return await this.fetchWithTimeout(url, options, timeoutMs);
       } catch (err) {
         lastError = err as Error;
-        const isRetryable =
-          lastError.name === 'AbortError' ||
-          // Browser messages: Chrome/Edge "Failed to fetch", Firefox "NetworkError...", Safari "Load failed"
-          lastError.message?.includes('Failed to fetch') ||
-          lastError.message?.includes('NetworkError') ||
-          lastError.message?.includes('Load failed') ||
-          // Node.js undici: message is "fetch failed", real code is in error.cause
-          lastError.message === 'fetch failed' ||
-          (lastError as { cause?: { code?: string } }).cause?.code === 'ECONNRESET' ||
-          (lastError as { cause?: { code?: string } }).cause?.code === 'ECONNREFUSED' ||
-          (lastError as { cause?: { code?: string } }).cause?.code === 'UND_ERR_SOCKET' ||
-          (lastError as { cause?: { code?: string } }).cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-          (lastError as { cause?: { code?: string } }).cause?.code === 'UND_ERR_HEADERS_TIMEOUT';
+        const isRetryable = BackendAdapter.isRetryableNetworkError(lastError);
         if (!isRetryable || attempt === maxRetries) throw lastError;
         // Exponential backoff: 1s, 2s, 4s
         const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
         logger.warn('backendAdapter', 'Sync request failed, retrying', { attempt: attempt + 1, maxRetries: maxRetries + 1, delayMs: delay, durationMs: Date.now() - retryStartTime, method, path });
         await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    throw lastError!;
+  }
+
+  /**
+   * Per-attempt deadline fetch（第 12 轮审计修复）：与 fetchWithRetry 相同的
+   * 重试语义（瞬态错误判定、指数退避 1s→2s→4s），但每次尝试都创建独立的
+   * 超时控制器，并把响应正文读取（consume 回调）纳入该次尝试的截止时间——
+   * 重试绝不复用已中止的信号。仓库分页的页级控制器在首次尝试超时后即已
+   * 中止，旧实现的重试继承同一信号，未发起有效请求即被取消，手动从后端
+   * 拉取会因此失败。
+   */
+  private async fetchPageWithDeadline<T>(
+    url: string,
+    options: RequestInit,
+    timeoutMs: number,
+    maxRetries: number,
+    consume: (res: Response) => Promise<T>,
+  ): Promise<T> {
+    const method = (options.method || 'GET').toUpperCase();
+    const path = url.replace(/^https?:\/\/[^/]+/, '');
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const attemptController = new AbortController();
+      const timer = setTimeout(() => attemptController.abort(), timeoutMs);
+      try {
+        const res = await this.fetchWithTimeout(url, { ...options, signal: attemptController.signal }, timeoutMs);
+        return await consume(res);
+      } catch (err) {
+        lastError = err as Error;
+        if (!BackendAdapter.isRetryableNetworkError(lastError) || attempt === maxRetries) throw lastError;
+        const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
+        logger.warn('backendAdapter', 'Sync request failed, retrying', {
+          attempt: attempt + 1,
+          maxRetries: maxRetries + 1,
+          delayMs: delay,
+          method,
+          path,
+        });
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } finally {
+        clearTimeout(timer);
       }
     }
     throw lastError!;
@@ -673,6 +733,10 @@ class BackendAdapter {
     // C 实现记录）。
     const startedAccountId = accountIdKey(useAppStore.getState().user);
     const startedGeneration = getAccountSessionGeneration();
+    // 第 12 轮审计修复：连接代次同时记录——后端地址 X→Y→X 切出再切回时，
+    // 账号与会话代次均未变化、this._backendUrl 又与捕获值重新一致，仅凭
+    // 两者无法使旧连接的在途候选失效；连接代次在每次地址提交时递增。
+    const startedConnectionGeneration = this._connectionGeneration;
     const sessionController = new AbortController();
     if (signal) {
       if (signal.aborted) sessionController.abort();
@@ -687,9 +751,14 @@ class BackendAdapter {
         return false;
       }
     };
-    // R2-C14：根目录与递归 tree 两条路径共用同一有效性检查——账号、会话代次
-    // 或后端 URL 任一变化都必须丢弃结果（后端切换后旧地址的数据绝不混入）。
-    const isRequestStale = (): boolean => isSessionStale() || this._backendUrl !== backendUrl;
+    // R2-C14：根目录与递归 tree 两条路径共用同一有效性检查——账号、会话代次、
+    // 连接代次或后端 URL 任一变化都必须丢弃结果（后端切换后旧地址的数据绝不
+    // 混入）。连接未变化时保留详情请求失败后回退根目录的既有行为。
+    const isRequestStale = (): boolean => (
+      isSessionStale()
+      || this._backendUrl !== backendUrl
+      || this._connectionGeneration !== startedConnectionGeneration
+    );
 
     const fetchRootContents = async (): Promise<GitHubReadmeCandidateItem[]> => {
       if (isRequestStale()) return [];
@@ -975,20 +1044,19 @@ class BackendAdapter {
     const PAGE_SIZE = 10000;
     const PAGE_DEADLINE_MS = 120000;
     for (let page = 1; ; page += 1) {
-      // 每页请求与 res.json() 正文读取共享同一截止时间，防止响应头返回后正文挂起
-      const pageController = new AbortController();
-      const pageTimer = setTimeout(() => pageController.abort(), PAGE_DEADLINE_MS);
-      let data: { repositories?: Repository[]; total?: number; revision?: unknown };
-      try {
-        const res = await this.fetchWithRetry(`${backendUrl}/repositories?page=${page}&limit=${PAGE_SIZE}`, {
-          headers,
-          signal: pageController.signal,
-        }, PAGE_DEADLINE_MS, 3);
-        if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
-        data = await res.json() as { repositories?: Repository[]; total?: number; revision?: unknown };
-      } finally {
-        clearTimeout(pageTimer);
-      }
+      // 第 12 轮审计修复：每次重试尝试创建独立的超时控制器，正文读取纳入
+      // 对应尝试的截止时间——重试绝不复用已中止的页级信号（旧实现首次尝试
+      // 超时中止后，后续尝试继承同一信号，未发起有效请求即被取消）。
+      const data = await this.fetchPageWithDeadline<{ repositories?: Repository[]; total?: number; revision?: unknown }>(
+        `${backendUrl}/repositories?page=${page}&limit=${PAGE_SIZE}`,
+        { headers },
+        PAGE_DEADLINE_MS,
+        3,
+        async (res) => {
+          if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
+          return await res.json() as { repositories?: Repository[]; total?: number; revision?: unknown };
+        },
+      );
       // R2-C13：分页累计前必须验证响应形状——缺失/非数组的 repositories 拒绝，
       // 绝不默认成 []（会被上游当作「完整空分区」授权破坏性推送/恢复）。
       // 显式 `repositories: []` + `total: 0` 仍是有效空分区。
@@ -1204,30 +1272,76 @@ class BackendAdapter {
    * token_update_skipped / token_update_superseded 两个布尔标志——调用方据此
    * 区分「设置已写入但 GitHub Token 未更新」与完全成功，给出用户提示或重试。
    * 标志缺省（或响应体不可解析）时按 false（已写入）处理。
+   *
+   * Issue #612 R12（跨域契约）：服务端另返回 active_account_update_skipped——
+   * PAT 校验等待期间另一请求（另一设备）把活跃账号切到别的账号时，本次
+   * active_account_id 写入被跳过，返回值同步暴露 activeAccountUpdateSkipped。
+   * 调用方（账号切换流程）必须把它视为「切换未在后端生效」而不是成功。
    */
   async syncSettings(
     settings: Record<string, unknown>,
     signal?: AbortSignal,
     accountId?: string | null,
-  ): Promise<{ tokenUpdateSkipped: boolean; tokenUpdateSuperseded: boolean }> {
-    if (!this._backendUrl) return { tokenUpdateSkipped: false, tokenUpdateSuperseded: false };
+  ): Promise<{
+    tokenUpdateSkipped: boolean;
+    tokenUpdateSuperseded: boolean;
+    /**
+     * 可选以保持向后兼容：旧测试桩/旧调用方无需提供本字段（缺省视为 false）。
+     * 适配器对真实响应始终返回布尔值。
+     */
+    activeAccountUpdateSkipped?: boolean;
+  }> {
+    if (!this._backendUrl) {
+      return { tokenUpdateSkipped: false, tokenUpdateSuperseded: false, activeAccountUpdateSkipped: false };
+    }
 
-    const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
-      method: 'PUT',
-      // accountId 显式指定目标账号（登录/添加流程在 Store 用户落位前写入后端时
-      // 必须传入，否则请求头缺 X-GitHub-Account-Id，服务端回退全局
-      // active_account_id 分区）；缺省时保持原行为（读取 Store 当前用户）。
-      headers: getBackendAuthHeaders(accountId),
-      body: JSON.stringify(settings),
-      signal,
-    });
-    if (!res.ok) await this.throwTranslatedError(res, 'Sync settings error');
+    // 第 12 轮审计修复：响应正文读取纳入超时——旧实现在 fetchWithTimeout
+    // 清理计时器后才 res.json()，正文停滞会让切换账号的调用方无限等待；
+    // 且读取超时曾被 catch 折叠成 payload=null，按「两个标志均为 false 的
+    // 成功响应」处理。超时现在向上抛出，凭据对齐结论保持未知（调用方的
+    // 凭据待对齐状态不被误清）；响应体缺失/非法的旧行为（按无标志成功处理）
+    // 仅对「已收到的非超时正文」保留。
+    const deadlineController = new AbortController();
+    let timedOut = false;
+    const deadlineTimer = setTimeout(() => {
+      timedOut = true;
+      deadlineController.abort();
+    }, SYNC_SETTINGS_DEADLINE_MS);
+    let callerAborted = false;
+    if (signal) {
+      if (signal.aborted) {
+        callerAborted = true;
+        deadlineController.abort();
+      } else {
+        signal.addEventListener('abort', () => deadlineController.abort(), { once: true });
+      }
+    }
     let payload: unknown = null;
     try {
-      payload = await res.json();
-    } catch {
-      // 响应体缺失/非法时按「无标志」处理（旧行为：写入成功）
-      payload = null;
+      const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
+        method: 'PUT',
+        // accountId 显式指定目标账号（登录/添加流程在 Store 用户落位前写入后端时
+        // 必须传入，否则请求头缺 X-GitHub-Account-Id，服务端回退全局
+        // active_account_id 分区）；缺省时保持原行为（读取 Store 当前用户）。
+        headers: getBackendAuthHeaders(accountId),
+        body: JSON.stringify(settings),
+        signal: deadlineController.signal,
+      });
+      if (!res.ok) await this.throwTranslatedError(res, 'Sync settings error');
+      try {
+        payload = await res.json();
+      } catch (err) {
+        if (timedOut) {
+          // 正文读取超时：凭据对齐结论未知——按失败处理，绝不当作两个标志均
+          // 为 false 的成功响应。
+          throw new Error('Sync settings response body timed out');
+        }
+        if (callerAborted) throw err;
+        // 响应体缺失/非法时按「无标志」处理（旧行为：写入成功）
+        payload = null;
+      }
+    } finally {
+      clearTimeout(deadlineTimer);
     }
     const body = payload && typeof payload === 'object' && !Array.isArray(payload)
       ? (payload as Record<string, unknown>)
@@ -1235,6 +1349,7 @@ class BackendAdapter {
     return {
       tokenUpdateSkipped: body.token_update_skipped === true,
       tokenUpdateSuperseded: body.token_update_superseded === true,
+      activeAccountUpdateSkipped: body.active_account_update_skipped === true,
     };
   }
 
