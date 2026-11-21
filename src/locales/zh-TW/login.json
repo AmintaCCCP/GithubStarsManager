@@ -59,6 +59,12 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Token 僅儲存在本機與你設定的後端，不會上傳到應用方伺服器。"
+    "token-permissions-local-storage": "Token 僅儲存在本機與你設定的後端（除非你在 WebDAV/檔案備份中啟用「備份/匯出時包含金鑰」），不會上傳到應用方伺服器。",
+    "saved-accounts": "已儲存的帳號",
+    "click-to-sign-in": "點擊登入",
+    "token-required": "需補充 Token",
+    "select-account-to-restore": "選擇要還原的帳號",
+    "multiple-accounts-exist-on-this-backend-select-th": "此後端存在多個帳號，請選擇要還原的帳號。",
+    "multiple-accounts-exist-on-this-backend-close-th": "此後端存在多個帳號。請關閉此視窗，然後在登入頁選擇要還原的帳號。"
   }
 }

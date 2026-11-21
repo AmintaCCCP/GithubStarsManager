@@ -23,6 +23,10 @@ function createRepo(t) {
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'ci-scope@example.com']);
   git(root, ['config', 'user.name', 'CI Scope Test']);
+  // 开发机全局可能开启 commit.gpgsign（ssh 签名程序在无 TTY 子进程中不可用），
+  // fixture 仓库必须显式关闭签名，保证测试对全局 git 配置免疫。
+  git(root, ['config', 'commit.gpgsign', 'false']);
+  git(root, ['config', 'tag.gpgsign', 'false']);
   return root;
 }
 

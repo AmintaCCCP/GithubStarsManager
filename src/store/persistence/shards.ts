@@ -51,6 +51,7 @@ export const PERSISTENCE_SHARD_FIELDS: Record<PersistenceShardName, readonly str
     'user',
     'githubToken',
     'isAuthenticated',
+    'savedAccounts',
     'themeTokens',
     'gistSearchFilters',
     'selectedGistCategory',

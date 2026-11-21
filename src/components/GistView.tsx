@@ -25,7 +25,7 @@ import {
 import { GistCard } from './GistCard';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
-import { useGistActions, type GistCreateInput, type GistUpdateInput } from '../features/gists/hooks/useGistActions';
+import { useGistActions, GistDetailSessionSwitchedError, type GistCreateInput, type GistUpdateInput } from '../features/gists/hooks/useGistActions';
 import { useAppStore } from '../store/useAppStore';
 import type { Gist, GistCategoryId } from '../types';
 import { filterAndSortGists, getGistCategoryItems, resolveGistAiSearchResults } from '../utils/gistUtils';
@@ -70,6 +70,23 @@ export const GistView: React.FC = () => {
   const [editingGist, setEditingGist] = useState<Gist | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const detailRequestSeqRef = useRef(0);
+
+  // 审计修复：详情状态是组件本地状态——若账号 A 的详情请求已完成，切换到
+  // 账号 B 后不会有在途请求抛出 GistDetailSessionSwitchedError，openDetail 的
+  // 错误分支不会执行，旧账号的 detailGist 会残留并继续展示。当前账号标识
+  // 变化时清除详情状态并递增请求序号，使未完成的详情请求失效。
+  const sessionAccountId = user?.id ?? null;
+  useEffect(() => {
+    detailRequestSeqRef.current += 1;
+    setDetailGist(null);
+    setIsDetailOpen(false);
+    // 审计修复（R13 finding 55）：账号切换时 GistView 保持挂载——编辑器若仍
+    // 打开，会继续显示上一账号的私有 Gist 草稿，且提交会以新会话 Token 调用
+    // updateGist（editingGist.id 无归属校验）。同一 effect 内关闭编辑器并清空
+    // 草稿，阻止切换后的提交与上一账号草稿的残留展示。
+    setEditingGist(null);
+    setIsEditorOpen(false);
+  }, [sessionAccountId]);
 
   const categoryItems = useMemo(() => ({
     all: getGistCategoryItems('all', gists, starredGists, user?.login),
@@ -132,13 +149,34 @@ export const GistView: React.FC = () => {
     const requestSeq = ++detailRequestSeqRef.current;
     setDetailGist(gist);
     setIsDetailOpen(true);
-    const detail = await fetchGistDetail(gist);
-    if (requestSeq !== detailRequestSeqRef.current || !detail) return;
-    setDetailGist(detail);
+    try {
+      const detail = await fetchGistDetail(gist);
+      if (requestSeq !== detailRequestSeqRef.current || !detail) return;
+      setDetailGist(detail);
+    } catch (error) {
+      // 审计修复（C35 调用侧）：详情请求因账号会话切换结束时，清除旧账号的
+      // detailGist 并关闭详情面板，不得继续显示旧账号的数据；普通失败维持
+      // hook 内既有的降级显示。
+      if (error instanceof GistDetailSessionSwitchedError) {
+        if (requestSeq === detailRequestSeqRef.current) {
+          setDetailGist(null);
+          setIsDetailOpen(false);
+        }
+        return;
+      }
+      throw error;
+    }
   };
 
-  const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput) => {
+  // 审计修复（R14 finding 2）：保存状态与完成回调绑定到发起保存的会话——
+  // 保存请求在途时用户可关闭编辑器并经补授权切换账号；submitGist 的过期会话
+  // 分支会正常返回（远端改动已按发起账号落账），旧保存的完成回调若不校验
+  // 会话就会关闭/重置当前会话刚打开的编辑器（覆盖未保存草稿）。此处以发起
+  // 时刻的会话标识为凭据：完成后仅当仍是同一会话才允许编辑器关闭。
+  const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput): Promise<boolean> => {
+    const initiatingSessionId = user?.id ?? null;
     await submitGist(input, editingGist);
+    return (useAppStore.getState().user?.id ?? null) === initiatingSessionId;
   };
 
   return (
@@ -409,7 +447,11 @@ export const GistView: React.FC = () => {
       </section>
 
       <GistDetailModal gist={detailGist} isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} />
+      {/* 审计修复（R14 finding 2）：key 把编辑器实例（含 isSaving 保存状态与
+          草稿字段）绑定到发起会话——账号切换即重挂载，旧保存的 isSaving 复位
+          落在已卸载实例上（no-op），绝不影响当前会话编辑器的保存按钮状态。 */}
       <GistEditorModal
+        key={sessionAccountId ?? 'anonymous'}
         gist={editingGist}
         isOpen={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}

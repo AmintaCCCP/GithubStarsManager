@@ -5,6 +5,11 @@
 import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { useDialog } from '../../../hooks/useDialog';
 import {
@@ -30,11 +35,18 @@ export const useWatchedSourcesSync = () => {
     if (!githubToken || isSyncingWatchedSources) return;
 
     setIsSyncingWatchedSources(true);
+    // 账号代次校验（Issue #611）：Watch 拉取切号后丢弃结果，不写入新账号的来源配置
+    const startedAccountId = peekCurrentAccountId();
+    // A→B→A 时账号 ID 与切号前相同：必须比较会话代次。
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const githubApi = createGitHubApiService(githubToken);
       // 只拉 /user/subscriptions（含私有仓）。/users/{login}/subscriptions 已被 GitHub 改为
       // 恒定返回 204 空响应体，且其结果本就是前者的公开子集，并行合并只会拖垮整个同步。
       const watchedRepos = await githubApi.getAllWatchedRepositories();
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
       // hiddenByRepo 在 await 之后从最新 state 读取：同步期间用户仍可在设置面板
       // 切换 release_hidden，旧快照会在 setReleaseSourceRepositories 时覆盖该修改。
       const hiddenByRepo = new Map(
@@ -51,7 +63,11 @@ export const useWatchedSourcesSync = () => {
       );
     } catch (error) {
       console.error('Failed to sync watched repositories:', error);
-      toast(t('useWatchedSourcesSync.failed-to-sync-watch-repositories-check-network'), 'error');
+      // 审计修复（C43）：失败 toast 前校验发起会话（账号 ID + 会话代次）——
+      // 仅发起会话仍是当前会话时提示；finally 的加载状态清理保持不变。
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(t('useWatchedSourcesSync.failed-to-sync-watch-repositories-check-network'), 'error');
+      }
     } finally {
       setIsSyncingWatchedSources(false);
     }

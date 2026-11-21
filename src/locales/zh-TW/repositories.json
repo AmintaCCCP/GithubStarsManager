@@ -41,7 +41,8 @@
     "failed": "Star 失敗",
     "starred": "已成功加入星號",
     "check-name": "請核對這個名稱",
-    "no-description": "暫無描述"
+    "no-description": "暫無描述",
+    "session-changed": "帳號已切換，請重新預覽後再 Star。"
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "無法應用插件結果",
@@ -208,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "停止AI分析",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "確定要停止 AI 分析嗎？已分析的結果將會保存。",
+    "analysis-task-already-running": "AI 分析任務正在進行中，請等待其完成或停止目前任務後再試。",
     "no-failed-repositories-to-re-analyze": "沒有分析失敗的倉庫！",
     "all-repositories-have-been-analyzed": "所有倉庫都已經分析過了！",
     "no-repositories-to-analyze": "沒有可分析的倉庫！",
@@ -246,7 +248,12 @@
     "unstar-confirmation": "取消Star確認",
     "unstar": "取消Star",
     "successfully-unstarred": "已成功取消 Star",
-    "failed-to-unstar-repository-please-check-your-ne": "取消 Star 失敗，請檢查網路連線或重新登入。"
+    "failed-to-unstar-repository-please-check-your-ne": "取消 Star 失敗，請檢查網路連線或重新登入。",
+    "similar-results-may-be-incomplete-the-dens": "相似倉庫結果可能不完整：稠密向量索引不可用。({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "相似倉庫結果可能不完整：向量 Worker 不支援按帳號過濾召回。請部署隨附的 Cloudflare Worker 後重試。",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "相似倉庫結果可能不完整：向量 accountId 中繼資料索引尚未就緒。請建立並驗證 accountId 中繼資料索引、回填存量向量，並在部署中啟用 ACCOUNT_METADATA_INDEXED。",
+    "dense-index-unavailable-reason-status-failed": "相似倉庫結果可能不完整：向量索引狀態檢查失敗。請稍後重試。",
+    "dense-index-unavailable-reason-needs-backfill": "相似倉庫結果可能不完整：向量索引尚未就緒，無法按帳號召回。請在向量搜尋設定中為目前帳號重建索引。"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "請先在設定中設定 GitHub Token，或連線後端服務。",
@@ -266,11 +273,16 @@
     "list-sync-failed-starred-repositories-were-synce": "List 同步失敗，星標倉庫已同步。請稍後重試，或檢查 GitHub Token 權限（需 user scope）。",
     "sync-completed-found-newrepocount-new-repositori": "同步完成！發現 {{newRepoCount}} 個新倉庫。",
     "sync-completed-all-repositories-are-up-to-date": "同步完成！所有倉庫都是最新的。",
+    "sync-completed-backend-write-failed": "星標已更新，但寫入後端失敗。本機資料已保留，將自動重試後端同步。",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub token 已過期或無效，請重新登入。",
     "sync-failed-please-check-your-network-connection": "同步失敗，請檢查網路連線或稍後重試。",
     "list-sync-new-categories_one": "（新建 {{count}} 個分類）",
     "list-sync-new-categories_other": "（新建 {{count}} 個分類）",
-    "list-sync-complete": "已同步 {{lists}} 個 list（新建 {{newCount}} 個分類）。"
+    "list-sync-complete": "已同步 {{lists}} 個 list（新建 {{newCount}} 個分類）。",
+    "vector-worker-does-not-support-account-scoped-recall": "向量 Worker 不支援按帳號召回；請重新部署倉庫自帶的 cloudflare-worker 並重建索引。",
+    "account-metadata-index-is-not-ready-create-the-accountid": "帳號中繼資料索引尚未就緒；請建立 accountId 中繼資料索引、回填向量並啟用 ACCOUNT_METADATA_INDEXED。",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "無法驗證向量 Worker 狀態；已回退到本地搜尋。",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "多帳號搜尋需要重建向量索引；已回退到本地搜尋。"
   },
   "repositoryHealthPanel": {
     "activity": "活躍度",

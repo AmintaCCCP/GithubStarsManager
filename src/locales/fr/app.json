@@ -236,7 +236,19 @@
     "menu-releases": "libérer",
     "menu-forks": "réplique",
     "menu-subscription": "Découvrir",
-    "menu-settings": "installation"
+    "menu-settings": "installation",
+    "switch-account": "Changer de compte",
+    "add-account": "Ajouter un compte",
+    "current-account": "Compte actuel",
+    "remove-account": "Supprimer le compte",
+    "remove-account-with-login": "Supprimer @{{login}}",
+    "logout-account-changed": "Le compte a changé. Veuillez vous déconnecter à nouveau pour le compte actuel.",
+    "switch-in-progress": "Un changement de compte est en cours. Veuillez réessayer dans un instant.",
+    "remove-account-confirm-title": "Supprimer le compte enregistré",
+    "remove-account-confirm-desc": "Cela supprime uniquement les identifiants de connexion enregistrés pour ce compte. Les dépôts et catégories en cache seront conservés. Continuer ?",
+    "account-switched": "Compte basculé vers @{{login}}",
+    "account-repo-count": "{{count}} dépôts",
+    "retry-credential-alignment": "Réessayer la synchronisation des identifiants du backend"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Synchroniser les catégories avec la liste GitHub"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "Importation des données réussie",
     "import-data": "Importer des données",
     "import-failed-please-try-again": "Échec de l'importation, veuillez réessayer",
+    "pat-export-authorization-title": "Autorisation d'exportation des jetons GitHub",
+    "pat-export-authorization-desc": "Cette exportation inclura les jetons GitHub de tous les comptes enregistrés en clair. Chaque exportation nécessite une confirmation explicite ; le réglage enregistré « Inclure les clés lors de la sauvegarde/exportation » ne vaut pas autorisation.",
+    "pat-export-deny": "Refuser",
+    "pat-export-authorize": "Autoriser",
+    "import-accounts-need-reauth": "Données importées avec succès. Les comptes suivants n'ont pas d'identifiants locaux et doivent être réautorisés : {{accounts}}",
+    "import-skipped-unattributed-top-level": "Les données de compte du niveau supérieur de la sauvegarde n'étaient rattachées à aucun compte et ont été ignorées. Rien n'a été écrit dans le compte actuel.",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "Les entrepôts non analysés ne peuvent pas être nettoyés directement, veuillez utiliser la fonction d'analyse IA pour les traiter.",
     "cleanup-data": "Nettoyer les données",
     "data-cleanup-successful": "Nettoyage des données réussi",
@@ -1416,5 +1434,19 @@
     "download": "Télécharger",
     "detected-from-filenames-and-release-metadata-no": "Détecté à partir des noms de fichiers et des métadonnées de la Release. Aucun contrôle de sécurité n'est effectué et rien ne s'exécute automatiquement. Vous pouvez toujours choisir un autre fichier dans la liste ci-dessous.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} fichier(s) écarté(s) car ils ne concernent pas cet appareil (code source, sommes de contrôle, signatures, symboles de débogage, blockmaps, autres plateformes ou architectures)."
+  },
+  "accountModal": {
+    "title": "Ajouter un compte GitHub",
+    "description": "Saisissez un nouveau jeton d'accès personnel GitHub pour ajouter un compte. Les données de votre compte actuel seront préservées en toute sécurité.",
+    "token-label": "Jeton d'accès personnel GitHub",
+    "cancel": "Annuler",
+    "confirm": "Ajouter et basculer",
+    "reauth-hint": "Veuillez saisir un jeton GitHub valide pour @{{login}}",
+    "account-mismatch": "Ce jeton appartient à un autre compte GitHub. Connectez-vous avec le jeton de @{{login}}.",
+    "backend-credential-sync-failed": "Connexion au compte effectuée, mais les identifiants du backend n'ont pas pu être mis à jour. Réessayez plus tard depuis le menu des comptes."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Déconnexion effectuée, mais le nettoyage des identifiants sur l'appareil n'est pas terminé. L'ancien identifiant reste masqué et sera réessayé automatiquement au prochain démarrage.",
+    "active-account-update-skipped": "Un autre appareil a changé le compte actif du backend pendant ce changement de compte ; le backend n'a donc pas basculé sur ce compte. La session locale utilise déjà ce compte ; réessayez depuis le menu des comptes pour aligner le backend."
   }
 }

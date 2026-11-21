@@ -14,10 +14,28 @@ export function initializeSchema(db: Database.Database): void {
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- v4 多账号隔离：repositories/releases/categories 以 (account_id, id) 为复合主键，
+    -- 与 Migration v4 重建后的形状逐列一致，保证全新数据库与升级数据库不漂移。
+    CREATE TABLE IF NOT EXISTS accounts (
+      account_id TEXT PRIMARY KEY,
+      user_json TEXT NOT NULL,
+      github_token_encrypted TEXT,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS account_settings (
+      account_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT,
+      PRIMARY KEY (account_id, key)
+    );
+
     CREATE TABLE IF NOT EXISTS repositories (
-      id INTEGER PRIMARY KEY,
+      account_id TEXT NOT NULL DEFAULT 'default',
+      id INTEGER NOT NULL,
       name TEXT NOT NULL,
-      full_name TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL,
       description TEXT,
       html_url TEXT NOT NULL,
       stargazers_count INTEGER DEFAULT 0,
@@ -38,12 +56,25 @@ export function initializeSchema(db: Database.Database): void {
       custom_tags TEXT,
       custom_category TEXT,
       category_locked INTEGER DEFAULT 0,
+      description_display TEXT,
+      tags_display TEXT,
       last_edited TEXT,
-      subscribed_to_releases INTEGER DEFAULT 0
+      subscribed_to_releases INTEGER DEFAULT 0,
+      vector_indexed_at TEXT,
+      license TEXT,
+      vector_indexed_license TEXT,
+      ai_shared INTEGER DEFAULT 0,
+      -- Issue #612 R2-A10：按字段的 AI 成果共享授权位（与 v7 迁移一致）。
+      ai_summary_shared INTEGER DEFAULT 0,
+      ai_tags_shared INTEGER DEFAULT 0,
+      ai_platforms_shared INTEGER DEFAULT 0,
+      PRIMARY KEY (account_id, id),
+      UNIQUE (account_id, full_name)
     );
 
     CREATE TABLE IF NOT EXISTS releases (
-      id INTEGER PRIMARY KEY,
+      account_id TEXT NOT NULL DEFAULT 'default',
+      id INTEGER NOT NULL,
       tag_name TEXT NOT NULL,
       name TEXT,
       body TEXT,
@@ -57,18 +88,21 @@ export function initializeSchema(db: Database.Database): void {
       draft INTEGER DEFAULT 0,
       is_read INTEGER DEFAULT 0,
       zipball_url TEXT,
-      tarball_url TEXT
+      tarball_url TEXT,
+      PRIMARY KEY (account_id, id)
     );
 
     CREATE TABLE IF NOT EXISTS categories (
-      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL DEFAULT 'default',
+      id TEXT NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
       icon TEXT NOT NULL DEFAULT '📁',
       keywords TEXT,
       color TEXT,
       sort_order INTEGER DEFAULT 0,
-      is_custom INTEGER DEFAULT 1
+      is_custom INTEGER DEFAULT 1,
+      PRIMARY KEY (account_id, id)
     );
 
     CREATE TABLE IF NOT EXISTS ai_configs (
@@ -108,6 +142,15 @@ export function initializeSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+
+    -- 每账号分区的服务端自身元数据（repo_revision 等内部状态）。
+    -- 独立于 account_settings：不会被备份导出/导入，也不会经 /api/settings 暴露。
+    CREATE TABLE IF NOT EXISTS partition_meta (
+      account_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT,
+      PRIMARY KEY (account_id, key)
     );
 
     CREATE TABLE IF NOT EXISTS embedding_configs (
@@ -169,4 +212,15 @@ export function initializeSchema(db: Database.Database): void {
   // 上一次向量索引时采用的 license 值（SPDX id / null）。用于增量谓词判断 license 是否
   // 变化：当期 license 与此值不一致时需重新索引，保证 license 变更能使向量元数据失效。
   addColumnIfMissing(db, 'repositories', 'vector_indexed_license', 'TEXT');
+  // 跨账号 AI 成果共享标记（Issue #612 A21）：写入 ai_* 的路由按账号设置置位。
+  addColumnIfMissing(db, 'repositories', 'ai_shared', 'INTEGER DEFAULT 0');
+  // 按字段的 AI 成果共享授权位（Issue #612 R2-A10，v7 迁移同样补列）。
+  addColumnIfMissing(db, 'repositories', 'ai_summary_shared', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'repositories', 'ai_tags_shared', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'repositories', 'ai_platforms_shared', 'INTEGER DEFAULT 0');
+
+  // 跨账号 AI 成果回填子查询（repositories.ts / accountScope.ts）按 `id = ? AND
+  // account_id != ?` 检索捐赠行；复合主键 (account_id, id) 无法命中纯 id 条件，
+  // 需要独立索引避免同步退化为全表扫描。
+  db.exec('CREATE INDEX IF NOT EXISTS idx_repositories_repo_id ON repositories(id)');
 }

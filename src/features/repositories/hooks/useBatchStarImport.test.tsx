@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useBatchStarImport } from './useBatchStarImport';
 import { GitHubTokenPermissionError } from '../../../services/githubApi';
+import { bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
 
 const mocks = vi.hoisted(() => ({
   token: 'token',
@@ -12,15 +13,46 @@ const mocks = vi.hoisted(() => ({
   starRepository: vi.fn(),
   forceSyncToBackend: vi.fn(),
   translateBatch: vi.fn(),
+  // 审计修复：切号后已成功的星标写回发起账号工作区并登记待同步——测试桩
+  // 提供最小 getState/setState 驱动账号代次校验与归档写回。
+  storeUser: null as { id: number } | null,
+  storeAccountWorkspaces: {} as Record<string, unknown>,
+  markPendingAccountSync: vi.fn(),
+  // R13 审计修复（CodeRabbit）：待同步标记的后端归属必须在「发起时后端 X →
+  // 等待期间切到 Y」的场景下验证——只有空 URL 断言无法区分实现读取的是
+  // 发起时地址还是请求完成时地址。
+  backend: { backendUrl: null as string | null },
 }));
-vi.mock('../../../store/useAppStore', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) => selector({
+vi.mock('../../../store/useAppStore', () => {
+  const store = (selector: (state: unknown) => unknown) => selector({
     githubToken: mocks.token, language: mocks.language, addRepository: mocks.addRepository,
-  }),
-}));
+  });
+  (store as unknown as { getState: () => unknown }).getState = () => ({
+    user: mocks.storeUser,
+    githubToken: mocks.token,
+    language: mocks.language,
+    addRepository: mocks.addRepository,
+    accountWorkspaces: mocks.storeAccountWorkspaces,
+  });
+  (store as unknown as { setState: (patch: unknown) => void }).setState = (patch: unknown) => {
+    const partial = typeof patch === 'function'
+      ? (patch as (state: unknown) => Record<string, unknown>)((store as unknown as { getState: () => unknown }).getState())
+      : (patch as Record<string, unknown>);
+    if (partial && typeof partial === 'object' && 'accountWorkspaces' in partial) {
+      mocks.storeAccountWorkspaces = partial.accountWorkspaces as Record<string, unknown>;
+    }
+  };
+  return { useAppStore: store };
+});
 vi.mock('../../../services/githubApiFactory', () => ({ createGitHubApiService: () => mocks }));
-vi.mock('../../../services/autoSync', () => ({ forceSyncToBackend: mocks.forceSyncToBackend }));
+vi.mock('../../../services/autoSync', () => ({
+  forceSyncToBackend: mocks.forceSyncToBackend,
+  markPendingAccountSync: mocks.markPendingAccountSync,
+  // 审计修复：切号后的星标写回经簿记守卫——测试桩直通执行。
+  withAccountSwitchGuardSync: (fn: () => void) => fn(),
+}));
 vi.mock('../../../services/translateService', () => ({ translateBatch: mocks.translateBatch }));
+vi.mock('../../../services/backendAdapter', () => ({ backend: mocks.backend }));
 
 const detail = (owner: string, name: string) => ({
   id: 1, name, full_name: `${owner}/${name}`, description: 'A repository',
@@ -35,6 +67,9 @@ describe('useBatchStarImport', () => {
     vi.clearAllMocks();
     mocks.token = 'token';
     mocks.language = 'zh';
+    mocks.storeUser = null;
+    mocks.storeAccountWorkspaces = {};
+    mocks.backend.backendUrl = null;
     mocks.getRepositoryDetails.mockImplementation(async (owner, name) => detail(owner, name));
     mocks.isRepositoryStarred.mockResolvedValue(false);
     mocks.starRepository.mockResolvedValue(undefined);
@@ -53,6 +88,39 @@ describe('useBatchStarImport', () => {
     expect(result.current.duplicateCount).toBe(7);
     expect(result.current.rows.every(row => row.selected)).toBe(true);
     expect(mocks.starRepository).not.toHaveBeenCalled();
+  });
+
+  it('drops preview rows produced by an account that was switched mid-resolution (R12 finding 9)', async () => {
+    mocks.storeUser = { id: 1 };
+    mocks.getRepositoryDetails.mockImplementation(async (owner: string, name: string) => {
+      // 解析等待期间切到账号 2
+      mocks.storeUser = { id: 2 };
+      bumpAccountSessionGeneration();
+      return detail(owner, name);
+    });
+    const { result } = renderHook(() => useBatchStarImport());
+
+    await act(() => result.current.preview('https://github.com/owner/repository'));
+
+    expect(result.current.rows).toEqual([]);
+    expect(mocks.starRepository).not.toHaveBeenCalled();
+  });
+
+  it('refuses to star a preview generated before an account switch (R12 finding 9)', async () => {
+    mocks.storeUser = { id: 1 };
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repository'));
+    expect(result.current.rows).toHaveLength(1);
+
+    // 预览后切到账号 2（旧预览不得用 B 的 Token 提交）
+    mocks.storeUser = { id: 2 };
+    bumpAccountSessionGeneration();
+    mocks.token = 'token-b';
+    await act(() => result.current.starSelected());
+
+    expect(mocks.starRepository).not.toHaveBeenCalled();
+    expect(mocks.addRepository).not.toHaveBeenCalled();
+    expect(result.current.syncError).toContain('账号已切换');
   });
 
   it('keeps already-starred and inaccessible repositories out of the selection', async () => {
@@ -194,5 +262,38 @@ describe('useBatchStarImport', () => {
     act(() => result.current.clearPreview());
     expect(result.current.translations).toEqual({});
     expect(result.current.translationsVisible).toBe(false);
+  });
+
+  it('records a successful star to the starting account workspace when the session switched mid-import', async () => {
+    // 审计修复：星标请求已在 GitHub 成功（不可撤销）而会话恰好切换时，
+    // 该星标必须记录到发起账号的工作区并登记待同步，绝不静默丢失；
+    // 尾部同步（forceSyncToBackend）绝不能在切号后执行。
+    mocks.storeUser = { id: 1 };
+    mocks.storeAccountWorkspaces = { '1': { repositories: [] } };
+    // 发起星标请求时后端为 X；等待期间切换到 Y（模拟切号流程更换后端连接）
+    mocks.backend.backendUrl = 'https://backend-x.example/api';
+    mocks.starRepository.mockImplementation(async () => {
+      // 星标请求期间切换到账号 2，同时后端地址从 X 切到 Y
+      mocks.storeUser = { id: 2 };
+      mocks.backend.backendUrl = 'https://backend-y.example/api';
+    });
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+    await act(() => result.current.starSelected());
+
+    expect(mocks.starRepository).toHaveBeenCalledTimes(1);
+    expect(mocks.addRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    // 星标记录进发起账号（id=1）的归档快照，并登记 (账号, 发起时后端) 待同步标记
+    const parked = mocks.storeAccountWorkspaces['1'] as { repositories: Array<{ id: number }> };
+    expect(parked.repositories).toHaveLength(1);
+    expect(parked.repositories[0].id).toBe(1);
+    // R13 审计修复（CodeRabbit）：待同步标记必须使用请求发起时的后端地址 X，
+    // 绝不能记录请求完成时的后端 Y——若实现改为在星标完成后读取地址，本断言
+    // 会因多出 Y 调用而失败。
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledTimes(1);
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', 'https://backend-x.example/api');
+    expect(mocks.markPendingAccountSync).not.toHaveBeenCalledWith('1', 'https://backend-y.example/api');
+    mocks.backend.backendUrl = null;
   });
 });

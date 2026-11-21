@@ -59,6 +59,12 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "토큰은 이 기기와 직접 구성한 백엔드에만 저장되며 앱 서버로 전송되지 않습니다."
+    "token-permissions-local-storage": "토큰은 이 기기와 직접 구성한 백엔드에만 저장되며(WebDAV/파일 백업에서 \"백업/내보내기에 키 포함\"을 활성화한 경우 제외) 앱 서버로 전송되지 않습니다.",
+    "saved-accounts": "저장된 계정",
+    "click-to-sign-in": "클릭하여 로그인",
+    "token-required": "토큰 필요",
+    "select-account-to-restore": "복원할 계정을 선택하세요",
+    "multiple-accounts-exist-on-this-backend-select-th": "이 백엔드에 여러 계정이 있습니다. 복원할 계정을 선택하세요.",
+    "multiple-accounts-exist-on-this-backend-close-th": "이 백엔드에 여러 계정이 있습니다. 대화상자를 닫은 후 로그인 페이지에서 복원할 계정을 선택하세요."
   }
 }

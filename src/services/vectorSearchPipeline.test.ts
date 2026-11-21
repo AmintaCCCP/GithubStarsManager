@@ -3,11 +3,12 @@ import type { Repository } from '../types';
 import { AIService } from './aiService';
 import { logger } from './logger';
 import type { GradedRerankResult } from './vectorSearchPipeline';
-import type { EmbeddingClient, VectorSearchService } from './vectorSearchService';
+import type { EmbeddingClient, VectorQueryResult, VectorSearchService } from './vectorSearchService';
 import {
   applyRelativeCutoff,
   chooseFinalOrder,
   fuseCandidates,
+  hydrateMatches,
   orderByCrossEncoder,
   rankStructuredCandidates,
   runVectorSearchPipeline,
@@ -477,5 +478,88 @@ describe('vectorSearchPipeline', () => {
     if (item.denseMatches.length >= 3) expect(rerankMock).toHaveBeenCalledTimes(1);
     else expect(rerankMock).not.toHaveBeenCalled();
     expect(result?.repositories.map(repo => String(repo.id))).toEqual(item.expectedTopIds);
+  });
+});
+
+describe('hydrateMatches 账号隔离（R4 审计修复）', () => {
+  const repoOne = makeRepo({ id: 1, full_name: 'acme/one' });
+  const repoTwo = makeRepo({ id: 2, full_name: 'acme/two' });
+  const repoById = new Map([['1', repoOne], ['2', repoTwo]]);
+
+  const match = (id: string, accountId?: string, score = 0.8): VectorQueryResult => ({
+    id,
+    score,
+    metadata: {
+      full_name: 'acme/one',
+      description: '',
+      language: '',
+      stars: 1,
+      tags: [],
+      ...(accountId ? { accountId } : {}),
+    },
+  });
+
+  it('keeps matches owned by the current account and strips the ID prefix for hydration', () => {
+    const ranked = hydrateMatches(
+      [match('7:1', '7'), match('7:2', '7', 0.7)],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: true } },
+    );
+    expect(ranked.map(item => item.repo.id)).toEqual([1, 2]);
+  });
+
+  it('drops matches owned by other accounts even when the repo exists locally', () => {
+    // 同一仓库在两个账号列表中都存在：他账号的向量不得经同一 ID 水合进来
+    const ranked = hydrateMatches(
+      [match('8:1', '8')],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: true } },
+    );
+    expect(ranked).toEqual([]);
+  });
+
+  it('hides legacy unowned matches in multi-account sessions', () => {
+    const ranked = hydrateMatches(
+      [match('1'), match('2')],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: true } },
+    );
+    expect(ranked).toEqual([]);
+  });
+
+  it('keeps legacy unowned matches visible only when legacy ownership is explicitly confirmed', () => {
+    const rankedConfirmed = hydrateMatches(
+      [match('1')],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: false, allowLegacyUnscoped: true } },
+    );
+    expect(rankedConfirmed.map(item => item.repo.id)).toEqual([1]);
+
+    // 仅本机保存单个账号（未确认 legacy 归属）不得召回无归属旧向量
+    const rankedUnconfirmed = hydrateMatches(
+      [match('1')],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: false } },
+    );
+    expect(rankedUnconfirmed).toEqual([]);
+  });
+
+  it('rejects prefixed matches whose metadata.accountId conflicts with the prefix', () => {
+    const ranked = hydrateMatches(
+      [match('7:1', '8')],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: true } },
+    );
+    expect(ranked).toEqual([]);
+  });
+
+  it('keeps the raw vector id lookup when no scope is provided (C13)', () => {
+    const ranked = hydrateMatches(
+      [match('8:2', '8', 0.9), match('1', undefined, 0.8)],
+      repoById,
+    );
+    // C13：无归属范围时保留原始向量 ID 查找——账号 8 的「8:2」向量绝不能
+    // 先剥前缀命中本地仓库 2 并影响其排名；legacy 无前缀向量照常水合。
+    expect(ranked.map(item => item.repo.id)).toEqual([1]);
   });
 });

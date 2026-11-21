@@ -1,12 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Repository } from '../types';
 import {
+  buildAccountScopedVectorId,
+  isAccountScopeMigrationDone,
   looksLikeLengthError,
+  parseAccountScopedVectorId,
   truncateForRetry,
   embedWithFallback,
   indexAllRepos,
   needsReindex,
+  __resetInMemoryAccountScopeMigrationForTest,
   EMBEDDING_FORMAT_VERSION,
+  VectorSearchService,
 } from './vectorSearchService';
 
 // Minimal mock: only the `.embed` method is used by embedWithFallback.
@@ -47,7 +52,8 @@ const makeIndexClient = () => ({
   embed: vi.fn(async (texts: string[]) => texts.map((_, i) => vec(i))),
 }) as unknown as Parameters<typeof indexAllRepos>[1];
 
-const makeVectorService = () => ({
+const makeVectorService = (workerId?: string) => ({
+  ...(workerId ? { workerId } : {}),
   upsert: vi.fn(async (vectors: Array<{ id: string }>) => ({ upserted: vectors.length })),
 }) as unknown as Parameters<typeof indexAllRepos>[2];
 
@@ -182,6 +188,60 @@ describe('indexAllRepos incremental filtering', () => {
     expect(indexedIds).toEqual(expected);
     expect(result.indexedRepoIds).toEqual(expected);
     expect(result.indexed).toBe(expected.length);
+  });
+});
+
+describe('indexAllRepos partial embedding failure reporting (R5 finding 4)', () => {
+  // 回归（CodeRabbit 发现 4）：upsertedCount 回调此前从原始 batch 推算仓库 ID，
+  // 当 batch=[repo1,repo2]、embedding=[null,vector2] 时会把「embedding 失败的
+  // repo1」报告为已上传——调用方给 repo1 写 vector_indexed_at，增量索引永久
+  // 跳过它；真正上传成功的 repo2 反而没有标记。修复后从成功向量列表读取。
+  const makePartiallyFailingClient = (vectors: Array<number[] | null>) => ({
+    embed: vi.fn(async () => vectors),
+  }) as unknown as Parameters<typeof indexAllRepos>[1];
+
+  const captureIndexed = async (vectors: Array<number[] | null>) => {
+    const client = makePartiallyFailingClient(vectors);
+    const vectorService = makeVectorService();
+    const indexedIds: number[] = [];
+    const result = await indexAllRepos(
+      [makeRepository(1), makeRepository(2), makeRepository(3)],
+      client,
+      vectorService,
+      { indexMode: 'description', onRepoIndexed: (repoId) => indexedIds.push(repoId) },
+    );
+    return { client, vectorService, indexedIds, result };
+  };
+
+  it('does not report the first repo as indexed when its embedding fails', async () => {
+    const { vectorService, indexedIds, result } = await captureIndexed([null, vec(2), vec(3)]);
+
+    // 只有 repo2/repo3 被上传并报告；失败的 repo1 绝不能出现在已索引列表
+    const upsertedVectorIds = (vectorService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
+    expect(upsertedVectorIds).toEqual(['2', '3']);
+    expect(indexedIds).toEqual([2, 3]);
+    expect(result.indexedRepoIds).toEqual([2, 3]);
+    expect(result.indexed).toBe(2);
+    expect(result.errors).toBe(1);
+  });
+
+  it('does not report middle repos as indexed when their embedding fails', async () => {
+    const { indexedIds, result } = await captureIndexed([vec(1), null, vec(3)]);
+
+    // repo1 在失败项之前：仍按构造顺序报告；repo3 在失败项之后：不被错位占用
+    expect(indexedIds).toEqual([1, 3]);
+    expect(result.indexedRepoIds).toEqual([1, 3]);
+    expect(result.indexed).toBe(2);
+    expect(result.errors).toBe(1);
+  });
+
+  it('keeps the existing report order when every embedding succeeds', async () => {
+    const { indexedIds, result } = await captureIndexed([vec(1), vec(2), vec(3)]);
+
+    expect(indexedIds).toEqual([1, 2, 3]);
+    expect(result.indexedRepoIds).toEqual([1, 2, 3]);
+    expect(result.indexed).toBe(3);
+    expect(result.errors).toBe(0);
   });
 });
 
@@ -398,5 +458,391 @@ describe('embedWithFallback', () => {
     controller.abort();
     const client = makeClient(async () => [vec(1)]);
     await expect(embedWithFallback(['a'], client, controller.signal, 6000)).rejects.toThrow('Aborted');
+  });
+});
+
+describe('indexAllRepos 账号隔离向量 ID（R4 审计修复）', () => {
+  const scopedRepos = (): Repository[] => [
+    makeRepository(1, { ai_tags: ['tag-a'] }),
+    makeRepository(2),
+  ];
+
+  const makeVectorServiceWithMock = () => {
+    const upsert = vi.fn(async (vectors: Array<{ id: string }>) => ({ upserted: vectors.length }));
+    return {
+      upsert,
+      service: { upsert } as unknown as Parameters<typeof indexAllRepos>[2],
+    };
+  };
+
+  it('prefixes vector IDs with the owning account and records it in metadata', async () => {
+    const { upsert, service } = makeVectorServiceWithMock();
+    await indexAllRepos(scopedRepos(), makeIndexClient(), service, { accountId: '42' });
+
+    const upserted = upsert.mock.calls[0][0] as Array<{ id: string; metadata: { accountId?: string } }>;
+    // 账号隔离：多账号共享索引时同仓库向量不再互相覆盖
+    expect(upserted.map((v) => v.id)).toEqual(['42:1', '42:2']);
+    expect(upserted[0].metadata.accountId).toBe('42');
+    expect(upserted[1].metadata.accountId).toBe('42');
+  });
+
+  it('falls back to legacy unprefixed IDs and attributes metadata to the default account when no owning account is available', async () => {
+    const { upsert, service } = makeVectorServiceWithMock();
+    await indexAllRepos(scopedRepos(), makeIndexClient(), service, {});
+
+    const upserted = upsert.mock.calls[0][0] as Array<{ id: string; metadata: { accountId?: string } }>;
+    // 第 13 轮跨域接缝（server 域 [68]）：匿名上传保持 legacy 无前缀 ID，但
+    // metadata 记入 'default' 归属——服务端按归属投影候选时匿名向量不再无法
+    // 归属（仅 metadata，不改 ID 形态）。
+    expect(upserted.map((v) => v.id)).toEqual(['1', '2']);
+    expect(upserted[0].metadata.accountId).toBe('default');
+    expect(upserted[1].metadata.accountId).toBe('default');
+  });
+
+  it('reports numeric repo ids to onRepoIndexed for account-prefixed vectors', async () => {
+    const { service } = makeVectorServiceWithMock();
+    const onRepoIndexed = vi.fn();
+    const result = await indexAllRepos(scopedRepos(), makeIndexClient(), service, {
+      accountId: '42',
+      onRepoIndexed,
+    });
+
+    // 向量 ID 带账号前缀后不得按 parseInt(id) 解析（前缀非数字会得到 NaN）
+    expect(onRepoIndexed).toHaveBeenCalledWith(1);
+    expect(onRepoIndexed).toHaveBeenCalledWith(2);
+    expect(result.indexedRepoIds).toEqual([1, 2]);
+  });
+});
+
+describe('账号隔离向量 ID 编解码（R4 审计修复）', () => {
+  it('builds prefixed IDs for known accounts and legacy IDs otherwise', () => {
+    expect(buildAccountScopedVectorId('42', 7)).toBe('42:7');
+    expect(buildAccountScopedVectorId('42', '7')).toBe('42:7');
+    expect(buildAccountScopedVectorId(null, 7)).toBe('7');
+    expect(buildAccountScopedVectorId(undefined, 7)).toBe('7');
+  });
+
+  it('parses scoped IDs and treats legacy IDs as unowned', () => {
+    expect(parseAccountScopedVectorId('42:7')).toEqual({ accountId: '42', repoId: '7' });
+    expect(parseAccountScopedVectorId('7')).toEqual({ accountId: null, repoId: '7' });
+    // 非数字前缀不是账号前缀（防垃圾字符串污染归属）
+    expect(parseAccountScopedVectorId('owner:7')).toEqual({ accountId: null, repoId: 'owner:7' });
+  });
+});
+
+describe('VectorSearchService.cleanup 账号范围参数（R5 发现 2）', () => {
+  const stubFetch = (capture: (url: string, init: RequestInit) => void) => {
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      capture(String(url), init ?? {});
+      return new Response(JSON.stringify({ success: true, deleted: 0 }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends accountPrefix and includeLegacy in the request body', async () => {
+    let capturedBody = '';
+    stubFetch((_url, init) => { capturedBody = String(init.body); });
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await service.cleanup(['1:1', '42'], { accountPrefix: '1', includeLegacy: true });
+
+    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1:1', '42'], accountPrefix: '1', includeLegacy: true });
+  });
+
+  it('forwards an explicit includeLegacy=false instead of dropping it', async () => {
+    let capturedBody = '';
+    stubFetch((_url, init) => { capturedBody = String(init.body); });
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await service.cleanup(['1'], { accountPrefix: null, includeLegacy: false });
+
+    // 显式 false 必须写入：省略会被 Worker 当成旧版无范围请求
+    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1'], includeLegacy: false });
+  });
+
+  it('rejects an explicit empty accountPrefix instead of silently sending an unscoped cleanup (R2-C25)', async () => {
+    const fetchMock = stubFetch(() => undefined);
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await expect(service.cleanup(['1'], { accountPrefix: '' })).rejects.toThrow(
+      'accountPrefix must be a non-empty string',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the legacy (keepIds, signal) call signature working', async () => {
+    let capturedBody = '';
+    let capturedSignal: AbortSignal | null | undefined;
+    stubFetch((_url, init) => {
+      capturedBody = String(init.body);
+      capturedSignal = init.signal;
+    });
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+    const controller = new AbortController();
+
+    await service.cleanup(['1'], controller.signal);
+
+    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1'] });
+    expect(capturedSignal).toBe(controller.signal);
+  });
+
+  it('surfaces worker failures as errors (contract unchanged)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: false, error: 'boom' }), { status: 500 })));
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await expect(service.cleanup(['1'], { accountPrefix: '1' })).rejects.toThrow('boom');
+  });
+});
+
+describe('indexAllRepos account-scope migration (audit fix)', () => {
+  const MIGRATION_KEY = 'gsm.vectorAccountScopeMigrationDone';
+
+  beforeEach(() => {
+    window.localStorage.removeItem(MIGRATION_KEY);
+    // 第 13 轮审计修复：迁移完成记录新增会话内内存副本——每个用例清空它，
+    // 避免前序用例 markAccountScopeMigrationDone 的内存标记串扰本用例判定。
+    __resetInMemoryAccountScopeMigrationForTest();
+  });
+
+  afterEach(() => {
+    window.localStorage.removeItem(MIGRATION_KEY);
+  });
+
+  it('re-upserts legacy-indexed unchanged repos with account-scoped IDs once, then marks migration done', async () => {
+    // 升级前的存量仓库：vector_indexed_at 已存在、内容未变——旧增量路径会跳过，
+    // 其 legacy 数字 ID 向量在账号过滤后不可召回。迁移待完成时增量索引必须
+    // 按全量候选补写带账号前缀的向量。
+    expect(isAccountScopeMigrationDone('42')).toBe(false);
+    const repos = [makeRepository(1), makeRepository(2)];
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    const upsertedIds = (vectorService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
+    expect(upsertedIds).toEqual([buildAccountScopedVectorId('42', 1), buildAccountScopedVectorId('42', 2)]);
+    expect(result.indexedRepoIds).toEqual([1, 2]);
+    // 补写完整成功后才标记完成
+    expect(isAccountScopeMigrationDone('42')).toBe(true);
+  });
+
+  it('restores the incremental path (no re-embedding of unchanged repos) after migration completes', async () => {
+    // 第 12 轮：迁移记录改为「账号 → Worker 身份」映射；'' 表示未绑定 Worker
+    // 身份的记录（老调用方/测试桩的回退语义：仅按账号判断视为已迁移）。
+    window.localStorage.setItem(MIGRATION_KEY, JSON.stringify({ '42': '' }));
+    const repos = [makeRepository(1), makeRepository(2, { vector_indexed_at: undefined })];
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    // 已迁移：未变化且已索引的 repo1 不再补写，只有新仓库 repo2 入列
+    expect(result.indexedRepoIds).toEqual([2]);
+    const upsertedIds = (vectorService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
+    expect(upsertedIds).toEqual([buildAccountScopedVectorId('42', 2)]);
+  });
+
+  it('keeps migration pending when a legacy-indexed repo fails embedding, and retries it next run', async () => {
+    const repos = [makeRepository(1), makeRepository(2)];
+    const failingClient = {
+      embed: vi.fn(async () => [null, vec(2)]),
+    } as unknown as Parameters<typeof indexAllRepos>[1];
+    const vectorService = makeVectorService();
+
+    const first = await indexAllRepos(repos, failingClient, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    // repo1 是 legacy 已索引仓库且补写失败：迁移不得标记完成
+    expect(first.indexedRepoIds).toEqual([2]);
+    expect(isAccountScopeMigrationDone('42')).toBe(false);
+
+    // 下一次增量运行继续按全量补写失败仓库
+    const retryClient = makeIndexClient();
+    const retryService = makeVectorService();
+    const second = await indexAllRepos(repos, retryClient, retryService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+    expect(second.indexedRepoIds).toEqual([1, 2]);
+    expect(isAccountScopeMigrationDone('42')).toBe(true);
+  });
+
+  it('marks migration done when only never-indexed repos fail (no legacy vector at risk)', async () => {
+    // repo1 从未索引（无 legacy 向量可丢失），补写失败不应把迁移永久挂起
+    const repos = [
+      makeRepository(1, { vector_indexed_at: undefined }),
+      makeRepository(2),
+    ];
+    const failingClient = {
+      embed: vi.fn(async () => [null, vec(2)]),
+    } as unknown as Parameters<typeof indexAllRepos>[1];
+    const vectorService = makeVectorService();
+
+    const result = await indexAllRepos(repos, failingClient, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    expect(result.indexedRepoIds).toEqual([2]);
+    expect(isAccountScopeMigrationDone('42')).toBe(true);
+  });
+
+  it('does not touch migration state without an account context (legacy no-prefix path)', async () => {
+    const repos = [makeRepository(1)];
+    const client = makeIndexClient();
+    const vectorService = makeVectorService();
+
+    const result = await indexAllRepos(repos, client, vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+    });
+
+    // 未提供 accountId：沿用既有增量语义（已索引未变化仓库跳过），不写迁移标记
+    expect(result.indexedRepoIds).toEqual([]);
+    expect(isAccountScopeMigrationDone('42')).toBe(false);
+    expect(isAccountScopeMigrationDone(null)).toBe(true);
+  });
+
+  it('treats the account as unmigrated again when the vector worker changes (round-12 audit fix)', async () => {
+    // 迁移完成记录绑定 Worker：账号在 W1 完成迁移后切到 W2，增量索引必须重新
+    // 按全量候选补写——否则 W2 上内容未变化的仓库会被 needsReindex 排除，其
+    // 账号范围向量永远不会写入 W2，语义搜索静默缺结果。
+    window.localStorage.setItem(MIGRATION_KEY, JSON.stringify({ '42': 'https://w1.example.com' }));
+    // W1：已迁移，增量路径沿用。对照组同时包含「已索引且未变化的仓库 1」与
+    // 「未索引的仓库 2」——若实现忽略 W1 的完成记录强制全量补写，W1 会返回
+    // [1, 2]，本断言即失败（第 13 轮审计修复：防止迁移后重复生成 embedding）。
+    const result1 = await indexAllRepos(
+      [makeRepository(1), makeRepository(2, { vector_indexed_at: undefined })],
+      makeIndexClient(),
+      makeVectorService('https://w1.example.com'),
+      {
+        incremental: true,
+        formatVersion: EMBEDDING_FORMAT_VERSION,
+        currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+        indexMode: 'description',
+        accountId: '42',
+      },
+    );
+    // W1 只上传未索引的仓库 2，已索引且未变化的仓库 1 不重复生成 embedding
+    expect(result1.indexedRepoIds).toEqual([2]);
+
+    // 切到 W2：旧记录不再豁免，重新按全量候选补写带账号前缀的向量
+    const w2Service = makeVectorService('https://w2.example.com');
+    const result2 = await indexAllRepos([makeRepository(1), makeRepository(2)], makeIndexClient(), w2Service, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+    const upsertedIds = (w2Service.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
+    expect(upsertedIds).toEqual([buildAccountScopedVectorId('42', 1), buildAccountScopedVectorId('42', 2)]);
+    // W2 完成范围上传后恢复增量路径
+    expect(result2.indexedRepoIds).toEqual([1, 2]);
+    expect(isAccountScopeMigrationDone('42', 'https://w2.example.com')).toBe(true);
+  });
+
+  it('records account-scope migration completion after a successful full rebuild (round-12 audit fix)', async () => {
+    // 全量重建成功后同样记录迁移完成——否则下一次增量索引仍强制按全量候选
+    // 重选全部仓库，未变化仓库被重复嵌入计费。
+    const client = makeIndexClient();
+    const vectorService = makeVectorService('https://worker.example.com');
+
+    const result = await indexAllRepos([makeRepository(1), makeRepository(2)], client, vectorService, {
+      incremental: false,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    expect(result.indexedRepoIds).toEqual([1, 2]);
+    expect(isAccountScopeMigrationDone('42', 'https://worker.example.com')).toBe(true);
+  });
+
+  it('keeps migration unrecorded when a full rebuild fails a legacy-indexed candidate', async () => {
+    // 保留既有保护：旧索引候选失败时不记录完成（下次运行继续补写）。
+    const repos = [makeRepository(1), makeRepository(2)];
+    const failingClient = {
+      embed: vi.fn(async () => [null, vec(2)]),
+    } as unknown as Parameters<typeof indexAllRepos>[1];
+    const vectorService = makeVectorService('https://worker.example.com');
+
+    await indexAllRepos(repos, failingClient, vectorService, {
+      incremental: false,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+
+    expect(isAccountScopeMigrationDone('42', 'https://worker.example.com')).toBe(false);
+  });
+
+  it('keeps the migration record in memory when localStorage persistence fails (round-13 audit fix)', async () => {
+    // 第 13 轮审计修复：localStorage 写入失败（隐私模式/配额）时迁移完成标记
+    // 退化为会话内标记——本次会话的读取路径合并内存记录，后续增量索引仍能
+    // 识别已完成迁移，不会对全部已分析仓库重复生成 Embedding。
+    // 环境里裸 localStorage 与 window.localStorage 可能是不同对象（Node 实验
+    // 全局 vs shim）：两个入口都清一次键并都拦截写入，保证用例确定性。
+    window.localStorage.removeItem(MIGRATION_KEY);
+    localStorage.removeItem(MIGRATION_KEY);
+    const setItemSpies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      }),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      }),
+    ];
+    try {
+      const client = makeIndexClient();
+      const vectorService = makeVectorService('https://worker.example.com');
+
+      await indexAllRepos([makeRepository(1), makeRepository(2)], client, vectorService, {
+        incremental: false,
+        formatVersion: EMBEDDING_FORMAT_VERSION,
+        currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+        indexMode: 'description',
+        accountId: '42',
+      });
+
+      // 持久化失败：磁盘记录不存在，但会话内内存记录使迁移判定仍然成立。
+      expect(window.localStorage.getItem(MIGRATION_KEY)).toBeNull();
+      expect(isAccountScopeMigrationDone('42', 'https://worker.example.com')).toBe(true);
+      expect(isAccountScopeMigrationDone('42')).toBe(true);
+    } finally {
+      setItemSpies.forEach((spy) => spy.mockRestore());
+    }
   });
 });

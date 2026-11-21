@@ -41,7 +41,8 @@
     "failed": "Star failed",
     "starred": "Starred",
     "check-name": "Check this name",
-    "no-description": "No description"
+    "no-description": "No description",
+    "session-changed": "The account changed. Preview the links again before starring."
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Failed to apply plugin result",
@@ -208,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "Stop AI Analysis",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "Are you sure you want to stop AI analysis? Analyzed results will be saved.",
+    "analysis-task-already-running": "An AI analysis task is already running. Please wait for it to finish or stop the current task before trying again.",
     "no-failed-repositories-to-re-analyze": "No failed repositories to re-analyze!",
     "all-repositories-have-been-analyzed": "All repositories have been analyzed!",
     "no-repositories-to-analyze": "No repositories to analyze!",
@@ -246,7 +248,12 @@
     "unstar-confirmation": "Unstar Confirmation",
     "unstar": "Unstar",
     "successfully-unstarred": "Successfully unstarred",
-    "failed-to-unstar-repository-please-check-your-ne": "Failed to unstar repository. Please check your network connection or login again."
+    "failed-to-unstar-repository-please-check-your-ne": "Failed to unstar repository. Please check your network connection or login again.",
+    "similar-results-may-be-incomplete-the-dens": "Similar repositories may be incomplete: the dense vector index is unavailable. ({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "Similar repositories may be incomplete: the vector worker does not support account-scoped recall. Deploy the bundled Cloudflare Worker and retry.",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "Similar repositories may be incomplete: the vector accountId metadata index is not ready. Create and verify the accountId metadata index, backfill existing vectors, and enable ACCOUNT_METADATA_INDEXED in the deployment.",
+    "dense-index-unavailable-reason-status-failed": "Similar repositories may be incomplete: the vector index status check failed. Please retry later.",
+    "dense-index-unavailable-reason-needs-backfill": "Similar repositories may be incomplete: the vector index is not ready for account-scoped recall. Rebuild the index in Vector Search settings for the current account."
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "Configure a GitHub token in Settings or connect the backend service first.",
@@ -266,11 +273,16 @@
     "list-sync-failed-starred-repositories-were-synce": "List sync failed, starred repositories were synced. Retry later, or check the GitHub Token has the user scope.",
     "sync-completed-found-newrepocount-new-repositori": "Sync completed! Found {{newRepoCount}} new repositories.",
     "sync-completed-all-repositories-are-up-to-date": "Sync completed! All repositories are up to date.",
+    "sync-completed-backend-write-failed": "Stars were updated, but writing them to the backend failed. Local data is kept; the backend sync will be retried automatically.",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub token has expired or is invalid. Please login again.",
     "sync-failed-please-check-your-network-connection": "Sync failed. Please check your network connection or try again later.",
     "list-sync-new-categories_one": " ({{count}} new category created)",
     "list-sync-new-categories_other": " ({{count}} new categories created)",
-    "list-sync-complete": "Synced {{lists}} lists ({{newCount}} new categories created)."
+    "list-sync-complete": "Synced {{lists}} lists ({{newCount}} new categories created).",
+    "vector-worker-does-not-support-account-scoped-recall": "Vector worker does not support account-scoped recall; redeploy the bundled cloudflare-worker and rebuild the index.",
+    "account-metadata-index-is-not-ready-create-the-accountid": "Account metadata index is not ready; create the accountId metadata index, backfill vectors, and enable ACCOUNT_METADATA_INDEXED.",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "Failed to verify vector worker status; fell back to local search.",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "Vector index needs rebuild for multi-account search; fell back to local search."
   },
   "repositoryHealthPanel": {
     "activity": "Activity",

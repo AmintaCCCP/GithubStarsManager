@@ -25,7 +25,10 @@
     "no-backup-files-found": "Sicherungsdatei nicht gefunden.",
     "backup-file-is-empty-cannot-restore": "Der Inhalt der Sicherungsdatei ist leer und kann nicht wiederhergestellt werden.",
     "data-restored-from-backup-repositories-v1-releas": "Aus der Sicherung wiederhergestellte Daten: Warehouse {{v1}}, Release {{v2}}, benutzerdefinierte Klassifizierung {{v3}}.",
-    "restore-failed": "Die Wiederherstellung ist fehlgeschlagen"
+    "restore-failed": "Die Wiederherstellung ist fehlgeschlagen",
+    "account-changed-during-restore": "Das Konto hat sich während der Wiederherstellung geändert. Die Wiederherstellung wurde zum Schutz Ihrer Daten abgebrochen.",
+    "gist-data-in-the-backup-contained-invalid-entries-th": "Die Gist-Daten im Backup enthielten ungültige Einträge; die betroffenen Felder wurden übersprungen und behalten ihre bisherigen Werte.",
+    "fork-data-in-the-backup-contained-invalid-entries-th": "Die Fork-Daten im Backup enthielten ungültige Einträge; die betroffenen Felder wurden übersprungen und behalten ihre bisherigen Werte."
   },
   "useDesktopActions": {
     "load-failed": "Das Laden ist fehlgeschlagen",

@@ -15,6 +15,8 @@ const repoRow = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   name: 'alpha',
   full_name: 'acme/alpha',
+  // A37：记录携带分区归属，get mock 按第一个绑定参数（accountId）校验
+  account_id: 'default',
   description: 'retrieval repository',
   html_url: 'https://github.com/acme/alpha',
   stargazers_count: 100,
@@ -55,6 +57,8 @@ function configureDb(options: {
   repos?: Record<string, unknown>[];
   releases?: Record<string, unknown>[];
   vectorEnabled?: boolean;
+  /** 模拟全局 settings.active_account_id（A37：活跃账号分区） */
+  activeAccountId?: string;
 } = {}) {
   const repos = options.repos ?? [repoRow()];
   const releases = options.releases ?? [];
@@ -75,22 +79,34 @@ function configureDb(options: {
   getDbMock.mockReturnValue({
     prepare(sql: string) {
       return {
-        all: () => {
-          if (sql.includes('FROM repositories')) return repos;
+        all: (accountId?: unknown) => {
+          if (sql.includes('FROM repositories')) {
+            // A37：列表查询同样按第一个绑定参数（account_id）过滤
+            return repos.filter((repo) => !repo.account_id || repo.account_id === accountId);
+          }
           return [];
         },
-        get: (value?: unknown) => {
+        // v4 多账号隔离后 SQL 均带 account_id 前导条件；第一个绑定参数是
+        // account_id，实际查找值是第二个参数。
+        get: (accountId?: unknown, second?: unknown) => {
           if (sql.includes('FROM vector_search_configs')) return vectorConfig;
           if (sql.includes('FROM embedding_configs')) return embeddingConfig;
+          if (sql.includes('FROM settings')) {
+            return options.activeAccountId && accountId === 'active_account_id'
+              ? { value: options.activeAccountId }
+              : undefined;
+          }
           if (sql.includes('FROM releases')) {
-            return releases.find((release) => Number(release.repo_id) === Number(value));
+            return releases.find((release) => Number(release.repo_id) === Number(second));
           }
-          if (sql.includes('WHERE id = ?')) {
-            return repos.find((repo) => Number(repo.id) === Number(value));
+          if (sql.includes('AND id = ?')) {
+            return repos.find((repo) => repo.account_id === accountId
+              && Number(repo.id) === Number(second));
           }
-          if (sql.includes('WHERE full_name = ?')) {
+          if (sql.includes('full_name = ?')) {
             return repos.find(
-              (repo) => String(repo.full_name).toLowerCase() === String(value).toLowerCase()
+              (repo) => repo.account_id === accountId
+                && String(repo.full_name).toLowerCase() === String(second).toLowerCase()
             );
           }
           return undefined;
@@ -292,5 +308,370 @@ describe('MCP provider discovery', () => {
 
     const result = await provider.vectorSearch('retrieval', {});
     expect(result).toEqual({ available: false, reason: 'worker_query_failed' });
+  });
+
+  it('returns only the active account record when two accounts hold the same repository id (A37)', async () => {
+    // 审计修订：改用真实双分区 SQLite 夹具执行实际 SQL——按 ID、全名与批量
+    // 查询的 account_id 谓词由 SQLite 亲自过滤，不依赖 configureDb 按绑定参数
+    // 模拟筛选（那种夹具即使生产 SQL 写错比较符也会通过）。结果必须只含
+    // 活跃账号（222）的仓库。
+    const Database = (await import('better-sqlite3')).default;
+    const { initializeSchema } = await import('../../src/db/schema.js');
+    const db = new Database(':memory:');
+    try {
+      initializeSchema(db);
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+      const insertRepo = db.prepare(
+        'INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      );
+      insertRepo.run('default', 1, 'default-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+      insertRepo.run('222', 1, 'beta-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+
+      getDbMock.mockReturnValue(db);
+      const byId = provider.getRepository(1);
+      expect(byId).not.toBeNull();
+      expect(byId?.name).toBe('beta-alpha');
+      const byName = provider.getRepository('acme/alpha');
+      expect(byName).not.toBeNull();
+      expect(byName?.name).toBe('beta-alpha');
+      const batch = provider.getRepositories(['acme/alpha']);
+      expect(batch.items[0]).toMatchObject({ status: 'found' });
+      expect((batch.items[0] as { repository: { name: string } | null }).repository?.name).toBe('beta-alpha');
+      // 列表查询同样只含活跃账号分区
+      const all = provider.loadAllRepositories();
+      expect(all.map((repo) => repo.name)).toEqual(['beta-alpha']);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('falls back to the default partition when no active account is set (A37)', () => {
+    configureDb({
+      repos: [
+        repoRow({ id: 1, name: 'default-alpha', full_name: 'acme/alpha' }),
+        repoRow({ id: 1, name: 'beta-alpha', full_name: 'acme/alpha', account_id: '222' }),
+      ],
+    });
+    const byId = provider.getRepository(1);
+    expect(byId).not.toBeNull();
+    expect(byId?.name).toBe('default-alpha');
+  });
+
+  it('reads release evidence only from the active account partition (R2-A26)', async () => {
+    // R2-A26：用小型内存库执行实际 SQL——两个账号持有同一 repo_id 的仓库与
+    // 发行版（不同 tag_name），最新发行版与发行版历史（health 事实）都必须
+    // 只含活跃账号数据；筛选由真实 SQL 完成，不在替身中复制。
+    const Database = (await import('better-sqlite3')).default;
+    const { initializeSchema } = await import('../../src/db/schema.js');
+    const db = new Database(':memory:');
+    try {
+      initializeSchema(db);
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+      const insertRepo = db.prepare(
+        'INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      );
+      insertRepo.run('default', 1, 'default-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+      insertRepo.run('222', 1, 'beta-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+      const insertRelease = db.prepare(
+        'INSERT INTO releases (account_id, id, tag_name, name, published_at, prerelease, draft, repo_id, repo_full_name, repo_name) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?)',
+      );
+      // default 分区包含一条时间晚于活跃账号（222）的发行版，确保最新发行版查询也严格按 account_id 过滤
+      insertRelease.run('default', 10, 'v9.9.9-legacy-newer', 'Legacy newer release', '2026-05-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
+      insertRelease.run('default', 11, 'v0.8.0-legacy', 'Legacy release two', '2026-02-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
+      insertRelease.run('222', 12, 'v2.0.0-beta', 'Beta release', '2026-04-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
+
+      getDbMock.mockReturnValue(db);
+      const result = provider.getRepoEvidence('acme/alpha');
+      expect(result).not.toHaveProperty('error');
+      const evidence = (result as { evidence: { latest_release: { id: number; tag_name: string } | null; health: { release_count: number | null; latest_release_at: string | null } } }).evidence;
+      // 最新发行版只取活跃账号（222）的数据
+      expect(evidence.latest_release).toMatchObject({ id: 12, tag_name: 'v2.0.0-beta' });
+      // 发行版历史只统计活跃账号的发行版（default 分区的两条不参与）
+      expect(evidence.health).toMatchObject({
+        release_count: 1,
+        latest_release_at: '2026-04-01T00:00:00.000Z',
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  describe('account metadata backfill probe (R2-A11/A13/A14)', () => {
+    const setupVectorDb = async () => {
+      const Database = (await import('better-sqlite3')).default;
+      const { initializeSchema } = await import('../../src/db/schema.js');
+      const db = new Database(':memory:');
+      initializeSchema(db);
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', '222')").run();
+      db.prepare(
+        "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, vector_indexed_at) VALUES ('222', 1, 'alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]', '2025-01-01T00:00:00Z')",
+      ).run();
+      db.prepare(
+        "INSERT INTO vector_search_configs (id, enabled, worker_url, auth_token_encrypted, embedding_config_id) VALUES ('default', 1, 'https://worker.example', 'worker-token', 'embedding-1')",
+      ).run();
+      db.prepare(
+        "INSERT INTO embedding_configs (id, name, api_type, model, api_key_encrypted, base_url) VALUES ('embedding-1', 'embedding', 'ollama', 'bge-m3', '', 'http://127.0.0.1:11434')",
+      ).run();
+      return db;
+    };
+
+    it('schedules a rebuild when the probe cannot fully confirm index ownership (R2-A11)', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // 诊断探测的 topK/threshold 不复用用户查询；探测结果无法证明索引归属
+        // （无同快照证据）→ 明确安排一次全量重建，且不再有无范围兼容重试。
+        const fetchMockLocal = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }));
+        vi.stubGlobal('fetch', fetchMockLocal);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
+        // 无范围兼容重试已移除：探测之外不得再发起任何 Worker 请求
+        expect(fetchMockLocal).toHaveBeenCalledTimes(3);
+
+        // 探测请求独立于用户查询：topK=50、threshold=0
+        const probeBody = JSON.parse(fetchMockLocal.mock.calls[2][1].body as string);
+        expect(probeBody).toMatchObject({ topK: 50, threshold: 0 });
+
+        // 重建已安排：索引标记清除、快照版本推进、完成标记绑定当前 Worker 标识（同一事务）
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
+          .toMatchObject({ value: 'https://worker.example' });
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
+          .toMatchObject({ value: '1' });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('schedules a rebuild even when the probe returns fully scoped candidates (count equality is not snapshot evidence)', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // 审计修订（381-384）：探测已不再调用 /status——候选全部带账号前缀
+        //（无 legacy 向量、数量与本地相等）同样不构成归属证据，归属仍按未确认
+        // 处理：清除重建标记并安排全量重建，绝不记录「探测完成」。
+        const fetchMockLocal = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }));
+        vi.stubGlobal('fetch', fetchMockLocal);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
+
+        // 实际请求序列恰好是 embedding → /query(400) → 探测 /query；
+        // 探测流程已不请求 /status：两次 /query 之外没有任何状态请求。
+        expect(fetchMockLocal).toHaveBeenCalledTimes(3);
+        const requestedUrls = fetchMockLocal.mock.calls.map((call) => String(call[0]));
+        expect(requestedUrls.filter((url) => url.includes('/query'))).toHaveLength(2);
+        expect(requestedUrls.some((url) => url.includes('/status'))).toBe(false);
+
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
+          .toMatchObject({ value: 'https://worker.example' });
+        // 清除了索引标记 → 推进快照版本（R2-A14）
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
+          .toMatchObject({ value: '1' });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('schedules a rebuild when the probe detects legacy prefix-less vectors', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // 探测返回无前缀旧向量（命中本账号仓库 ID）→ 归属仍未确认并安排重建；
+        // 探测流程只发 embedding + 两次 /query，不再请求 /status。
+        const fetchMockLocal = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchMockLocal);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
+        expect(fetchMockLocal).toHaveBeenCalledTimes(3);
+        const requestedUrls = fetchMockLocal.mock.calls.map((call) => String(call[0]));
+        expect(requestedUrls.some((url) => url.includes('/status'))).toBe(false);
+
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
+          .toMatchObject({ value: 'https://worker.example' });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('sends default scope for default-partition queries and triggers backfill on empty scoped 200', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // 1) R12：default 查询一律发送 accountId: 'default'——本地分区数量不能
+        //    证明共享 Worker 中无前缀向量的归属，无范围兼容查询已移除。
+        db.prepare("DELETE FROM settings WHERE key = 'active_account_id'").run();
+        db.prepare(
+          "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics) VALUES ('default', 2, 'beta', 'acme/beta', 'https://github.com/acme/beta', 'acme', '[]')",
+        ).run();
+        const fetchDefault = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '2', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchDefault);
+
+        await provider.vectorSearch('retrieval', {});
+        const defaultQueryBody = JSON.parse(fetchDefault.mock.calls[1][1].body as string);
+        expect(defaultQueryBody.accountId).toBe('default');
+
+        // 2) 元数据索引已启用（200 空结果）但分区有非空 vector_indexed_at 时触发回填探测并清除旧标记
+        //    （实际请求为 embedding → /query → 探测 /query，探测不再请求 /status）
+        db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+        const fetchEmpty = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchEmpty);
+
+        const emptyRes = await provider.vectorSearch('retrieval', {});
+        expect(emptyRes).toMatchObject({ available: true, matches: [] });
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+      } finally {
+        db.close();
+      }
+    });
+
+    it('returns the migration state for default scope when local indexed vectors are not recallable (R12 ISSUE-2)', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // default 分区：本地记录有已上传的向量（非空 vector_indexed_at），
+        // 但带 accountId='default' 的查询返回 200 空结果 → 索引已启用但存量
+        // 向量未回填/覆盖未确认，绝不能静默返回 available:true, matches:[]。
+        db.prepare("DELETE FROM settings WHERE key = 'active_account_id'").run();
+        db.prepare(
+          "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, vector_indexed_at) VALUES ('default', 2, 'beta', 'acme/beta', 'https://github.com/acme/beta', 'acme', '[]', '2025-01-01T00:00:00Z')",
+        ).run();
+        const fetchDefaultEmpty = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }))
+          // 独立覆盖探测：default 范围内没有任何向量
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }));
+        vi.stubGlobal('fetch', fetchDefaultEmpty);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
+
+        const probeBody = JSON.parse(fetchDefaultEmpty.mock.calls[2][1].body as string);
+        expect(probeBody).toMatchObject({ accountId: 'default', topK: 50, threshold: -1e9 });
+        // 不触发破坏性重建（default 分区向量由未登录客户端上传，重建不会补元数据）
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = 'default' AND id = 2").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).not.toBeNull();
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = 'default' AND key = 'vector_account_backfill_checked'").get())
+          .toBeUndefined();
+      } finally {
+        db.close();
+      }
+    });
+
+    it('returns the migration state for default scope when the coverage probe fails', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        db.prepare("DELETE FROM settings WHERE key = 'active_account_id'").run();
+        db.prepare(
+          "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, vector_indexed_at) VALUES ('default', 2, 'beta', 'acme/beta', 'https://github.com/acme/beta', 'acme', '[]', '2025-01-01T00:00:00Z')",
+        ).run();
+        const fetchProbeFails = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }))
+          .mockResolvedValueOnce(jsonResponse({ error: 'worker down' }, 500));
+        vi.stubGlobal('fetch', fetchProbeFails);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        // 探测失败同样属于「覆盖未确认」——不得静默返回空结果
+        expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('keeps an empty result for default scope when scoped probe finds vectors (threshold-only emptiness)', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        db.prepare("DELETE FROM settings WHERE key = 'active_account_id'").run();
+        db.prepare(
+          "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, vector_indexed_at) VALUES ('default', 2, 'beta', 'acme/beta', 'https://github.com/acme/beta', 'acme', '[]', '2025-01-01T00:00:00Z')",
+        ).run();
+        const fetchHasScopedVectors = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          // 用户查询（threshold 默认 0.35）为空
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }))
+          // 覆盖探测（极低阈值）在 default 范围内找到向量 → 空结果是阈值导致
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '2', score: 0.1 }] }));
+        vi.stubGlobal('fetch', fetchHasScopedVectors);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toMatchObject({ available: true, matches: [] });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('keeps an empty result for default scope when the local partition never indexed vectors', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        db.prepare("DELETE FROM settings WHERE key = 'active_account_id'").run();
+        db.prepare(
+          "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics) VALUES ('default', 2, 'beta', 'acme/beta', 'https://github.com/acme/beta', 'acme', '[]')",
+        ).run();
+        const fetchNoLocalIndex = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }));
+        vi.stubGlobal('fetch', fetchNoLocalIndex);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        // 本地没有 default 索引标记 = 真「无数据」，不额外探测
+        expect(result).toMatchObject({ available: true, matches: [] });
+        expect(fetchNoLocalIndex).toHaveBeenCalledTimes(2);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('returns structured unavailable result instead of rejecting when backfill transaction fails', async () => {
+      const db = await setupVectorDb();
+      try {
+        // 用只读触发器/代理使事务写入失败，验证 vectorSearch 返回 available: false 而不 reject
+        db.exec(`
+          CREATE TRIGGER fail_backfill BEFORE UPDATE ON repositories
+          BEGIN SELECT RAISE(ABORT, 'simulated db write failure'); END;
+        `);
+        getDbMock.mockReturnValue(db);
+        const fetchMockFail = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }))
+          .mockResolvedValueOnce(jsonResponse({ vectorCount: 1 }));
+        vi.stubGlobal('fetch', fetchMockFail);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toEqual({ available: false, reason: 'vector_backfill_failed' });
+        // 失败回滚，未写入完成标记，可重试
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
+          .toBeUndefined();
+      } finally {
+        db.close();
+      }
+    });
   });
 });

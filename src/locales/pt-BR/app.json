@@ -236,7 +236,19 @@
     "menu-releases": "liberar",
     "menu-forks": "réplica",
     "menu-subscription": "Descobrir",
-    "menu-settings": "configurar"
+    "menu-settings": "configurar",
+    "switch-account": "Trocar conta",
+    "add-account": "Adicionar conta",
+    "current-account": "Conta atual",
+    "remove-account": "Remover conta",
+    "remove-account-with-login": "Remover @{{login}}",
+    "logout-account-changed": "A conta mudou. Saia novamente para a conta atual.",
+    "switch-in-progress": "Uma troca de conta está em andamento. Tente novamente em instantes.",
+    "remove-account-confirm-title": "Remover conta salva",
+    "remove-account-confirm-desc": "Isso remove apenas a credencial de login salva desta conta. Os repositórios e categorias em cache serão mantidos. Continuar?",
+    "account-switched": "Alterado para @{{login}}",
+    "account-repo-count": "{{count}} repositórios",
+    "retry-credential-alignment": "Repetir a sincronização de credenciais do backend"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Sincronize categorias com a lista do GitHub"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "Importação de dados bem-sucedida",
     "import-data": "Importar dados",
     "import-failed-please-try-again": "Falha na importação. Tente novamente",
+    "pat-export-authorization-title": "Autorização para exportar tokens do GitHub",
+    "pat-export-authorization-desc": "Esta exportação incluirá os tokens do GitHub de todas as contas salvas em texto plano. Cada exportação exige confirmação explícita; a configuração salva «Incluir chaves ao fazer backup/exportar» não conta como autorização.",
+    "pat-export-deny": "Negar",
+    "pat-export-authorize": "Autorizar",
+    "import-accounts-need-reauth": "Dados importados com sucesso. As contas a seguir não têm credenciais locais e precisam ser reautorizadas: {{accounts}}",
+    "import-skipped-unattributed-top-level": "Os dados de conta do nível superior do backup não estavam atribuídos a nenhuma conta e foram ignorados. Nada foi gravado na conta atual.",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "Armazéns não analisados ​​não podem ser limpos diretamente, use a função de análise de IA para processá-los.",
     "cleanup-data": "Limpar dados",
     "data-cleanup-successful": "Limpeza de dados bem-sucedida",
@@ -1416,5 +1434,19 @@
     "download": "Baixar",
     "detected-from-filenames-and-release-metadata-no": "Detectado a partir de nomes de arquivo e metadados da Release. Nenhuma verificação de segurança é feita e nada é executado automaticamente. Você sempre pode escolher outro arquivo na lista abaixo.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} arquivo(s) que não se aplicam a este dispositivo foram excluídos (código-fonte, somas de verificação, assinaturas, símbolos de depuração, blockmaps, outras plataformas ou arquiteturas)."
+  },
+  "accountModal": {
+    "title": "Adicionar conta do GitHub",
+    "description": "Insira um novo token pessoal do GitHub para adicionar uma conta. Os dados da sua conta atual serão preservados com segurança.",
+    "token-label": "Token pessoal do GitHub",
+    "cancel": "Cancelar",
+    "confirm": "Adicionar e trocar",
+    "reauth-hint": "Insira um token do GitHub válido para @{{login}}",
+    "account-mismatch": "Este token pertence a outra conta do GitHub. Entre com o token de @{{login}}.",
+    "backend-credential-sync-failed": "A sessão foi iniciada na conta, mas as credenciais do backend não puderam ser atualizadas. Tente novamente mais tarde no menu de contas."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Sessão encerrada, mas a limpeza de credenciais do dispositivo não foi concluída. A credencial antiga permanece bloqueada e será repetida automaticamente na próxima inicialização.",
+    "active-account-update-skipped": "Outro dispositivo alterou a conta ativa do backend durante esta troca, então o backend não foi alterado para esta conta. A sessão local já está nesta conta; tente novamente no menu de contas para alinhar o backend."
   }
 }

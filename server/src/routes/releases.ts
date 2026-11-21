@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
+import { resolveAccountScope, resolveWritableAccountScope, hasInvalidAccountHeader, bumpAccountRevision } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -34,15 +35,25 @@ function transformRelease(row: Record<string, unknown>) {
 router.get('/api/releases', (req, res) => {
   try {
     const db = getDb();
+    // Issue #612 审计（143）：显式携带但格式无效的账号头（空白 / 非数字）按无效
+    // 请求处理，绝不当作缺失回退到活跃账号 / default 分区读取他人数据。
+    if (hasInvalidAccountHeader(req)) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = resolveAccountScope(req, db);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 50));
     const repoId = req.query.repo_id as string | undefined;
     const unread = req.query.unread as string | undefined;
     const offset = (page - 1) * limit;
 
-    let sql = 'SELECT * FROM releases';
+    let sql = 'SELECT * FROM releases WHERE account_id = ?';
     const conditions: string[] = [];
-    const params: unknown[] = [];
+    const params: unknown[] = [accountId];
 
     if (repoId) {
       conditions.push('repo_id = ?');
@@ -53,7 +64,7 @@ router.get('/api/releases', (req, res) => {
     }
 
     if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
+      sql += ' AND ' + conditions.join(' AND ');
     }
 
     sql += ' ORDER BY published_at DESC LIMIT ? OFFSET ?';
@@ -62,10 +73,10 @@ router.get('/api/releases', (req, res) => {
     const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
     const releases = rows.map(transformRelease);
 
-    let countSql = 'SELECT COUNT(*) as total FROM releases';
-    const countParams: unknown[] = [];
+    let countSql = 'SELECT COUNT(*) as total FROM releases WHERE account_id = ?';
+    const countParams: unknown[] = [accountId];
     if (conditions.length > 0) {
-      countSql += ' WHERE ' + conditions.join(' AND ');
+      countSql += ' AND ' + conditions.join(' AND ');
       if (repoId) countParams.push(parseInt(repoId));
     }
     const countRow = db.prepare(countSql).get(...countParams) as { total: number };
@@ -81,6 +92,15 @@ router.get('/api/releases', (req, res) => {
 router.put('/api/releases', (req, res) => {
   try {
     const db = getDb();
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const { releases } = req.body as { releases: Record<string, unknown>[] };
     if (!Array.isArray(releases)) {
       res.status(400).json({ error: 'releases array required', code: 'RELEASES_ARRAY_REQUIRED' });
@@ -94,14 +114,17 @@ router.put('/api/releases', (req, res) => {
       }
     }
 
+    // v4 复合主键 (account_id, id)：两条 UPSERT 的冲突目标与 INSERT 列均加入
+    // account_id；account_id 占位参数一律追加到参数列表末位（参数位置契约）。
     const stmtPreserveIsRead = db.prepare(`
       INSERT INTO releases (
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
         repo_id, repo_full_name, repo_name,
-        zipball_url, tarball_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
+        zipball_url, tarball_url,
+        account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(account_id, id) DO UPDATE SET
         tag_name = excluded.tag_name,
         name = excluded.name,
         body = excluded.body,
@@ -122,9 +145,10 @@ router.put('/api/releases', (req, res) => {
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
         repo_id, repo_full_name, repo_name,
-        zipball_url, tarball_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
+        zipball_url, tarball_url,
+        account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(account_id, id) DO UPDATE SET
         tag_name = excluded.tag_name,
         name = excluded.name,
         body = excluded.body,
@@ -164,10 +188,13 @@ router.put('/api/releases', (req, res) => {
           repository?.full_name ?? release.repo_full_name ?? null,
           repository?.name ?? release.repo_name ?? null,
           release.zipball_url ?? null,
-          release.tarball_url ?? null
+          release.tarball_url ?? null,
+          accountId
         );
         count++;
       }
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      if (count > 0) bumpAccountRevision(db, accountId);
       return count;
     });
 
@@ -183,6 +210,15 @@ router.put('/api/releases', (req, res) => {
 router.patch('/api/releases/:id', (req, res) => {
   try {
     const db = getDb();
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const id = parseInt(req.params.id);
     const { is_read } = req.body as { is_read?: boolean };
 
@@ -191,10 +227,19 @@ router.patch('/api/releases/:id', (req, res) => {
       return;
     }
 
-    db.prepare('UPDATE releases SET is_read = ? WHERE id = ?').run(is_read ? 1 : 0, id);
+    // Issue #612 R2-A21：PATCH 写入与快照版本递增纳入同一事务——版本写入失败
+    // 时数据写入一并回滚（PUT 路径 159-190 行方式）。
+    const applyReadState = db.transaction((): Record<string, unknown> | null => {
+      db.prepare('UPDATE releases SET is_read = ? WHERE account_id = ? AND id = ?').run(is_read ? 1 : 0, accountId, id);
+      const row = db.prepare('SELECT * FROM releases WHERE account_id = ? AND id = ?').get(accountId, id) as Record<string, unknown> | undefined;
+      if (!row) return null;
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      bumpAccountRevision(db, accountId);
+      return row;
+    });
 
-    const row = db.prepare('SELECT * FROM releases WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    if (!row) {
+    const row = applyReadState();
+    if (row === null) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
     }
@@ -206,11 +251,24 @@ router.patch('/api/releases/:id', (req, res) => {
 });
 
 // POST /api/releases/mark-all-read
-router.post('/api/releases/mark-all-read', (_req, res) => {
+router.post('/api/releases/mark-all-read', (req, res) => {
   try {
     const db = getDb();
-    const result = db.prepare('UPDATE releases SET is_read = 1').run();
-    res.json({ updated: result.changes });
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(400).json({ error: 'Account id required', code: 'ACCOUNT_SCOPE_REQUIRED' });
+      return;
+    }
+    const accountId = scope.accountId;
+    // Issue #612 R2-A21：写入与快照版本递增纳入同一事务——版本写入失败时
+    // 数据写入一并回滚（PUT 路径 159-190 行方式）。
+    const markAll = db.transaction((): number => {
+      const result = db.prepare('UPDATE releases SET is_read = 1 WHERE account_id = ?').run(accountId);
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      if (result.changes > 0) bumpAccountRevision(db, accountId);
+      return result.changes;
+    });
+    res.json({ updated: markAll() });
   } catch (err) {
     console.error('POST /api/releases/mark-all-read error:', err);
     res.status(500).json({ error: 'Failed to mark all as read', code: 'MARK_ALL_READ_FAILED' });
@@ -233,9 +291,26 @@ router.delete('/api/releases/:id', (req, res) => {
     }
 
     const db = getDb();
-    const result = db.prepare('DELETE FROM releases WHERE id = ?').run(id);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
+    // Issue #612 R2-A21：删除与快照版本递增纳入同一事务——版本写入失败时
+    // 删除一并回滚（PUT 路径 159-190 行方式）。
+    const remove = db.transaction((): boolean => {
+      const result = db.prepare('DELETE FROM releases WHERE account_id = ? AND id = ?').run(accountId, id);
+      if (result.changes === 0) return false;
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      bumpAccountRevision(db, accountId);
+      return true;
+    });
 
-    if (result.changes === 0) {
+    if (!remove()) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
     }

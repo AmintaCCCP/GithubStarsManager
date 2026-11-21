@@ -74,6 +74,11 @@ class BackendTokenMissingError extends Error {
   }
 }
 
+// 同账号整集替换写入的模块级串行队列（第 13 轮审计修复 [77]）：键为归属账号
+// （X-GitHub-Account-Id 分区；缺失时归入共享桶），同账号的写入跨 api 实例按序
+// 执行——新写入等旧写入的 HTTP 往返结束后才发出。
+const USER_LIST_WRITE_QUEUES = new Map<string, Promise<void>>();
+
 export interface GitHubList {
   id: string;
   name: string;
@@ -159,6 +164,7 @@ export class GitHubListsApiService {
   private token: string;
   private backendUrl: string | null = null;
   private backendAuthToken: string | null = null;
+  private backendAccountId: string | null = null;
   /** 后端代理路径失败后置位，本实例剩余请求走直连（幂等切换，不重复尝试代理）。 */
   private proxyFailed = false;
 
@@ -174,10 +180,18 @@ export class GitHubListsApiService {
     this.backendAuthToken = token;
   }
 
+  /** 代理请求携带的账号分区（应与本实例 token 的归属账号一致）。 */
+  setBackendAccountId(accountId: string | null): void {
+    this.backendAccountId = accountId;
+  }
+
   private getBackendHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.backendAuthToken) {
       headers.Authorization = `Bearer ${this.backendAuthToken}`;
+    }
+    if (this.backendAccountId) {
+      headers['X-GitHub-Account-Id'] = this.backendAccountId;
     }
     return headers;
   }
@@ -206,7 +220,7 @@ export class GitHubListsApiService {
   private async request<T>(
     query: string,
     variables: Record<string, unknown> = {},
-    options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number; replayableMutation?: boolean } = {}
+    options: { toleratePartialErrors?: boolean; signal?: AbortSignal; timeoutMs?: number; replayableMutation?: boolean; handoverSafeWrite?: boolean } = {}
   ): Promise<T> {
     const body = JSON.stringify({ query, variables });
     const parentSignal = options.signal;
@@ -224,7 +238,14 @@ export class GitHubListsApiService {
       }
       // 每次尝试独立超时：超时上限不被重试+退避消耗，也不会中止退避等待
       //（否则 sleep 抛出 AbortError，掩盖最终的 RetriableError）。退避只受 parentSignal 控制。
-      const controller = createCombinedAbortController(parentSignal, options.timeoutMs ?? 30_000);
+      // 第 13 轮审计修复 [77]：整集替换写入（handoverSafeWrite）的尝试边界仍由
+      // parentSignal 把关（此处与退避等待），但在途 fetch 不与调用方信号耦合——
+      // 同账号新推送交接时的中止只让旧任务的客户端等待结束，服务端仍会把该
+      // 请求处理完；取消在途 fetch 反而让「服务端写入结束」无法确认。
+      const controller = createCombinedAbortController(
+        options.handoverSafeWrite ? undefined : parentSignal,
+        options.timeoutMs ?? 30_000,
+      );
       // 后端代理路径一旦失败（网络/5xx/token 缺失）即切直连，并保持到本次同步结束：
       // 避免同一批次的每个查询都先撞击一次失败的代理。
       const useProxy = this.backendUrl !== null && !this.proxyFailed;
@@ -374,6 +395,15 @@ export class GitHubListsApiService {
     try {
       payload = await response.json();
     } catch {
+      // 第 13 轮审计修复 [78]：请求收到 200 后、读取正文期间被中止（调用方
+      // 取消或任务交接）时，json() 会以 AbortError 拒绝——此处先还原取消语义
+      // 抛出 AbortError，request 才能把它识别为取消（调用方取消原样传播、
+      // 不计入「解析失败」）；内部超时仍按既有瞬时错误策略处理。
+      if (signal.aborted) {
+        const abortErr = new Error('Aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      }
       // 非 JSON 响应：5xx 时网关可能返回 HTML 错误页，按瞬时错误重试
       if (response.status >= 500 && response.status <= 599) {
         throw new RetriableError(
@@ -767,19 +797,50 @@ export class GitHubListsApiService {
    * 将某仓库（itemId 为 GraphQL node id）加入指定 list 集合。
    * 注意：该操作会整体替换仓库所属的 list 集合（覆盖语义）。
    * 传入空数组表示将该仓库从所有 list 中移除（用于清理过期成员关系）。
+   *
+   * signal（第 12 轮审计修复）：调用方会话失效（切换账号后同账号新一轮推送
+   * 取代旧任务）时中止——重试在尝试/退避边界停止，可重放的整集替换绝不以
+   * 旧成员集合覆盖新推送的结果。
+   *
+   * 第 13 轮审计修复 [77]：同账号整集替换写入按模块级队列串行（api 实例按
+   * 推送任务创建，实例级队列覆盖不了跨任务交接），且在途 fetch 不与调用方
+   * 中止信号耦合（handoverSafeWrite）——新写入等待旧写入的 HTTP 往返结束后
+   * 才发出，交接基于「服务端写入结束」而不是客户端 Promise；被取代任务的
+   * signal 只在尝试/退避边界停止其后续重试。残余窗口：旧写入因网络/内部
+   * 超时客户端失败但服务端稍后完成时仍可能晚于新写入到达（客户端无法证明
+   * 该情形，需要推送后的成员集合校验才能闭环）。
    */
-  async updateUserListsForItem(itemId: string, listIds: string[]): Promise<void> {
-    await this.request<{ updateUserListsForItem: { clientMutationId: string | null } }>(
-      `mutation($itemId: ID!, $listIds: [ID!]!) {
-        updateUserListsForItem(input: { itemId: $itemId, listIds: $listIds }) {
-          clientMutationId
-        }
-      }`,
-      { itemId, listIds },
-      // 整集替换语义（服务端按集合去重）：无论重放多少次，最终成员集合相同，
-      // 因此未知结果后可安全重放，与 query 一致。
-      { replayableMutation: true }
-    );
+  async updateUserListsForItem(itemId: string, listIds: string[], signal?: AbortSignal): Promise<void> {
+    const queueKey = this.backendAccountId ?? '';
+    const previous = USER_LIST_WRITE_QUEUES.get(queueKey) ?? Promise.resolve();
+    const run = async (): Promise<void> => {
+      if (signal?.aborted) {
+        const err = new Error('Aborted');
+        err.name = 'AbortError';
+        throw err;
+      }
+      await this.request<{ updateUserListsForItem: { clientMutationId: string | null } }>(
+        `mutation($itemId: ID!, $listIds: [ID!]!) {
+          updateUserListsForItem(input: { itemId: $itemId, listIds: $listIds }) {
+            clientMutationId
+          }
+        }`,
+        { itemId, listIds },
+        // 整集替换语义（服务端按集合去重）：无论重放多少次，最终成员集合相同，
+        // 因此未知结果后可安全重放，与 query 一致。
+        { replayableMutation: true, signal, handoverSafeWrite: true }
+      );
+    };
+    const next = previous.then(run, run);
+    const settled = next.then(() => undefined, () => undefined);
+    USER_LIST_WRITE_QUEUES.set(queueKey, settled);
+    // 队列尾部清理：最后一次写入完成后移除键，避免 Map 无限增长。
+    void settled.then(() => {
+      if (USER_LIST_WRITE_QUEUES.get(queueKey) === settled) {
+        USER_LIST_WRITE_QUEUES.delete(queueKey);
+      }
+    });
+    await next;
   }
 
   /**

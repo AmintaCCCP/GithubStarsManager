@@ -54,6 +54,7 @@ export type PersistedAppState = Partial<
     | 'isAuthenticated'
     | 'backendApiSecret'
     | 'accountWorkspaces'
+    | 'savedAccounts'
     | 'repositories'
     | 'gists'
     | 'starredGists'

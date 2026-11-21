@@ -112,6 +112,7 @@ describe('ForkTimeline owner filtering', () => {
       storeState.forks = forks;
     });
     storeState.setForkIsRefreshing = vi.fn((refreshing: boolean) => {
+      // 第二参数为刷新归属（ accountId/generation），mock 仅需复位标志本身
       storeState.forkIsRefreshing = refreshing;
     });
     storeState.setUser = vi.fn((user: typeof storeState.user) => {
@@ -368,6 +369,7 @@ describe('ForkTimeline async session and sync contracts', () => {
       }),
     });
     storeState.setForkIsRefreshing = vi.fn((refreshing: boolean) => {
+      // 第二参数为刷新归属（ accountId/generation），mock 仅需复位标志本身
       storeState.forkIsRefreshing = refreshing;
     });
     MockGitHubApiService.mockImplementation(function () { return {
@@ -410,7 +412,7 @@ describe('ForkTimeline async session and sync contracts', () => {
     resolveForks([personalFork]);
 
     await waitFor(() => expect(storeState.forks).toEqual([]));
-    expect(storeState.setForkIsRefreshing).toHaveBeenLastCalledWith(false);
+    expect(storeState.setForkIsRefreshing).toHaveBeenLastCalledWith(false, expect.objectContaining({ accountId: '1' }));
     expect(toastMock).not.toHaveBeenCalledWith('刷新完成！', expect.anything());
   });
 

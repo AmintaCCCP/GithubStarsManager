@@ -59,6 +59,12 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде — никогда на серверах приложения."
+    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде (если только вы не включили «Включать ключи в резервную копию/экспорт» для резервных копий WebDAV или файлов) — никогда на серверах приложения.",
+    "saved-accounts": "Сохранённые аккаунты",
+    "click-to-sign-in": "Нажмите, чтобы войти",
+    "token-required": "Требуется токен",
+    "select-account-to-restore": "Выберите аккаунт для восстановления",
+    "multiple-accounts-exist-on-this-backend-select-th": "На этом бэкенде есть несколько аккаунтов; выберите аккаунт для восстановления.",
+    "multiple-accounts-exist-on-this-backend-close-th": "На этом бэкенде есть несколько аккаунтов. Закройте это окно и выберите аккаунт для восстановления на странице входа."
   }
 }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../../../types';
 import { useRepositoryCardActions } from './useRepositoryCardActions';
 import { useAppStore } from '../../../store/useAppStore';
+import { bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
@@ -20,6 +21,8 @@ const mocks = vi.hoisted(() => ({
     Boolean(error && typeof error === 'object' && 'name' in error && error.name === 'AbortError')
   )),
   forceSyncToBackend: vi.fn(),
+  markPendingAccountSync: vi.fn(),
+  markPendingRepositoryDeletion: vi.fn(),
   unstarRepository: vi.fn(),
   getRepositoryReadme: vi.fn(),
   loggerInfo: vi.fn(),
@@ -58,6 +61,9 @@ vi.mock('../../../services/similarRepositoryPipeline', () => ({
 
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
+  markPendingAccountSync: mocks.markPendingAccountSync,
+  markPendingRepositoryDeletion: mocks.markPendingRepositoryDeletion,
+  withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
 }));
 
 vi.mock('../../../services/githubApi', () => ({
@@ -228,6 +234,77 @@ describe('useRepositoryCardActions', () => {
     );
   });
 
+  it('localizes the dense-index degradation toast from the stable reason code (R12 handoff 3)', async () => {
+    mocks.runSimilarRepositoryPipeline.mockResolvedValue({
+      repositories: [{ ...repository, id: 2 }],
+      diagnostics: {
+        denseIndexUnavailable: true,
+        denseIndexUnavailableReason: 'legacy english text',
+        denseIndexUnavailableReasonCode: 'worker-unsupported',
+      },
+    });
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith(
+      '相似仓库结果可能不完整：向量 Worker 不支持按账号过滤召回。请部署随附的 Cloudflare Worker 后重试。',
+      'warning',
+    );
+  });
+
+  it('falls back to the legacy diagnostic text when the reason code is missing (R12)', async () => {
+    mocks.runSimilarRepositoryPipeline.mockResolvedValue({
+      repositories: [{ ...repository, id: 2 }],
+      diagnostics: {
+        denseIndexUnavailable: true,
+        denseIndexUnavailableReason: 'legacy reason text',
+        denseIndexUnavailableReasonCode: null,
+      },
+    });
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.stringContaining('legacy reason text'),
+      'warning',
+    );
+  });
+
+  it('localizes the dense-index failure toast by reason code when the pipeline throws (R13 finding 74)', async () => {
+    // 空结果错误路径：管道抛出的 Error 携带稳定原因代码——catch 按代码渲染
+    // 本地化提示，不再把英文诊断文本直接展示给用户。
+    const pipelineError = new Error('Vector index is not ready for account-scoped recall') as Error & { denseIndexUnavailableReasonCode?: string };
+    pipelineError.denseIndexUnavailableReasonCode = 'metadata-index-not-ready';
+    mocks.runSimilarRepositoryPipeline.mockRejectedValue(pipelineError);
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith(
+      '相似仓库结果可能不完整：向量 accountId 元数据索引尚未就绪。请创建并验证 accountId 元数据索引、回填存量向量，并在部署中启用 ACCOUNT_METADATA_INDEXED。',
+      'error',
+    );
+  });
+
+  it('keeps the raw error fallback for non-index failures without a reason code (R13 finding 74)', async () => {
+    mocks.runSimilarRepositoryPipeline.mockRejectedValue(new Error('network unavailable'));
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith('network unavailable', 'error');
+  });
+
   it('stores the PR-03 failure patch and preserves the failure toast on AI errors', async () => {
     mocks.analyzeRepository.mockRejectedValue(new Error('model unavailable'));
     const { result } = renderActions();
@@ -343,5 +420,288 @@ describe('useRepositoryCardActions', () => {
     expect(storeState.deleteRepository).toHaveBeenCalledWith(repository.id);
     expect(mocks.forceSyncToBackend).toHaveBeenCalledOnce();
     expect(mocks.toast).toHaveBeenCalledWith('已成功取消 Star', 'success');
+  });
+});
+
+/**
+ * 账号代次校验回归（Issue #611 审计修复）：分析/相似搜索/取消星标在等待期间
+ * 切号后，结果绝不写入切号后的当前账号工作区；分析标记的清理只作用于
+ * 发起账号仍是当前账号的工作区。
+ */
+describe('useRepositoryCardActions account switch guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
+      selector ? selector(storeState) : storeState
+    )) as typeof useAppStore);
+    (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    mocks.confirm.mockResolvedValue(true);
+    mocks.forceSyncToBackend.mockResolvedValue(undefined);
+    mocks.unstarRepository.mockResolvedValue(undefined);
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      callback(performance.now());
+      return 1;
+    }));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const switchToB = () => {
+    (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+  };
+
+  it('drops the analysis result but clears the old-generation analyzing marker after a switch', async () => {
+    mocks.analyzeRepository.mockImplementation(async () => {
+      switchToB();
+      return { summary: 's', tags: [], platforms: [], custom_category: null, category_locked: false, analyzed_at: '2026-09-01T00:00:00.000Z' };
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.analyze(); });
+
+    expect(storeState.updateRepository).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    // R2-C19：结果被丢弃，但本请求自己的忙标记必须清除——切号（同账号换
+    // 凭据只推进代次）后 isAnalyzing 不得永久残留 true。
+    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(2);
+    expect(storeState.setAnalyzingRepository).toHaveBeenNthCalledWith(1, 1, true);
+    expect(storeState.setAnalyzingRepository).toHaveBeenNthCalledWith(2, 1, false);
+  });
+
+  it('drops the analysis failure patch but clears the old-generation marker after a switch', async () => {
+    mocks.analyzeRepository.mockImplementation(async () => {
+      switchToB();
+      throw new Error('ai down');
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.analyze(); });
+
+    expect(storeState.updateRepository).not.toHaveBeenCalled();
+    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(2);
+    expect(storeState.setAnalyzingRepository).toHaveBeenLastCalledWith(1, false);
+  });
+
+  it('does not enter the similar view after a switch', async () => {
+    mocks.runSimilarRepositoryPipeline.mockImplementation(async () => {
+      switchToB();
+      return { repositories: [repository], diagnostics: {} };
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.findSimilar(); });
+
+    expect(storeState.enterSimilarView).not.toHaveBeenCalled();
+  });
+
+  it('stops the unstar flow before the remote call when the account switched during confirm', async () => {
+    mocks.confirm.mockImplementation(async () => {
+      switchToB();
+      return true;
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.unstar(); });
+
+    expect(mocks.unstarRepository).not.toHaveBeenCalled();
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+  });
+
+  it('skips local deletion and sync when the remote unstar completed but the account switched', async () => {
+    mocks.unstarRepository.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.unstar(); });
+
+    expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('preserves a repo re-starred during the switch and skips the pending deletion (R12 finding 5)', async () => {
+    // A 的取消星标在途时切 B 再切回 A，用户重新加星并同步（starred_at 刷新）；
+    // 迟到的成功响应不得删除这条新记录，也不得登记待删除（GitHub 上仍是已加星）。
+    const original = { ...repository, starred_at: '2026-01-01T00:00:00.000Z' } as Repository;
+    const restarred = { ...repository, starred_at: '2026-03-01T00:00:00.000Z' } as Repository;
+    const stateWithWorkspaces = storeState as unknown as {
+      repositories: Repository[];
+      searchResults: Repository[];
+      releases: Array<{ id: number; repository: { id: number } }>;
+      accountWorkspaces: Record<string, {
+        repositories: Repository[];
+        releases: Array<{ id: number; repository: { id: number } }>;
+      }>;
+    };
+    // R13 审计修复（CodeRabbit）：先用 original 初始化实时列表——重新加星
+    // 必须发生在远端请求发出之后（切回账号 A 时写入 restarred），这样即使
+    // 对账读取的是请求开始时的快照，断言也无法通过，从而验证对账读取的是
+    // 请求完成时的记录。
+    stateWithWorkspaces.repositories = [original];
+    stateWithWorkspaces.searchResults = [original];
+    stateWithWorkspaces.releases = [{ id: 101, repository: { id: original.id } }];
+    stateWithWorkspaces.accountWorkspaces = {
+      '1': { repositories: [], releases: [] },
+      '2': { repositories: [], releases: [] },
+    };
+    (mockUseAppStore as unknown as { setState: (updater: unknown) => void }).setState = vi.fn((updater: unknown) => {
+      const patch = typeof updater === 'function'
+        ? (updater as (state: typeof storeState) => Record<string, unknown>)(storeState)
+        : updater as Record<string, unknown>;
+      if (patch && typeof patch === 'object') Object.assign(storeState, patch);
+    });
+
+    let releaseUnstar!: () => void;
+    mocks.unstarRepository.mockImplementation(() => new Promise<void>((resolve) => {
+      releaseUnstar = resolve;
+    }));
+    const { result } = renderActions(original);
+    let promise!: Promise<void>;
+    await act(async () => {
+      promise = result.current.unstar();
+    });
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    // 切回账号 A 后用户重新加星并同步：实时列表更新为 restarred
+    stateWithWorkspaces.repositories = [restarred];
+    stateWithWorkspaces.searchResults = [restarred];
+    await act(async () => {
+      releaseUnstar();
+      await promise;
+    });
+
+    expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
+    // 重新加星的同 ID 仓库保留在实时工作区，且不登记待删除/待补推
+    expect(stateWithWorkspaces.repositories.map(r => r.id)).toEqual([restarred.id]);
+    expect(stateWithWorkspaces.releases.map(rel => rel.id)).toEqual([101]);
+    expect(mocks.markPendingRepositoryDeletion).not.toHaveBeenCalled();
+    expect(mocks.markPendingAccountSync).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+  });
+
+  it('keeps the deletion state for the reactivated account after A→B→A (unstar)', async () => {
+    // 审计修复（C31）：取消星标请求在 A 发起后保持 pending，用实际切号操作
+    // 切 B 再切回 A（推进真实会话代次）后完成——执行真实的 setState 工作区删除，
+    // 验证重新激活的 A 已移除该仓库及 release，且 B 中同 ID 仓库保持不变。
+    const stateWithWorkspaces = storeState as unknown as {
+      repositories: Repository[];
+      searchResults: Repository[];
+      releases: Array<{ id: number; repository: { id: number } }>;
+      releaseSubscriptions: Set<number>;
+      readReleases: Set<number>;
+      accountWorkspaces: Record<string, {
+        repositories: Repository[];
+        releases: Array<{ id: number; repository: { id: number } }>;
+        releaseSubscriptions: number[];
+        readReleases: number[];
+      }>;
+    };
+    stateWithWorkspaces.repositories = [repository];
+    stateWithWorkspaces.searchResults = [repository];
+    stateWithWorkspaces.releases = [
+      { id: 101, repository: { id: repository.id } },
+      { id: 102, repository: { id: 555 } },
+    ];
+    stateWithWorkspaces.releaseSubscriptions = new Set([repository.id, 999]);
+    stateWithWorkspaces.readReleases = new Set([101, 102, 999]);
+    stateWithWorkspaces.accountWorkspaces = {
+      '1': {
+        repositories: [repository],
+        releases: [
+          { id: 101, repository: { id: repository.id } },
+          { id: 102, repository: { id: 555 } },
+        ],
+        releaseSubscriptions: [repository.id, 999],
+        readReleases: [101, 102, 999],
+      },
+      '2': {
+        repositories: [{ ...repository, full_name: 'other/example-repository' }],
+        releases: [{ id: 202, repository: { id: repository.id } }],
+        releaseSubscriptions: [repository.id],
+        readReleases: [202],
+      },
+    };
+    (mockUseAppStore as unknown as { setState: (updater: unknown) => void }).setState = vi.fn((updater: unknown) => {
+      const patch = typeof updater === 'function'
+        ? (updater as (state: typeof storeState) => Record<string, unknown>)(storeState)
+        : updater as Record<string, unknown>;
+      if (patch && typeof patch === 'object') Object.assign(storeState, patch);
+    });
+
+    let releaseUnstar!: () => void;
+    mocks.unstarRepository.mockImplementation(() => new Promise<void>((resolve) => {
+      releaseUnstar = resolve;
+    }));
+    const { result } = renderActions();
+    let promise!: Promise<void>;
+    await act(async () => {
+      promise = result.current.unstar();
+    });
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    await act(async () => {
+      releaseUnstar();
+      await promise;
+    });
+
+    expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
+    // 重新激活的 A 已移除该仓库及其 release（其他仓库的 release 保留），
+    // 同时不触碰 B 中同 ID 的仓库与 release
+    expect(stateWithWorkspaces.repositories).toEqual([]);
+    expect(stateWithWorkspaces.releases.map(rel => rel.id)).toEqual([102]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].repositories.map(r => r.id)).toEqual([repository.id]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].releases.map(rel => rel.id)).toEqual([202]);
+    // R12（交接项 4）：与 deleteRepository 同一清理规则——实时工作区的订阅
+    // 与已读索引同步清理，B 中同 ID 仓库的订阅/已读保持不变
+    expect(stateWithWorkspaces.releaseSubscriptions.has(repository.id)).toBe(false);
+    expect(stateWithWorkspaces.releaseSubscriptions.has(999)).toBe(true);
+    expect([...stateWithWorkspaces.readReleases].sort()).toEqual([102]);
+    expect(stateWithWorkspaces.accountWorkspaces['1'].releaseSubscriptions).toEqual([999]);
+    expect(stateWithWorkspaces.accountWorkspaces['1'].readReleases).toEqual([102]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].releaseSubscriptions).toEqual([repository.id]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].readReleases).toEqual([202]);
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    // C29：为发起账号保留删除状态——登记 (发起账号, 发起时后端) 待补推标记
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', expect.any(String));
+  });
+
+  it('drops the stale similar result after A→B→A (generation advanced)', async () => {
+    // 审计修复（C31/R2-C27）：相似搜索在 A 发起后保持 pending，实际切号推进
+    // 代次后放行一条有效的非空结果——若成功路径缺少会话守卫，enterSimilarView
+    // 断言必然失败（旧 mock 解析 undefined 会让成功路径抛错，掩盖该缺陷）。
+    let releasePipeline!: () => void;
+    mocks.runSimilarRepositoryPipeline.mockImplementation(() => new Promise((resolve) => {
+      releasePipeline = () => resolve({ repositories: [repository] });
+    }));
+    const { result } = renderActions();
+    let promise!: Promise<void>;
+    await act(async () => {
+      promise = result.current.findSimilar();
+    });
+    // 先断言流水线已执行，再放行结果
+    await waitFor(() => expect(mocks.runSimilarRepositoryPipeline).toHaveBeenCalledTimes(1));
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    await act(async () => {
+      releasePipeline();
+      await promise;
+    });
+
+    expect(storeState.enterSimilarView).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
   });
 });

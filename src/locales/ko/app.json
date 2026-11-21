@@ -236,7 +236,19 @@
     "menu-releases": "풀어 주다",
     "menu-forks": "레플리카",
     "menu-subscription": "발견하다",
-    "menu-settings": "설정"
+    "menu-settings": "설정",
+    "switch-account": "계정 전환",
+    "add-account": "계정 추가",
+    "current-account": "현재 계정",
+    "remove-account": "계정 삭제",
+    "remove-account-with-login": "@{{login}} 제거",
+    "logout-account-changed": "계정이 변경되었습니다. 현재 계정에 대해 다시 로그아웃해 주세요.",
+    "switch-in-progress": "계정을 전환하는 중입니다. 잠시 후 다시 시도해 주세요.",
+    "remove-account-confirm-title": "저장된 계정 삭제",
+    "remove-account-confirm-desc": "이 계정의 저장된 로그인 자격 증명만 제거됩니다. 캐시된 저장소와 카테고리는 유지됩니다. 계속하시겠습니까?",
+    "account-switched": "@{{login}}(으)로 전환되었습니다",
+    "account-repo-count": "저장소 {{count}}개",
+    "retry-credential-alignment": "백엔드 자격 증명 동기화 다시 시도"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "카테고리를 GitHub 목록에 동기화"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "데이터 가져오기 성공",
     "import-data": "데이터 가져오기",
     "import-failed-please-try-again": "가져오기에 실패했습니다. 다시 시도해 주세요.",
+    "pat-export-authorization-title": "GitHub 토큰 내보내기 승인",
+    "pat-export-authorization-desc": "이 내보내기에는 저장된 모든 계정의 GitHub 토큰이 일반 텍스트로 포함됩니다. 내보낼 때마다 명시적인 승인이 필요하며, 저장된 \"백업/내보내기 시 키 포함\" 설정은 승인으로 간주되지 않습니다.",
+    "pat-export-deny": "거부",
+    "pat-export-authorize": "승인",
+    "import-accounts-need-reauth": "데이터 가져오기에 성공했습니다. 다음 계정은 로컬 자격 증명이 없어 다시 인증이 필요합니다: {{accounts}}",
+    "import-skipped-unattributed-top-level": "백업의 최상위 데이터는 어떤 계정에도 귀속되지 않아 건너뛰었으며, 현재 계정에는 기록되지 않았습니다.",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "분석되지 않은 창고는 직접 청소가 불가능하므로 AI 분석 기능을 활용하여 처리하시기 바랍니다.",
     "cleanup-data": "데이터 정리",
     "data-cleanup-successful": "데이터 정리 성공",
@@ -1416,5 +1434,19 @@
     "download": "다운로드",
     "detected-from-filenames-and-release-metadata-no": "파일 이름과 Release 메타데이터로 판별합니다. 보안 검사는 하지 않으며 자동으로 실행되지 않습니다. 아래 자산 목록에서 언제든 다른 자산을 선택할 수 있습니다.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "이 기기에 해당하지 않는 자산 {{v1}}개를 제외했습니다(소스 코드, 체크섬, 서명, 디버그 기호, blockmap, 다른 플랫폼 또는 아키텍처)."
+  },
+  "accountModal": {
+    "title": "GitHub 계정 추가",
+    "description": "새 GitHub 개인 액세스 토큰을 입력하여 계정을 추가하세요. 현재 계정의 데이터는 안전하게 보존됩니다.",
+    "token-label": "GitHub 개인 액세스 토큰",
+    "cancel": "취소",
+    "confirm": "추가 후 전환",
+    "reauth-hint": "@{{login}} 계정의 유효한 GitHub 토큰을 다시 입력해 주세요",
+    "account-mismatch": "이 토큰은 다른 GitHub 계정의 것입니다. @{{login}} 계정의 토큰으로 로그인해 주세요.",
+    "backend-credential-sync-failed": "계정에 로그인했지만 백엔드 자격 증명을 업데이트하지 못했습니다. 나중에 계정 메뉴에서 다시 시도하세요."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "로그아웃되었지만 기기 자격 증명 정리가 완료되지 않았습니다. 이전 자격 증명은 계속 차단되며 다음 시작 시 자동으로 다시 시도됩니다.",
+    "active-account-update-skipped": "이 전환 중에 다른 기기가 백엔드의 활성 계정을 변경하여 백엔드가 이 계정으로 전환되지 않았습니다. 로컬 세션은 이미 이 계정을 사용 중입니다. 계정 메뉴에서 다시 시도하여 백엔드를 정렬하세요."
   }
 }

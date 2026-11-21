@@ -195,6 +195,9 @@ export interface VectorizeVector {
     // 可选：此 PR 之前（embedding v2）索引的向量不含 license 键，重索引前以 undefined 出现。
     // indexAllRepos 写入时会填入字符串；消费方请按可选处理。
     license?: string;
+    // 可选：多账号账号隔离（R4 审计修复）。此前的存量向量（legacy）没有该键；
+    // 新写入的向量始终记录归属账号，供查询侧按当前账号过滤。
+    accountId?: string;
   };
 }
 
@@ -209,16 +212,112 @@ export interface VectorQueryResult {
     tags: string[];
     // 同上：旧向量查询返回时缺该键，按可选处理。
     license?: string;
+    // 同上：legacy 向量缺该键，按可选处理。
+    accountId?: string;
   };
 }
+
+/**
+ * 账号隔离的向量 ID（R4 审计修复）：多账号共享同一 VECTORIZE 索引，若沿用
+ * `String(repo.id)` 作为向量 ID，两个账号索引同一仓库会以相同 ID 互相覆盖
+ * 向量与 metadata（ai_tags/license 串号泄漏）。upsert 统一写入
+ * `${accountId}:${repo.id}` 并在 metadata 记录 accountId，使每个账号拥有
+ * 独立的向量副本。
+ *
+ * 兼容策略：accountId 未知（未登录边缘态）时保持旧格式无前缀 ID——与
+ * cleanup keepIds 的 legacy 形式一致；存量旧格式 ID 由查询侧按会话形态兼容
+ * （单账号会话视为本账号 legacy 数据继续可见，多账号会话因无法判定归属而
+ * 过滤，详见 hydrateMatches）。
+ */
+export const buildAccountScopedVectorId = (accountId: string | null | undefined, repoId: number | string): string => (
+  accountId ? `${accountId}:${repoId}` : String(repoId)
+);
+
+/**
+ * 解析向量 ID：带合法数字账号前缀（`accountId:repoId`）时返回归属账号与仓库
+ * ID；否则视为 legacy 无前缀 ID（accountId=null，repoId 即原 ID）。
+ */
+export const parseAccountScopedVectorId = (id: string): { accountId: string | null; repoId: string } => {
+  const separatorIndex = id.indexOf(':');
+  if (separatorIndex > 0) {
+    const prefix = id.slice(0, separatorIndex);
+    if (/^\d+$/.test(prefix)) {
+      return { accountId: prefix, repoId: id.slice(separatorIndex + 1) };
+    }
+  }
+  return { accountId: null, repoId: id };
+};
 
 export interface VectorizeStatus {
   vectorCount: number;
   dimensions: number;
   indexName?: string;
+  /** /cleanup 是否支持按账号前缀限定删除范围（旧部署的 Worker 不携带该字段） */
+  accountScopedCleanup?: boolean;
 }
 
+/** /cleanup 的账号范围参数（R5 审计修复：多账号共享索引时的删除范围约定）。 */
+export interface VectorCleanupOptions {
+  /**
+   * 仅删除 ID 以 `${accountPrefix}:` 开头的向量；其他账号前缀与 legacy 无前缀
+   * 向量一律保留。缺省时 Worker 只清理 legacy 无前缀向量。
+   */
+  accountPrefix?: string | null;
+  /**
+   * 是否同时清理 legacy 无前缀向量（审计修复 C17）。
+   * 仅在独立确认旧无前缀向量归属后才可为 true——例如通过旧部署记录/迁移
+   * 清单确认该索引的 legacy 向量专属当前账号。本机仅有一个已保存账号不能
+   * 作为归属已确认的依据：共享索引中可能仍有其他设备/旧客户端上传的
+   * legacy 向量，无法由本机账号数证明其归属。
+   */
+  includeLegacy?: boolean;
+  signal?: AbortSignal;
+}
+
+/**
+ * 识别 AbortSignal（审计修复 C18）：`instanceof` 只认当前窗口的构造函数——
+ * 跨窗口（iframe/弹窗）传来的 signal 不通过该检查，会被误当作选项对象。
+ * 在 instanceof 之外叠加 duck-typing（aborted 布尔 + add/removeEventListener
+ * 函数）识别跨窗口 AbortSignal。
+ */
+const isAbortSignalLike = (value: unknown): value is AbortSignal => (
+  value instanceof AbortSignal
+  || (
+    typeof value === 'object'
+    && value !== null
+    && typeof (value as AbortSignal).aborted === 'boolean'
+    && typeof (value as AbortSignal).addEventListener === 'function'
+    && typeof (value as AbortSignal).removeEventListener === 'function'
+    && typeof (value as AbortSignal).dispatchEvent === 'function'
+  )
+);
+
 type VectorSearchServiceConfig = Pick<VectorSearchConfig, 'workerUrl' | 'authToken'>;
+
+/**
+ * Worker 请求错误（第 13 轮审计修复 [71]/[73]）：保留响应体中的稳定错误码
+ * （如 ACCOUNT_METADATA_NOT_INDEXED——/status 探测通过后 Worker 仍可能在查询
+ * 时回滚），查询管道据此识别「账号元数据索引未就绪」并把稠密召回标记为降级。
+ */
+export class WorkerRequestError extends Error {
+  readonly code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'WorkerRequestError';
+    if (code) this.code = code;
+  }
+}
+
+/** 从 Worker 错误响应体（JSON 文本）中提取稳定错误码。 */
+const parseWorkerErrorCode = (rawBody: string): string | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(rawBody);
+    const code = (parsed as { code?: unknown } | null)?.code;
+    return typeof code === 'string' && code ? code : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export class VectorSearchService {
   private workerUrl: string;
@@ -227,6 +326,14 @@ export class VectorSearchService {
   constructor(config: VectorSearchServiceConfig) {
     this.workerUrl = config.workerUrl.replace(/\/+$/, '');
     this.authToken = config.authToken;
+  }
+
+  /**
+   * 归一化后的 Worker 地址——账号范围迁移完成记录的绑定身份（第 12 轮审计
+   * 修复）：切换向量 Worker 后旧记录不再豁免增量路径。
+   */
+  get workerId(): string {
+    return this.workerUrl;
   }
 
   private async request<T>(path: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
@@ -241,12 +348,16 @@ export class VectorSearchService {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      throw new Error(`Worker error ${response.status}: ${errText}`);
+      throw new WorkerRequestError(`Worker error ${response.status}: ${errText}`, parseWorkerErrorCode(errText));
     }
 
     const data = await response.json();
     if (data.success === false) {
-      throw new Error(data.error || 'Unknown worker error');
+      const code = (data as { code?: unknown }).code;
+      throw new WorkerRequestError(
+        data.error || 'Unknown worker error',
+        typeof code === 'string' && code ? code : undefined,
+      );
     }
     return data as T;
   }
@@ -266,13 +377,14 @@ export class VectorSearchService {
    */
   async query(
     vector: number[],
-    options: { topK?: number; threshold?: number } = {},
+    options: { topK?: number; threshold?: number; accountId?: string } = {},
     signal?: AbortSignal,
   ): Promise<VectorQueryResult[]> {
-    const { topK = 20, threshold = 0.35 } = options;
+    const { topK = 20, threshold = 0.35, accountId } = options;
     const result = await this.request<{ matches: VectorQueryResult[] }>('/query', {
       method: 'POST',
-      body: JSON.stringify({ vector, topK, threshold }),
+      // accountId 让 Worker 在 topK 之前按归属过滤（多账号共享索引）。
+      body: JSON.stringify({ vector, topK, threshold, ...(accountId ? { accountId } : {}) }),
     }, signal);
     return result.matches;
   }
@@ -288,20 +400,45 @@ export class VectorSearchService {
   }
 
   /**
-   * 清理不在 keepIds 列表中的向量（删除已 unstar 的仓库）
+   * 清理不在 keepIds 列表中的向量（删除已 unstar 的仓库）。
+   *
+   * R5 审计修复：多账号共享同一 VECTORIZE 索引时必须携带账号范围——
+   * `accountPrefix` 限定只删除当前账号前缀的向量（其他设备/其他账号的向量
+   * 一律保留）；`includeLegacy` 默认应为 `false`，本机仅有一个已保存账号不足以
+   * 证明共享索引中无前缀 legacy 向量的归属，只有独立确认归属后才可传入 true。
+   * 两者都缺省时请求体与旧版客户端一致，Worker 保持旧行为：只删除 keepIds
+   * 之外的纯数字 legacy ID，带账号前缀的向量一律保留。
+   * 兼容旧签名 cleanup(keepIds, signal)。
    */
-  async cleanup(keepIds: string[], signal?: AbortSignal): Promise<{ deleted: number }> {
-    return this.request<{ deleted: number }>('/cleanup', {
+  async cleanup(keepIds: string[], options: VectorCleanupOptions | AbortSignal = {}): Promise<{ deleted: number; partial?: boolean }> {
+    // 审计修复（C18）：跨窗口 AbortSignal 不依赖当前窗口构造函数识别，
+    // 兼容旧签名 cleanup(keepIds, signal) 并转发给清理请求。
+    const normalized: VectorCleanupOptions = isAbortSignalLike(options)
+      ? { signal: options }
+      : options ?? {};
+    const { accountPrefix, includeLegacy, signal } = normalized;
+    const body: Record<string, unknown> = { keepIds };
+    // R2-C25：显式账号前缀必须非空。旧实现用 truthy 判断，空串会被静默省略，
+    // 请求退化为旧版无范围清理（可能删除其他账号向量）——客户端直接拒绝。
+    if (accountPrefix !== undefined && accountPrefix !== null) {
+      if (typeof accountPrefix !== 'string' || accountPrefix.length === 0) {
+        throw new Error('accountPrefix must be a non-empty string when provided');
+      }
+      body.accountPrefix = accountPrefix;
+    }
+    // 显式 false 也必须写入：省略会让 Worker 按旧版无范围请求处理。
+    if (includeLegacy !== undefined) body.includeLegacy = includeLegacy;
+    return this.request<{ deleted: number; partial?: boolean }>('/cleanup', {
       method: 'POST',
-      body: JSON.stringify({ keepIds }),
+      body: JSON.stringify(body),
     }, signal);
   }
 
   /**
    * 获取索引状态
    */
-  async getStatus(): Promise<VectorizeStatus> {
-    return this.request<VectorizeStatus>('/status');
+  async getStatus(signal?: AbortSignal): Promise<VectorizeStatus> {
+    return this.request<VectorizeStatus>('/status', {}, signal);
   }
 
   /**
@@ -334,8 +471,105 @@ export class VectorSearchService {
  * 嵌入文本格式版本。
  * buildEmbeddingText 的输出格式变化时必须递增，
  * 使增量索引能检测到格式变化并强制重新索引所有向量。
+ *
+ * 保持 v3 不变：单账号老用户升级后可直接沿用存量 v3 向量（免重新调 Embedding API），
+ * 仅在添加多账号时通过多账号隔离路径按需重建索引。
  */
 export const EMBEDDING_FORMAT_VERSION = 3;
+
+// ============================================================
+// 账号范围迁移状态（审计修复：与 v3 版本、vector_indexed_at 分开记录）
+// ============================================================
+
+const ACCOUNT_SCOPE_MIGRATION_KEY = 'gsm.vectorAccountScopeMigrationDone';
+
+/**
+ * 单账号老用户升级到多账号后的账号范围迁移：
+ * 升级前的存量 v3 向量使用无归属的纯数字 ID，多账号共享索引下严格账号查询
+ * （按 accountId 过滤）找不到它们；这些仓库的 vector_indexed_at 与嵌入格式
+ * 版本均未变化，增量索引不会补写带账号前缀的新向量，旧仓库会从语义搜索中
+ * 消失，只能靠用户手动全量重建恢复。
+ *
+ * 这里按账号记录迁移状态，且记录必须绑定写入它的 Worker（第 12 轮审计修复）：
+ * 迁移完成记录以「账号 → Worker 身份（归一化 workerUrl）」存储。账号在
+ * Worker W1 完成账号范围上传后切换到 W2 时，旧记录不再豁免增量路径——该账号
+ * 重新视为未迁移，直到 W2 完成一次成功的账号范围上传（否则 W2 上内容未变化
+ * 的仓库会被 needsReindex 排除，其账号范围向量永远不会写入，语义搜索静默
+ * 缺结果）。Worker 绑定不提供向量列举（无法远端探测 legacy 数字 ID），因此
+ * 以「该账号是否已在当前 Worker 完成过一次成功的范围上传」为迁移判据——
+ * 保守方向是多写一次，不会漏迁。旧格式（string[]，无 Worker 绑定）一律视为
+ * 未迁移。
+ */
+type AccountScopeMigrationRecord = Record<string, string>;
+
+/**
+ * 会话内迁移完成记录（第 13 轮审计修复 [22]）：localStorage 写入失败（隐私
+ * 模式/配额）时退化为会话内标记——迁移成功后先同步更新内存，再尝试持久化；
+ * 读取路径合并内存与持久化记录，使写入失败后本次会话的后续增量索引仍能
+ * 识别已完成迁移，不会对全部已分析仓库重复生成 Embedding。
+ */
+let inMemoryMigrationDoneWorkers: AccountScopeMigrationRecord = {};
+
+const readPersistedMigrationDoneWorkers = (): AccountScopeMigrationRecord => {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_SCOPE_MIGRATION_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const record = parsed as Record<string, unknown>;
+    const result: AccountScopeMigrationRecord = {};
+    for (const [accountId, workerId] of Object.entries(record)) {
+      if (!accountId || typeof workerId !== 'string') continue;
+      result[accountId] = workerId;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+};
+
+const readMigrationDoneWorkers = (): AccountScopeMigrationRecord => ({
+  ...readPersistedMigrationDoneWorkers(),
+  ...inMemoryMigrationDoneWorkers,
+});
+
+const persistMigrationDoneWorkers = (record: AccountScopeMigrationRecord): void => {
+  try {
+    localStorage.setItem(ACCOUNT_SCOPE_MIGRATION_KEY, JSON.stringify(record));
+  } catch {
+    // 存储不可用（隐私模式/配额）时退化为会话内标记（内存记录已同步更新）
+  }
+};
+
+/**
+ * 该账号是否已完成账号范围迁移（增量索引可沿用既有路径）。
+ * `workerId` 为当前向量 Worker 的绑定身份（归一化 workerUrl）；无法确定
+ * Worker 身份（老调用方/测试桩）时退回仅按账号判断的旧行为。
+ */
+export function isAccountScopeMigrationDone(
+  accountId: string | null | undefined,
+  workerId?: string | null,
+): boolean {
+  if (!accountId) return true;
+  const boundWorker = readMigrationDoneWorkers()[accountId];
+  if (boundWorker === undefined) return false;
+  if (typeof workerId !== 'string' || !workerId) return true;
+  return boundWorker === workerId;
+}
+
+function markAccountScopeMigrationDone(accountId: string, workerId?: string | null): void {
+  const record = readMigrationDoneWorkers();
+  if (record[accountId] !== undefined && record[accountId] === (workerId ?? '')) return;
+  const workerValue = typeof workerId === 'string' && workerId ? workerId : '';
+  // 第 13 轮审计修复 [22]：先同步更新内存记录（localStorage 写入失败时会话内
+  // 标记仍然生效），再尝试持久化；仅在上传成功后被调用，上传失败保持未完成。
+  inMemoryMigrationDoneWorkers[accountId] = workerValue;
+  persistMigrationDoneWorkers({ ...record, [accountId]: workerValue });
+}
+
+/** 仅供测试：清空会话内迁移完成记录，模拟一次全新的应用启动。 */
+export const __resetInMemoryAccountScopeMigrationForTest = (): void => {
+  inMemoryMigrationDoneWorkers = {};
+};
 
 /**
  * 拼接仓库文本用于 embedding
@@ -563,15 +797,37 @@ export async function indexAllRepos(
     formatVersion?: number;
     /** 最新格式版本号（EMBEDDING_FORMAT_VERSION） */
     currentFormatVersion?: number;
+    /**
+     * 归属账号（GitHub 数值 ID 字符串）。多账号共享同一向量索引时必须提供：
+     * 向量 ID 以账号为前缀、metadata 记录归属，避免不同账号互相覆盖/泄漏。
+     * 未提供（未登录边缘态）时退回 legacy 无前缀 ID（见
+     * buildAccountScopedVectorId 的兼容策略）。
+     */
+    accountId?: string | null;
   } = {}
 ): Promise<{ indexed: number; skipped: number; errors: number; error?: string; indexedRepoIds: number[] }> {
-  const { batchSize = 32, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000, incremental, onRepoIndexed } = options;
+  const { batchSize = 32, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000, incremental, onRepoIndexed, accountId } = options;
 
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
     throw new Error('batchSize must be a positive integer');
   }
 
-  const indexable = selectIndexableRepos(repos, { incremental, formatVersion: options.formatVersion, currentFormatVersion: options.currentFormatVersion });
+  // 账号范围迁移（审计修复）：增量模式下该账号尚未完成迁移时，强制按全量
+  // 候选补写带账号前缀的向量（升级前的存量 v3 向量可能是无归属数字 ID，
+  // 账号过滤后不可召回）；上传成功后才标记完成，恢复既有增量路径。
+  // 第 12 轮审计修复：迁移完成记录绑定写入它的 Worker——切换 Worker 后该账号
+  // 重新视为未迁移，直到新 Worker 完成一次成功的账号范围上传。
+  const workerId = typeof vectorService.workerId === 'string' && vectorService.workerId
+    ? vectorService.workerId
+    : null;
+  const accountScopeMigrationPending = incremental === true
+    && !!accountId
+    && !isAccountScopeMigrationDone(accountId, workerId);
+  const indexable = selectIndexableRepos(repos, {
+    incremental: incremental === true && !accountScopeMigrationPending,
+    formatVersion: options.formatVersion,
+    currentFormatVersion: options.currentFormatVersion,
+  });
   let indexed = 0;
   let errors = 0;
   let lastError = '';
@@ -623,12 +879,20 @@ export async function indexAllRepos(
 
       // 2. 组装成功项的 Vectorize 格式（跳过 null 的失败项）
       const vectorizeVectors: VectorizeVector[] = [];
+      // R5 审计修复（CodeRabbit 发现 4）：构造向量的同时记录每个成功向量对应的
+      // 仓库 ID——embedding 失败的项（null）不入列，两者的下标一一对应。此前
+      // upsertedCount 回调直接取 batch[j].id，当批内存在失败项时会把「失败仓库」
+      // 报告为已上传（调用方写入 vector_indexed_at，增量索引永久跳过它），而
+      // 真正上传成功的仓库反而没有标记。
+      const vectorizeRepoIds: number[] = [];
       let batchErrors = 0;
       for (let j = 0; j < batch.length; j++) {
         const vec = vectors[j];
         if (vec && Array.isArray(vec)) {
           vectorizeVectors.push({
-            id: String(batch[j].id),
+            // 账号隔离（R4 审计修复）：多账号共享索引时按账号前缀区分向量，
+            // metadata 同步记录归属账号，查询侧据此过滤
+            id: buildAccountScopedVectorId(accountId, batch[j].id),
             values: vec,
             metadata: {
               full_name: batch[j].full_name,
@@ -639,8 +903,14 @@ export async function indexAllRepos(
               // 历史/导入数据 license 可能是 GitHub 对象或数字；统一经 normalizeLicense
               // 降为 SPDX id / 哨兵，避免把 "[object Object]" 写入向量元数据。
               license: normalizeLicense(batch[j].license),
+              // 第 13 轮跨域接缝（server 域 [68]）：未登录（accountId 缺省）的上传
+              // 统一以 'default' 记入 metadata.accountId——服务端按归属投影候选时
+              // 匿名向量不再无法归属。仅写 metadata，不改向量 ID 形态（保持
+              // legacy 无前缀 ID，server 侧候选投影无需放行新前缀）。
+              accountId: accountId ?? 'default',
             },
           });
+          vectorizeRepoIds.push(batch[j].id);
         } else {
           batchErrors++;
         }
@@ -656,9 +926,12 @@ export async function indexAllRepos(
           ? Math.min(upsertResult.upserted, vectorizeVectors.length)
           : vectorizeVectors.length;
         indexed += upsertedCount;
-        // 仅标记确认 upserted 的 repo（按顺序）
+        // 仅标记确认 upserted 的 repo（按 vectorizeRepoIds 的顺序，即成功向量
+        // 的构造顺序）。全批成功时该列表与 batch 的 id 顺序一致，保持既有报告
+        // 顺序；有失败项时失败仓库不会被报告——向量 ID 带账号前缀后不能再
+        // parseInt(id)（前缀非数字会得到 NaN）。
         for (let j = 0; j < upsertedCount; j++) {
-          const repoId = parseInt(vectorizeVectors[j].id, 10);
+          const repoId = vectorizeRepoIds[j];
           indexedRepoIds.push(repoId);
           onRepoIndexed?.(repoId);
         }
@@ -683,6 +956,23 @@ export async function indexAllRepos(
 
     const currentBatch = Math.floor(i / batchSize) + 1;
     onProgress?.({ phase: 'embedding', done: currentBatch, total: totalBatches });
+  }
+
+  // 迁移完成的判定（审计修复 + 第 12 轮扩展）：所有升级前已索引（vector_indexed_at
+  // 存在，即可能带有 legacy 无归属向量）的候选仓库都必须在本轮上传成功——增量
+  // 迁移补写与全量重建同样适用（全量重建不设置 accountScopeMigrationPending，
+  // 但它是用户在没有迁移标记时最先执行的操作：不记录完成会让下一次增量索引
+  // 强制重选全部仓库，未变化仓库被重复嵌入计费）。失败项里存在这类仓库时保持
+  // 迁移待完成——下次运行继续按全量补写；失败项全部是「从未索引」的仓库时，
+  // 它们没有可丢失的 legacy 向量（且后续增量路径会以带前缀 ID 首次写入），可
+  // 安全标记完成，避免永久失败项把每次运行都退化为全量重复嵌入。完成记录绑定
+  // 当前 Worker 身份（workerId），切换 Worker 后重新视为未迁移。
+  if (accountId && (accountScopeMigrationPending || incremental !== true)) {
+    const indexedIdSet = new Set(indexedRepoIds);
+    const failedLegacyIndexed = indexable.some((repo) => !indexedIdSet.has(repo.id) && !!repo.vector_indexed_at);
+    if (!failedLegacyIndexed) {
+      markAccountScopeMigrationDone(accountId, workerId);
+    }
   }
 
   return { indexed, skipped: repos.length - indexable.length, errors, error: lastError || undefined, indexedRepoIds };

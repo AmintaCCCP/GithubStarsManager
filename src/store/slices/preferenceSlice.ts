@@ -4,6 +4,20 @@ import { REQUIRED_HEADER_MENU_IDS } from '../schema';
 import { normalizeThemeTokens } from '../../utils/themeTokens';
 import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields';
 import { normalizeRepositoryCardActions } from '../../utils/repositoryCardActions';
+import {
+  accountIdKey,
+  getAccountSessionGeneration,
+} from '../helpers/accountWorkspace';
+import { useAppStore } from '../useAppStore';
+
+/**
+ * Release 刷新状态的归属会话（审计修复 B4）：set(true) 时捕获发起刷新的
+ * 账号 ID + 会话代次；set(false) 时——若调用方传入其发起时的身份——仅当
+ * 该身份仍是标志的当前持有者才清除（旧账号 A 的 finally 在 B 已重新发起
+ * 刷新后到达时，身份不匹配被忽略）；未传身份时退回「归属会话与当前会话
+ * 一致才清除」的判定；两者皆无时保持无条件布尔语义，兼容既有调用点。
+ */
+let _releaseRefreshOwner: { accountId: string | null; generation: number } | null = null;
 
 export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setThemeMode'
@@ -124,7 +138,41 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
         return { releaseExpandedRepositories: newSet };
       }),
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
-      setReleaseIsRefreshing: (releaseIsRefreshing) => set({ releaseIsRefreshing }),
+      setReleaseIsRefreshing: (releaseIsRefreshing, owner) => set(() => {
+        if (releaseIsRefreshing) {
+          _releaseRefreshOwner = owner ?? null;
+          return { releaseIsRefreshing: true };
+        }
+        if (owner) {
+          // B4：finally 清理携带发起刷新时的身份——仅当该身份仍是标志的当前
+          // 持有者才清除；期间切号后 B 已重新发起刷新时，A 的过期 finally
+          // 身份不匹配，被忽略。
+          if (_releaseRefreshOwner
+            && _releaseRefreshOwner.accountId === owner.accountId
+            && _releaseRefreshOwner.generation === owner.generation) {
+            _releaseRefreshOwner = null;
+            return { releaseIsRefreshing: false };
+          }
+          return {};
+        }
+        if (_releaseRefreshOwner) {
+          let currentUser: { id: number } | null = null;
+          try {
+            const store = useAppStore as unknown as { getState?: () => { user: { id: number } | null } };
+            currentUser = typeof store.getState === 'function' ? (store.getState()?.user ?? null) : null;
+          } catch {
+            currentUser = null;
+          }
+          const sameAccount = _releaseRefreshOwner.accountId === accountIdKey(currentUser);
+          const sameGeneration = _releaseRefreshOwner.generation === getAccountSessionGeneration();
+          if (!sameAccount || !sameGeneration) {
+            // 过期清理：发起刷新的账号/会话已被切换，不得清除当前账号的刷新状态
+            return {};
+          }
+          _releaseRefreshOwner = null;
+        }
+        return { releaseIsRefreshing: false };
+      }),
       setIncludePreRelease: (includePreRelease) => set({ includePreRelease }),
       setIncludeKeysInBackup: (includeKeysInBackup) => set({ includeKeysInBackup }),
 

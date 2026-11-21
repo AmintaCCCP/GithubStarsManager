@@ -236,7 +236,19 @@
     "menu-releases": "发布",
     "menu-forks": "复刻",
     "menu-subscription": "发现",
-    "menu-settings": "设置"
+    "menu-settings": "设置",
+    "switch-account": "切换账号",
+    "add-account": "添加新账号",
+    "current-account": "当前账号",
+    "remove-account": "移除账号",
+    "remove-account-with-login": "移除 @{{login}}",
+    "logout-account-changed": "账号已切换，请对当前账号重新发起退出登录。",
+    "switch-in-progress": "正在切换账号，请稍后再试。",
+    "remove-account-confirm-title": "移除已保存的账号",
+    "remove-account-confirm-desc": "仅移除该账号的快捷登录凭证，本地缓存的仓库与分类数据仍会保留。确定继续吗？",
+    "account-switched": "已切换到账号 @{{login}}",
+    "account-repo-count": "{{count}} 个仓库",
+    "retry-credential-alignment": "重试后端凭据对齐"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "同步分类到 GitHub list"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "数据导入成功",
     "import-data": "导入数据",
     "import-failed-please-try-again": "导入失败，请重试",
+    "pat-export-authorization-title": "GitHub Token 导出授权",
+    "pat-export-authorization-desc": "本次导出将以明文包含所有已保存账号的 GitHub Token。每次导出都需要明确确认；此前保存的「备份/导出时包含密钥」开关不视为授权。",
+    "pat-export-deny": "拒绝",
+    "pat-export-authorize": "授权",
+    "import-accounts-need-reauth": "数据导入成功。以下账号缺少本机凭据，需要重新授权：{{accounts}}",
+    "import-skipped-unattributed-top-level": "备份的顶层数据未归属任何账号，已跳过写入，当前账号数据不受影响。",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "未分析仓库无法直接清理，请通过 AI 分析功能处理",
     "cleanup-data": "清理数据",
     "data-cleanup-successful": "数据清理成功",
@@ -979,7 +997,7 @@
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "备份/导出时包含密钥",
-    "includes-keys-for-ai-configs-webdav-proxy-remote": "包含 AI 配置、WebDAV、代理、远程下载和后端服务器的密钥",
+    "includes-keys-for-ai-configs-webdav-proxy-remote": "包含 GitHub Token 及 AI 配置、WebDAV、代理、远程下载和后端服务器的密钥（启用时也会随 WebDAV 备份上传）",
     "warning-backup-file-contains-plaintext-keys": "勾选后，备份与导出文件内含明文密钥、密码及其他凭据，请妥善保管这些文件"
   },
   "mcpSettingsPanel": {
@@ -1416,5 +1434,19 @@
     "download": "下载",
     "detected-from-filenames-and-release-metadata-no": "按文件名与 Release 元数据识别，未验证安装包安全性，也不会自动运行。你始终可以在下方资产列表中手动选择其他资产。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 个不适用于当前设备的资产（源代码、校验和、签名、调试符号、blockmap、其他平台/架构）。"
+  },
+  "accountModal": {
+    "title": "添加 GitHub 账号",
+    "description": "输入新的 GitHub Personal Access Token 添加账号，当前账号的数据将被安全保留。",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "取消",
+    "confirm": "添加并切换",
+    "reauth-hint": "请为账号 @{{login}} 重新输入有效的 GitHub Token",
+    "account-mismatch": "该 Token 属于另一个 GitHub 账号，请使用 @{{login}} 的 Token 登录。",
+    "backend-credential-sync-failed": "已登录该账号，但后端凭据未能更新。请稍后从账号菜单重试。"
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "已退出登录，但设备端凭据清理未完成。旧凭据已被屏蔽，将在下次启动时自动重试。",
+    "active-account-update-skipped": "切换期间另一台设备更改了后端的活跃账号，后端未能切换到本账号。本机会话已切换到该账号；请从账号菜单重试以对齐后端。"
   }
 }

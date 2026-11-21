@@ -59,6 +59,12 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Your token is stored only on this device and your own backend — never on the app's servers."
+    "token-permissions-local-storage": "Your token is stored only on this device and your own backend (unless you enable \"Include keys in backup/export\" for WebDAV/file backups) — never on the app's servers.",
+    "saved-accounts": "Saved Accounts",
+    "click-to-sign-in": "Click to sign in",
+    "token-required": "Token required",
+    "select-account-to-restore": "Select an account to restore",
+    "multiple-accounts-exist-on-this-backend-select-th": "Multiple accounts exist on this backend; select the account to restore.",
+    "multiple-accounts-exist-on-this-backend-close-th": "Multiple accounts exist on this backend. Close this dialog and select the account to restore on the login screen."
   }
 }

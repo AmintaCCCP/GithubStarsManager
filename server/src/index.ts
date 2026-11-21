@@ -13,6 +13,7 @@ import { logger, morganLoggerStream } from './services/logger.js';
 import { mountStaticFrontend, resolveSpaIndexFile } from './services/staticFrontend.js';
 import { getDb, closeDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
+import { accountScopeMiddleware } from './db/accountScope.js';
 import healthRouter from './routes/health.js';
 import repositoriesRouter from './routes/repositories.js';
 import releasesRouter from './routes/releases.js';
@@ -161,6 +162,8 @@ export function createApp(): express.Express {
         'Mcp-Session-Id',
         'mcp-session-id',
         'Last-Event-ID',
+        'X-GitHub-Account-Id',
+        'x-github-account-id',
       ],
     })
   );
@@ -198,6 +201,10 @@ export function createApp(): express.Express {
 
   // Auth middleware for all /api/* except /api/health
   app.use('/api', authMiddleware);
+
+  // 多账号分区：携带 X-GitHub-Account-Id 的请求在进入路由前尝试一次
+  // 存量 default 数据认领（带 GitHub 身份校验，失败不阻塞请求）。
+  app.use('/api', accountScopeMiddleware);
 
   // Routes
   app.use(healthRouter);

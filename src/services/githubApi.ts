@@ -461,6 +461,7 @@ export class GitHubApiService {
   private rateLimitReset: number | null = null;
   private backendUrl: string | null = null;
   private backendAuthToken: string | null = null;
+  private backendAccountId: string | null = null;
 
   constructor(token: string) {
     this.token = token;
@@ -479,10 +480,21 @@ export class GitHubApiService {
     this.backendAuthToken = token;
   }
 
+  /** 代理请求携带的账号分区（应与本实例 token 的归属账号一致）。 */
+  setBackendAccountId(accountId: string | null): void {
+    this.backendAccountId = accountId;
+  }
+
   private getBackendHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.backendAuthToken) {
       headers.Authorization = `Bearer ${this.backendAuthToken}`;
+    }
+    // 多账号隔离（Issue #611 审计修复）：代理路由靠该头选择账号 Token；
+    // 缺失时服务端回退全局 active_account_id，另一台设备切换账号后会
+    // 用别人的 Token 执行 star/follow/私有仓库读取。
+    if (this.backendAccountId) {
+      headers['X-GitHub-Account-Id'] = this.backendAccountId;
     }
     return headers;
   }

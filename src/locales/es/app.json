@@ -236,7 +236,19 @@
     "menu-releases": "liberar",
     "menu-forks": "réplica",
     "menu-subscription": "Descubrir",
-    "menu-settings": "configuración"
+    "menu-settings": "configuración",
+    "switch-account": "Cambiar de cuenta",
+    "add-account": "Añadir cuenta",
+    "current-account": "Cuenta actual",
+    "remove-account": "Eliminar cuenta",
+    "remove-account-with-login": "Eliminar @{{login}}",
+    "logout-account-changed": "La cuenta ha cambiado. Vuelve a cerrar sesión para la cuenta actual.",
+    "switch-in-progress": "Hay un cambio de cuenta en curso. Inténtalo de nuevo en unos instantes.",
+    "remove-account-confirm-title": "Eliminar cuenta guardada",
+    "remove-account-confirm-desc": "Esto solo elimina la credencial de inicio de sesión guardada de esta cuenta. Los repositorios y las categorías en caché se conservarán. ¿Continuar?",
+    "account-switched": "Cambiado a @{{login}}",
+    "account-repo-count": "{{count}} repositorios",
+    "retry-credential-alignment": "Reintentar la sincronización de credenciales del backend"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Sincronizar categorías con la lista de GitHub"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "Importación de datos exitosa",
     "import-data": "Importar datos",
     "import-failed-please-try-again": "La importación falló, inténtelo de nuevo",
+    "pat-export-authorization-title": "Autorización para exportar tokens de GitHub",
+    "pat-export-authorization-desc": "Esta exportación incluirá los tokens de GitHub de todas las cuentas guardadas en texto plano. Cada exportación requiere una confirmación explícita; la opción guardada «Incluir claves al realizar copias de seguridad/exportar» no cuenta como autorización.",
+    "pat-export-deny": "Denegar",
+    "pat-export-authorize": "Autorizar",
+    "import-accounts-need-reauth": "Datos importados correctamente. Las siguientes cuentas no tienen credenciales locales y deben volver a autorizarse: {{accounts}}",
+    "import-skipped-unattributed-top-level": "Los datos de cuenta del nivel superior de la copia de seguridad no estaban atribuidos a ninguna cuenta y se omitieron. No se escribió nada en la cuenta actual.",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "Los almacenes no analizados no se pueden limpiar directamente; utilice la función de análisis de IA para procesarlos.",
     "cleanup-data": "Datos limpios",
     "data-cleanup-successful": "Limpieza de datos exitosa",
@@ -1416,5 +1434,19 @@
     "download": "Descargar",
     "detected-from-filenames-and-release-metadata-no": "Se detecta a partir de nombres de archivo y metadatos del Release. No se comprueba la seguridad ni se ejecuta nada automáticamente. Siempre puedes elegir otro recurso en la lista de abajo.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Se excluyeron {{v1}} recursos que no aplican a este dispositivo (código fuente, sumas de verificación, firmas, símbolos de depuración, blockmaps, otras plataformas o arquitecturas)."
+  },
+  "accountModal": {
+    "title": "Añadir cuenta de GitHub",
+    "description": "Introduce un nuevo token personal de GitHub para añadir una cuenta. Los datos de tu cuenta actual se conservarán de forma segura.",
+    "token-label": "Token personal de GitHub",
+    "cancel": "Cancelar",
+    "confirm": "Añadir y cambiar",
+    "reauth-hint": "Introduce un token de GitHub válido para @{{login}}",
+    "account-mismatch": "Este token pertenece a otra cuenta de GitHub. Inicia sesión con el token de @{{login}}.",
+    "backend-credential-sync-failed": "Se inició sesión en la cuenta, pero no se pudieron actualizar las credenciales del backend. Vuelve a intentarlo más tarde desde el menú de cuentas."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Se cerró la sesión, pero la limpieza de credenciales del dispositivo no finalizó. La credencial anterior permanece bloqueada y se reintentará automáticamente en el próximo inicio.",
+    "active-account-update-skipped": "Otro dispositivo cambió la cuenta activa del backend mientras se realizaba este cambio, por lo que el backend no se cambió a esta cuenta. La sesión local ya usa esta cuenta; vuelve a intentarlo desde el menú de cuentas para alinear el backend."
   }
 }

@@ -15,7 +15,9 @@ import {
   fuseCandidates,
   hydrateMatches,
   rankStructuredCandidates,
+  resolveDenseQueryAccountScope,
   withBudget,
+  type VectorAccountIdScope,
   type VectorQueryAnalysis,
 } from './vectorSearchPipeline';
 import {
@@ -39,7 +41,34 @@ interface DenseOutcome {
   matches: VectorQueryResult[];
   success: boolean;
   error?: string;
+  /** 账号隔离范围未就绪（Worker 未建立 accountId 元数据索引）：稠密召回被跳过（C15）。 */
+  indexUnavailable?: boolean;
+  /**
+   * 第 12 轮审计修复：稠密召回不可用的稳定原因代码——诊断字段不再承载面向
+   * 用户的英文文本，展示层（useRepositoryCardActions）按代码选择本地化文案。
+   * 与 vectorSearchPipeline 的 DenseQueryScopeResolution.reason 同源，缺省
+   * （兜底重建建议）为 'needs-backfill'。
+   */
+  reason?: DenseIndexUnavailableReason;
 }
+
+/**
+ * 稠密召回不可用的稳定原因代码（第 12 轮审计修复）：worker-unsupported /
+ * metadata-index-not-ready / status-failed / needs-backfill。展示层按代码
+ * 用 t() 渲染本地化提示，诊断字段不再包含面向用户的英文错误文本。
+ */
+export type DenseIndexUnavailableReason = 'worker-unsupported' | 'metadata-index-not-ready' | 'status-failed' | 'needs-backfill';
+
+/**
+ * C15：稠密召回因账号隔离范围未就绪被跳过时的失败语义——不得当作成功的空
+ * 结果返回。该消息经既有错误路径（结果为空时抛错 → 调用方 toast）单独报告
+ * 「索引不可用/需重建」，重建入口沿用现有的 VectorSearchSettings 重建按钮。
+ */
+const DENSE_INDEX_UNAVAILABLE_ERROR = 'Vector index is not ready for account-scoped recall; rebuild the index in Vector Search settings for the current account';
+// R2-C26：区分三种稠密召回不可用的情形，只有确认需要回填时才建议重建。
+const DENSE_INDEX_WORKER_UNSUPPORTED_ERROR = 'Vector worker does not support account-scoped recall; deploy the bundled cloudflare-worker and retry';
+const DENSE_INDEX_METADATA_NOT_READY_ERROR = 'Vector accountId metadata index is not ready; create and verify the accountId metadata index, backfill vectors, and enable ACCOUNT_METADATA_INDEXED';
+const DENSE_INDEX_STATUS_FAILED_ERROR = 'Failed to verify the vector index status for account-scoped recall; retry later';
 
 export interface RunSimilarRepositoryPipelineOptions {
   source: Repository;
@@ -56,6 +85,11 @@ export interface RunSimilarRepositoryPipelineOptions {
     signal?: AbortSignal,
   ) => Promise<string>;
   signal: AbortSignal;
+  /**
+   * 账号隔离范围（R4 审计修复）：多账号共享向量索引时按归属账号过滤命中；
+   * 缺省（未登录边缘态）不过滤，保持既有行为。
+   */
+  accountIdScope?: VectorAccountIdScope;
 }
 
 export interface SimilarRepositoryPipelineResult {
@@ -74,6 +108,22 @@ export interface SimilarRepositoryPipelineResult {
     profileSource: 'ai' | 'local';
     llmStatus: 'complete' | 'empty' | 'invalid' | 'skipped';
     fallback: 'none' | 'cross-encoder' | 'fusion' | 'empty-guard';
+    /** C15：稠密召回因账号隔离范围未就绪被跳过（索引不可用/需重建）。 */
+    denseIndexUnavailable: boolean;
+    /**
+     * 审计修复：索引不可用的具体原因文本（与空结果错误路径同一组消息），
+     * 随结果返回供调用方在非空结果时展示降级提示（结果可能不完整 + 恢复
+     * 步骤），不再只保留在日志中。denseIndexUnavailable 为 false 时为 null。
+     * 第 12 轮起保留为诊断/日志字段：展示层应改用下方的稳定原因代码渲染
+     * 本地化文案，避免中文界面显示英文句子。
+     */
+    denseIndexUnavailableReason: string | null;
+    /**
+     * 第 12 轮审计修复：稠密召回不可用的稳定原因代码（与
+     * DenseQueryScopeResolution.reason 同源）。展示层按代码选择本地化文案；
+     * denseIndexUnavailable 为 false 时为 null。
+     */
+    denseIndexUnavailableReasonCode: DenseIndexUnavailableReason | null;
     timingsMs: Record<string, number>;
   };
 }
@@ -358,9 +408,34 @@ export async function runSimilarRepositoryPipeline(
     readme,
     vectorConfig.readmeMaxChars ?? 6000,
   );
+  // 审计修复（C16）：账号隔离范围每次搜索只决议一次，exact 与 profile 两路共享
+  // 同一决议结果；决议在嵌入请求之前完成——判定跳过时两路都不发送 embedding
+  // 请求（旧实现把 skip 当作成功的空结果，还会白白消耗两次嵌入调用）；
+  // Worker 就绪时两路仍各自生成 embedding。
+  const denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
   const recallDense = async (text: string, prefix: 'exact' | 'profile'): Promise<DenseOutcome> => {
     if (!text.trim()) {
       return { matches: [], success: false, error: `${prefix} query text is empty` };
+    }
+    const denseScope = await denseScopePromise;
+    if (denseScope.skip) {
+      // 审计修复（C15/R2-C26）：索引对当前账号不可用时按失败语义单独报告，
+      // 绝不当作成功的空结果；提示按原因细分——部署不支持账号筛选的新版
+      // Worker、状态请求暂时失败、或索引确实需要回填重建。稳定原因代码随
+      // DenseOutcome 返回（第 12 轮），展示层按代码渲染本地化文案。
+      const reason: DenseIndexUnavailableReason = denseScope.reason ?? 'needs-backfill';
+      const message = reason === 'worker-unsupported'
+        ? DENSE_INDEX_WORKER_UNSUPPORTED_ERROR
+        : reason === 'metadata-index-not-ready'
+          ? DENSE_INDEX_METADATA_NOT_READY_ERROR
+          : reason === 'status-failed'
+            ? DENSE_INDEX_STATUS_FAILED_ERROR
+            : DENSE_INDEX_UNAVAILABLE_ERROR;
+      logger.warn('vector-search', `${prefix} dense recall skipped: ${message}`, {
+        accountId: options.accountIdScope?.accountId ?? null,
+        reason,
+      });
+      return { matches: [], success: false, error: message, indexUnavailable: true, reason };
     }
     let embeddingTimedOut = false;
     const embeddingStarted = Date.now();
@@ -385,7 +460,11 @@ export async function runSimilarRepositoryPipeline(
       const matches = await withBudget(
         stageSignal => options.vectorService.query(
           vectors[0],
-          { topK: RECALL_TOP_K, threshold },
+          {
+            topK: RECALL_TOP_K,
+            threshold,
+            ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
+          },
           stageSignal,
         ),
         WORKER_TIMEOUT_MS,
@@ -400,6 +479,20 @@ export async function runSimilarRepositoryPipeline(
       return { matches, success: true };
     } catch (error) {
       if (isAbortError(error) || signal.aborted) throw abortError();
+      // 第 13 轮审计修复 [73]：/status 返回就绪后 Worker 仍可能在账号范围查询
+      // 时回滚（ACCOUNT_METADATA_NOT_INDEXED）——保留错误码并映射为
+      // metadata-index-not-ready，设置 indexUnavailable 提示调用方结果不完整；
+      // 保留本地候选，绝不改用无范围查询。
+      if ((error as { code?: unknown } | null)?.code === 'ACCOUNT_METADATA_NOT_INDEXED') {
+        logger.warn('vector-search', `${prefix} dense query rejected: accountId metadata index is not ready`, { error });
+        return {
+          matches: [],
+          success: false,
+          error: DENSE_INDEX_METADATA_NOT_READY_ERROR,
+          indexUnavailable: true,
+          reason: 'metadata-index-not-ready',
+        };
+      }
       logger.warn('vector-search', `${prefix} dense recall failed, continuing`, { error });
       return { matches: [], success: false, error: safeErrorMessage(error) };
     }
@@ -451,12 +544,12 @@ export async function runSimilarRepositoryPipeline(
   const rawMatches = hydrateMatches(
     exactOutcome.matches,
     repoById,
-    { excludeSource: source, excludeForks: true },
+    { excludeSource: source, excludeForks: true, accountIdScope: options.accountIdScope },
   );
   const profileMatches = hydrateMatches(
     profileOutcome.matches,
     repoById,
-    { excludeSource: source, excludeForks: true },
+    { excludeSource: source, excludeForks: true, accountIdScope: options.accountIdScope },
   );
   const similarityQueryText = buildSimilarityLexicalQuery(profile);
   const lexical = AIService.rankLexicalCandidates(
@@ -485,9 +578,20 @@ export async function runSimilarRepositoryPipeline(
     && lexical.length === 0
     && structured.length === 0
   ) {
-    throw new Error(
-      exactOutcome.error || profileOutcome.error || 'Similar repository retrieval failed',
-    );
+    const message = exactOutcome.error || profileOutcome.error || 'Similar repository retrieval failed';
+    const error = new Error(message) as Error & { denseIndexUnavailableReasonCode?: DenseIndexUnavailableReason };
+    // 第 13 轮审计修复 [74]：索引未就绪且无本地候选的错误路径携带稳定原因
+    // 代码——展示层（useRepositoryCardActions 的 catch）按代码渲染本地化提示，
+    // 而不是直接显示英文 error.message。非索引类错误不携带代码（保持旧行为）。
+    const failureReason = exactOutcome.indexUnavailable
+      ? exactOutcome.reason
+      : profileOutcome.indexUnavailable
+        ? profileOutcome.reason
+        : undefined;
+    if (failureReason) {
+      error.denseIndexUnavailableReasonCode = failureReason;
+    }
+    throw error;
   }
 
   const profileUsable = hasUsableProfile(profile);
@@ -520,6 +624,21 @@ export async function runSimilarRepositoryPipeline(
   });
   Object.assign(timingsMs, finished.diagnostics.timingsMs);
 
+  // 审计修复：稠密召回被跳过的具体原因随结果返回（跳过路径的 DenseOutcome.error
+  // 即 DENSE_INDEX_* 消息），供调用方在非空结果时提示「结果可能不完整」。
+  // 第 12 轮起同时返回稳定原因代码，展示层用 t() 按代码渲染本地化文案。
+  const denseIndexUnavailable = !!(exactOutcome.indexUnavailable || profileOutcome.indexUnavailable);
+  const denseIndexUnavailableReason = denseIndexUnavailable
+    ? ((exactOutcome.indexUnavailable ? exactOutcome.error : null)
+      ?? (profileOutcome.indexUnavailable ? profileOutcome.error : null)
+      ?? DENSE_INDEX_UNAVAILABLE_ERROR)
+    : null;
+  const denseIndexUnavailableReasonCode = denseIndexUnavailable
+    ? ((exactOutcome.indexUnavailable ? exactOutcome.reason : null)
+      ?? (profileOutcome.indexUnavailable ? profileOutcome.reason : null)
+      ?? 'needs-backfill')
+    : null;
+
   return {
     repositories: finished.candidates.map(item => item.repo),
     diagnostics: {
@@ -536,6 +655,9 @@ export async function runSimilarRepositoryPipeline(
       profileSource: profileSource as 'ai' | 'local',
       llmStatus: finished.diagnostics.llmStatus,
       fallback: finished.diagnostics.fallback,
+      denseIndexUnavailable,
+      denseIndexUnavailableReason,
+      denseIndexUnavailableReasonCode,
       timingsMs,
     },
   };

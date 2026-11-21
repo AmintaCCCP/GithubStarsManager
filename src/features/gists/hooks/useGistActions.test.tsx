@@ -1,18 +1,22 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Gist } from '../../../types';
-import { applyGistAnalysisFailure, applyGistAnalysisSuccess, useGistActions } from './useGistActions';
+import { bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
+import { applyGistAnalysisFailure, applyGistAnalysisSuccess, GistDetailSessionSwitchedError, useGistActions } from './useGistActions';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
   toast: vi.fn(),
   confirm: vi.fn(),
   forceSyncToBackend: vi.fn(),
+  getGist: vi.fn(),
   getGistForAnalysis: vi.fn(),
   getGistContentPreview: vi.fn(),
   unstarGist: vi.fn(),
   deleteGist: vi.fn(),
   getGistFileRaw: vi.fn(),
+  updateGist: vi.fn(),
+  createGist: vi.fn(),
   analyzeGist: vi.fn(),
   searchGistsWithReranking: vi.fn(),
 }));
@@ -27,15 +31,21 @@ vi.mock('../../../hooks/useDialog', () => ({
 
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
+  // 审计修复：切号后远端已成功的 Gist 变更经簿记守卫写回发起账号工作区——
+  // 测试桩直通执行（真实实现只静音订阅簿记）。
+  withAccountSwitchGuardSync: (fn: () => void) => fn(),
 }));
 
 vi.mock('../../../services/githubApiFactory', () => ({
   createGitHubApiService: () => ({
+    getGist: mocks.getGist,
     getGistForAnalysis: mocks.getGistForAnalysis,
     getGistContentPreview: mocks.getGistContentPreview,
     unstarGist: mocks.unstarGist,
     deleteGist: mocks.deleteGist,
     getGistFileRaw: mocks.getGistFileRaw,
+    updateGist: mocks.updateGist,
+    createGist: mocks.createGist,
   }),
 }));
 
@@ -47,10 +57,13 @@ vi.mock('../../../services/aiService', () => ({
 }));
 
 const createStoreState = () => ({
-  user: { login: 'me', avatar_url: 'https://example.com/me.png' },
+  // 审计修复：账号 ID 必须是数值——peekCurrentAccountId 以 id 归一账号键，
+  // 切号期间远端已成功的 Gist 变更按发起账号 ID 写回其归档工作区。
+  user: { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' },
   githubToken: 'github-token' as string | null,
-  gists: [],
-  starredGists: [],
+  gists: [] as Gist[],
+  starredGists: [] as Gist[],
+  accountWorkspaces: {} as Record<string, unknown>,
   gistSearchFilters: {
     query: '',
     sortBy: 'updated' as const,
@@ -84,6 +97,15 @@ const mockUseAppStore = vi.mocked(mocks.useAppStore);
 mockUseAppStore.mockImplementation((selector?: (state: typeof storeState) => unknown) =>
   selector ? selector(storeState) : storeState);
 (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
+// 审计修复：切号后远端已成功的 Gist 变更经 useAppStore.setState 写回发起账号
+// 的归档工作区——选择器桩补齐 setState（对象或 updater 两种形态）。
+(mockUseAppStore as unknown as { setState: (patch: unknown) => void }).setState = vi.fn((patch: unknown) => {
+  if (typeof patch === 'function') {
+    Object.assign(storeState, (patch as (state: typeof storeState) => Partial<typeof storeState>)(storeState));
+  } else {
+    Object.assign(storeState, patch as Partial<typeof storeState>);
+  }
+});
 
 const gist: Gist = {
   id: 'gist-1',
@@ -203,15 +225,21 @@ describe('useGistActions card actions', () => {
 
     it('calls onUnstarred before the store update and toasts success', async () => {
       mocks.confirm.mockResolvedValue(true);
+      // R12：取消星标只改星标字段——列表中的最新条目可能已被编辑
+      storeState.gists = [{ ...gist, description: 'edited while unstarring' }];
+      storeState.starredGists = [{ ...gist }];
       const onUnstarred = vi.fn();
       const { result } = renderHook(() => useGistActions());
       await act(async () => { await result.current.unstarGist(gist, onUnstarred); });
 
       expect(mocks.unstarGist).toHaveBeenCalledWith('gist-1');
       const onUnstarredOrder = onUnstarred.mock.invocationCallOrder[0];
-      const updateOrder = storeState.updateGist.mock.invocationCallOrder[0];
-      expect(onUnstarredOrder).toBeLessThan(updateOrder);
-      expect(storeState.updateGist).toHaveBeenCalledWith({ ...gist, starred: false });
+      const setStateMock = (mockUseAppStore as unknown as {
+        setState: { mock: { invocationCallOrder: number[] } };
+      }).setState;
+      expect(onUnstarredOrder).toBeLessThan(setStateMock.mock.invocationCallOrder[0]);
+      expect(storeState.gists[0]).toEqual({ ...gist, description: 'edited while unstarring', starred: false });
+      expect(storeState.starredGists[0]).toEqual({ ...gist, starred: false });
       expect(mocks.toast).toHaveBeenCalledWith('已取消收藏', 'success');
     });
 
@@ -346,6 +374,249 @@ describe('useGistActions AI search', () => {
 
     expect(storeState.setGistSearchResults).toHaveBeenCalledWith([pending]);
     expect(onReranked).toHaveBeenCalledWith(ranked);
+  });
+});
+
+/**
+ * 账号代次校验回归（Issue #611 审计修复）：任何异步 Gist 操作在等待期间切号后，
+ * 结果绝不写入切号后的当前账号工作区，结果回调不再触发。
+ */
+describe('useGistActions account switch guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    // accountIdKey 需要数值 id：默认账号 A(id=1)，切号目标 B(id=2)
+    (storeState as unknown as { user: { id: number; login: string; avatar_url: string } }).user = { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' };
+  });
+
+  const switchToB = () => {
+    (storeState as unknown as { user: { id: number; login: string; avatar_url: string } }).user = { id: 2, login: 'other', avatar_url: 'https://example.com/other.png' };
+  };
+
+  it('aiSearch drops results, callbacks and filter writes after a switch', async () => {
+    mocks.searchGistsWithReranking.mockImplementation(async () => {
+      switchToB();
+      return [gist];
+    });
+    const { result } = renderHook(() => useGistActions());
+    const onReranked = vi.fn();
+    await act(async () => { await result.current.aiSearch('query', [gist], onReranked); });
+
+    expect(mocks.searchGistsWithReranking).toHaveBeenCalledTimes(1);
+    expect(onReranked).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('aiSearch also drops the failure fallback filter write after a switch', async () => {
+    mocks.searchGistsWithReranking.mockImplementation(async () => {
+      switchToB();
+      throw new Error('ai down');
+    });
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.aiSearch('query', [gist], vi.fn()); });
+
+    expect(mocks.searchGistsWithReranking).toHaveBeenCalledTimes(1);
+    expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('single-card analyzeOne skips result writes and the analyzing cleanup after a switch', async () => {
+    mocks.getGistForAnalysis.mockImplementation(async () => {
+      switchToB();
+      return gistDetail;
+    });
+    mocks.getGistContentPreview.mockReturnValue('preview');
+    mocks.analyzeGist.mockResolvedValue('summary');
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.analyzeOne(gist); });
+
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    // 审计修复（C36a）：AI 发送边界——切号后绝不把旧账号 Gist 正文发给 AI
+    expect(mocks.analyzeGist).not.toHaveBeenCalled();
+    // 分析标记作用于发起账号：切号后 finally 不清理当前账号工作区的标记
+    expect(storeState.setAnalyzingGist).toHaveBeenCalledTimes(1);
+    expect(storeState.setAnalyzingGist).toHaveBeenCalledWith('gist-1', true);
+  });
+
+  it('drops the stale result after A→B→A with a pending gist request', async () => {
+    // 审计修复（C36b）：Gist 请求在 A 发起后保持 pending，用真实切号推进会话
+    // 代次（A→B→A 后账号 ID 复发），完成旧请求后断言未写入、未回调。
+    let resolveSearch!: (gists: Gist[]) => void;
+    mocks.searchGistsWithReranking.mockReturnValue(new Promise<Gist[]>(resolve => {
+      resolveSearch = resolve;
+    }));
+    const { result } = renderHook(() => useGistActions());
+    const onReranked = vi.fn();
+    let searchPromise!: Promise<void>;
+    await act(async () => {
+      searchPromise = result.current.aiSearch('query', [gist], onReranked);
+    });
+    expect(mocks.searchGistsWithReranking).toHaveBeenCalledTimes(1);
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as unknown as { user: { id: number; login: string; avatar_url: string } }).user = { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' };
+    await act(async () => {
+      resolveSearch([gist]);
+      await searchPromise;
+    });
+
+    expect(onReranked).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('fetchGistDetail throws the session-switch marker and skips updateGist after a switch', async () => {
+    mocks.getGist.mockImplementation(async () => {
+      switchToB();
+      return gistDetail;
+    });
+    const { result } = renderHook(() => useGistActions());
+    let caught: unknown = null;
+    await act(async () => {
+      try {
+        await result.current.fetchGistDetail(gist);
+      } catch (error) {
+        caught = error;
+      }
+    });
+
+    // 审计修复（C35）：会话切换与普通失败可区分——抛出专用标记错误，调用方
+    // 据此清除旧账号 detailGist 并关闭详情面板；绝不返回/写入旧账号详情。
+    expect(caught).toBeInstanceOf(GistDetailSessionSwitchedError);
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+  });
+
+  it('unstarGist skips the onUnstarred callback and local writes after a switch', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.unstarGist.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    // 审计修复：发起账号 A 仍停放时，远端已完成的取消星标写回其归档快照
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [{ ...gist, starred: true }], starredGists: [{ ...gist, starred: true }] },
+    };
+    const { result } = renderHook(() => useGistActions());
+    const onUnstarred = vi.fn();
+    await act(async () => { await result.current.unstarGist(gist, onUnstarred); });
+
+    // 远端取消星标已按发起账号完成；本地写入与回调被丢弃
+    expect(mocks.unstarGist).toHaveBeenCalledWith('gist-1');
+    expect(onUnstarred).not.toHaveBeenCalled();
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    // 切回 A 时归档快照换入实时列表——归档必须已反映 GitHub 的取消星标结果
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string; starred?: boolean }>; starredGists: Array<{ id: string; starred?: boolean }> }> }).accountWorkspaces['1'];
+    expect(parked.gists[0].starred).toBe(false);
+    expect(parked.starredGists[0].starred).toBe(false);
+  });
+
+  it('deleteGist skips local deletion and the onDeleted callback after a switch', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.deleteGist.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    // 审计修复：发起账号 A 仍停放时，远端已完成的删除写回其归档快照
+    //（切回 A 后已删除的 Gist 不得复活）
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [gist], starredGists: [gist] },
+    };
+    const { result } = renderHook(() => useGistActions());
+    const onDeleted = vi.fn();
+    await act(async () => { await result.current.deleteGist(gist, onDeleted); });
+
+    // R2-C28：远端删除请求确实已按发起账号发出（本地副作用被丢弃不改变该事实）
+    expect(mocks.deleteGist).toHaveBeenCalledWith(gist.id);
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(storeState.deleteGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string }>; starredGists: Array<{ id: string }> }> }).accountWorkspaces['1'];
+    expect(parked.gists).toHaveLength(0);
+    expect(parked.starredGists).toHaveLength(0);
+  });
+
+  it('submitGist skips the local update and success toast after a switch', async () => {
+    mocks.updateGist.mockImplementation(async () => {
+      switchToB();
+      return gistDetail;
+    });
+    // 审计修复：发起账号 A 仍停放时，远端已完成的编辑写回其归档快照
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [gist], starredGists: [] },
+    };
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.submitGist({ description: 'x' } as never, gist); });
+
+    // R2-C28：远端更新请求确实已按发起账号发出
+    expect(mocks.updateGist).toHaveBeenCalledWith(gist.id, expect.anything(), expect.anything());
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string; files: Record<string, { size: number }> }> }> }).accountWorkspaces['1'];
+    expect(parked.gists[0].id).toBe('gist-1');
+    expect(parked.gists[0].files['a.ts'].size).toBe(gistDetail.files['a.ts'].size);
+  });
+
+  it('submitGist writes a created gist back to the parked owner archive after a switch (R12)', async () => {
+    const created = { ...gist, id: 'gist-new', description: 'created during switch' };
+    mocks.createGist.mockImplementation(async () => {
+      switchToB();
+      return created;
+    });
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [gist], starredGists: [] },
+    };
+    storeState.gists = [{ ...gist, id: 'b-gist' }];
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.submitGist({ description: 'created during switch' } as never, null); });
+
+    expect(mocks.createGist).toHaveBeenCalledTimes(1);
+    // 不显示旧会话的成功提示，也不写当前账号（B）的实时列表
+    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(storeState.gists.map(item => item.id)).toEqual(['b-gist']);
+    // 发起账号 A 的归档补入新 Gist（按 ID 插入，保留原条目）
+    const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string }> }> }).accountWorkspaces['1'];
+    expect(parked.gists.map(item => item.id)).toEqual(['gist-new', 'gist-1']);
+  });
+
+  it('late unstar only patches the starred field and preserves edits made during the switch (R12)', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.unstarGist.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    // A 的归档在等待期间被编辑（描述更新），迟到的取消星标不得覆盖它
+    (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
+      '1': { gists: [{ ...gist, description: 'edited later' }], starredGists: [{ ...gist, description: 'edited later' }] },
+    };
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.unstarGist(gist, vi.fn()); });
+
+    const parked = (storeState as unknown as {
+      accountWorkspaces: Record<string, { gists: Array<{ id: string; description: string; starred?: boolean }>; starredGists: Array<{ id: string; description: string; starred?: boolean }> }>;
+    }).accountWorkspaces['1'];
+    expect(parked.gists[0]).toEqual({ ...gist, description: 'edited later', starred: false });
+    expect(parked.starredGists[0]).toEqual({ ...gist, description: 'edited later', starred: false });
+  });
+
+  it('clears the analyzing marker after a same-account credential switch (R12)', async () => {
+    // 同账号换凭据：账号 ID 不变，只有会话代次推进
+    mocks.getGistForAnalysis.mockImplementation(async () => {
+      bumpAccountSessionGeneration();
+      return gistDetail;
+    });
+    mocks.getGistContentPreview.mockReturnValue('preview');
+    mocks.analyzeGist.mockResolvedValue('summary');
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.analyzeOne(gist); });
+
+    // 旧任务不得写入新会话的结果/提示，但必须清掉自己留下的「分析中」标记
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(storeState.setAnalyzingGist).toHaveBeenCalledTimes(2);
+    expect(storeState.setAnalyzingGist).toHaveBeenLastCalledWith('gist-1', false);
   });
 });
 

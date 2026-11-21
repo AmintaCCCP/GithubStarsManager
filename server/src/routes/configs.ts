@@ -1,9 +1,33 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
+import { z } from 'zod';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
+import {
+  resolveAccountScope,
+  resolveWritableAccountScope,
+  extractRequestedAccountId,
+  hasInvalidAccountHeader,
+  hasPendingDefaultPartitionData,
+  getLegacyDefaultClaimedBy,
+  getLegacyDefaultVerifiedToken,
+  snapshotLegacyDefaultTokenBeforeOverwrite,
+  fetchGitHubUserId,
+  getAccountCredentialVersion,
+  bumpAccountCredentialVersion,
+  getAccountProfileVersion,
+  bumpAccountProfileVersion,
+  getActiveAccountVersion,
+  bumpActiveAccountVersion,
+  ACCOUNT_SCOPED_SETTING_KEYS,
+  INTERNAL_SETTING_KEYS,
+} from '../db/accountScope.js';
+
+// 账号级设置键集合（Per-Account）：从 accountScope 统一出口转发，
+// 保持 configs.ts 作为 /api/settings 语义的定义点。
+export { ACCOUNT_SCOPED_SETTING_KEYS };
 
 const router = Router();
 
@@ -519,17 +543,57 @@ router.delete('/api/configs/webdav/:id', (req, res) => {
 // ── Settings ──
 
 // GET /api/settings
-router.get('/api/settings', (_req, res) => {
+// 先读取全局 settings，再用当前账号 account_settings 中的键值覆盖同名键。
+// 全局表中的账号级键（ACCOUNT_SCOPED_SETTING_KEYS）只归属 default 分区或
+// 已认领存量数据的 legacy owner（legacy_default_claimed_by）账号；其他真实账号
+// 缺失账号级键时保持缺失，绝不继承其他账号留在全局表中的旧值（防串号）。
+// Issue #612 审计（548）：无账号头请求的分区解析必须与 GET /api/categories
+// 完全一致——default 分区仍有待认领数据时，无头请求可能属于存量 default
+// 数据（无头 GET 读 default）；否则同一无头会话的分类与设置会来自不同分区
+// （分类读 default、设置读活跃账号），customCategories 与 categoryOrder 等
+// 账号级键随之错配。
+router.get('/api/settings', (req, res) => {
   try {
     const db = getDb();
+    if (hasInvalidAccountHeader(req)) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const headerAccountId = extractRequestedAccountId(req);
+    const accountId = headerAccountId
+      ?? (hasPendingDefaultPartitionData(db) ? 'default' : resolveAccountScope(req, db));
+    const inheritLegacyScopedSettings = accountId === 'default'
+      || getLegacyDefaultClaimedBy(db) === accountId;
+    const verifiedLegacyToken = accountId !== 'default' && inheritLegacyScopedSettings
+      ? getLegacyDefaultVerifiedToken(db)
+      : null;
     const rows = db.prepare('SELECT * FROM settings').all() as Record<string, unknown>[];
     const settings: Record<string, unknown> = {};
 
     for (const row of rows) {
       const key = row.key as string;
+      // Issue #612 A13：内部账号状态键（legacy_default_github_token 密文快照 /
+      // legacy_default_owner_id 内嵌密文 JSON / 认领标记等）绝不过序列化边界，
+      // 不得向任何账号返回凭据快照。
+      if (INTERNAL_SETTING_KEYS.has(key)) continue;
+      if (!inheritLegacyScopedSettings && (ACCOUNT_SCOPED_SETTING_KEYS.has(key) || key === 'user_profile')) {
+        // 其他账号的账号级设置与旧全局资料：对当前账号不可见。user_profile 与
+        // 账号级键同属升级前的 default 存量——只有 default 分区与已验证的
+        // legacy 认领者可继承；其他真实账号的资料只来自其自身 accounts.user_json
+        //（下方合并），绝不回退到旧全局资料（Issue #612 R12）。
+        continue;
+      }
       let value = row.value as string | null;
 
       if (key === 'github_token' && value) {
+        if (accountId !== 'default' && (!verifiedLegacyToken || value !== verifiedLegacyToken)) {
+          // 认领跳过 Token 复制或全局 Token 已轮换/换绑：与 /api/sync/auth 保持一致，
+          // 不把来源不匹配的全局 Token 报告为当前账号可用凭据。
+          continue;
+        }
         const { decryptedValue, status } = getMaskedSecretResult({
           encryptedValue: value,
           encryptionKey: config.encryptionKey,
@@ -542,6 +606,58 @@ router.get('/api/settings', (_req, res) => {
       settings[key] = value;
     }
 
+    // Issue #612 A13：客户端需要活跃账号 ID 时改用该公开字段返回（内部键
+    // active_account_id 已被过滤；此处为本次请求解析出的分区）。
+    settings.active_account_id = accountId;
+
+    if (accountId !== 'default') {
+      const accountRows = db.prepare('SELECT key, value FROM account_settings WHERE account_id = ?')
+        .all(accountId) as Array<{ key: string; value: string | null }>;
+      for (const row of accountRows) {
+        // Issue #612 A13：内部键不参与响应合并（公开的 active_account_id 已在上方返回）。
+        if (INTERNAL_SETTING_KEYS.has(row.key)) continue;
+        if (row.key === 'github_token' && !row.value) {
+          // 账号级记录存在但为空 = 显式清空：不能沿用全局 Token 的可用状态。
+          settings.github_token = '';
+          settings.github_token_status = 'empty';
+          continue;
+        }
+        if (row.key === 'github_token' && row.value) {
+          const { decryptedValue, status } = getMaskedSecretResult({
+            encryptedValue: row.value,
+            encryptionKey: config.encryptionKey,
+            kind: 'GitHub token',
+          });
+          settings.github_token_status = status;
+          settings[row.key] = status === 'empty' ? '' : maskApiKey(decryptedValue);
+          continue;
+        }
+        settings[row.key] = row.value;
+      }
+
+      // Issue #612 R12：真实账号的资料只来自本账号 accounts.user_json（覆盖
+      // 可能继承到的旧全局资料）；没有资料或仅有 token-only 占位身份时省略该
+      // 字段，绝不回退到属于其他账号的旧全局资料。
+      try {
+        const accountProfileRow = db.prepare('SELECT user_json FROM accounts WHERE account_id = ?')
+          .get(accountId) as { user_json: string | null } | undefined;
+        const userJson = typeof accountProfileRow?.user_json === 'string' ? accountProfileRow.user_json : '';
+        if (userJson) {
+          const parsedProfile = JSON.parse(userJson) as unknown;
+          const isPlaceholderOnlyId = parsedProfile !== null
+            && typeof parsedProfile === 'object'
+            && !Array.isArray(parsedProfile)
+            && Object.keys(parsedProfile as Record<string, unknown>).length === 1
+            && 'id' in (parsedProfile as Record<string, unknown>);
+          if (!isPlaceholderOnlyId) {
+            settings.user_profile = userJson;
+          }
+        }
+      } catch {
+        // 无法解析的资料与轻量 stub 缺 accounts 表都不进入响应
+      }
+    }
+
     res.json(settings);
   } catch (err) {
     logger.errorFromError('configs.getSettings', 'GET /api/settings error', err);
@@ -550,44 +666,388 @@ router.get('/api/settings', (_req, res) => {
 });
 
 // PUT /api/settings
-router.put('/api/settings', (req, res) => {
+// 镜像语义（防旧客户端丢 token）：
+// - 账号级键（ACCOUNT_SCOPED_SETTING_KEYS）在 resolveAccountScope 解析为真实账号时
+//   写入 account_settings(account_id, key, value)，并同步 accounts 表；
+// - 解析为 'default'（无头请求 / 旧客户端 / 无 active_account_id）时必须同时写入
+//   全局 settings 表，保证 settings.github_token 的旧语义不变。
+router.put('/api/settings', async (req, res) => {
   try {
     const db = getDb();
     const updates = req.body as Record<string, unknown>;
+    const hasScopedWrite = Object.keys(updates).some(
+      (k) => ACCOUNT_SCOPED_SETTING_KEYS.has(k) || k === 'user_profile',
+    );
+    let accountId: string;
+    if (hasScopedWrite) {
+      const scope = resolveWritableAccountScope(req, db);
+      if (!scope.ok) {
+        res.status(409).json({
+          error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+          code: 'ACCOUNT_SCOPE_REQUIRED',
+        });
+        return;
+      }
+      accountId = scope.accountId;
+    } else {
+      accountId = resolveAccountScope(req, db);
+    }
+    // Issue #612 审计（798）：无账号头的账号级写入在 GitHub 校验等待期间（最长
+    // 8s）可能因另一设备添加/移除账号分区而失去唯一范围——写入事务内需要重新
+    // 确认。显式账号头请求始终使用其指定分区，不受此重新确认影响。
+    const headerlessScopedWrite = hasScopedWrite && !extractRequestedAccountId(req);
+    const isRealAccount = accountId !== 'default';
 
-    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    // Issue #612 A21：ai_result_sharing_enabled 必须是显式布尔值（zod 校验，
+    // 默认 false）；存储统一归一化为 '1' / '0'。
+    if ('ai_result_sharing_enabled' in updates) {
+      const parsed = z.boolean().safeParse(updates.ai_result_sharing_enabled);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: 'ai_result_sharing_enabled must be a boolean',
+          code: 'INVALID_AI_SHARING_SETTING',
+        });
+        return;
+      }
+    }
+
+    // Issue #612 A12：整个请求的校验（user_profile.id 与目标账号匹配等）必须在
+    // 任何设置写入和事务执行之前完成——不匹配只发一次 400 且不修改任何设置。
+    // Issue #612 A14：user_profile 先统一规范化（JSON 字符串解析为对象），再对
+    // 规范化结果执行同一 ID 校验；显式清空资料（null / ''）的用法保留。
+    let normalizedUserProfile: unknown;
+    if ('user_profile' in updates) {
+      const raw = updates.user_profile;
+      if (raw === null || raw === '') {
+        normalizedUserProfile = raw;
+      } else if (typeof raw === 'string') {
+        try {
+          normalizedUserProfile = JSON.parse(raw);
+        } catch {
+          res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
+          return;
+        }
+      } else if (typeof raw === 'object') {
+        normalizedUserProfile = raw;
+      } else {
+        res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
+        return;
+      }
+      // Issue #612 R2-A22：归一化结果必须仍是资料对象——数组与其他标量
+      // （JSON 字符串形态的 '"abc"' / '42' 等）在账号 ID 校验前直接拒绝；
+      // 显式 null / '' 清空路径保留。
+      if (normalizedUserProfile !== null && normalizedUserProfile !== ''
+        && (typeof normalizedUserProfile !== 'object' || Array.isArray(normalizedUserProfile))) {
+        res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
+        return;
+      }
+      if (normalizedUserProfile && typeof normalizedUserProfile === 'object') {
+        const profileObj = normalizedUserProfile as Record<string, unknown>;
+        const profileId = profileObj.id;
+        // Issue #612 审计（699）：先校验 id 类型再比较账号——数组等非数字形态
+        // 会骗过字符串比较（String([111]) === '111'）并被原样写进 accounts.user_json，
+        // 客户端的 accountIdKey 无法接受。仅接受数字或数字字符串；合法数字字符
+        // 串先归一化为数字再核对（'0111' 与 111 同一账号）。
+        // Issue #612 R13（审计 64）：真实账号的非空资料必须包含与目标账号匹配的
+        // 数字 id——仅含 login 等字段（或 id 缺失 / null / 非数字）的资料一旦替换
+        // accounts.user_json，恢复流程会因缺数字 id 拒绝该条目且不回查 PAT，
+        // 账号无法进入已保存账号列表（非活跃账号失去一键切换入口）。故在写入前
+        // 拒绝请求，已保存的 PAT 不受影响。显式清空（null / ''）路径保留；
+        // default 分区的全局 user_profile 写入语义不变。
+        if (isRealAccount) {
+          const isNumericProfileId = (typeof profileId === 'number' && Number.isInteger(profileId))
+            || (typeof profileId === 'string' && /^\d+$/.test(profileId));
+          const comparableProfileId = typeof profileId === 'string' ? Number(profileId) : profileId;
+          if (!isNumericProfileId || String(comparableProfileId) !== accountId) {
+            res.status(400).json({
+              error: 'user_profile.id does not match target account',
+              code: 'INVALID_USER_PROFILE',
+            });
+            return;
+          }
+        }
+        // 统一将数字字符串 id 规范化为 number，与备份导出/恢复校验规则一致
+        if (typeof profileId === 'string' && /^\d+$/.test(profileId)) {
+          const parsedId = Number(profileId);
+          if (Number.isSafeInteger(parsedId)) {
+            normalizedUserProfile = { ...profileObj, id: parsedId };
+          }
+        }
+      }
+    }
+
+    if ('github_token' in updates && updates.github_token !== undefined) {
+      if (updates.github_token !== null && typeof updates.github_token !== 'string') {
+        res.status(400).json({
+          error: 'github_token must be a string or null',
+          code: 'INVALID_GITHUB_TOKEN',
+        });
+        return;
+      }
+    }
+
+    // Issue #612 A11：把新 PAT 写入真实账号分区之前，在事务外用 GitHub /user
+    // 验证其身份。验证失败（网络错误 / 超时 / 401 / 身份不符）时保留该账号现有
+    // 凭据：跳过本次 Token 写入并在响应中报告，绝不保存归属不明的凭据。
+    // 「复用已验证凭据」路径：与该账号分区已存储的凭据完全一致的新 Token 免于
+    // 重复查询。同账号 Token 轮换（身份一致）与显式清空不受影响。
+    // Issue #612 R2-A1：校验前记录该账号的凭据版本——GitHub 校验等待期间
+    // （最长 8s）另一设备可能清空/轮换同账号凭据；写入事务内复核版本，已变化
+    // 时放弃本次 PAT 写回（绝不把校验时的 PAT 写回两个已变化的位置）。
+    let tokenVerificationFailed = false;
+    let tokenWriteSuperseded = false;
+    // Issue #612 R13（审计 13）：资料版本与凭据版本分开记录——资料写入不推进
+    // 凭据/活跃账号版本，GitHub 校验等待期间另一设备可以只更新同账号资料。
+    const profileVersionBefore = isRealAccount ? getAccountProfileVersion(db, accountId) : 0;
+    const credentialVersionBefore = isRealAccount ? getAccountCredentialVersion(db, accountId) : 0;
+    const activeAccountVersionBefore = isRealAccount ? getActiveAccountVersion(db) : 0;
+    const rawToken = updates.github_token;
+    if (isRealAccount && typeof rawToken === 'string' && rawToken && !rawToken.startsWith('***')) {
+      let storedEncrypted: string | null = null;
+      try {
+        const scoped = db
+          .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
+          .get(accountId) as { value: string | null } | undefined;
+        if (scoped !== undefined && scoped.value) {
+          storedEncrypted = scoped.value;
+        } else if (scoped === undefined) {
+          const accountRow = db
+            .prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?')
+            .get(accountId) as { github_token_encrypted: string | null } | undefined;
+          storedEncrypted = accountRow?.github_token_encrypted ?? null;
+        }
+      } catch { /* 轻量 stub 缺表时按无已存凭据处理 */ }
+      let matchesStored = false;
+      if (storedEncrypted) {
+        try {
+          matchesStored = decrypt(storedEncrypted, config.encryptionKey) === rawToken;
+        } catch {
+          matchesStored = false;
+        }
+      }
+      if (!matchesStored) {
+        const ownerId = await fetchGitHubUserId(rawToken);
+        if (ownerId !== accountId) {
+          tokenVerificationFailed = true;
+        }
+      }
+    }
+
+    const globalStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    const accountStmt = db.prepare(
+      'INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)'
+    );
+
+    const accountPayload: { userProfile: unknown; tokenEncrypted: string | null; tokenCleared: boolean } = {
+      userProfile: undefined,
+      tokenEncrypted: null,
+      tokenCleared: false,
+    };
+
+    let scopeChangedDuringWait = false;
+    // Issue #612 R12：更晚的账号切换抢先导致本次活跃账号写入被跳过时置位，
+    // 供客户端识别冲突 / 重试（不把这次请求报告为对齐成功）。
+    let activeWriteSkipped = false;
+    // Issue #612 R13（审计 13）：校验等待期间同账号资料已被并发请求更新
+    // （资料版本已推进）时置位：本次携带的旧资料被跳过并在响应中报告冲突。
+    let profileWriteSuperseded = false;
 
     const upsert = db.transaction(() => {
+      // Issue #612 审计（798）：无账号头请求在事务写入任何设置前重新确认写入
+      // 范围仍唯一且等于最初解析的账号——范围新增、消失或变为其他账号时返回
+      // ACCOUNT_SCOPE_REQUIRED，不保存 PAT 或账号级设置（与校验等待结束后发起
+      // 的相同请求同一结果）。显式账号头请求不受影响。
+      if (headerlessScopedWrite) {
+        const rechecked = resolveWritableAccountScope(req, db);
+        if (!rechecked.ok || rechecked.accountId !== accountId) {
+          scopeChangedDuringWait = true;
+          return;
+        }
+      }
       for (const [key, rawValue] of Object.entries(updates)) {
         let value = rawValue as string | null;
 
-        if (key === 'github_token' && value && typeof value === 'string') {
-          if (value.startsWith('***')) {
+        // 内部账号状态（认领标记 / 已验证所有者）只能由服务端认领流程写入。
+        if (INTERNAL_SETTING_KEYS.has(key)) continue;
+
+        if (key === 'github_token') {
+          if (typeof value === 'string' && value.startsWith('***')) {
             // Skip masked values — keep existing
             continue;
           }
-          value = encrypt(value, config.encryptionKey);
+          if (value && typeof value === 'string') {
+            // Issue #612 A11：身份验证未通过的 Token 不写入（保留现有凭据）。
+            if (tokenVerificationFailed) continue;
+            // Issue #612 R2-A1：事务内复核凭据版本——校验等待期间被并发变更
+            // （另一设备显式清空 / 轮换）时放弃本次写入，两个存储位置都不动。
+            if (isRealAccount && getAccountCredentialVersion(db, accountId) !== credentialVersionBefore) {
+              tokenWriteSuperseded = true;
+              continue;
+            }
+            value = encrypt(value, config.encryptionKey);
+            if (isRealAccount) {
+              accountPayload.tokenEncrypted = value;
+              bumpAccountCredentialVersion(db, accountId);
+            }
+          } else if (isRealAccount && (value === '' || value === null)) {
+            // 显式清空（'' / null）：除 account_settings 外，accounts 表的加密
+            // 凭据副本必须一并清空，否则代理会继续复用旧 Token。
+            // Issue #612 R2-A1：显式清空无论当前值是否为空都推进凭据版本，
+            // 使等待校验的其他设备的迟到写回失效。
+            accountPayload.tokenCleared = true;
+            bumpAccountCredentialVersion(db, accountId);
+          }
+        }
+
+        if (key === 'user_profile') {
+          if (isRealAccount) {
+            // user_profile 是 accounts.user_json 的唯一写入路径（客户端登录/切号时
+            // 携带）；归一化结果已在事务前完成校验，此处只记录载荷。
+            accountPayload.userProfile = normalizedUserProfile;
+            continue;
+          }
+          // Issue #612 审计（821）：default 分区（无真实账号分区）保持 v4 之前的
+          // 全局 settings.user_profile 写入语义——归一化后的资料序列化进全局表，
+          // 显式清空（null / ''）原样落库；跳过会让客户端拿到 updated: true 却
+          // 读回旧资料。
+          value = normalizedUserProfile as string | null;
         }
 
         // better-sqlite3 interprets objects/arrays as named parameter maps,
         // causing RangeError. Serialize non-primitive values to JSON strings.
+        // ai_result_sharing_enabled 已在事务前完成 zod 校验，统一存 '1' / '0'。
         const serialized =
-          value === null || value === undefined
-            ? null
-            : typeof value === 'object'
-              ? JSON.stringify(value)
-              : value;
-        stmt.run(key, serialized);
+          key === 'ai_result_sharing_enabled'
+            ? (rawValue === true ? '1' : '0')
+            : value === null || value === undefined
+              ? null
+              : typeof value === 'object'
+                ? JSON.stringify(value)
+                : value;
+
+        if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && isRealAccount) {
+          accountStmt.run(accountId, key, serialized);
+        } else {
+          if (key === 'github_token' && !isRealAccount) {
+            snapshotLegacyDefaultTokenBeforeOverwrite(db);
+          }
+          globalStmt.run(key, serialized);
+          // 无头请求下账号级键镜像写入全局表已覆盖；真实账号下账号级键不写全局。
+        }
+      }
+
+      if (isRealAccount
+        && (accountPayload.userProfile !== undefined
+          || accountPayload.tokenEncrypted !== null
+          || accountPayload.tokenCleared)) {
+        // Issue #612 R13（审计 13）：写回前单独复核资料版本——校验等待期间资料
+        // 已被并发请求更新时，跳过本次携带的旧资料（保留较新的 user_json）并在
+        // 响应中报告冲突；未被替换且已验证的 PAT 照常保存。资料未提交或版本
+        // 未变时行为与原先一致。
+        let effectiveUserProfile = accountPayload.userProfile;
+        if (effectiveUserProfile !== undefined
+          && getAccountProfileVersion(db, accountId) !== profileVersionBefore) {
+          profileWriteSuperseded = true;
+          effectiveUserProfile = undefined;
+        }
+        upsertAccountRow(
+          db,
+          accountId,
+          effectiveUserProfile,
+          accountPayload.tokenCleared ? null : accountPayload.tokenEncrypted,
+          accountPayload.tokenCleared,
+        );
+        // 后台 Token 补写（只有 github_token，没有 user_profile）绝不能改写
+        // 活跃账号；异步 PAT 校验期间若已发生较新的账号切换，也不得改回旧账号。
+        // Issue #612 R12：仅当活跃账号实际改变时推进活跃账号版本——同账号资料
+        // 刷新（活跃账号未变）不再 bump，避免使另一设备等待中的切换被误判失效；
+        // 版本确实因更晚的切换而变化且本次活跃账号写入被跳过时，单独在响应中
+        // 报告（active_account_update_skipped），绝不静默伪装成对齐成功。
+        const activeRow = db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'")
+          .get() as { value: string | null } | undefined;
+        const activeChangedDuringWait = getActiveAccountVersion(db) !== activeAccountVersionBefore;
+        const intendActiveWrite = accountPayload.userProfile !== undefined || !activeRow?.value;
+        if (intendActiveWrite && !activeChangedDuringWait) {
+          globalStmt.run('active_account_id', accountId);
+          if (activeRow?.value !== accountId) {
+            bumpActiveAccountVersion(db);
+          }
+        } else if (intendActiveWrite && activeChangedDuringWait && activeRow?.value !== accountId) {
+          activeWriteSkipped = true;
+        }
       }
     });
 
     upsert();
-    res.json({ updated: true });
+    // Issue #612 审计（798）：校验等待期间账号范围变化的无头请求未写入任何
+    // 设置，按范围歧义拒绝。
+    if (scopeChangedDuringWait) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    // Issue #612 A11：Token 验证失败时其余设置照常保存，但凭据写入被跳过。
+    // Issue #612 R2-A1：校验等待期间凭据被并发变更时，本次 PAT 写回被放弃。
+    res.json({
+      updated: true,
+      ...(tokenVerificationFailed ? { token_update_skipped: true } : {}),
+      ...(tokenWriteSuperseded ? { token_update_superseded: true } : {}),
+      ...(profileWriteSuperseded ? { profile_update_superseded: true } : {}),
+      ...(activeWriteSkipped ? { active_account_update_skipped: true } : {}),
+    });
   } catch (err) {
     logger.errorFromError('configs.updateSettings', 'PUT /api/settings error', err);
     res.status(500).json({ error: 'Failed to update settings', code: 'UPDATE_SETTINGS_FAILED' });
   }
 });
+
+function upsertAccountRow(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  userProfileRaw: unknown,
+  tokenEncrypted: string | null,
+  clearToken = false,
+): void {
+  const existing = db.prepare('SELECT user_json FROM accounts WHERE account_id = ?')
+    .get(accountId) as { user_json: string | null } | undefined;
+  let userJson = existing?.user_json ?? null;
+  if (userProfileRaw !== undefined) {
+    if (userProfileRaw === null || userProfileRaw === '') {
+      userJson = null;
+    } else if (typeof userProfileRaw === 'string') {
+      userJson = userProfileRaw;
+    } else if (typeof userProfileRaw === 'object') {
+      userJson = JSON.stringify(userProfileRaw);
+    }
+  }
+  // v4 schema 将 accounts.user_json 声明为 NOT NULL：首建账号行且本次未携带有效
+  // 资料时，以仅含 GitHub 数值 id 的占位身份落库（accountId 即 GitHub user id），
+  // 保证 token-only 凭据保存（autoSync 通道）不会触发约束错误回滚整个设置事务。
+  const numericId = Number(accountId);
+  const placeholderUserJson = Number.isInteger(numericId) && numericId > 0
+    ? JSON.stringify({ id: numericId })
+    : JSON.stringify({ id: accountId });
+  const effectiveUserJson = userJson ?? placeholderUserJson;
+  db.prepare(`
+    INSERT INTO accounts (account_id, user_json, github_token_encrypted, last_used_at)
+    VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(account_id) DO UPDATE SET
+      user_json = CASE WHEN @userJsonProvided THEN excluded.user_json ELSE accounts.user_json END,
+      github_token_encrypted = CASE WHEN @clearToken THEN NULL
+        ELSE COALESCE(excluded.github_token_encrypted, accounts.github_token_encrypted) END,
+      last_used_at = excluded.last_used_at
+  `).run(accountId, effectiveUserJson, tokenEncrypted, {
+    userJsonProvided: userProfileRaw !== undefined ? 1 : 0,
+    clearToken: clearToken ? 1 : 0,
+  });
+  // Issue #612 R13（审计 13）：资料实际写回后递增资料版本，使其他设备等待中的
+  // 迟到资料写回失效（与凭据版本同语义；这是 accounts.user_json 的唯一写路径）。
+  if (userProfileRaw !== undefined) {
+    bumpAccountProfileVersion(db, accountId);
+  }
+}
 
 // ── Embedding Configs ──
 

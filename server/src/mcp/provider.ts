@@ -3,6 +3,13 @@ import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
 import {
+  resolveActiveAccountScope,
+  getLegacyDefaultClaimedBy,
+  getPartitionMeta,
+  getAccountRevision,
+  bumpAccountRevision,
+} from '../db/accountScope.js';
+import {
   type McpRepository,
   type McpSearchFilters,
   normalizeLicense,
@@ -65,25 +72,28 @@ export function transformRepoRow(row: Record<string, unknown>): McpRepository {
 /** Soft cap to avoid unbounded memory if a DB ever holds extreme row counts. */
 const MAX_REPOS_IN_MEMORY = 50_000;
 
-export function loadAllRepositories(): McpRepository[] {
+export function loadAllRepositories(scope?: string): McpRepository[] {
   const db = getDb();
+  // MCP 查询按当前活跃账号分区过滤（无头请求回退 active_account_id → 'default'）
+  const accountId = scope ?? resolveActiveAccountScope(db);
   const rows = db
-    .prepare('SELECT * FROM repositories ORDER BY stargazers_count DESC LIMIT ?')
-    .all(MAX_REPOS_IN_MEMORY) as Record<string, unknown>[];
+    .prepare('SELECT * FROM repositories WHERE account_id = ? ORDER BY stargazers_count DESC LIMIT ?')
+    .all(accountId, MAX_REPOS_IN_MEMORY) as Record<string, unknown>[];
   return rows.map(transformRepoRow);
 }
 
-export function getRepository(idOrFullName: string | number): McpRepository | null {
+export function getRepository(idOrFullName: string | number, scope?: string): McpRepository | null {
   const db = getDb();
+  const accountId = scope ?? resolveActiveAccountScope(db);
   let row: Record<string, unknown> | undefined;
   if (typeof idOrFullName === 'number' || /^\d+$/.test(String(idOrFullName))) {
     row = db
-      .prepare('SELECT * FROM repositories WHERE id = ?')
-      .get(Number(idOrFullName)) as Record<string, unknown> | undefined;
+      .prepare('SELECT * FROM repositories WHERE account_id = ? AND id = ?')
+      .get(accountId, Number(idOrFullName)) as Record<string, unknown> | undefined;
   } else {
     row = db
-      .prepare('SELECT * FROM repositories WHERE full_name = ? COLLATE NOCASE')
-      .get(String(idOrFullName)) as Record<string, unknown> | undefined;
+      .prepare('SELECT * FROM repositories WHERE account_id = ? AND full_name = ? COLLATE NOCASE')
+      .get(accountId, String(idOrFullName)) as Record<string, unknown> | undefined;
   }
   return row ? transformRepoRow(row) : null;
 }
@@ -97,15 +107,16 @@ export function getRepositories(inputs: string[]) {
 
 export function getLatestRelease(repoId: number): McpReleaseEvidence | null {
   const db = getDb();
+  const accountId = resolveActiveAccountScope(db);
   const row = db
     .prepare(
       `SELECT id, tag_name, name, html_url, published_at, prerelease, draft
        FROM releases
-       WHERE repo_id = ?
+       WHERE account_id = ? AND repo_id = ?
        ORDER BY (published_at IS NULL) ASC, published_at DESC, id DESC
        LIMIT 1`
     )
-    .get(repoId) as Record<string, unknown> | undefined;
+    .get(accountId, repoId) as Record<string, unknown> | undefined;
   if (!row) return null;
   return {
     id: row.id as number,
@@ -137,15 +148,16 @@ const MAX_RELEASES_PER_REPO_EVIDENCE = 500;
  */
 export function getRepositoryReleases(repoId: number): HealthReleaseInput[] {
   const db = getDb();
+  const accountId = resolveActiveAccountScope(db);
   const rows = db
     .prepare(
       `SELECT repo_id, tag_name, published_at, prerelease
        FROM releases
-       WHERE repo_id = ?
+       WHERE account_id = ? AND repo_id = ?
        ORDER BY (published_at IS NULL) ASC, published_at DESC, id DESC
        LIMIT ?`
     )
-    .all(repoId, MAX_RELEASES_PER_REPO_EVIDENCE) as Array<Record<string, unknown>>;
+    .all(accountId, repoId, MAX_RELEASES_PER_REPO_EVIDENCE) as Array<Record<string, unknown>>;
 
   return rows.map((row) => ({
     repo_id: typeof row.repo_id === 'number' ? row.repo_id : Number(row.repo_id),
@@ -157,9 +169,10 @@ export function getRepositoryReleases(repoId: number): HealthReleaseInput[] {
 
 export function listCategories(): Array<Record<string, unknown>> {
   const db = getDb();
+  const accountId = resolveActiveAccountScope(db);
   const rows = db
-    .prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC')
-    .all() as Record<string, unknown>[];
+    .prepare('SELECT * FROM categories WHERE account_id = ? ORDER BY sort_order ASC, name ASC')
+    .all(accountId) as Record<string, unknown>[];
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -266,15 +279,241 @@ export function getVectorAvailability(): VectorAvailability {
 
 const FETCH_TIMEOUT_MS = 15_000;
 
-async function fetchWithTimeout(
+/** partition_meta 标记：该账号分区的账号元数据回填探测已完成（避免重复探测）。 */
+const VECTOR_BACKFILL_CHECKED_KEY = 'vector_account_backfill_checked';
+
+/** 诊断探测查询的 topK 上限（与 Worker /query 的 QUERY_TOPK_LIMIT 一致）。 */
+const VECTOR_PROBE_TOPK = 50;
+
+/**
+ * default 分区覆盖探测使用的阈值：保留合法的负 cosine/dot 分数，确保「索引里
+ * 是否存在该范围的向量」不会被相似度阈值影响（与 deploy.mjs 的覆盖探测一致）。
+ */
+const VECTOR_PROBE_THRESHOLD = -1e9;
+
+/**
+ * Issue #612 R12 审计 ISSUE-2：default 分区的元数据覆盖探测。
+ *
+ * Worker 的 ACCOUNT_METADATA_INDEXED 开启后，带 accountId='default' 的 /query
+ * 会按元数据过滤；索引建立前写入的存量向量（前端在未登录时上传、metadata
+ * 不含 accountId）不会出现在结果里——200 空结果是「未回填」，不是「无数据」。
+ * 本地 default 分区仍存在非空 vector_indexed_at 说明客户端确实上传过向量，
+ * 此时用独立探测（topK=上限、极低阈值、显式 accountId='default'）区分。
+ * Issue #612 R13 审计（14）：探测有命中只证明 default 范围「存在向量」，不能
+ * 证明本地全部已索引仓库的向量都已具备元数据——部分回填时（如仓库 1 已回填但
+ * 分数低于阈值、仓库 2 缺元数据本应命中），空用户结果仍会把仓库 2 的漏召回
+ * 误报成正常的「无相似仓库」。判定依据改为逐条核对：本地全部已索引仓库都
+ * 出现在探测结果中才确认覆盖；任一缺失或本地数量超过探测 topK（无法完整
+ * 核对）时一律保留迁移状态：
+ * - has_scoped_vectors：本地全部已索引仓库都带 default 元数据可被范围查询召回，
+ *   空用户结果是阈值/相似度导致；
+ * - no_scoped_vectors：default 范围查不到覆盖本地记录所需的向量 → 覆盖未确认
+ *   （未回填/索引丢失），必须返回迁移状态而不是静默空结果；
+ * - probe_failed：无法确认（探测失败 / 无法完整核对），同样不得静默返回空结果。
+ */
+async function probeDefaultPartitionScopedCoverage(
+  db: ReturnType<typeof getDb>,
+  workerUrl: string,
+  queryHeaders: Record<string, string>,
+  queryVector: number[],
+): Promise<'has_scoped_vectors' | 'no_scoped_vectors' | 'probe_failed'> {
+  // 覆盖核对的基准：本地 default 分区全部已索引仓库。超过探测 topK 时探测结果
+  // 被 Worker 截断（QUERY_TOPK_LIMIT 上限），无法逐条核对，按未确认处理。
+  const expectedRepoIds = loadDefaultPartitionIndexedRepositoryIds(db);
+  if (expectedRepoIds.length > VECTOR_PROBE_TOPK) return 'probe_failed';
+  try {
+    const probeResult = await fetchWithBodyTimeout(
+      `${workerUrl}/query`,
+      {
+        method: 'POST',
+        headers: queryHeaders,
+        body: JSON.stringify({
+          vector: queryVector,
+          topK: VECTOR_PROBE_TOPK,
+          threshold: VECTOR_PROBE_THRESHOLD,
+          accountId: 'default',
+        }),
+      },
+      async (res) => {
+        if (!res.ok) return { ok: false as const };
+        const payload = (await res.json().catch(() => null)) as { matches?: unknown } | null;
+        return { ok: true as const, payload };
+      },
+    );
+    if (!probeResult.ok || !probeResult.payload || !Array.isArray(probeResult.payload.matches)) {
+      return 'probe_failed';
+    }
+    // default 范围命中的向量 ID：重新上传带 default 元数据时带 `default:` 前缀
+    // （与客户端 buildAccountScopedVectorId 的 `${accountId}:${repoId}` 形态一致），
+    // 兼容直接以 repoId 落库的无前缀形态。
+    const matchedRepoIds = new Set<string>();
+    for (const match of probeResult.payload.matches) {
+      const id = typeof (match as { id?: unknown })?.id === 'string' ? (match as { id: string }).id : '';
+      if (!id) continue;
+      const separator = id.indexOf(':');
+      const prefix = separator > 0 ? id.slice(0, separator) : '';
+      matchedRepoIds.add(prefix === 'default' ? id.slice(separator + 1) : id);
+    }
+    for (const expected of expectedRepoIds) {
+      if (!matchedRepoIds.has(expected)) return 'no_scoped_vectors';
+    }
+    return 'has_scoped_vectors';
+  } catch {
+    return 'probe_failed';
+  }
+}
+
+/** 本地 default 分区全部已索引仓库的 ID（覆盖核对的基准清单）。 */
+function loadDefaultPartitionIndexedRepositoryIds(db: ReturnType<typeof getDb>): string[] {
+  try {
+    const rows = db
+      .prepare("SELECT id FROM repositories WHERE account_id = 'default' AND vector_indexed_at IS NOT NULL")
+      .all() as Array<{ id: unknown }>;
+    return rows.map((row) => String(row.id));
+  } catch {
+    // 轻量 stub 缺列/缺表时按「无待核对记录」处理（调用方的存在性检查已先行）。
+    return [];
+  }
+}
+
+/** 本地 default 分区是否记录过已上传的向量（依据 vector_indexed_at 标记）。 */
+function hasIndexedDefaultPartitionRepositories(db: ReturnType<typeof getDb>): boolean {
+  try {
+    return Boolean(
+      db
+        .prepare("SELECT 1 AS one FROM repositories WHERE account_id = 'default' AND vector_indexed_at IS NOT NULL LIMIT 1")
+        .get(),
+    );
+  } catch {
+    // 轻量 stub 缺列/缺表时按「无本地索引标记」处理（保持旧行为）
+    return false;
+  }
+}
+
+/**
+ * Issue #612 A25（R2-A11/A12/A13/A14 修订 + 审计 381 修订）：旧索引标记（v4 迁移 /
+ * 无冲突认领保留的 legacy 向量）触发账号元数据回填。服务端无法对存量向量增量
+ * 补写元数据（向量由客户端生成上传），恢复路径是全量重建。
+ *
+ * 探测流程：
+ * - 使用独立于用户查询参数的诊断请求（topK=探针上限、threshold=0），不复用
+ *   用户查询的有限 topK/threshold；
+ * - 审计修订：探测无法取得「/query 结果来自当前索引快照」的证据（Worker API
+ *   无快照 ID，两次独立请求之间的数量相等只是巧合），一律按归属未确认处理——
+ *   明确安排一次全量重建（清除该分区 vector_indexed_at，客户端下次同步携带
+ *   accountId 元数据重新上传）后再标记完成，绝不记录「探测完整确认」。
+ *
+ * 写入流程（R2-A13/A14）：
+ * - 完成标记的重查、索引标记清除与版本推进在同一写事务内执行；迟到的并发
+ *   探测不得再次清除已重建的索引状态；
+ * - 任一写入失败回滚事务并向外传播（不吞异常），失败可重试；
+ * - 仅当确实清除了索引标记才推进对应账号快照版本。
+ * 探测阶段的网络失败不标记、静默返回，下次查询重试。
+ */
+async function ensureAccountVectorMetadataBackfill(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  workerUrl: string,
+  queryHeaders: Record<string, string>,
+  queryVector: number[],
+): Promise<void> {
+  if (accountId === 'default') return;
+  const workerIdentity = workerUrl.replace(/\/$/, '');
+  if (getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) === workerIdentity) return;
+
+  // Issue #612 R13 审计（15）：探测开始时记录账号快照版本。探测（网络）期间
+  // 导入可能清除完成标记并安排重建，客户端重建随后写回新的 vector_indexed_at；
+  // 下方完成标记复核此时看到空标记会放行旧探测，清除重建后的新索引状态。
+  // 写事务内复核版本，已变化时放弃本次决策（不清除任何索引状态、不写标记），
+  // 下次查询重新探测。
+  const revisionAtProbeStart = getAccountRevision(db, accountId);
+
+  // ── 探测阶段（网络）：诊断 /query 失败直接返回并允许重试 ──
+  try {
+    const probeResult = await fetchWithBodyTimeout(
+      `${workerIdentity}/query`,
+      {
+        method: 'POST',
+        headers: queryHeaders,
+        body: JSON.stringify({ vector: queryVector, topK: VECTOR_PROBE_TOPK, threshold: 0 }),
+      },
+      async (res) => {
+        if (!res.ok) return { ok: false as const, payload: null };
+        const payload = (await res.json().catch(() => null)) as
+          | { matches?: Array<{ id: string; metadata?: Record<string, unknown> }> }
+          | null;
+        return { ok: true as const, payload };
+      },
+    );
+    if (!probeResult.ok || !probeResult.payload || !Array.isArray(probeResult.payload.matches)) {
+      return; // Worker 不可用 / 被拒：不置位，下次重试
+    }
+  } catch (err) {
+    logger.warn('mcp.vector', 'Account metadata backfill probe failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  // Issue #612 审计（381-384）：/query 与 /status 是两次独立请求，Worker API
+  // 未提供把两个响应绑定到同一索引快照的证据（无快照 ID / 版本号）。两次请求
+  // 之间并发客户端可能删除向量并重传不同格式的新向量，「数量相等」只反映巧合
+  // 而非同一快照。无法取得同快照证据时一律按「归属未确认」处理：明确安排一次
+  // 全量重建（清除该分区 vector_indexed_at，客户端携带 accountId 元数据重新
+  // 上传），绝不仅凭数量相等记录探测完成。探测响应本身不再参与归属判定
+  // （上方校验仅作为 Worker 可达性与响应合法性门槛），失败时不标记、下次重试。
+
+  // ── 写入阶段（R2-A13/A14）：单事务，提交前核对当前 Worker 标识，失败回滚并向上传播 ──
+  const applyBackfillDecision = db.transaction((): boolean => {
+    const currentConfig = db
+      .prepare('SELECT worker_url FROM vector_search_configs WHERE id = ?')
+      .get('default') as { worker_url?: unknown } | undefined;
+    const currentWorkerIdentity = typeof currentConfig?.worker_url === 'string'
+      ? currentConfig.worker_url.replace(/\/$/, '')
+      : '';
+    if (currentWorkerIdentity !== workerIdentity) return false;
+
+    // 重新检查完成标记：相同 Worker 标识的并发探测共享完成状态，不得再次清除已重建的索引状态。
+    const claimedRow = db
+      .prepare('SELECT value FROM partition_meta WHERE account_id = ? AND key = ?')
+      .get(accountId, VECTOR_BACKFILL_CHECKED_KEY) as { value: string | null } | undefined;
+    if (claimedRow && claimedRow.value === workerIdentity) return false;
+    // Issue #612 R13 审计（15）：复核探测开始时记录的快照版本——探测期间该分区
+    // 发生过任何仓库写入（导入清除完成标记、客户端重建写回新 vector_indexed_at
+    // 等）时，探测结论已过期，不得清除任何索引状态（否则旧探测会抹掉重建后的
+    // 新索引状态，迫使客户端再次全量重建）。
+    if (getAccountRevision(db, accountId) !== revisionAtProbeStart) return false;
+    // 归属未确认（无同快照证据）或探测到 legacy 向量：清除索引标记，明确安排
+    // 一次全量重建（客户端下次同步携带 accountId 元数据重新上传）。
+    const cleared = db.prepare(
+      'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
+    ).run(accountId).changes;
+    // 仅当确实清除了索引标记才推进对应账号快照版本。
+    if (cleared > 0) bumpAccountRevision(db, accountId);
+    db.prepare('INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES (?, ?, ?)')
+      .run(accountId, VECTOR_BACKFILL_CHECKED_KEY, workerIdentity);
+    return true;
+  });
+
+  const rebuilt = applyBackfillDecision();
+  if (rebuilt) {
+    logger.warn('mcp.vector', 'Account vector index rebuild scheduled (legacy vectors detected or ownership unverifiable)', {
+      accountId,
+    });
+  }
+}
+
+async function fetchWithBodyTimeout<T>(
   url: string,
   init: RequestInit,
+  readBody: (res: Response) => Promise<T>,
   timeoutMs = FETCH_TIMEOUT_MS
-): Promise<Response> {
+): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    return await readBody(response);
   } finally {
     clearTimeout(timer);
   }
@@ -340,16 +579,21 @@ async function embedQuery(
     body = { model, input: texts };
   }
 
-  const res = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Embedding API error ${res.status} (${apiType} ${url}): ${text.slice(0, 200)}`);
-  }
-  const data = (await res.json()) as Record<string, unknown>;
+  const data = await fetchWithBodyTimeout(
+    url,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    },
+    async (res) => {
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Embedding API error ${res.status} (${apiType} ${url}): ${text.slice(0, 200)}`);
+      }
+      return (await res.json()) as Record<string, unknown>;
+    },
+  );
 
   if (apiType === 'ollama') {
     const embeddings = data.embeddings as number[][] | undefined;
@@ -405,6 +649,8 @@ export async function vectorSearch(
   }
 
   const db = getDb();
+  // 固定一次账号范围：后续两次查询（Worker 候选 + DB 仓库）必须同一账号。
+  const accountId = resolveActiveAccountScope(db);
   const vs = db
     .prepare('SELECT * FROM vector_search_configs WHERE id = ?')
     .get('default') as Record<string, unknown>;
@@ -438,59 +684,183 @@ export async function vectorSearch(
   }
 
   const workerUrl = String(vs.worker_url).replace(/\/$/, '');
-  let res: Response;
-  try {
-    res = await fetchWithTimeout(`${workerUrl}/query`, {
+  const queryHeaders = {
+    'Content-Type': 'application/json',
+    ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
+  };
+  const sendWorkerQuery = (scopedAccountId?: string) => fetchWithBodyTimeout(
+    `${workerUrl}/query`,
+    {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
-      },
-      body: JSON.stringify({ vector, topK: workerTopK, threshold }),
-    });
+      headers: queryHeaders,
+      body: JSON.stringify({
+        vector,
+        topK: workerTopK,
+        threshold,
+        ...(scopedAccountId ? { accountId: scopedAccountId } : {}),
+      }),
+    },
+    async (response) => {
+      if (!response.ok) {
+        return { ok: false as const, status: response.status, text: await response.text().catch(() => '') };
+      }
+      const json = (await response.json()) as {
+        matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }>;
+      };
+      return { ok: true as const, status: response.status, data: json };
+    },
+  );
+
+  // Issue #612 R2-A12：default（无活跃账号）查询同样要向 Worker 提供能隔离
+  // default 候选的范围（accountId='default' 过滤），避免其他账号候选占满
+  // topK 后被本地丢弃。
+  // Issue #612 R12（审计修订）：本地分区数量无法推断远程共享 Worker 中向量的
+  // 归属——共享索引上其他部署遗留的无前缀向量同样存在，无范围兼容查询会把
+  // 其他部署的向量仅凭仓库 ID 匹配关联到本地仓库并参与打分。范围过滤必须在
+  // Worker 的 topK 计算前按已验证的元数据范围生效：default 查询一律发送
+  // accountId='default'；旧索引尚未回填元数据时 Worker 返回
+  // ACCOUNT_METADATA_NOT_INDEXED，走现有迁移状态（客户端携带 accountId 元数据
+  // 重新上传），绝不仅凭仓库 ID 匹配接受无前缀候选。
+  const workerScope = accountId;
+  let queryResult:
+    | { ok: false; status: number; text: string }
+    | { ok: true; status: number; data: { matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }> } };
+  try {
+    queryResult = await sendWorkerQuery(workerScope);
   } catch {
-    // 连接失败 / 15s 超时 abort 都走这里；findSimilarRepositories 依赖本函数
+    // 连接失败 / 15s 超时 abort / 非 JSON 响应都走这里；findSimilarRepositories 依赖本函数
     // 永不 throw，异常必须折叠进声明的 { available: false } 结果
     return {
       available: false,
       reason: 'worker_query_failed',
     };
   }
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    return { available: false, reason: `worker_query_failed: ${res.status} ${text.slice(0, 120)}` };
+  if (!queryResult.ok) {
+    const { status, text } = queryResult;
+    const isMetadataNotIndexed = status === 400 && text.includes('ACCOUNT_METADATA_NOT_INDEXED');
+    if (isMetadataNotIndexed && accountId !== 'default' && getLegacyDefaultClaimedBy(db) === accountId) {
+      // Issue #612 A25：在启用 accountId 过滤前完成存量向量元数据回填——探测
+      // 无法可靠确认索引归属时明确安排一次全量重建（R2-A11/A13/A14）。
+      try {
+        await ensureAccountVectorMetadataBackfill(db, accountId, workerUrl, queryHeaders, vector);
+      } catch (err) {
+        logger.warn('mcp.vector', 'Account metadata backfill transaction failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return { available: false, reason: 'vector_backfill_failed' };
+      }
+      // Issue #612 A26（审计修订 668）：本地 SQLite 的账号分区数量不能证明远程
+      // 共享索引中的无前缀旧向量只属于当前账号——共享 Worker 上其他部署遗留的
+      // 无前缀向量同样存在，无范围兼容查询会把其他账号的相似度用于本账号的
+      // 仓库。当前 Worker API 未提供无前缀索引归属的独立证据，兼容重试路径
+      // 已移除：一律按归属未确认返回；恢复路径是回填探测安排的全量重建
+      // （客户端携带 accountId 元数据重新上传后，带范围的查询正常工作）。
+      return { available: false, reason: 'account_metadata_not_indexed' };
+    } else if (isMetadataNotIndexed) {
+      // R2-A12：default 范围查询在元数据索引未就绪时同样声明语义化原因。
+      return { available: false, reason: 'account_metadata_not_indexed' };
+    } else {
+      return { available: false, reason: `worker_query_failed: ${status} ${text.slice(0, 120)}` };
+    }
   }
-  let data: {
-    matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }>;
-  };
-  try {
-    data = (await res.json()) as typeof data;
-  } catch {
-    return {
-      available: false,
-      reason: 'worker_query_failed',
-    };
-  }
+  const data = queryResult.data;
   // JSON null / 缺 matches 字段是合法 JSON，res.json() 不会 reject，必须在此
   // 做结构校验；Electron 端 runVectorSearch 保持相同语义
   if (!data || !Array.isArray(data.matches)) {
     return { available: false, reason: 'worker_query_failed' };
   }
   const matches = data.matches;
-  const repos = loadAllRepositories();
+  // 若元数据索引已启用，但账号分区仍有非空 vector_indexed_at（如备份恢复或
+  // 单账号升级保留的旧向量标记）且尚未针对当前 Worker 完成回填探测，触发一次
+  // 回填探测以在存在旧向量时清除索引标记并安排重建。
+  // Issue #612 审计（702/867）：检查不依赖过滤查询结果是否为空——范围查询按
+  // accountId 元数据过滤，缺元数据的旧向量本就不会出现在结果中；只要该账号
+  // 存在已索引仓库且当前 Worker 尚未完成检查，就执行探测（失败被下方
+  // try/catch 包裹，不阻断当前查询）。
+  if (
+    accountId !== 'default'
+    && getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) !== workerUrl
+  ) {
+    let hasIndexedRepos = false;
+    try {
+      const indexedRow = db
+        .prepare('SELECT 1 AS one FROM repositories WHERE account_id = ? AND vector_indexed_at IS NOT NULL LIMIT 1')
+        .get(accountId);
+      hasIndexedRepos = Boolean(indexedRow);
+    } catch {
+      // 轻量 stub 缺列/缺表时忽略
+    }
+    if (hasIndexedRepos) {
+      try {
+        await ensureAccountVectorMetadataBackfill(db, accountId, workerUrl, queryHeaders, vector);
+      } catch (err) {
+        logger.warn('mcp.vector', 'Account metadata backfill after empty scoped search failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+  // Issue #612 R12 审计 ISSUE-2：default 分区不得在「元数据索引已启用但未回填/
+  // 覆盖未确认」时静默返回空结果。带 accountId='default' 的查询在旧向量缺少
+  // accountId 元数据时同样返回 200 空 matches；本地 default 分区存在已索引仓库
+  // 时先做独立探测，逐条核对本地全部已索引仓库是否都能被 default 范围召回——
+  // 仅凭「范围内有向量」不能确认覆盖完整（部分回填会把漏召回伪装成正常的
+  // 阈值空结果，R13 审计 14）。未确认（含探测失败 / 无法完整核对）时按与
+  // account_metadata_not_indexed 一致的迁移状态返回。default 分区没有本地索引
+  // 标记时是真「无数据」，保持空结果。
+  if (
+    accountId === 'default'
+    && matches.length === 0
+    && hasIndexedDefaultPartitionRepositories(db)
+  ) {
+    const coverage = await probeDefaultPartitionScopedCoverage(db, workerUrl, queryHeaders, vector);
+    if (coverage !== 'has_scoped_vectors') {
+      logger.warn('mcp.vector', 'Default partition account metadata coverage unconfirmed', {
+        coverage,
+      });
+      return { available: false, reason: 'account_metadata_not_indexed' };
+    }
+  }
+  const repos = loadAllRepositories(accountId);
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 
-  const candidates = matches
-    .map((m) => {
-      const repo = byId.get(String(m.id));
-      if (!repo) return null;
-      return {
-        id: String(m.id),
-        score: Number(m.score),
-        repository: repo,
-      };
-    })
-    .filter(Boolean) as Array<{ id: string; score: number; repository: McpRepository }>;
+  // Issue #612 A27：旧索引（迁移期）里同一仓库可能同时存在 legacy 无前缀向量
+  // 与 `${accountId}:${repoId}` 新向量。投影前先按规范化 repoId 去重，避免同一
+  // 仓库占用两个候选名额；两种候选并存时优先保留带账号前缀（scopedAccountId）
+  // 的新向量，等优先级时保留更高分。首次出现顺序保持稳定。
+  const dedupedCandidates = new Map<string, { id: string; score: number; repository: McpRepository; scoped: boolean }>();
+  for (const m of matches) {
+    // 向量 ID 可能是 `${accountId}:${repoId}`：先解析再核对归属与元数据一致性。
+    const rawId = String(m.id);
+    const separator = rawId.indexOf(':');
+    const prefix = separator > 0 ? rawId.slice(0, separator) : '';
+    const scopedAccountId = /^\d+$/.test(prefix) ? prefix : null;
+    if (scopedAccountId && scopedAccountId !== accountId) continue;
+    const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
+    if (metaAccountId && metaAccountId !== accountId) continue;
+    if (scopedAccountId && metaAccountId && metaAccountId !== scopedAccountId) continue;
+    const repoId = scopedAccountId ? rawId.slice(separator + 1) : rawId;
+    const repo = byId.get(repoId);
+    if (!repo) continue;
+    const score = Number(m.score);
+    const scoped = scopedAccountId !== null;
+    const existing = dedupedCandidates.get(repoId);
+    if (!existing) {
+      dedupedCandidates.set(repoId, { id: repoId, score, repository: repo, scoped });
+      continue;
+    }
+    const preferNew = scoped && !existing.scoped;
+    const preferHigherScore = scoped === existing.scoped && score > existing.score;
+    if (preferNew || preferHigherScore) {
+      // Map.set 对已存在键保持首次插入位置，稳定候选顺序。
+      dedupedCandidates.set(repoId, { id: repoId, score, repository: repo, scoped });
+    }
+  }
+
+  const candidates = Array.from(
+    dedupedCandidates.values(),
+    ({ id, score, repository }) => ({ id, score, repository }),
+  );
 
   if (!filtersActive) {
     const enriched = candidates.map((candidate) => ({
@@ -535,7 +905,8 @@ export async function findSimilarRepositories(
       matches: Array<Record<string, unknown>>;
     }
 > {
-  const source = getRepository(idOrFullName);
+  const accountId = resolveActiveAccountScope(getDb());
+  const source = getRepository(idOrFullName, accountId);
   if (!source) return { error: 'not_found', idOrFullName: String(idOrFullName) };
 
   const topK = Math.min(50, Math.max(1, opts.topK ?? 10));

@@ -3,6 +3,11 @@ import { useCallback, useMemo, useState, type MutableRefObject, useRef } from 'r
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { AIService, isAbortError } from '../../../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
@@ -55,6 +60,11 @@ const aiSearchAbortRef: { current: AbortController | null } = { current: null };
 export const cancelActiveAiSearch = () => {
   aiSearchAbortRef.current?.abort();
 };
+
+// 星标同步状态所有者标识（审计修复 C21）：setSyncingStars 是共享 Store 状态。
+// 同一时刻只认最新一次同步请求——新请求（含切号后新会话发起的请求）递增标识
+// 使旧请求失去所有权，仅标识匹配的请求可在 finally 中清除标记。
+let starSyncRunSeq = 0;
 
 /** 统计本次同步中真正新增的仓库数（与合并口径一致）。 */
 export const countNewStarredRepositories = (
@@ -288,6 +298,11 @@ export const useSearchActions = (): SearchActions => {
     applyFilters: (repos: Repository[]) => Repository[],
     options?: { signal?: AbortSignal },
   ): Promise<void> => {
+    // 账号代次校验（Issue #611 审计修复）：AI 等待期间切号后，旧账号的查询与
+    // 结果绝不能提交到新账号。此检查保护所有写入分支——未启用向量搜索、向量
+    // 结果为 null、向量请求失败降级都会经过本函数的提交路径。
+    const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
 
     let filtered = repositories;
@@ -300,11 +315,15 @@ export const useSearchActions = (): SearchActions => {
         const aiResults = await aiService.searchRepositoriesWithSelection(repositories, query, {
           signal: options?.signal,
           onPhase: (phase) => {
+            // 审计修复（C23）：回调先比较发起会话（账号 ID + 会话代次），
+            // 不一致立即返回——不更新阶段、不显示降级警告。
+            if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
             setSearchPhase(phase === 'selecting'
               ? t('useSearchActions.ai-selecting-relevant-repositories')
               : t('useSearchActions.ai-semantic-analysis'));
           },
           onFallback: (reason) => {
+            if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
             // 端点抖动/配置问题时用户看到的不能只是"空结果"：明确告知已降级
             if (reason === 'ai_failed') {
               toast(t('useSearchActions.ai-request-failed-fell-back-to-local-lexical-sea'), 'warning');
@@ -331,6 +350,11 @@ export const useSearchActions = (): SearchActions => {
 
     if (options?.signal?.aborted) {
       throw new DOMException('Search cancelled', 'AbortError');
+    }
+
+    // 提交前用保存的发起账号复核（不能只依赖取消信号）
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+      return;
     }
 
     // Apply other filters and update results
@@ -369,6 +393,10 @@ export const useSearchActions = (): SearchActions => {
     setIsSearching(true);
     setSearchPhase(null);
     vectorScoreMapRef.current = null;
+    // 账号代次校验（Issue #611）：向量索引内容为实例共享，搜索期间切号后
+    // 结果不得写进新账号（结果仓库还会按当前账号 id 集合二次过滤）
+    const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
 
     try {
       // ====== 向量搜索分支 ======
@@ -389,6 +417,24 @@ export const useSearchActions = (): SearchActions => {
           const crossEncoder = activeEmbConfig.apiType === 'siliconflow'
             ? new CrossEncoderReranker(activeEmbConfig)
             : null;
+          // 账号隔离范围（R4 审计修复）：多账号共享同一向量索引，命中必须按
+          // 归属账号过滤（同仓库在两个账号列表中都存在时，既有 id 集合过滤
+          // 无法拦截他账号向量经同一 ID 水合进来）
+          const scopeAccountId = peekCurrentAccountId();
+          const isMultiAccount = Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1;
+          const accountIdScope = scopeAccountId
+            ? {
+              accountId: scopeAccountId,
+              multiAccount: isMultiAccount,
+              // 审计修复（R5）：本机保存的账号数量无法证明共享索引中无前缀
+              // legacy 向量的归属（其他设备/旧客户端/已移除账号都可能写入）。
+              // vectorSearchPipeline 明确禁止该推断：allowLegacyUnscoped 只在
+              // 索引归属被独立确认时才为 true——当前没有这样的确认机制，
+              // 一律拒绝无归属 legacy 向量（索引未就绪时跳过稠密召回，走
+              // 本地词法召回）；单账号兼容由格式版本升级触发的完整重建收敛。
+              allowLegacyUnscoped: false,
+            }
+            : undefined;
           const result = await runVectorSearchPipeline({
             query,
             repositories,
@@ -399,7 +445,25 @@ export const useSearchActions = (): SearchActions => {
             vectorService,
             crossEncoder,
             signal: controller.signal,
+            accountIdScope,
+            onDenseSkipped: (reason) => {
+              if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+              // 审计修复：降级提示按原因本地化（原文为英文硬编码，非英语界面
+              // 下用户仍看到英文）。reason 枚举见 vectorSearchPipeline 的
+              // DenseQueryScopeResolution；needs-backfill 走默认分支。
+              const notice = reason === 'worker-unsupported'
+                ? t('useSearchActions.vector-worker-does-not-support-account-scoped-recall')
+                : reason === 'metadata-index-not-ready'
+                  ? t('useSearchActions.account-metadata-index-is-not-ready-create-the-accountid')
+                  : reason === 'status-failed'
+                    ? t('useSearchActions.failed-to-verify-vector-worker-status-fell-back-to-loca')
+                    : t('useSearchActions.vector-index-needs-rebuild-for-multi-account-search-fe');
+              toast(notice, 'info');
+            },
             onPhase: (phase) => {
+              // 审计修复（C23）：回调先比较发起会话（账号 ID + 会话代次），
+              // 不一致立即返回，不更新新账号的搜索阶段。
+              if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
               setSearchPhase(
                 phase === 'analyzing'
                   ? t('useSearchActions.ai-analyzing-query')
@@ -416,11 +480,25 @@ export const useSearchActions = (): SearchActions => {
             throw new DOMException('Search superseded', 'AbortError');
           }
           if (result === null) {
+            // 回退前复核发起账号（审计修复）：keywordSearch 内部的账号检查以
+            // 当前账号为准，切号后恒通过——闭包里的 query/repositories 仍是
+            // 旧账号的，回退会把旧账号的结果写进新账号的搜索视图
+            if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+              return;
+            }
             await keywordSearch(query, applyFilters, { signal: controller.signal });
             return;
           }
 
-          const finalFiltered = applyFilters([...result.repositories]);
+          // 跨账号数据外泄防护：按当前活跃账号的仓库 id 集合过滤后才能展示
+          if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+            return;
+          }
+          const currentRepoIds = new Set(
+            useAppStore.getState().repositories.map((repo) => String(repo.id)),
+          );
+          const finalFiltered = applyFilters([...result.repositories])
+            .filter((repo) => currentRepoIds.has(String(repo.id)));
           const order = new Map(
             result.repositories.map((repo, index) => [String(repo.id), index]),
           );
@@ -441,6 +519,11 @@ export const useSearchActions = (): SearchActions => {
       }
       // ====== 向量搜索分支结束 ======
 
+      // 回退前复核发起账号（审计修复）：向量请求抛出非取消异常或未启用向量时，
+      // 切号后闭包中的 query/repositories 已不属于当前账号，回退提交必须丢弃
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
       await keywordSearch(query, applyFilters, { signal: controller.signal });
     } catch (error) {
       // 取消不是失败：静默结束当前搜索（不产出结果），不当作可恢复的 AI 失败
@@ -458,7 +541,7 @@ export const useSearchActions = (): SearchActions => {
         setSearchPhase(null);
       }
     }
-  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, keywordSearch, t]);
+  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, keywordSearch, t, toast]);
 
   const syncStars = useCallback(async (mode: 'auto' | 'stars-only' | 'stars-and-lists' = 'auto') => {
     if (!githubToken) {
@@ -466,11 +549,22 @@ export const useSearchActions = (): SearchActions => {
       return;
     }
 
+    // 审计修复（C21）：同步状态所有权标识——仅最新一次请求可清除共享标记。
+    const runId = ++starSyncRunSeq;
     setSyncingStars(true);
+    // 账号代次校验（Issue #611）：全量拉取耗时期间切号后丢弃结果，绝不覆盖新账号
+    const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
+    // R12（finding 15）：区分「星标已写入本地」与「后端写入失败」——本地星标
+    // 已更新时后端推送失败不得再报「同步失败请检查网络」。
+    let starredApplied = false;
     try {
       const githubApi = createGitHubApiService(githubToken);
       const newRepositories = await githubApi.getAllStarredRepositories();
 
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
       const storeRepos = useAppStore.getState().repositories;
       const mergedRepositories = mergeStarredRepositories(newRepositories, storeRepos);
 
@@ -490,6 +584,12 @@ export const useSearchActions = (): SearchActions => {
             throw new Error(t('useSearchActions.failed-to-get-github-username-please-login-again'));
           }
           const lists = await listsApi.getUserLists(login);
+
+          // 账号代次校验（Issue #611 审计修复）：getUserLists 等待期间切号后，
+          // 必须在写入任何分类之前退出——末尾的账号检查无法撤销已创建的分类
+          if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+            return;
+          }
 
           // allCategories 与 View 的 useMemo 同源同值（getAllCategories 四参口径）
           const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);
@@ -525,7 +625,11 @@ export const useSearchActions = (): SearchActions => {
           }
         } catch (listError) {
           console.error('List sync failed:', listError);
-          toast(t('useSearchActions.list-sync-failed-starred-repositories-were-synce'), 'error');
+          // 审计修复（C22）：列表请求失败提示同样绑定发起会话——仅请求所属
+          // 会话仍是当前会话时显示；当前会话的列表失败保留已完成的星标同步结果。
+          if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+            toast(t('useSearchActions.list-sync-failed-starred-repositories-were-synce'), 'error');
+          }
           // 不中断：星标同步结果仍然生效
         }
       }
@@ -535,12 +639,26 @@ export const useSearchActions = (): SearchActions => {
       // 会被误报为新增，弹出「发现 N 个新仓库」的错误提示。
       const newRepoCount = countNewStarredRepositories(newRepositories, storeRepos);
 
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
       setRepositories(finalRepositories);
-      await forceSyncToBackend();
+      starredApplied = true;
+      const backendWriteSucceeded = await forceSyncToBackend();
+
+      // 审计修复（C20）：推送完成后再写 lastSync 与提示前重新校验会话——
+      // forceSyncToBackend 等待期间切号后，A 的同步结果绝不写进 B 的会话。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
 
       setLastSync(new Date().toISOString());
 
-      if (newRepoCount > 0) {
+      if (!backendWriteSucceeded) {
+        // R12（finding 15）：星标已更新，仅后端写入失败——提示保留本地结果的
+        // 专用文案，绝不误报为整体同步失败。
+        toast(t('useSearchActions.sync-completed-backend-write-failed'), 'warning');
+      } else if (newRepoCount > 0) {
         toast(t('useSearchActions.sync-completed-found-newrepocount-new-repositori', { newRepoCount: newRepoCount }), 'success');
       } else {
         toast(t('useSearchActions.sync-completed-all-repositories-are-up-to-date'), 'info');
@@ -548,13 +666,25 @@ export const useSearchActions = (): SearchActions => {
 
     } catch (error) {
       console.error('Sync failed:', error);
-      if (error instanceof Error && error.message.includes('token')) {
+      // 审计修复（C22）：星标请求失败提示复用成功路径的会话校验——仅请求
+      // 所属会话仍是当前会话时显示错误提示。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
+      if (starredApplied) {
+        // 本地星标已写入：失败只属于后端推送，提示专用文案并保留本地结果
+        toast(t('useSearchActions.sync-completed-backend-write-failed'), 'warning');
+      } else if (error instanceof Error && error.message.includes('token')) {
         toast(t('useSearchActions.github-token-has-expired-or-is-invalid-please-lo'), 'error');
       } else {
         toast(t('useSearchActions.sync-failed-please-check-your-network-connection'), 'error');
       }
     } finally {
-      setSyncingStars(false);
+      // 审计修复（C21）：仅标识匹配（仍是最新一次同步请求）的请求可清除
+      // 共享的同步标记；切号后新会话发起的同步会递增标识使旧请求失去所有权。
+      if (starSyncRunSeq === runId) {
+        setSyncingStars(false);
+      }
     }
   }, [githubToken, setSyncingStars, syncMode, user, t, toast, addCustomCategory, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, setRepositories, setLastSync]);
 

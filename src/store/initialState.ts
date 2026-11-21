@@ -26,6 +26,7 @@ export const createInitialState = (): AppState => ({
       githubToken: null,
       isAuthenticated: false,
       accountWorkspaces: {},
+      savedAccounts: {},
       repositories: [],
       // Theme token 默认全部"跟随预设"（开发守则 §14）
       themeTokens: { ...DEFAULT_THEME_TOKENS },

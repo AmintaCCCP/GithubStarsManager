@@ -8,8 +8,15 @@ import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccount,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
-import { forceSyncToBackend } from '../../../services/autoSync';
+import { forceSyncToBackend, markPendingAccountSync, markPendingRepositoryDeletion, withAccountSwitchGuardSync } from '../../../services/autoSync';
+import { backend } from '../../../services/backendAdapter';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../../../utils/categoryUtils';
 import {
@@ -76,6 +83,22 @@ export const useBulkRepositoryActions = ({
   const t = useT('repositories');
 
   const unstar = useCallback(async (repositories: Repository[]) => {
+    // 账号代次校验（Issue #611 审计修复）：操作所属账号必须在任何 await（含
+    // 确认框）之前保存；确认返回后、每次远端操作前、删除本地仓库前都用保存值
+    // 复核——两次即时读取（peekCurrentAccountId + isCurrentAccount 内部再读）
+    // 比较的都是当前账号，识别不出等待期间发生的切号。
+    const startedAccountId = peekCurrentAccountId();
+    // A→B→A：账号 ID 与确认前相同，只有会话代次能识别这次切号。
+    const startedGeneration = getAccountSessionGeneration();
+    // 审计修复（R12，CodeRabbit Major）：记录发起时各仓库的星标时间——迟到的
+    // 取消星标对账据此区分「原始记录仍在」与「切号期间用户重新加星的同 ID
+    // 新记录」（重新加星路径都会刷新 starred_at），后者必须保留且不登记删除。
+    const startedStarredAtById = new Map<number, string | undefined>(
+      repositories.map((repository) => [repository.id, repository.starred_at]),
+    );
+    // 审计修复（C26）：操作发起时保存目标后端地址——完成时即使后端已切换，
+    // 待补推标记也登记到发起时的 (账号, 后端) 复合键，绝不推到切换后的后端。
+    const startedBackendUrl = backend.backendUrl ?? '';
     if (!githubToken) {
       toast(t('useBulkRepositoryActions.github-token-not-found-please-login-again'), 'error');
       return false;
@@ -87,12 +110,17 @@ export const useBulkRepositoryActions = ({
       { type: 'danger', confirmText: t('useBulkRepositoryActions.unstar') },
     );
     if (!confirmed) return false;
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+      return false;
+    }
 
     const githubApi = createGitHubApiService(githubToken);
     const successIds: number[] = [];
     const failedRepositories: string[] = [];
 
     for (const repository of repositories) {
+      // 切号后不再发起新的远端操作（已完成的远端取消星标不可撤销）
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) break;
       try {
         const [owner, name] = repository.full_name.split('/');
         await githubApi.unstarRepository(owner, name);
@@ -103,6 +131,95 @@ export const useBulkRepositoryActions = ({
       }
     }
 
+    // 等待 GitHub API 期间已切号：远端取消星标按发起账号完成（保留），
+    // 审计修复（C25）：按结果归属处理——发起账号已重新激活时在其当前实时
+    // 工作区对账（列表与 release 归档一致），仍停放时更新其归档快照；
+    // 两条路径都只作用于发起账号自己的数据，绝不影响其他账号中 ID 相同的
+    // 仓库（代次不匹配后也不再发起新的远端请求，循环已在会话失效时 break）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+      if (startedAccountId && successIds.length > 0 && typeof useAppStore.setState === 'function') {
+        // 审计修复（R12，CodeRabbit Major）：对账只删除「取消请求发出后未被
+        // 重新加星」的仓库——切号期间用户重新加星的同 ID 仓库（starred_at
+        // 已刷新）必须保留在工作区，且不得登记待删除记录，否则迟到的响应
+        // 会删掉重新加星的仓库并把删除标记推给后端（GitHub 上仍是已加星）。
+        const collectRestarred = (list: Repository[] | undefined): Set<number> => {
+          const restarred = new Set<number>();
+          for (const id of successIds) {
+            const current = list?.find((repo) => repo.id === id);
+            if (current && (current.starred_at ?? undefined) !== startedStarredAtById.get(id)) {
+              restarred.add(id);
+            }
+          }
+          return restarred;
+        };
+        const reconcileState = useAppStore.getState();
+        // 只有发起账号仍是当前账号时实时列表才属于它；切到 B 后实时列表是
+        // B 的工作区（同 ID 仓库与 A 无关），只核对 A 的归档快照。
+        const restarredIds = new Set<number>([
+          ...(isCurrentAccount(startedAccountId) ? collectRestarred(reconcileState.repositories) : []),
+          ...collectRestarred(reconcileState.accountWorkspaces[startedAccountId]?.repositories),
+        ]);
+        const deletableIds = new Set(successIds.filter((id) => !restarredIds.has(id)));
+        // R12（finding 0）：没有可删除项（全部在等待期间重新加星）时不做任何
+        // 工作区写回，也不登记待删除/待补推。
+        if (deletableIds.size > 0 && isCurrentAccount(startedAccountId)) {
+          // 已重新激活：在其当前实时工作区应用删除（重新加星的同 ID 仓库保留）
+          withAccountSwitchGuardSync(() => {
+            useAppStore.setState((state) => {
+              // 审计修复（R12）：跨会话取消星标与 deleteRepository 同一清理规则
+              // ——移除已删除仓库的订阅，并清掉剩余 Release 已不包含的已读 ID。
+              const remainingReleaseIds = new Set(
+                state.releases.filter((rel) => !deletableIds.has(rel.repository.id)).map((rel) => rel.id),
+              );
+              const nextSubscriptions = new Set(state.releaseSubscriptions ?? []);
+              for (const id of deletableIds) nextSubscriptions.delete(id);
+              return {
+                repositories: state.repositories.filter((r) => !deletableIds.has(r.id)),
+                searchResults: (state.searchResults ?? []).filter((r) => !deletableIds.has(r.id)),
+                releases: state.releases.filter((rel) => !deletableIds.has(rel.repository.id)),
+                releaseSubscriptions: nextSubscriptions,
+                readReleases: new Set(
+                  Array.from(state.readReleases ?? []).filter((releaseId) => remainingReleaseIds.has(releaseId)),
+                ),
+              };
+            });
+          });
+        }
+        if (deletableIds.size > 0) withAccountSwitchGuardSync(() => {
+          useAppStore.setState((state) => {
+            const parked = state.accountWorkspaces[startedAccountId];
+            if (!parked) return state;
+            // 归档快照同样应用删除，保持列表/归档一致（仅限发起账号条目）
+            const remainingReleaseIds = new Set(
+              parked.releases.filter((rel) => !deletableIds.has(rel.repository.id)).map((rel) => rel.id),
+            );
+            const nextSubscriptions = new Set(parked.releaseSubscriptions ?? []);
+            for (const id of deletableIds) nextSubscriptions.delete(id);
+            return {
+              accountWorkspaces: {
+                ...state.accountWorkspaces,
+                [startedAccountId]: {
+                  ...parked,
+                  repositories: parked.repositories.filter((r) => !deletableIds.has(r.id)),
+                  releases: parked.releases.filter((rel) => !deletableIds.has(rel.repository.id)),
+                  releaseSubscriptions: Array.from(nextSubscriptions),
+                  readReleases: Array.from(parked.readReleases ?? []).filter((releaseId) => remainingReleaseIds.has(releaseId)),
+                },
+              },
+            };
+          });
+        });
+        // 审计修复（C26）：为每个成功取消 Star 的仓库登记待确认删除，并登记账号级待补推。
+        // R12：重新加星的同 ID 仓库绝不登记（本地保留记录，且 GitHub 上仍为已加星）。
+        if (deletableIds.size > 0) {
+          for (const repositoryId of deletableIds) {
+            markPendingRepositoryDeletion(startedAccountId, repositoryId, startedBackendUrl);
+          }
+          markPendingAccountSync(startedAccountId, startedBackendUrl);
+        }
+      }
+      return false;
+    }
     for (const repositoryId of successIds) {
       deleteRepository(repositoryId);
     }
@@ -119,6 +236,9 @@ export const useBulkRepositoryActions = ({
   const restore = useCallback(async (repositories: Repository[], config: RepositoryRestoreConfig) => {
     if (repositories.length === 0) return false;
 
+    // 账号代次校验（Issue #611）：本地写入为同步执行，入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {
@@ -144,6 +264,9 @@ export const useBulkRepositoryActions = ({
   }, [language, toast, updateRepository, t]);
 
   const categorize = useCallback(async (repositories: Repository[], categoryName: string) => {
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {
       try {
@@ -168,6 +291,9 @@ export const useBulkRepositoryActions = ({
   }, [allCategories, language, toast, updateRepository, t]);
 
   const subscribe = useCallback(async (repositories: Repository[]) => {
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     for (const repository of repositories) {
       try {
@@ -196,6 +322,9 @@ export const useBulkRepositoryActions = ({
       return false;
     }
 
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     batchUnsubscribeReleases(subscribedRepositories.map((repository) => repository.id));
     const failedRepositories: string[] = [];
     for (const repository of subscribedRepositories) {
@@ -218,6 +347,9 @@ export const useBulkRepositoryActions = ({
   }, [batchUnsubscribeReleases, language, releaseSubscriptions, t, toast, updateRepository]);
 
   const lockCategory = useCallback(async (repositories: Repository[]) => {
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     let skippedCount = 0;
     const failedRepositories: string[] = [];
@@ -249,6 +381,9 @@ export const useBulkRepositoryActions = ({
   }, [language, toast, updateRepository, t]);
 
   const unlockCategory = useCallback(async (repositories: Repository[]) => {
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {

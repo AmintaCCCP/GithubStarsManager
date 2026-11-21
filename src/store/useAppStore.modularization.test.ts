@@ -46,9 +46,9 @@ const partialize = (overrides: Partial<ReturnType<AppStore['getState']>> = {}): 
 
 const currentPersistedKeys = [
   'user',
-  'githubToken',
   'isAuthenticated',
   'accountWorkspaces',
+  'savedAccounts',
   'repositories',
   'lastSync',
   'themeTokens',
@@ -176,14 +176,33 @@ const historicalSnapshots = (): PersistedSnapshot[] => [
 describe('PR-07 Store modularization compatibility', () => {
   it('keeps exactly one persistence shell and the current persisted key set', () => {
     const options = persistenceOptions();
+    // 审计修复（R2-B17）：显式构造 githubToken 非空的 savedAccounts 账号，
+    // 断言持久化结果中该令牌被剥除——不依赖共享初始化状态恰好为空。
     const persisted = partialize({
       analyzingGistIds: new Set(['gist-1']),
       proxyConfig: { enabled: true, type: 'http', host: 'proxy.example.com', port: 7890, password: 'proxy-password' },
       rpcDownloadConfig: { enabled: true, host: 'rpc.example.com', port: 6800, secret: 'rpc-secret' },
+      savedAccounts: {
+        '42': {
+          accountId: '42',
+          user: { id: 42, login: 'octocat', name: 'Octocat', avatar_url: 'https://example.com/a.png', email: null },
+          githubToken: 'ghp_secret_token_must_be_stripped',
+          addedAt: '2026-01-01T00:00:00.000Z',
+          lastUsedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
     });
 
-    expect(options.version).toBe(17);
+    // 审计修复（B7）：v19 起明文 PAT 不再进入持久化分片（githubToken 键被移除，
+    // savedAccounts 仅保留非敏感元数据）。
+    expect(options.version).toBe(19);
     expect(Object.keys(persisted)).toEqual(currentPersistedKeys);
+    expect(persisted).not.toHaveProperty('githubToken');
+    const savedEntries = Object.values(persisted.savedAccounts ?? {}) as Array<{ githubToken?: string }>;
+    expect(savedEntries).toHaveLength(1);
+    for (const entry of savedEntries) {
+      expect(entry.githubToken ?? '').toBe('');
+    }
     expect(persisted.analyzingGistIds).toEqual(['gist-1']);
     expect(persisted.proxyConfig).toMatchObject({ password: 'proxy-password' });
     expect(persisted.rpcDownloadConfig).toMatchObject({ secret: 'rpc-secret' });

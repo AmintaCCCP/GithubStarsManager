@@ -236,7 +236,19 @@
     "menu-releases": "發布",
     "menu-forks": "復刻",
     "menu-subscription": "發現",
-    "menu-settings": "設定"
+    "menu-settings": "設定",
+    "switch-account": "切換帳號",
+    "add-account": "新增帳號",
+    "current-account": "目前帳號",
+    "remove-account": "移除帳號",
+    "remove-account-with-login": "移除 @{{login}} 帳號",
+    "logout-account-changed": "帳號已切換，請對目前帳號重新執行登出。",
+    "switch-in-progress": "正在切換帳號，請稍後再試。",
+    "remove-account-confirm-title": "移除已儲存的帳號",
+    "remove-account-confirm-desc": "僅會移除該帳號的快速登入憑證，本機快取的儲存庫與分類仍會保留。確定要繼續嗎？",
+    "account-switched": "已切換至 @{{login}}",
+    "account-repo-count": "{{count}} 個儲存庫",
+    "retry-credential-alignment": "重試後端憑證對齊"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "同步分類到 GitHub list"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "數據導入成功",
     "import-data": "導入數據",
     "import-failed-please-try-again": "導入失敗，請重試",
+    "pat-export-authorization-title": "GitHub Token 匯出授權",
+    "pat-export-authorization-desc": "本次匯出將以明文包含所有已儲存帳號的 GitHub Token。每次匯出都需要明確確認；先前儲存的「備份/匯出時包含金鑰」開關不視為授權。",
+    "pat-export-deny": "拒絕",
+    "pat-export-authorize": "授權",
+    "import-accounts-need-reauth": "資料匯入成功。以下帳號缺少本機憑證，需要重新授權：{{accounts}}",
+    "import-skipped-unattributed-top-level": "備份的頂層資料未歸屬任何帳號，已跳過寫入，目前帳號資料不受影響。",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "未分析倉庫無法直接清理，請透過 AI 分析功能處理",
     "cleanup-data": "清理數據",
     "data-cleanup-successful": "資料清理成功",
@@ -1416,5 +1434,19 @@
     "download": "下載",
     "detected-from-filenames-and-release-metadata-no": "依檔名與 Release 中繼資料辨識，未驗證安裝包安全性，也不會自動執行。你隨時可以在下方資產清單中手動選擇其他資產。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 個不適用於目前裝置的資產（原始碼、校驗和、簽章、偵錯符號、blockmap、其他平台/架構）。"
+  },
+  "accountModal": {
+    "title": "新增 GitHub 帳號",
+    "description": "輸入新的 GitHub Personal Access Token 以新增帳號，目前帳號的資料將被安全保留。",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "關閉",
+    "confirm": "新增並切換",
+    "reauth-hint": "請為帳號 @{{login}} 重新輸入有效的 GitHub Token",
+    "account-mismatch": "此 Token 屬於另一個 GitHub 帳號，請使用 @{{login}} 的 Token 登入。",
+    "backend-credential-sync-failed": "已登入該帳號，但後端憑證未能更新。請稍後從帳號選單重試。"
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "已登出，但裝置端憑證清理未完成。舊憑證已被封鎖，將於下次啟動時自動重試。",
+    "active-account-update-skipped": "切換期間另一台裝置更改了後端的活躍帳號，後端未能切換到本帳號。本機工作階段已切換到該帳號；請從帳號選單重試以對齊後端。"
   }
 }

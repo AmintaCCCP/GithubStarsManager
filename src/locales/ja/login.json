@@ -59,6 +59,12 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "トークンはこのデバイスと自分のバックエンドにのみ保存され、アプリのサーバーには送信されません。"
+    "token-permissions-local-storage": "トークンはこのデバイスと自分のバックエンドにのみ保存され（WebDAV やファイルバックアップで「バックアップ・エクスポートにキーを含める」を有効にした場合を除く）、アプリのサーバーには送信されません。",
+    "saved-accounts": "保存済みアカウント",
+    "click-to-sign-in": "クリックしてサインイン",
+    "token-required": "トークンが必要です",
+    "select-account-to-restore": "復元するアカウントを選択してください",
+    "multiple-accounts-exist-on-this-backend-select-th": "このバックエンドには複数のアカウントがあります。復元するアカウントを選択してください。",
+    "multiple-accounts-exist-on-this-backend-close-th": "このバックエンドには複数のアカウントがあります。ダイアログを閉じて、ログイン画面で復元するアカウントを選択してください。"
   }
 }

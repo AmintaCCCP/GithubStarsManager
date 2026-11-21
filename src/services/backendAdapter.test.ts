@@ -1,8 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { backend } from './backendAdapter';
+import { logger } from './logger';
+
+// 可变共享桩：restoreAuth 账号头测试需要模拟「本机已登录账号 A」的会话状态
+const mockStoreState: { backendApiSecret: string; user: { id: number; login: string } | null } = {
+  backendApiSecret: '',
+  user: null,
+};
 
 vi.mock('../store/useAppStore', () => ({
-  useAppStore: { getState: () => ({ backendApiSecret: '' }) },
+  useAppStore: { getState: () => mockStoreState },
 }));
 
 function make429Response(headers: Record<string, string>): Response {
@@ -77,12 +84,16 @@ function makeHealthOkResponse(): Response {
 }
 
 function makeJsonResponse(payload: unknown): Response {
+  const text = typeof payload === 'string' ? payload : JSON.stringify(payload);
   return {
     ok: true,
     status: 200,
     json: async () => payload,
+    // 第 13 轮审计修复 [33]：syncSettings 分离正文读取与 JSON 解析（res.text()
+    // + JSON.parse），测试桩需提供 text。
+    text: async () => text,
     headers: { forEach: () => {} },
-    clone: () => ({ text: async () => '' }),
+    clone: () => ({ text: async () => text }),
   } as unknown as Response;
 }
 
@@ -150,6 +161,131 @@ describe('backendAdapter settings hydration', () => {
     vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse(payload));
 
     await expect(backend.fetchSettings()).rejects.toThrow('invalid settings response');
+  });
+});
+
+describe('syncSettings token 更新标志（server configs.ts 契约，审计修复）', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+  });
+
+  it('puts settings and surfaces token_update_skipped / token_update_superseded flags', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      token_update_skipped: true,
+      token_update_superseded: false,
+    }));
+
+    await expect(backend.syncSettings({ collapsedSidebarCategoryCount: 34 })).resolves.toEqual({
+      tokenUpdateSkipped: true,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
+    });
+  });
+
+  it('surfaces token_update_superseded independently of token_update_skipped (round-12 audit fix)', async () => {
+    // tokenUpdateSuperseded 被固定为 false 的回归在此暴露：两个「凭据未更新」
+    // 结果必须能被独立验证。
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      token_update_skipped: false,
+      token_update_superseded: true,
+    }));
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: true,
+      activeAccountUpdateSkipped: false,
+    });
+  });
+
+  it('surfaces active_account_update_skipped (round-12 audit ISSUE-1)', async () => {
+    // 服务端在「更晚的切换抢先、本次活跃账号写入被跳过」时返回该标记；
+    // 适配器必须解析它，账号切换流程才能避免把并发冲突报告成成功。
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      updated: true,
+      token_update_skipped: false,
+      token_update_superseded: false,
+      active_account_update_skipped: true,
+    }));
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: true,
+    });
+  });
+
+  it('rejects when the response body exceeds the deadline instead of reporting success', async () => {    // 第 12 轮审计修复：正文读取超时不得被折叠成「两个标志均为 false 的成功
+    // 响应」——凭据对齐结论未知，必须按失败处理，保留调用方的待对齐状态。
+    vi.useFakeTimers();
+    try {
+      adapter._backendUrl = 'http://localhost:3000/api';
+      let deadlineSignal: AbortSignal | null = null;
+      vi.mocked(window.fetch).mockImplementation(async (_url, init) => {
+        deadlineSignal = (init as RequestInit | undefined)?.signal ?? null;
+        return {
+          ok: true,
+          status: 200,
+          // 第 13 轮审计修复 [33]：正文读取与解析分离——正文读取超时用 text()
+          // 模拟（json() 不再被调用）。
+          text: () => new Promise((_resolve, reject) => {
+            deadlineSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+          }),
+          headers: { forEach: () => {} },
+        } as unknown as Response;
+      });
+
+      const pending = backend.syncSettings({});
+      const assertion = expect(pending).rejects.toThrow('Sync settings response body timed out');
+      await vi.advanceTimersByTimeAsync(30000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+      vi.mocked(window.fetch).mockReset();
+      adapter._backendUrl = null;
+    }
+  });
+
+  it('defaults missing flags to false (fully written)', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({}));
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
+    });
+  });
+
+  it('tolerates an unparseable response body as no flags', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      // 第 13 轮审计修复 [33]：正文完整读取（text 成功）但 JSON 非法 → 仍按
+      // 「无标志成功」处理（旧行为）；读取失败则抛错，不进入该分支。
+      text: async () => 'not-json{{',
+      headers: { forEach: () => {} },
+    } as unknown as Response);
+
+    await expect(backend.syncSettings({})).resolves.toEqual({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
+    });
+  });
+
+  it('passes the accountId header through for explicit partition writes', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    const fetchMock = vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({}));
+    await backend.syncSettings({ github_token: 'tok' }, undefined, '42');
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(headers['X-GitHub-Account-Id']).toBe('42');
   });
 });
 
@@ -224,6 +360,92 @@ describe('backendAdapter 后端 URL 安全策略', () => {
 
     expect(window.fetch).toHaveBeenCalledWith('http://127.0.0.2:8080/api/health', expect.anything());
     expect(backend.isAvailable).toBe(true);
+  });
+});
+
+describe('restoreAuth 账号头策略（R4 审计修复）', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+    mockStoreState.user = null;
+    mockStoreState.backendApiSecret = '';
+  });
+
+  const requestHeaders = (): Record<string, string> => {
+    const init = vi.mocked(window.fetch).mock.calls[0]?.[1] as RequestInit;
+    return init.headers as Record<string, string>;
+  };
+
+  it('缺省携带当前登录账号的 X-GitHub-Account-Id（普通账号定向恢复保留）', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    mockStoreState.user = { id: 1, login: 'alice' };
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({ github_token: 'tok', accounts: [] }));
+
+    await backend.restoreAuth();
+
+    expect(requestHeaders()['X-GitHub-Account-Id']).toBe('1');
+  });
+
+  it('omitAccountHeader 模式显式省略账号头，Bearer 鉴权保留', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    mockStoreState.user = { id: 1, login: 'alice' };
+    mockStoreState.backendApiSecret = 'api-secret';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({ github_token: 'tok', accounts: [] }));
+
+    await backend.restoreAuth({ omitAccountHeader: true });
+
+    const headers = requestHeaders();
+    // 候选后端恢复：绝不继承本机旧账号头（服务端回退后端自己的 active_account_id）
+    expect(headers['X-GitHub-Account-Id']).toBeUndefined();
+    expect(headers['Authorization']).toBe('Bearer api-secret');
+  });
+
+  it('/sync/auth 的响应正文不进入调试日志（多账号明文 Token）', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    const token = 'synthetic-github-token-for-log-test';
+    const withBody = (payload: unknown): Response => {
+      const body = JSON.stringify(payload);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => JSON.parse(body),
+        headers: { forEach: () => {} },
+        clone: () => ({ text: async () => body }),
+      } as unknown as Response;
+    };
+    const isDebug = vi.spyOn(logger, 'isDebugMode').mockReturnValue(true);
+    const debug = vi.spyOn(logger, 'debug').mockImplementation(() => {});
+    let logged: string;
+    try {
+      // Control: a normal endpoint still logs its (redacted) body.
+      vi.mocked(window.fetch).mockResolvedValueOnce(withBody({ collapsedSidebarCategoryCount: 3 }));
+      await backend.fetchSettings();
+      expect(JSON.stringify(debug.mock.calls)).toContain('collapsedSidebarCategoryCount');
+
+      debug.mockClear();
+      // >4000 chars: the pre-fix code truncated first, then failed to parse the
+      // truncated JSON and fell back to a pass that only strips gsm_mcp_ tokens.
+      const accounts = Array.from({ length: 60 }, (_, index) => ({
+        accountId: String(index + 1),
+        user: { id: index + 1, login: `user-${index + 1}` },
+        githubToken: token,
+      }));
+      vi.mocked(window.fetch).mockResolvedValueOnce(withBody({
+        github_token: token,
+        accounts,
+      }));
+      expect(JSON.stringify({ github_token: token, accounts }).length).toBeGreaterThan(4000);
+      await backend.restoreAuth({ omitAccountHeader: true });
+      // Read before the finally block: mockRestore() clears recorded calls.
+      logged = JSON.stringify(debug.mock.calls);
+    } finally {
+      isDebug.mockRestore();
+      debug.mockRestore();
+    }
+    expect(logged).toContain('/sync/auth');
+    expect(logged).not.toContain(token);
   });
 });
 

@@ -4,6 +4,7 @@ import type { Category, Repository } from '../../types';
 import { defaultCategories, initialSearchFilters } from '../schema';
 import { createRepositorySlice } from './repositorySlice';
 import { logger } from '../../services/logger';
+import { bumpAccountSessionGeneration } from '../helpers/accountWorkspace';
 import { GITHUB_LISTS_MAX_COUNT, GITHUB_LISTS_NAME_MAX_LENGTH } from '../helpers/listsPushPlan';
 
 vi.mock('../../services/logger', () => ({
@@ -288,7 +289,8 @@ describe('pushCategoriesToLists 隐藏分类不参与回写', () => {
     await push();
 
     // 仓库加入 devtools list 的同时，保留其在隐藏分类 list（L_web）中的成员关系
-    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_web', 'L_new']);
+    // 第 12 轮：pushCategoriesToLists 为远端写入传入会话中止信号（第三参数）
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_web', 'L_new'], expect.anything());
   });
 });
 
@@ -315,7 +317,7 @@ describe('pushCategoriesToLists 仅推送选中分类', () => {
     expect(api.createUserList).toHaveBeenCalledTimes(1);
     expect(api.createUserList).toHaveBeenCalledWith('Alpha', true);
     expect(api.updateUserList).not.toHaveBeenCalled();
-    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev', 'L_new']);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev', 'L_new'], expect.anything());
     expect(state.categoryListIdMap).toEqual({ devtools: 'L_dev', 'custom-alpha': 'L_new' });
     expect(state.listsPush.error).toBeNull();
   });
@@ -335,7 +337,7 @@ describe('pushCategoriesToLists 仅推送选中分类', () => {
     await push(['custom-alpha']);
 
     expect(api.updateUserListsForItem).toHaveBeenCalledTimes(1);
-    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev']);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev'], expect.anything());
   });
 
   it('选中分类与未选分类共享同一 list 时，共享 list 的成员关系不被清理', async () => {
@@ -369,5 +371,64 @@ describe('pushCategoriesToLists 仅推送选中分类', () => {
     expect(api.getUserLists).not.toHaveBeenCalled();
     expect(state.listsPush.isRunning).toBe(false);
     expect(state.listsPush.error).toBe('No categories selected to push');
+  });
+});
+
+describe('pushCategoriesToLists 陈旧 isRunning 恢复（round-14 [27]）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('会话代次递增使旧推送跳过复位后，残留 isRunning 不阻塞下一轮推送', async () => {
+    const { push, api, state } = makeSliceHarness({
+      currentLists: [{ id: 'L_dev', name: 'devtools', items: [] }],
+      categoryListIdMap: { devtools: 'L_dev' },
+      nodeIdMap: new Map([['owner/my-cli-app', 'node_1']]),
+    });
+    // 模拟推送期间通过「添加账号」提交同一 GitHub 账号的新 PAT：addAccountWithToken
+    // 递增会话代次但不清除 listsPush。旧推送在请求完成后因会话检查中止，跳过
+    // 状态复位（isRunning 残留），finally 只释放远端槽。
+    api.resolveRepositoryNodeIds.mockImplementation(async () => {
+      bumpAccountSessionGeneration();
+      return new Map([['owner/my-cli-app', 'node_1']]);
+    });
+
+    await push();
+
+    // 旧任务已结束但状态未复位：isRunning 残留（既有行为），远端槽已释放。
+    expect(state.listsPush.isRunning).toBe(true);
+
+    // 下一轮推送不得被残留 isRunning 阻塞：远端槽已全部释放（无在途任务）。
+    api.getUserLists.mockClear();
+    api.resolveRepositoryNodeIds.mockResolvedValue(new Map([['owner/my-cli-app', 'node_1']]));
+    await push();
+    expect(api.getUserLists).toHaveBeenCalledTimes(1);
+    expect(state.listsPush.isRunning).toBe(false);
+    expect(state.listsPush.message).toBeTruthy();
+    expect(state.listsPush.error).toBeNull();
+  });
+
+  it('仍有在途任务（远端槽未释放）时保持重入保护提前返回', async () => {
+    const { push, api, state } = makeSliceHarness({
+      currentLists: [{ id: 'L_dev', name: 'devtools', items: [] }],
+      categoryListIdMap: { devtools: 'L_dev' },
+      nodeIdMap: new Map([['owner/my-cli-app', 'node_1']]),
+    });
+    let releaseNodeIds!: () => void;
+    api.resolveRepositoryNodeIds.mockImplementation(
+      () => new Promise<Map<string, string>>((resolve) => { releaseNodeIds = () => resolve(new Map([['owner/my-cli-app', 'node_1']])); }),
+    );
+
+    const first = push();
+    await vi.waitFor(() => expect(api.resolveRepositoryNodeIds).toHaveBeenCalledTimes(1));
+
+    // 在途任务持有远端槽：第二次推送必须照常提前返回，不发起任何远端请求。
+    await push();
+    expect(api.getUserLists).toHaveBeenCalledTimes(1);
+
+    releaseNodeIds();
+    await first;
+    expect(state.listsPush.isRunning).toBe(false);
+    expect(state.listsPush.message).toBeTruthy();
   });
 });

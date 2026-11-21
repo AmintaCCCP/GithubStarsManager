@@ -59,6 +59,12 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend; nunca en los servidores de la app."
+    "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend (salvo que actives \"Incluir claves en copia de seguridad/exportación\" para copias WebDAV o de archivos); nunca en los servidores de la app.",
+    "saved-accounts": "Cuentas guardadas",
+    "click-to-sign-in": "Haz clic para iniciar sesión",
+    "token-required": "Se requiere token",
+    "select-account-to-restore": "Selecciona la cuenta que quieres restaurar",
+    "multiple-accounts-exist-on-this-backend-select-th": "Existen varias cuentas en este backend; selecciona la cuenta que quieres restaurar.",
+    "multiple-accounts-exist-on-this-backend-close-th": "Existen varias cuentas en este backend. Cierra este diálogo y selecciona la cuenta que quieres restaurar en la página de inicio de sesión."
   }
 }

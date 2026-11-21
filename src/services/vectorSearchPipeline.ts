@@ -1,6 +1,11 @@
 import type { EmbeddingConfig, Repository, VectorSearchConfig } from '../types';
 import { AIService, isAbortError } from './aiService';
-import type { EmbeddingClient, VectorQueryResult, VectorSearchService } from './vectorSearchService';
+import {
+  parseAccountScopedVectorId,
+  type EmbeddingClient,
+  type VectorQueryResult,
+  type VectorSearchService,
+} from './vectorSearchService';
 import {
   buildCrossEncoderDocument,
   deriveRepoKind,
@@ -57,6 +62,7 @@ export interface VectorSearchPipelineResult {
     lexicalCount: number;
     structuredCount: number;
     fusedCount: number;
+    denseSkipReason?: DenseQueryScopeResolution['reason'];
     crossEncoderUsed: boolean;
     crossEncoderPartial: boolean;
     llmStatus: 'complete' | 'empty' | 'invalid' | 'skipped';
@@ -169,19 +175,130 @@ function buildRepoIndex(repositories: Repository[]): Map<string, Repository> {
   return repoById;
 }
 
+/**
+ * 查询侧的账号隔离范围（R4 审计修复）：多账号共享同一向量索引，命中必须
+ * 按归属账号过滤后才能参与召回，防止其他账号的向量（ai_tags/license 等
+ * metadata 与 embedding 内容）经同一仓库 ID 串入当前账号的搜索结果。
+ */
+export interface VectorAccountIdScope {
+  /** 当前活跃账号（GitHub 数值 ID 字符串） */
+  accountId: string;
+  /**
+   * 保留兼容字段（不再据此推断 legacy 归属）。
+   */
+  multiAccount: boolean;
+  /**
+   * 仅当独立确认旧无前缀索引专属于当前账号时才传 true；
+   * 否则 hydrateMatches 与未就绪索引的降级查询均拒绝无归属 legacy 向量。
+   */
+  allowLegacyUnscoped?: boolean;
+}
+
+export interface DenseQueryScopeResolution {
+  skip: boolean;
+  accountId?: string;
+  /**
+   * 跳过原因（R2-C26）：Worker 不支持账号筛选、状态请求失败、或索引确实需要
+   * 回填（账号元数据未建立）。调用方按原因给出不同提示，只有回填场景才建议
+   * 重建索引。
+   */
+  reason?: 'worker-unsupported' | 'metadata-index-not-ready' | 'status-failed' | 'needs-backfill';
+}
+
+/**
+ * 解析稠密向量查询的账号隔离策略：
+ * - 无 accountIdScope（旧调用方/测试）时不过滤；
+ * - 若 vectorService 提供 getStatus，必须确认 accountScopedCleanup===true（即
+ *   Worker 已建立 accountId 元数据索引并回填）后才下发 accountId 过滤；
+ * - 索引未就绪时：若未明确确认 allowLegacyUnscoped，则跳过稠密召回（避免
+ *   Worker 400 或无过滤召回串入其他账号），否则走无 accountId 的兼容查询。
+ *
+ * R2-C23 实现选择：绝不以「本机只有一个已保存账号」推断无范围 legacy 向量
+ * 的归属（共享索引可能仍有其他设备/旧客户端上传的向量）。显式兼容
+ * 开关只在索引归属已被独立确认时由调用方传入 allowLegacyUnscoped=true。
+ *
+ * 第 12 轮审计更正（原注释有误）：EMBEDDING_FORMAT_VERSION 升级触发的完整
+ * 重建本身并不能恢复单账号稠密召回——Worker /status 的 accountScopedCleanup
+ * 只读取部署变量 ACCOUNT_METADATA_INDEXED（cloudflare-worker/src/index.ts），
+ * 与索引内容无关；该变量保持 "false" 时，严格账号范围的查询会跳过稠密召回、
+ * 降级为本地词法检索（本文件下方 metadata-index-not-ready 分支）。恢复稠密
+ * 召回必须同时满足：创建 accountId 元数据索引、完成存量向量回填，并由部署
+ * 路径显式设置 ACCOUNT_METADATA_INDEXED=true。升级后的单账号是否可不经额外
+ * 部署即恢复稠密召回属未定的产品行为，不在本注释假设。
+ */
+export async function resolveDenseQueryAccountScope(
+  vectorService: Pick<VectorSearchService, 'query'> & Partial<Pick<VectorSearchService, 'getStatus'>>,
+  accountIdScope: VectorAccountIdScope | undefined,
+  signal: AbortSignal,
+): Promise<DenseQueryScopeResolution> {
+  if (!accountIdScope) return { skip: false };
+  if (typeof vectorService.getStatus !== 'function') {
+    return { skip: false, accountId: accountIdScope.accountId };
+  }
+  try {
+    const status = await withBudget<{ accountScopedCleanup?: boolean } | null>(
+      (stageSignal) => vectorService.getStatus!(stageSignal),
+      WORKER_TIMEOUT_MS,
+      signal,
+      null,
+    );
+    if (status?.accountScopedCleanup === true) {
+      return { skip: false, accountId: accountIdScope.accountId };
+    }
+    if (accountIdScope.allowLegacyUnscoped) {
+      return { skip: false };
+    }
+    // R2-C26：状态探测本身失败（null）与 Worker 明确不支持账号筛选必须区分；
+    // 前者提示稍后重试，后者提示部署新版 Worker，只有确认需要回填才提示重建。
+    if (!status) {
+      return { skip: true, reason: 'status-failed' };
+    }
+    if (status.accountScopedCleanup === false) {
+      return { skip: true, reason: 'metadata-index-not-ready' };
+    }
+    return { skip: true, reason: 'worker-unsupported' };
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    if (accountIdScope.allowLegacyUnscoped) return { skip: false };
+    // R2-C26：状态请求失败是暂时性错误，不应提示用户重建索引。
+    return { skip: true, reason: 'status-failed' };
+  }
+}
+
 export function hydrateMatches(
   matches: VectorQueryResult[],
   repoById: Map<string, Repository>,
   options: {
     excludeSource?: Repository;
     excludeForks?: boolean;
+    accountIdScope?: VectorAccountIdScope;
   } = {},
 ): RankedChannel[] {
   const best = new Map<string, { repo: Repository; score: number }>();
   const sourceId = options.excludeSource ? String(options.excludeSource.id) : '';
   const sourceFullName = options.excludeSource?.full_name.trim().toLowerCase() || '';
   matches.forEach((match) => {
-    const repo = repoById.get(String(match.id));
+    // 向量 ID 带账号前缀（accountId:repoId）：剥离前缀前先核对归属与元数据一致性。
+    const { accountId: prefixAccountId, repoId } = parseAccountScopedVectorId(String(match.id));
+    const scope = options.accountIdScope;
+    let lookupId = String(match.id);
+    if (scope) {
+      const matchAccountId = match.metadata?.accountId;
+      if (prefixAccountId) {
+        if (prefixAccountId !== scope.accountId) return;
+        if (matchAccountId && matchAccountId !== prefixAccountId) return;
+        // 归属已确认：剥离前缀后按本地仓库 ID 查找
+        lookupId = repoId;
+      } else if (matchAccountId) {
+        if (matchAccountId !== scope.accountId) return;
+      } else if (!scope.allowLegacyUnscoped) {
+        return;
+      }
+    }
+    // 审计修复（C13）：无 accountIdScope 时保留原始向量 ID 查找——绝不能先剥
+    // 前缀再跳过归属检查，否则账号 8 的「8:42」向量会命中本地仓库 42 并影响
+    // 其排名（带前缀的原始 ID 不在本地索引中，自然无法水合）。
+    const repo = repoById.get(lookupId);
     if (!repo || !Number.isFinite(match.score) || match.score <= 0) return;
     const id = String(repo.id);
     if (
@@ -617,6 +734,13 @@ export interface RunVectorSearchPipelineOptions {
   crossEncoder: CrossEncoderReranker | null;
   signal: AbortSignal;
   onPhase?: (phase: 'analyzing' | 'embedding' | 'recalling' | 'reranking') => void;
+  /** 密集召回被跳过时回调（含无候选回退关键词搜索场景），便于界面向用户提示原因。 */
+  onDenseSkipped?: (reason: NonNullable<DenseQueryScopeResolution['reason']>) => void;
+  /**
+   * 账号隔离范围（R4 审计修复）：多账号共享向量索引时按归属账号过滤命中；
+   * 缺省（未登录边缘态）不过滤，保持既有行为。
+   */
+  accountIdScope?: VectorAccountIdScope;
 }
 
 export async function runVectorSearchPipeline(
@@ -658,30 +782,75 @@ export async function runVectorSearchPipeline(
     timingsMs.rawEmbedding = Date.now() - rawEmbeddingStarted;
   });
 
+  // 审计修复（C14）：共享 /status 检查仅在任一路取得有效查询向量后才启动并
+  // 等待（惰性 memo，每次搜索最多决议一次，exact 与 ideal 两路共享结果）；
+  // 两路嵌入皆空（关 HyDE 且原始嵌入为空）时直接继续本地召回，绝不等待
+  // 最长 4 秒的 Worker 状态超时。
+  let denseScopePromise: Promise<DenseQueryScopeResolution> | null = null;
+  let denseSkipReason: DenseQueryScopeResolution['reason'] | undefined;
+  let denseSkipNotified = false;
+  const ensureDenseScope = (): Promise<DenseQueryScopeResolution> => {
+    if (!denseScopePromise) {
+      denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal)
+        .then((scope) => {
+          if (scope.skip && !denseSkipNotified) {
+            denseSkipNotified = true;
+            denseSkipReason = scope.reason ?? 'needs-backfill';
+            options.onDenseSkipped?.(denseSkipReason);
+          }
+          return scope;
+        });
+    }
+    return denseScopePromise;
+  };
+
+  // 第 13 轮审计修复 [71]：/status 探测通过后 Worker 仍可能在账号范围查询时
+  // 回滚（ACCOUNT_METADATA_NOT_INDEXED）——保留 Worker 错误码，收到该错误时
+  // 每次搜索只通知一次 onDenseSkipped（metadata-index-not-ready），随后继续
+  // 使用本地召回，绝不发无范围查询。
+  const handleDenseQueryFailure = (stage: 'Raw' | 'Ideal', error: unknown): VectorQueryResult[] => {
+    if (isAbortError(error)) throw error;
+    const workerCode = (error as { code?: unknown } | null)?.code;
+    if (workerCode === 'ACCOUNT_METADATA_NOT_INDEXED') {
+      if (!denseSkipNotified) {
+        denseSkipNotified = true;
+        denseSkipReason = 'metadata-index-not-ready';
+        options.onDenseSkipped?.('metadata-index-not-ready');
+      }
+      logger.warn('vector-search', `${stage} dense query rejected: accountId metadata index is not ready`, { error });
+      return [];
+    }
+    logger.warn('vector-search', `${stage} embedding or dense recall failed, continuing without it`, { error });
+    return [];
+  };
+
   let rawDenseStarted = 0;
   const rawDensePromise = rawEmbeddingPromise
-    .then(vectors => {
+    .then((vectors) => {
       if (!vectors[0]) return [];
-      rawDenseStarted = Date.now();
-      return withBudget(
-        stageSignal => options.vectorService.query(
-          vectors[0],
-          { topK: RECALL_TOP_K, threshold },
-          stageSignal,
-        ),
-        WORKER_TIMEOUT_MS,
-        signal,
-        [],
-      );
+      return ensureDenseScope().then((denseScope) => {
+        if (denseScope.skip) return [];
+        rawDenseStarted = Date.now();
+        return withBudget(
+          stageSignal => options.vectorService.query(
+            vectors[0],
+            {
+              topK: RECALL_TOP_K,
+              threshold,
+              ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
+            },
+            stageSignal,
+          ),
+          WORKER_TIMEOUT_MS,
+          signal,
+          [],
+        );
+      });
     })
     .finally(() => {
       if (rawDenseStarted) timingsMs.rawDense = Date.now() - rawDenseStarted;
     })
-    .catch(error => {
-      if (isAbortError(error)) throw error;
-      logger.warn('vector-search', 'Raw embedding or dense recall failed, continuing without it', { error });
-      return [];
-    });
+    .catch(error => handleDenseQueryFailure('Raw', error));
   // Analysis may reject first on cancellation; keep the in-flight dense promise handled.
   void rawDensePromise.catch(() => undefined);
 
@@ -705,13 +874,20 @@ export async function runVectorSearchPipeline(
           timingsMs.idealEmbedding = Date.now() - idealEmbeddingStarted;
         });
       })()
-        .then(vectors => {
+        .then(async (vectors) => {
           if (!vectors[0]) return [];
+          // C14：仅在该路取得有效查询向量后才启动/等待共享 /status 检查
+          const denseScope = await ensureDenseScope();
+          if (denseScope.skip) return [];
           const started = Date.now();
           return withBudget(
             stageSignal => options.vectorService.query(
               vectors[0],
-              { topK: RECALL_TOP_K, threshold },
+              {
+                topK: RECALL_TOP_K,
+                threshold,
+                ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
+              },
               stageSignal,
             ),
             WORKER_TIMEOUT_MS,
@@ -721,11 +897,7 @@ export async function runVectorSearchPipeline(
             timingsMs.idealDense = Date.now() - started;
           });
         })
-        .catch(error => {
-          if (isAbortError(error)) throw error;
-          logger.warn('vector-search', 'Ideal embedding or dense recall failed, continuing without it', { error });
-          return [];
-        })
+        .catch(error => handleDenseQueryFailure('Ideal', error))
     : Promise.resolve([]);
 
   const [rawMatchResults, idealMatchResults] = await Promise.all([
@@ -736,8 +908,8 @@ export async function runVectorSearchPipeline(
 
   options.onPhase?.('recalling');
   const repoById = buildRepoIndex(repositories);
-  const rawMatches = hydrateMatches(rawMatchResults, repoById);
-  const idealMatches = hydrateMatches(idealMatchResults, repoById);
+  const rawMatches = hydrateMatches(rawMatchResults, repoById, { accountIdScope: options.accountIdScope });
+  const idealMatches = hydrateMatches(idealMatchResults, repoById, { accountIdScope: options.accountIdScope });
   const lexical = AIService.rankLexicalCandidates(repositories, query, analysis?.keywords ?? [])
     .filter(item => item.score > 0);
   const structured = rankStructuredCandidates(repositories, analysis, query);
@@ -779,6 +951,7 @@ export async function runVectorSearchPipeline(
       lexicalCount: lexical.length,
       structuredCount: structured.length,
       fusedCount: fused.length,
+      ...(denseSkipReason ? { denseSkipReason } : {}),
       ...finished.diagnostics,
       timingsMs,
     },

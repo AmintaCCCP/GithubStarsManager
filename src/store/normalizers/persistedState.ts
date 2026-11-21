@@ -20,7 +20,7 @@ import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import { normalizeExternalDiscoveryChannels } from '../../utils/discoveryFeeds';
 import { isChannelScrapable, isScrapeSupportSettled } from '../../services/scrapeSupport';
 import type { AppStoreState } from '../types';
-import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
+import { accountIdKey, normalizeAccountWorkspaces, normalizeSavedAccounts } from '../helpers/accountWorkspace';
 import { readAuthMirror } from '../persistence/authStorage';
 import {
   defaultDiscoveryChannels,
@@ -89,13 +89,18 @@ export const normalizePersistedState = (
   }
   const authMirror = readAuthMirror();
 
-  // Effective auth: persisted values win; the synchronous localStorage mirror
-  // back-fills when the IndexedDB snapshot lost them (asynchronous unload write).
+  // Effective auth: persisted values win. The mirror only back-fills the user
+  // and backend secret（IndexedDB 异步卸载写入丢失时兜底）。
+  // 第 12 轮审计修复：移除常规水合中已失效的镜像 PAT 匹配分支——审计修复
+  // B7/CWE-922 起 readAuthMirror 恒返回 githubToken: null，无论账号 ID 是否
+  // 匹配该分支都不能回填 PAT，仅剩一套不参与凭据选择的账号匹配规则。
+  // 常规水合直接采用持久化的字符串 PAT（否则 null）；旧镜像明文 PAT 的迁移
+  // 仍由专用读取函数 readLegacyAuthMirrorForDesktopMigration 处理。
   const resolvedUser = safePersisted.user ?? authMirror?.user ?? null;
   const resolvedGithubToken =
     typeof safePersisted.githubToken === 'string'
       ? safePersisted.githubToken
-      : (authMirror?.githubToken ?? null);
+      : null;
   const resolvedBackendApiSecret =
     typeof safePersisted.backendApiSecret === 'string'
       ? (safePersisted.backendApiSecret || null)
@@ -148,6 +153,32 @@ export const normalizePersistedState = (
 
   const normalizedAssetFilters = normalizeAssetFilters(safePersisted.assetFilters);
 
+  // savedAccounts：规整化后，仅在对应账号记录缺失时才从当前会话补录，
+  // 避免覆盖从备份恢复的 PAT；补录前先复制映射，保持原映射引用不被就地修改。
+  const baseSavedAccounts = normalizeSavedAccounts(
+    (safePersisted as Record<string, unknown>).savedAccounts,
+  );
+  const resolvedAccountId = accountIdKey(resolvedUser);
+  const needsBackfill = Boolean(
+    resolvedAccountId
+    && resolvedUser
+    && typeof resolvedGithubToken === 'string'
+    && resolvedGithubToken
+    && !baseSavedAccounts[resolvedAccountId],
+  );
+  const normalizedSavedAccounts = needsBackfill && resolvedAccountId && resolvedUser && resolvedGithubToken
+    ? {
+        ...baseSavedAccounts,
+        [resolvedAccountId]: {
+          accountId: resolvedAccountId,
+          user: resolvedUser,
+          githubToken: resolvedGithubToken,
+          addedAt: new Date().toISOString(),
+          lastUsedAt: new Date().toISOString(),
+        },
+      }
+    : baseSavedAccounts;
+
   return {
     ...currentState,
     ...persistedRest,
@@ -160,6 +191,7 @@ export const normalizePersistedState = (
     accountWorkspaces: normalizeAccountWorkspaces(
       (safePersisted as Record<string, unknown>).accountWorkspaces,
     ),
+    savedAccounts: normalizedSavedAccounts,
     themeMode,
     themePresetLight,
     themePresetDark,

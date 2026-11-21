@@ -236,7 +236,19 @@
     "menu-releases": "freigeben",
     "menu-forks": "Replik",
     "menu-subscription": "Entdecken",
-    "menu-settings": "aufstellen"
+    "menu-settings": "aufstellen",
+    "switch-account": "Konto wechseln",
+    "add-account": "Konto hinzufügen",
+    "current-account": "Aktuelles Konto",
+    "remove-account": "Konto entfernen",
+    "remove-account-with-login": "@{{login}} entfernen",
+    "logout-account-changed": "Das Konto hat sich geändert. Bitte melde dich für das aktuelle Konto erneut ab.",
+    "switch-in-progress": "Ein Kontowechsel läuft. Bitte versuche es gleich erneut.",
+    "remove-account-confirm-title": "Gespeichertes Konto entfernen",
+    "remove-account-confirm-desc": "Dies entfernt nur die gespeicherten Anmeldedaten dieses Kontos. Zwischengespeicherte Repositories und Kategorien bleiben erhalten. Fortfahren?",
+    "account-switched": "Zu @{{login}} gewechselt",
+    "account-repo-count": "{{count}} Repositories",
+    "retry-credential-alignment": "Backend-Anmeldedaten erneut synchronisieren"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Kategorien mit der GitHub-Liste synchronisieren"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "Datenimport erfolgreich",
     "import-data": "Daten importieren",
     "import-failed-please-try-again": "Der Import ist fehlgeschlagen. Bitte versuchen Sie es erneut",
+    "pat-export-authorization-title": "Autorisierung für den Token-Export",
+    "pat-export-authorization-desc": "Dieser Export enthält die GitHub-Token aller gespeicherten Konten im Klartext. Jeder Export erfordert eine ausdrückliche Bestätigung; die gespeicherte Einstellung „Beziehen Sie beim Sichern/Exportieren Schlüssel mit ein“ gilt nicht als Autorisierung.",
+    "pat-export-deny": "Ablehnen",
+    "pat-export-authorize": "Autorisieren",
+    "import-accounts-need-reauth": "Daten erfolgreich importiert. Folgende Konten haben keine lokalen Anmeldedaten und müssen erneut autorisiert werden: {{accounts}}",
+    "import-skipped-unattributed-top-level": "Die Daten des obersten Kontos aus der Sicherung waren keinem Konto zugeordnet und wurden übersprungen. In das aktuelle Konto wurde nichts geschrieben.",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "Nicht analysierte Lager können nicht direkt gereinigt werden. Bitte verwenden Sie zur Verarbeitung die KI-Analysefunktion.",
     "cleanup-data": "Saubere Daten",
     "data-cleanup-successful": "Datenbereinigung erfolgreich",
@@ -979,7 +997,7 @@
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Beziehen Sie beim Sichern/Exportieren Schlüssel mit ein",
-    "includes-keys-for-ai-configs-webdav-proxy-remote": "Enthält Schlüssel für AI-Konfiguration, WebDAV, Proxy, Remote-Download und Backend-Server",
+    "includes-keys-for-ai-configs-webdav-proxy-remote": "Enthält GitHub-Tokens sowie Schlüssel für AI-Konfiguration, WebDAV, Proxy, Remote-Download und Backend-Server (wird bei Aktivierung auch in WebDAV-Backups hochgeladen)",
     "warning-backup-file-contains-plaintext-keys": "Bei Aktivierung enthalten Backup- und Exportdateien Schlüssel, Passwörter und andere Zugangsdaten im Klartext. Bewahren Sie diese Dateien sicher auf."
   },
   "mcpSettingsPanel": {
@@ -1416,5 +1434,19 @@
     "download": "Herunterladen",
     "detected-from-filenames-and-release-metadata-no": "Erkannt anhand von Dateinamen und Release-Metadaten. Es findet keine Sicherheitsprüfung statt und es wird nichts automatisch ausgeführt. Du kannst unten jederzeit eine andere Datei auswählen.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} Datei(en) ausgeschlossen, die nicht zu diesem Gerät passen (Quellcode, Prüfsummen, Signaturen, Debug-Symbole, Blockmaps, andere Plattformen oder Architekturen)."
+  },
+  "accountModal": {
+    "title": "GitHub-Konto hinzufügen",
+    "description": "Gib ein neues GitHub-Personal-Access-Token ein, um ein Konto hinzuzufügen. Die Daten deines aktuellen Kontos bleiben sicher erhalten.",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "Abbrechen",
+    "confirm": "Hinzufügen und wechseln",
+    "reauth-hint": "Bitte gib ein gültiges GitHub-Token für @{{login}} ein",
+    "account-mismatch": "Dieses Token gehört zu einem anderen GitHub-Konto. Bitte melde dich mit dem Token von @{{login}} an.",
+    "backend-credential-sync-failed": "Bei dem Konto angemeldet, aber die Backend-Anmeldedaten konnten nicht aktualisiert werden. Bitte später über das Kontomenü erneut versuchen."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Abgemeldet, aber die Bereinigung der Geräte-Anmeldedaten ist nicht abgeschlossen. Die alten Anmeldedaten bleiben gesperrt und werden beim nächsten Start automatisch erneut entfernt.",
+    "active-account-update-skipped": "Ein anderes Gerät hat während dieses Kontowechsels das aktive Konto im Backend geändert, daher wurde das Backend nicht auf dieses Konto umgestellt. Die lokale Sitzung verwendet dieses Konto bereits; versuche es über das Kontomenü erneut, um das Backend abzugleichen."
   }
 }

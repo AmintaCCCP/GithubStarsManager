@@ -14,6 +14,7 @@ export type CompactMetadata = {
   stars: number;
   tags: string[];
   license?: string;
+  accountId?: string;
 };
 
 /** Mirror of Vectorize's metadata value types, kept free of workers-types. */
@@ -22,6 +23,13 @@ export type VectorMetadata = VectorMetadataValue | Record<string, VectorMetadata
 
 /** Vectorize's hard per-vector metadata limit (10 KiB). */
 export const VECTORIZE_METADATA_LIMIT_BYTES = 10_240;
+
+export class InvalidVectorMetadataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidVectorMetadataError';
+  }
+}
 
 /**
  * Keep a margin below Vectorize's 10 KiB per-vector metadata limit so that
@@ -74,6 +82,8 @@ function normalizeMetadata(input: unknown): CompactMetadata {
       : [],
   };
   if (typeof source.license === 'string') metadata.license = source.license;
+  // accountId 是清理/查询过滤的必备归属字段，压缩时不得丢弃。
+  if (typeof source.accountId === 'string' && source.accountId) metadata.accountId = source.accountId;
   return metadata;
 }
 
@@ -172,7 +182,11 @@ export function compactVectorMetadata(input: unknown): Record<string, VectorMeta
     tags: [],
   };
   if (metadata.license) fallback.license = truncateUtf8(metadata.license, 256);
+  if (metadata.accountId) fallback.accountId = metadata.accountId;
   if (jsonByteLength(fallback) > VECTORIZE_METADATA_SAFE_BYTES) delete fallback.license;
+  if (jsonByteLength(fallback) > VECTORIZE_METADATA_SAFE_BYTES) {
+    throw new InvalidVectorMetadataError('Vector metadata.accountId exceeds Vectorize 10KB metadata budget');
+  }
   return fallback as Record<string, VectorMetadata>;
 }
 

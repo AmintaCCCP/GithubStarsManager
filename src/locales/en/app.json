@@ -236,7 +236,19 @@
     "menu-releases": "Releases",
     "menu-forks": "Forks",
     "menu-subscription": "Discover",
-    "menu-settings": "Settings"
+    "menu-settings": "Settings",
+    "switch-account": "Switch Account",
+    "add-account": "Add Account",
+    "current-account": "Current Account",
+    "remove-account": "Remove Account",
+    "remove-account-with-login": "Remove @{{login}}",
+    "logout-account-changed": "The account has changed. Please log out again for the current account.",
+    "switch-in-progress": "An account switch is in progress. Please try again shortly.",
+    "remove-account-confirm-title": "Remove Saved Account",
+    "remove-account-confirm-desc": "This only removes the saved sign-in credential for this account. Cached repositories and categories will be kept. Continue?",
+    "account-switched": "Switched to @{{login}}",
+    "account-repo-count": "{{count}} repos",
+    "retry-credential-alignment": "Retry backend credential sync"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Pushing categories to lists"
@@ -792,6 +804,12 @@
     "data-imported-successfully": "Data imported successfully",
     "import-data": "Import data",
     "import-failed-please-try-again": "Import failed, please try again",
+    "pat-export-authorization-title": "GitHub token export authorization",
+    "pat-export-authorization-desc": "This export will include the GitHub tokens of all saved accounts in plain text. Every export requires explicit confirmation; the previously saved \"Include keys in backup/export\" switch does not count as authorization.",
+    "pat-export-deny": "Deny",
+    "pat-export-authorize": "Authorize",
+    "import-accounts-need-reauth": "Data imported successfully. The following accounts have no local credentials and need to be re-authorized: {{accounts}}",
+    "import-skipped-unattributed-top-level": "The backup's top-level account data was not attributed to any account and was skipped. Nothing was written to the current account.",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "Unanalyzed repos cannot be cleaned directly. Use AI analysis to process them.",
     "cleanup-data": "Cleanup data",
     "data-cleanup-successful": "Data cleanup successful",
@@ -979,7 +997,7 @@
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Include keys in backup/export",
-    "includes-keys-for-ai-configs-webdav-proxy-remote": "Includes keys for AI configs, WebDAV, proxy, remote download, and backend server",
+    "includes-keys-for-ai-configs-webdav-proxy-remote": "Includes GitHub tokens and keys for AI configs, WebDAV, proxy, remote download, and backend server (also uploaded to WebDAV when enabled)",
     "warning-backup-file-contains-plaintext-keys": "When enabled, backup and export files contain plaintext keys, passwords, and other credentials. Keep them safe."
   },
   "mcpSettingsPanel": {
@@ -1416,5 +1434,19 @@
     "download": "Download",
     "detected-from-filenames-and-release-metadata-no": "Detected from filenames and release metadata. No safety check is performed and nothing runs automatically. You can always pick another asset in the list below.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Excluded {{v1}} asset(s) that do not apply to this device (source code, checksums, signatures, debug symbols, blockmaps, other platforms or architectures)."
+  },
+  "accountModal": {
+    "title": "Add GitHub Account",
+    "description": "Enter a new GitHub Personal Access Token to add an account. Your current account data will be safely preserved.",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "Cancel",
+    "confirm": "Add & Switch",
+    "reauth-hint": "Please enter a valid GitHub token for @{{login}}",
+    "account-mismatch": "This token belongs to a different GitHub account. Please sign in with the token of @{{login}}.",
+    "backend-credential-sync-failed": "Signed in to the account, but the backend credentials could not be updated. Please retry later from the account menu."
+  },
+  "accountSwitch": {
+    "device-credential-removal-pending": "Logged out, but the device credential cleanup did not finish. The old credential stays masked and will be retried automatically on next launch.",
+    "active-account-update-skipped": "Another device changed the backend active account while this switch was in progress, so the backend was not switched to this account. Your local session is already on this account; retry from the account menu to align the backend."
   }
 }

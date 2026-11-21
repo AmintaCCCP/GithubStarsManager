@@ -41,7 +41,8 @@
     "failed": "スター追加失敗",
     "starred": "スターを追加しました",
     "check-name": "名前を確認してください",
-    "no-description": "説明なし"
+    "no-description": "説明なし",
+    "session-changed": "アカウントが切り替わりました。もう一度プレビューしてからスターしてください。"
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "プラグインの結果を適用できません",
@@ -208,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "AI解析を停止する",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "AI分析を停止してもよろしいですか?分析結果は保存されます。",
+    "analysis-task-already-running": "AI 分析タスクが実行中です。完了を待つか、現在のタスクを停止してから再試行してください。",
     "no-failed-repositories-to-re-analyze": "分析に失敗したリポジトリはありません。",
     "all-repositories-have-been-analyzed": "すべての倉庫が分析されました!",
     "no-repositories-to-analyze": "分析するリポジトリがありません。",
@@ -246,7 +248,12 @@
     "unstar-confirmation": "スター確認をキャンセルする",
     "unstar": "キャンセルスター",
     "successfully-unstarred": "スターは正常にキャンセルされました",
-    "failed-to-unstar-repository-please-check-your-ne": "スターのキャンセルに失敗しました。ネットワーク接続を確認するか、再度ログインしてください。"
+    "failed-to-unstar-repository-please-check-your-ne": "スターのキャンセルに失敗しました。ネットワーク接続を確認するか、再度ログインしてください。",
+    "similar-results-may-be-incomplete-the-dens": "類似リポジトリの結果は不完全な可能性があります：密ベクトルインデックスを利用できません。({{v1}})",
+    "dense-index-unavailable-reason-worker-unsupported": "類似リポジトリの結果は不完全な可能性があります：ベクトルワーカーはアカウント単位の検索に対応していません。同梱の Cloudflare Worker をデプロイしてから再試行してください。",
+    "dense-index-unavailable-reason-metadata-index-not-ready": "類似リポジトリの結果は不完全な可能性があります：ベクトルの accountId メタデータインデックスが準備できていません。accountId メタデータインデックスを作成して検証し、既存のベクトルをバックフィルしたうえで、デプロイで ACCOUNT_METADATA_INDEXED を有効にしてください。",
+    "dense-index-unavailable-reason-status-failed": "類似リポジトリの結果は不完全な可能性があります：ベクトルインデックスの状態確認に失敗しました。しばらくしてから再試行してください。",
+    "dense-index-unavailable-reason-needs-backfill": "類似リポジトリの結果は不完全な可能性があります：ベクトルインデックスがアカウント単位の検索に対応していません。設定のベクトル検索で現在のアカウントのインデックスを再構築してください。"
   },
   "useRepositoryReleaseSheet": {
     "configure-a-github-token-in-settings-or-connect": "最初に設定で GitHub トークンを構成するか、バックエンド サービスに接続してください。",
@@ -266,11 +273,16 @@
     "list-sync-failed-starred-repositories-were-synce": "リストの同期に失敗しました。スター ウェアハウスは同期されました。後でもう一度試すか、GitHub トークンの権限を確認してください (ユーザー スコープが必要です)。",
     "sync-completed-found-newrepocount-new-repositori": "同期が完了しました！ {{newRepoCount}} 個の新しいリポジトリが見つかりました。",
     "sync-completed-all-repositories-are-up-to-date": "同期が完了しました！すべてのリポジトリは最新です。",
+    "sync-completed-backend-write-failed": "スターは更新されましたが、バックエンドへの書き込みに失敗しました。ローカルデータは保持され、バックエンド同期は自動的に再試行されます。",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub トークンの有効期限が切れているか、無効です。再度ログインしてください。",
     "sync-failed-please-check-your-network-connection": "同期に失敗しました。ネットワーク接続を確認するか、後でもう一度試してください。",
     "list-sync-new-categories_one": "（{{count}} 個の分類を新規作成）",
     "list-sync-new-categories_other": "（{{count}} 個の分類を新規作成）",
-    "list-sync-complete": "{{lists}} 個の list を同期しました（{{newCount}} 個の分類を新規作成）。"
+    "list-sync-complete": "{{lists}} 個の list を同期しました（{{newCount}} 個の分類を新規作成）。",
+    "vector-worker-does-not-support-account-scoped-recall": "ベクトル Worker はアカウント単位の検索に対応していません。リポジトリ同梱の cloudflare-worker を再デプロイし、インデックスを再構築してください。",
+    "account-metadata-index-is-not-ready-create-the-accountid": "アカウントメタデータのインデックスが準備できていません。accountId メタデータインデックスを作成し、ベクトルをバックフィルして、ACCOUNT_METADATA_INDEXED を有効にしてください。",
+    "failed-to-verify-vector-worker-status-fell-back-to-loca": "ベクトル Worker の状態を確認できなかったため、ローカル検索にフォールバックしました。",
+    "vector-index-needs-rebuild-for-multi-account-search-fe": "マルチアカウント検索にはベクトルインデックスの再構築が必要なため、ローカル検索にフォールバックしました。"
   },
   "repositoryHealthPanel": {
     "activity": "アクティビティ",
