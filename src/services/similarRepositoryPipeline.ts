@@ -10,6 +10,7 @@ import {
   ANALYSIS_TIMEOUT_MS,
   EMBEDDING_TIMEOUT_MS,
   RECALL_TOP_K,
+  RECALL_QUERY_TOP_K,
   WORKER_TIMEOUT_MS,
   finishRankedCandidates,
   fuseCandidates,
@@ -461,7 +462,9 @@ export async function runSimilarRepositoryPipeline(
         stageSignal => options.vectorService.query(
           vectors[0],
           {
-            topK: RECALL_TOP_K,
+            // 第 15 轮审计修复 [20]：宽候选池抵消冗余向量对召回名额的占用
+            topK: RECALL_QUERY_TOP_K,
+            wide: true,
             threshold,
             ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
           },

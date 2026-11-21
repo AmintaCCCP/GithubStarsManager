@@ -312,6 +312,36 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     expect(state.savedAccounts['3']?.githubToken).toBe('');
   });
 
+  it('combines the re-auth and unattributed-skip notices into one message when both apply (R15 finding 1)', async () => {
+    // 备份 activeAccountId: null（未归属）+ Token 身份核对失败（需重新授权）：
+    // showSuccess 只保留一条消息——两条注意项必须合并在同一条消息中展示，
+    // 绝不连续调用互相覆盖
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 999, login: 'mallory' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const user = userEvent.setup();
+      await importBackupAndClick(user, {
+        activeAccountId: null,
+        includeKeysInBackup: true,
+        savedAccounts: {
+          '3': savedAccount('3', { ...userA, id: 3, login: 'carol' }, 'ghp_carol_token'),
+        },
+      }, 'dataManagementPanel.merge-import');
+
+      const notice = await screen.findByText(/import-accounts-need-reauth/);
+      expect(notice).toBeInTheDocument();
+      // 同一条消息同时携带「未归属顶层数据已跳过」
+      expect(notice.textContent).toContain('import-skipped-unattributed-top-level');
+      // 凭据仍被拒绝（条目保留为需重新授权的元数据）
+      expect(useAppStore.getState().savedAccounts['3']?.githubToken).toBe('');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('merge mode archives top-level backup data by id without clobbering merged local entries', async () => {
     const user = userEvent.setup();
 
@@ -1026,6 +1056,50 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     expect(await screen.findByText('dataManagementPanel.invalid-backup-file-format')).toBeInTheDocument();
     expect(useAppStore.getState().repositories[0].ai_summary).toBe('alice-live');
     expect(useAppStore.getState().gists).toEqual([]);
+  });
+
+  it('rejects imports whose gist file map contains invalid entries before any write (R15 finding 21)', async () => {
+    // 有效 id + `files: { 'README.md': null }` 此前能通过映射级校验写入实时
+    // Gist 列表，消费者读取 file.content 时抛 TypeError——必须整体拒绝
+    const user = userEvent.setup();
+    await importBackupFile(user, {
+      activeAccountId: '1',
+      includeKeysInBackup: true,
+      repositories: [repo(9, 'should-not-be-written')],
+      gists: [{ ...gist('gist-bad-file', 'bad file gist'), files: { 'README.md': null } }],
+    });
+    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
+
+    // 整体拒绝且发生在首次写入前：仓库不被替换
+    expect(await screen.findByText('dataManagementPanel.invalid-backup-file-format')).toBeInTheDocument();
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('alice-live');
+    expect(useAppStore.getState().gists).toEqual([]);
+  });
+
+  it('reuses the local WebDAV password for masked backups only for the same service (R15 finding 22)', async () => {
+    // 本机已有两个服务；备份沿用 id 但 wdv-2 改了 URL 且密码为掩码——
+    // 旧密码绝不绑定到改址后的新服务（同服务才复用，否则要求重新输入）
+    useAppStore.setState({
+      webdavConfigs: [
+        { id: 'wdv-1', name: 'Dav A', url: 'https://dav-a.example', username: 'u', password: 'local-a', path: '/', isActive: false },
+        { id: 'wdv-2', name: 'Dav B', url: 'https://dav-b.example', username: 'u', password: 'local-b', path: '/', isActive: false },
+      ],
+    });
+    const user = userEvent.setup();
+    await importBackupAndClick(user, {
+      includeKeysInBackup: false,
+      webdavConfigs: [
+        { id: 'wdv-1', name: 'Dav A', url: 'https://dav-a.example', username: 'u', password: '***', path: '/', isActive: false },
+        { id: 'wdv-2', name: 'Dav B moved', url: 'https://dav-moved.example', username: 'u', password: '***', path: '/', isActive: false },
+      ],
+    }, 'dataManagementPanel.replace-import');
+
+    const state = useAppStore.getState();
+    // 同服务（URL + 用户名一致）：本机密码照常复用
+    expect(state.webdavConfigs.find(c => c.id === 'wdv-1')?.password).toBe('local-a');
+    // 改址后的配置：不携带本机旧密码（空密码要求重新输入）
+    expect(state.webdavConfigs.find(c => c.id === 'wdv-2')?.url).toBe('https://dav-moved.example');
+    expect(state.webdavConfigs.find(c => c.id === 'wdv-2')?.password).toBe('');
   });
 
   it('dedupes entries with the same id within one backup in merge mode (R12)', async () => {

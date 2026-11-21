@@ -28,7 +28,8 @@
     "restore-failed": "Restore failed",
     "account-changed-during-restore": "The account changed during restore. This restore was aborted to protect your data.",
     "gist-data-in-the-backup-contained-invalid-entries-th": "Gist data in the backup contained invalid entries; the affected fields were skipped and keep their previous values.",
-    "fork-data-in-the-backup-contained-invalid-entries-th": "Fork data in the backup contained invalid entries; the affected fields were skipped and keep their previous values."
+    "fork-data-in-the-backup-contained-invalid-entries-th": "Fork data in the backup contained invalid entries; the affected fields were skipped and keep their previous values.",
+    "unbound-top-level-backup-data-skipped-activeaccountid-null": "Top-level backup data without account ownership (activeAccountId=null) was skipped and not restored."
   },
   "useDesktopActions": {
     "load-failed": "Load failed",

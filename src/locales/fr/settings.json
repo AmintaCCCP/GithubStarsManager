@@ -28,7 +28,8 @@
     "restore-failed": "La récupération a échoué",
     "account-changed-during-restore": "Le compte a changé pendant la restauration. La restauration a été interrompue pour protéger vos données.",
     "gist-data-in-the-backup-contained-invalid-entries-th": "Les données Gist de la sauvegarde contenaient des entrées invalides ; les champs concernés ont été ignorés et conservent leurs valeurs précédentes.",
-    "fork-data-in-the-backup-contained-invalid-entries-th": "Les données Fork de la sauvegarde contenaient des entrées invalides ; les champs concernés ont été ignorés et conservent leurs valeurs précédentes."
+    "fork-data-in-the-backup-contained-invalid-entries-th": "Les données Fork de la sauvegarde contenaient des entrées invalides ; les champs concernés ont été ignorés et conservent leurs valeurs précédentes.",
+    "unbound-top-level-backup-data-skipped-activeaccountid-null": "Les données de niveau supérieur de la sauvegarde sans compte associé (activeAccountId=null) ont été ignorées et n'ont pas été restaurées."
   },
   "useDesktopActions": {
     "load-failed": "Le chargement a échoué",

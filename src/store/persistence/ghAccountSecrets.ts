@@ -81,6 +81,41 @@ let knownDiskTokens: GhAccountTokenMap | null = null;
 const PENDING_REMOVED_ACCOUNTS_KEY = 'gsm.pendingGhAccountRemovals';
 
 /**
+ * 读取持久化的待删标记（启动恢复）。损坏数据的处理规则（第 15 轮审计修复）：
+ * 键不存在 ⇒ 无标记（启动行为不变）；JSON 解析失败或不是数组 ⇒ 明确告警后
+ * 按「无标记」处理（内容不可解释，无法参与过滤，告警即不静默丢弃）；
+ * 解析成功但条目未通过账号 ID 校验 ⇒ 逐项过滤（只恢复合法 ID）。
+ */
+const readPersistedPendingRemovals = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(PENDING_REMOVED_ACCOUNTS_KEY);
+    if (!raw) return [];
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (parseError) {
+      logger.warn('store.ghAccountSecrets', 'persisted gh-account removal markers are not valid JSON; markers cannot be restored and may be lost across restarts', {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+      return [];
+    }
+    if (!Array.isArray(parsed)) {
+      logger.warn('store.ghAccountSecrets', 'persisted gh-account removal markers have an unexpected shape; markers cannot be restored and may be lost across restarts', {
+        kind: typeof parsed,
+      });
+      return [];
+    }
+    return parsed.filter((id): id is string => typeof id === 'string' && GH_ACCOUNT_ID_PATTERN.test(id));
+  } catch (error) {
+    logger.warn('store.ghAccountSecrets', 'failed to read persisted gh-account removal markers; markers cannot be restored and may be lost across restarts', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
+};
+
+/**
  * 把待删标记写入可确认的持久化存储，返回是否确认写入成功（第 14 轮审计修复）。
  * localStorage 写入失败（配额/隐私模式/存储损坏）时标记只存在于内存——若本次
  * 加密存储删除同样失败，重启后水化会返回仍在磁盘上的旧 PAT 并重新回填该账号。
@@ -106,7 +141,9 @@ const persistPendingRemovals = (ids: Map<string, number>): boolean => {
  * 存储保存确认删除成功后才清除。第 14 轮审计修复：每个删除意图带独立版本——
  * 保存请求只允许提交「发起时已登记且此后未被更新」的标记；入队等待期间新
  * 登记的意图（如退出请求）不得被较早排队的常规保存当作重新授权写回旧 PAT
- * 后清除。
+ * 后清除。第 15 轮审计修复：持久化标记在启动时恢复（见下方恢复循环），否则
+ * 「加密删除失败 + 标记已落盘」后重启，内存 Map 为空，加载器会把磁盘上的
+ * 旧 PAT 重新回填已退出账号。
  */
 const pendingRemovedAccountIds = new Map<string, number>();
 
@@ -117,6 +154,13 @@ const registerPendingRemoval = (accountId: string): void => {
   removalIntentVersion += 1;
   pendingRemovedAccountIds.set(accountId, removalIntentVersion);
 };
+
+// 启动恢复：为每个持久化的待删 ID 登记删除意图版本，使其参与加载过滤与
+// 保存提交（提交规则与运行期登记一致——在首次保存/加载操作发起前即已存在，
+// 属于可被相应请求观察并提交的「已确认持久化」意图）。
+for (const restoredAccountId of readPersistedPendingRemovals()) {
+  registerPendingRemoval(restoredAccountId);
+}
 
 /** 待删标记未能持久化时的明确告警（第 14 轮审计修复：不得静默吞掉）。 */
 const warnUnpersistedRemovalMarker = (): void => {
@@ -395,22 +439,36 @@ export const fillMissingGhAccountTokens = (
 });
 
 /** 清除桌面端安全存储中的全部账号 Token（成功后磁盘状态已知为空）。 */
-export const clearGhAccountTokens = (): Promise<void> => enqueueGhAccountsOp(async () => {
-  const bridge = getBridge();
-  if (!bridge) return;
-  const result = await bridge.clear();
-  if (!result.success) {
-    throw new Error(result.error ?? 'gh-accounts clear failed');
-  }
-  pendingRemovedAccountIds.clear();
-  persistPendingRemovals(pendingRemovedAccountIds);
-  // 第 13 轮审计修复：全部凭据已清除 ⇒ 现存迁移输入整体失效——否则 deleteAllData
-  // 若 clearAllStorage 失败，内存中的账号条目仍在且确认标记未置位，后续分片写入
-  // 会把迁移输入中的旧 PAT 回填进明文分片（输入为空时该调用不改变任何行为）。
-  forgetV19MigrationInputs(Object.keys(getV19MigrationInputs() ?? {}));
-  ghAccountTokensFullyLoaded = true;
-  knownDiskTokens = {};
-});
+export const clearGhAccountTokens = (): Promise<void> => {
+  // 第 15 轮审计修复：快照发起时已登记的删除意图版本——全量清除只提交
+  // 「发起时已登记且此后未被更新」的标记。等待 IPC 期间新登记/更新的退出
+  // 标记保留给其所属请求提交：否则排在清除之后的退出标记被这里移除后，
+  // 更早入队的普通保存会把旧 PAT 写回磁盘，应用在退出请求执行前关闭时
+  // 磁盘上有旧 PAT 却没有可供重启屏蔽的标记。
+  const observedRemovalVersions = new Map(pendingRemovedAccountIds);
+  return enqueueGhAccountsOp(async () => {
+    const bridge = getBridge();
+    if (!bridge) return;
+    const result = await bridge.clear();
+    if (!result.success) {
+      throw new Error(result.error ?? 'gh-accounts clear failed');
+    }
+    for (const accountId of Array.from(pendingRemovedAccountIds.keys())) {
+      if (observedRemovalVersions.get(accountId) === pendingRemovedAccountIds.get(accountId)) {
+        pendingRemovedAccountIds.delete(accountId);
+      }
+    }
+    if (!persistPendingRemovals(pendingRemovedAccountIds)) {
+      warnUnpersistedRemovalMarker();
+    }
+    // 第 13 轮审计修复：全部凭据已清除 ⇒ 现存迁移输入整体失效——否则 deleteAllData
+    // 若 clearAllStorage 失败，内存中的账号条目仍在且确认标记未置位，后续分片写入
+    // 会把迁移输入中的旧 PAT 回填进明文分片（输入为空时该调用不改变任何行为）。
+    forgetV19MigrationInputs(Object.keys(getV19MigrationInputs() ?? {}));
+    ghAccountTokensFullyLoaded = true;
+    knownDiskTokens = {};
+  });
+};
 
 /**
  * 把当前 Store 会话的全部账号 Token 幂等同步到桌面端安全存储。

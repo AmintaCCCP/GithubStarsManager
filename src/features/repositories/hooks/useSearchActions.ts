@@ -405,7 +405,13 @@ export const useSearchActions = (): SearchActions => {
       const embConfigs = useAppStore.getState().embeddingConfigs;
       const activeEmbConfig = embConfigs.find(c => c.id === vsConfig?.embeddingConfigId);
 
-      if (vsConfig?.enabled && vsConfig?.workerUrl && activeEmbConfig) {
+      // R15 审计修复（CodeRabbit Major）：无账号 ID（登出/切号窗口）时稠密向量
+      // 召回不得以无范围查询执行——resolveDenseQueryAccountScope 对 undefined
+      // scope 直接放行（{ skip: false } 且无 accountId），hydrateMatches 也跳过
+      // 归属检查，HyDE 通道同样查询共享索引。整个向量分支此时一并跳过，回退
+      // 本地词法召回；账号 ID 可用后稠密召回照常执行。
+      const scopeAccountId = startedAccountId;
+      if (vsConfig?.enabled && vsConfig?.workerUrl && activeEmbConfig && scopeAccountId) {
         try {
           const embeddingClient = new EmbeddingClient(activeEmbConfig);
           const vectorService = new VectorSearchService(vsConfig);
@@ -419,22 +425,20 @@ export const useSearchActions = (): SearchActions => {
             : null;
           // 账号隔离范围（R4 审计修复）：多账号共享同一向量索引，命中必须按
           // 归属账号过滤（同仓库在两个账号列表中都存在时，既有 id 集合过滤
-          // 无法拦截他账号向量经同一 ID 水合进来）
-          const scopeAccountId = peekCurrentAccountId();
+          // 无法拦截他账号向量经同一 ID 水合进来）。R15 finding 14：无账号 ID
+          // 的窗口已在分支条件中整体跳过向量路径，此处恒有账号 ID。
           const isMultiAccount = Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1;
-          const accountIdScope = scopeAccountId
-            ? {
-              accountId: scopeAccountId,
-              multiAccount: isMultiAccount,
-              // 审计修复（R5）：本机保存的账号数量无法证明共享索引中无前缀
-              // legacy 向量的归属（其他设备/旧客户端/已移除账号都可能写入）。
-              // vectorSearchPipeline 明确禁止该推断：allowLegacyUnscoped 只在
-              // 索引归属被独立确认时才为 true——当前没有这样的确认机制，
-              // 一律拒绝无归属 legacy 向量（索引未就绪时跳过稠密召回，走
-              // 本地词法召回）；单账号兼容由格式版本升级触发的完整重建收敛。
-              allowLegacyUnscoped: false,
-            }
-            : undefined;
+          const accountIdScope = {
+            accountId: scopeAccountId,
+            multiAccount: isMultiAccount,
+            // 审计修复（R5）：本机保存的账号数量无法证明共享索引中无前缀
+            // legacy 向量的归属（其他设备/旧客户端/已移除账号都可能写入）。
+            // vectorSearchPipeline 明确禁止该推断：allowLegacyUnscoped 只在
+            // 索引归属被独立确认时才为 true——当前没有这样的确认机制，
+            // 一律拒绝无归属 legacy 向量（索引未就绪时跳过稠密召回，走
+            // 本地词法召回）；单账号兼容由格式版本升级触发的完整重建收敛。
+            allowLegacyUnscoped: false,
+          };
           const result = await runVectorSearchPipeline({
             query,
             repositories,

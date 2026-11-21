@@ -285,9 +285,19 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
     expect(useAppStore.getState().savedAccounts['42']?.githubToken ?? '').toBe('');
     vi.mocked(saveGhAccountTokens).mockClear();
     vi.mocked(saveGhAccountTokens).mockResolvedValue(undefined);
+    // 第 15 轮审计 [31]：fillMissingGhAccountTokens 在 migrate 阶段已被调用过，
+    // hydrate 前先清空调用记录，避免残留调用影响下方逐载荷断言。
+    vi.mocked(fillMissingGhAccountTokens).mockClear();
     hydrate();
     await flushMigrationSave();
-    expect(vi.mocked(saveGhAccountTokens)).not.toHaveBeenCalledWith({ '42': 'ghp_legacy_token' });
+    // 第 15 轮审计 [31]：逐次检查两个 mock 的每个载荷——整对象比较在旧 PAT 与
+    // 其他账号合并传入同一批次时不会失败，无法发现 42 的旧 PAT 被写回。
+    for (const [payload] of vi.mocked(saveGhAccountTokens).mock.calls) {
+      expect(payload['42']).not.toBe('ghp_legacy_token');
+    }
+    for (const [payload] of vi.mocked(fillMissingGhAccountTokens).mock.calls) {
+      expect(payload['42']).not.toBe('ghp_legacy_token');
+    }
   });
 
   it('D: 多账号快照迁移失败 + 单账号镜像迁移成功时保留其他账号的迁移输入', async () => {

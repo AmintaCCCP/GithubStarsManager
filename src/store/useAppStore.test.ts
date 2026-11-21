@@ -9,6 +9,10 @@ import {
   buildTransientDiscoverySnapshot,
   type PersistedSnapshot,
 } from './__fixtures__/persistedSnapshots';
+import {
+  getRemovedSavedAccountIdsSnapshot,
+  isSavedAccountRemovedInSession,
+} from './helpers/accountWorkspace';
 
 let useAppStore: typeof import('./useAppStore').useAppStore;
 let normalizePersistedState: typeof import('./useAppStore').normalizePersistedState;
@@ -1221,11 +1225,12 @@ describe('useAppStore logout and per-account workspaces', () => {
       githubToken: 'ghp_a',
       isAuthenticated: true,
       savedAccounts: {
-        // 审计修复（B23）候选强度：bob（较新、有 Token）、carol（更早、有 Token）、
+        // 审计修复（B23）候选强度：bob（较早、有 Token，按 ID 枚举时在前）、
+        // carol（较新、有 Token，应被选中）、
         // dave（最新但无 Token——必须被跳过，不得因最近使用而当选）
         '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't1' },
-        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't3' },
-        '3': { accountId: '3', user: userC, githubToken: 'ghp_c', addedAt: 't', lastUsedAt: 't2' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't2' },
+        '3': { accountId: '3', user: userC, githubToken: 'ghp_c', addedAt: 't', lastUsedAt: 't3' },
         '4': { accountId: '4', user: userD, githubToken: '', addedAt: 't', lastUsedAt: 't4' },
       },
       repositories: aliceRepos,
@@ -1251,19 +1256,72 @@ describe('useAppStore logout and per-account workspaces', () => {
           syncMode: 'stars',
           syncModeConfigured: false,
         },
+        '3': {
+          repositories: [createRepository(3, { ai_summary: 'carol-ai' })],
+          lastSync: null,
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
       },
     });
 
     useAppStore.getState().removeSavedAccount('1');
     const state = useAppStore.getState();
-    // 被移除的是当前账号：自动切换到「最近使用的有效账号」（无 Token 的账号被跳过）
+    // 被移除的是当前账号：自动切换到「最近使用的有效账号」（无 Token 的账号被跳过）。
+    // bob 按 ID 枚举在前且 lastUsedAt 较早，carol 较新——只有按 lastUsedAt 降序
+    // 排序并跳过无 Token 的 dave 才会选中 carol。
     expect(state.savedAccounts['1']).toBeUndefined();
-    expect(state.user?.login).toBe('bob');
-    expect(state.githubToken).toBe('ghp_b');
+    expect(state.user?.login).toBe('carol');
+    expect(state.githubToken).toBe('ghp_c');
     expect(state.isAuthenticated).toBe(true);
-    // 账号 A 的顶层数据先被归档，账号 B 的工作区被恢复，双端零丢失
+    // 账号 A 的顶层数据先被归档，账号 C（Carol）的工作区被恢复，双端零丢失
     expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
-    expect(state.repositories[0].ai_summary).toBe('bob-ai');
+    expect(state.repositories[0].ai_summary).toBe('carol-ai');
+    expect(state.accountWorkspaces['3']?.repositories[0].ai_summary).toBe('carol-ai');
+  });
+
+  it('registers session-scoped removal so async flows can skip upserts for removed accounts (round-15 [11] mechanism)', () => {
+    // 机制侧（LoginScreen 登记循环 / autoSync 身份写入的跨域协调接口）：
+    // removeSavedAccount 登记被移除账号（会话级，不推进会话代次）；
+    // upsertSavedAccount 显式（重新）登记即撤销——用户重新添加后照常放行。
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+    });
+
+    useAppStore.getState().removeSavedAccount('2');
+    // 提交回写前的点查：被移除账号在会话内标记为已移除，未移除账号不受影响。
+    //（'1' 可能带有更早用例的移除残留——登记是会话级模块状态，这里以从未
+    // 被任何用例移除的 '3' 作为未移除参照。）
+    expect(isSavedAccountRemovedInSession('2')).toBe(true);
+    expect(isSavedAccountRemovedInSession('3')).toBe(false);
+    // 快照 API 可供「await 前后做差集」的消费方使用（返回数组）。
+    expect(Array.isArray(getRemovedSavedAccountIdsSnapshot())).toBe(true);
+    expect(getRemovedSavedAccountIdsSnapshot()).toContain('2');
+
+    // 用户重新添加同一账号：upsert 撤销移除登记，条目回到 savedAccounts。
+    useAppStore.getState().upsertSavedAccount(userB, 'ghp_b');
+    expect(isSavedAccountRemovedInSession('2')).toBe(false);
+    expect(useAppStore.getState().savedAccounts['2']?.githubToken).toBe('ghp_b');
   });
 
   it('parks the current account before an external restore without polluting its snapshot', () => {

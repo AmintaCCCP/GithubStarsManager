@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import {
+  accountIdKey,
   getAccountSessionGeneration,
   isCurrentAccountSession,
   peekCurrentAccountId,
@@ -32,7 +33,21 @@ import { findReleasesWithChangedAssets } from '../../../utils/releaseAssets';
 export const useReleaseTimelineActions = () => {
   const state = useAppStore(useShallow(selectReleaseTimelineState));
   const { toast, confirm } = useDialog();
-  const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
+  // R15 finding 3：刷新时间按发起会话归属——ReleasesView/ReleaseTimeline 不按
+  // 账号重挂载，切换账号后旧账号的刷新时间与完成标记不得显示。A→B→A 时账号
+  // ID 与发起时相同，只有会话代次能识别（与本文件其余异步写入的归属校验同构）；
+  // currentAccountId 订阅保证切号本身触发重渲染，派生值在渲染期重算。
+  const currentAccountId = useAppStore((s) => accountIdKey(s.user));
+  const [lastRefresh, setLastRefresh] = useState<{
+    time: string;
+    accountId: string | null;
+    generation: number;
+  } | null>(null);
+  const lastRefreshTime = lastRefresh !== null
+    && lastRefresh.accountId === currentAccountId
+    && isCurrentAccountSession(lastRefresh.accountId, lastRefresh.generation)
+    ? lastRefresh.time
+    : null;
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
   const t = useT('releases');
 
@@ -104,7 +119,7 @@ export const useReleaseTimelineActions = () => {
       const updatedReleases = findReleasesWithChangedAssets(latestReleases, existingReleases);
       if (actuallyNewReleases.length > 0) addReleases(actuallyNewReleases);
       if (updatedReleases.length > 0) upsertReleases(updatedReleases);
-      setLastRefreshTime(now);
+      setLastRefresh({ time: now, accountId: startedAccountId, generation: startedGeneration });
 
       // updatedReleases 既含资产变化也含正文回填（空日志补回），文案不再只提资产。
       const updatedPart = updatedReleases.length > 0

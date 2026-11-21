@@ -384,14 +384,22 @@ const importedListEntriesAreValid = (value: unknown): boolean => {
  * ——mergeListById 去重与 gistUtils（gist.id.slice、files 遍历）直接读取这些
  * 字段，`gists: [{}]` 这类空对象此前能通过结构校验写入实时状态与工作区快照。
  * owner 允许为 null（类型即如此），其余展示字段缺失不拒绝。
+ * 审计修复（R15 finding 21）：files 映射的每个文件条目逐项校验——
+ * `files: { 'README.md': null }` 此前能通过映射级校验写入实时 Gist 列表，
+ * 消费者读取 file.content 时抛 TypeError；每个文件条目必须为非空普通对象
+ * （与 WebDAV 恢复路径 useBackupActions 的 backupGistEntriesAreValid 同一规则），
+ * 空文件映射（{}）继续接受。
  */
 const importedGistEntriesAreValid = (value: unknown): boolean => {
   if (!Array.isArray(value)) return false;
   return value.every((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
     const record = entry as { id?: unknown; files?: unknown };
-    return typeof record.id === 'string' && record.id.length > 0
-      && !!record.files && typeof record.files === 'object' && !Array.isArray(record.files);
+    if (!(typeof record.id === 'string' && record.id.length > 0)) return false;
+    if (!record.files || typeof record.files !== 'object' || Array.isArray(record.files)) return false;
+    return Object.values(record.files).every(
+      (file) => Boolean(file) && typeof file === 'object' && !Array.isArray(file),
+    );
   });
 };
 
@@ -1555,11 +1563,24 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (selectedTypes.includes('webdavConfigs') && importedData.webdavConfigs) {
           // 审计修复（R13 finding 39）：同 AI 密钥——WebDAV 密码的本机回退值
           // 读取等待结束后的实时凭据，绝不用旧快照覆盖等待期间轮换的新密码。
+          // 审计修复（R15 finding 22）：掩码/缺失备份密码的本机回退必须仅在同一
+          // WebDAV 服务时复用（URL 去空白 + 用户名均与本机配置一致，与恢复路径
+          // useBackupActions 的 sameWebDAVService 同一规则）——备份沿用配置 id
+          // 但改了 URL 时，旧密码绝不绑定到新服务；不匹配回退空密码，用户需
+          // 重新输入。
           const liveWebdavConfigs = useAppStore.getState().webdavConfigs;
-          const restoredConfigs = importedData.webdavConfigs.map(cfg => ({
-            ...cfg,
-            password: wasIncluded && isRealSecret(cfg.password) ? cfg.password : liveWebdavConfigs.find(c => c.id === cfg.id)?.password || ''
-          }));
+          const restoredConfigs = importedData.webdavConfigs.map(cfg => {
+            const existing = liveWebdavConfigs.find(c => c.id === cfg.id);
+            const sameWebDAVService = Boolean(existing)
+              && (cfg.url ?? '').trim() === (existing?.url ?? '').trim()
+              && (cfg.username ?? '') === (existing?.username ?? '');
+            return {
+              ...cfg,
+              password: wasIncluded && isRealSecret(cfg.password)
+                ? cfg.password
+                : (sameWebDAVService ? existing?.password ?? '' : ''),
+            };
+          });
           store.setWebDAVConfigs(restoredConfigs);
         }
         if (selectedTypes.includes('customCategories')) {
@@ -2180,16 +2201,23 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         const localAccount = useAppStore.getState().savedAccounts[id];
         return !localAccount?.githubToken?.trim();
       });
-      if (accountsNeedingReauth.length > 0) {
-        showSuccess(t('dataManagementPanel.import-accounts-need-reauth', {
+      // 审计修复（R15 finding 1）：重新授权提示与「未归属顶层数据已跳过」提示
+      // 不互斥（备份 activeAccountId: null 且身份核对失败时两者同时成立）——
+      // showSuccess 只保留一条消息，两条注意项必须合并进同一条消息展示，
+      // 绝不连续调用互相覆盖。
+      const reauthNotice = accountsNeedingReauth.length > 0
+        ? t('dataManagementPanel.import-accounts-need-reauth', {
           accounts: accountsNeedingReauth.join(', '),
-        }));
-      } else if (backupActiveAccountUnattributed) {
-        // 审计修复（R13 finding 40）：备份显式声明 activeAccountId: null——未归属
-        // 任何账号的顶层账号数据已跳过（绝不写入当前账号），提示用户；已归属的
-        // 工作区仍按各自 ID 恢复。
-        addLog(t('dataManagementPanel.import-data'), true, 'unattributed top-level account data skipped (activeAccountId: null)');
-        showSuccess(t('dataManagementPanel.import-skipped-unattributed-top-level'));
+        })
+        : null;
+      const unattributedNotice = backupActiveAccountUnattributed
+        ? t('dataManagementPanel.import-skipped-unattributed-top-level')
+        : null;
+      const combinedNotice = [reauthNotice, unattributedNotice]
+        .filter((notice): notice is string => Boolean(notice))
+        .join(' ');
+      if (combinedNotice) {
+        showSuccess(combinedNotice);
       } else if (hasMaskedBackupSecrets(importedData)) {
         // 如果导入的数据包含屏蔽的密钥，提示用户
         showSuccess(t('dataManagementPanel.data-imported-successfully-some-secrets-were-mas'));
@@ -2197,12 +2225,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         showSuccess(t('dataManagementPanel.data-imported-successfully'));
       }
 
+      // 操作日志明细同步承载两条注意项（R15 finding 1：与提示同源，不遗漏）
+      const importNoticeDetails: string[] = [];
+      if (accountsNeedingReauth.length > 0) {
+        importNoticeDetails.push(`accounts need re-authorization: ${accountsNeedingReauth.join(', ')}`);
+      }
+      if (backupActiveAccountUnattributed) {
+        importNoticeDetails.push('unattributed top-level account data skipped (activeAccountId: null)');
+      }
       addLog(
         t('dataManagementPanel.import-data'),
         true,
-        accountsNeedingReauth.length > 0
-          ? `accounts need re-authorization: ${accountsNeedingReauth.join(', ')}`
-          : undefined,
+        importNoticeDetails.length > 0 ? importNoticeDetails.join('; ') : undefined,
       );
       setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
     } catch (error) {

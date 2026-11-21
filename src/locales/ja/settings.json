@@ -28,7 +28,8 @@
     "restore-failed": "回復に失敗しました",
     "account-changed-during-restore": "復元中にアカウントが切り替えられたため、データ保護のため今回の復元を中止しました。",
     "gist-data-in-the-backup-contained-invalid-entries-th": "バックアップの Gist データに無効なエントリが含まれていたため、該当フィールドはスキップされ、以前の値が保持されています。",
-    "fork-data-in-the-backup-contained-invalid-entries-th": "バックアップの Fork データに無効なエントリが含まれていたため、該当フィールドはスキップされ、以前の値が保持されています。"
+    "fork-data-in-the-backup-contained-invalid-entries-th": "バックアップの Fork データに無効なエントリが含まれていたため、該当フィールドはスキップされ、以前の値が保持されています。",
+    "unbound-top-level-backup-data-skipped-activeaccountid-null": "アカウントの紐付けがないバックアップのトップレベルデータ（activeAccountId=null）はスキップされ、復元されていません。"
   },
   "useDesktopActions": {
     "load-failed": "読み込みに失敗しました",

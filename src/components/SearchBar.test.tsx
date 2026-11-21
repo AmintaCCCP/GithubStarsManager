@@ -86,6 +86,9 @@ const createStoreState = (overrides: Partial<ReturnType<typeof baseStoreState>> 
 });
 
 const baseStoreState = () => ({
+  // R15 finding 14：无账号 ID 时稠密召回整体跳过（不得发无范围查询）——
+  // 向量路径用例需要已登录账号。
+  user: { id: 1, login: 'alice', name: 'Alice', avatar_url: '', email: null },
   searchFilters: { ...defaultSearchFilters },
   repositories: [] as Repository[],
   releaseSubscriptions: new Set<number>(),

@@ -17,12 +17,14 @@ const importFresh = async () => {
 const PENDING_SYNC_ACCOUNTS_KEY = 'gsm.pendingSyncAccounts';
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
 const LEGACY_PENDING_SYNC_EVALUATED_KEY = 'gsm.pendingSyncLegacyEvaluated';
+const MIGRATION_SOURCE_KEY = 'gsm.pendingSyncMigrationSource';
 
 describe('loadPendingSyncAccounts legacy record migration (audit fix)', () => {
   afterEach(() => {
     window.localStorage.removeItem(PENDING_SYNC_ACCOUNTS_KEY);
     window.localStorage.removeItem(BACKEND_URL_STORAGE_KEY);
     window.localStorage.removeItem(LEGACY_PENDING_SYNC_EVALUATED_KEY);
+    window.localStorage.removeItem(MIGRATION_SOURCE_KEY);
     vi.resetModules();
   });
 
@@ -154,6 +156,70 @@ describe('loadPendingSyncAccounts legacy record migration (audit fix)', () => {
     expect(window.localStorage.getItem(LEGACY_PENDING_SYNC_EVALUATED_KEY)).toBe('1');
     expect(JSON.parse(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY) ?? '[]'))
       .toEqual([['77', 'https://persisted.test/api']]);
+  });
+
+  it('never rebinds a legacy record to a backend connected after a failed migration write-back (round-15 [17])', async () => {
+    // 第一次启动：原后端 X 已知，但记录写回失败（配额）。
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://origin.test/api');
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['77']]));
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const blockPendingSyncWrite = (key: string, value: string) => {
+      if (key === PENDING_SYNC_ACCOUNTS_KEY) throw new Error('QuotaExceededError');
+      originalSetItem(key, value);
+    };
+    const setItemSpies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(blockPendingSyncWrite),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blockPendingSyncWrite),
+    ];
+    try {
+      const firstStart = await importFresh();
+      firstStart.backend._backendUrl = 'https://origin.test/api';
+      // 绑定前先固化迁移来源（写回失败不影响来源键）
+      expect(window.localStorage.getItem(MIGRATION_SOURCE_KEY)).toBe('https://origin.test/api');
+    } finally {
+      setItemSpies.forEach((spy) => spy.mockRestore());
+    }
+
+    // 用户随后连接另一后端 Y 并重启：绝不能用 Y 的 URL 绑定账号 77 的旧记录。
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://other.test/api');
+    const secondStart = await importFresh();
+    secondStart.backend._backendUrl = 'https://other.test/api';
+    // 记录按固化来源绑定到 X（不是 Y），当前连接 Y 下不产生任何待推
+    expect(secondStart.autoSync.hasPendingAccountSync('77')).toBe(false);
+    expect(JSON.parse(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY) ?? '[]'))
+      .toEqual([['77', 'https://origin.test/api']]);
+    // 迁移完成：来源键清理
+    expect(window.localStorage.getItem(MIGRATION_SOURCE_KEY)).toBeNull();
+  });
+
+  it('keeps legacy records unbound when the migration source cannot be persisted (round-15 [17])', async () => {
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://origin.test/api');
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['77']]));
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const blockSourceWrite = (key: string, value: string) => {
+      if (key === MIGRATION_SOURCE_KEY) throw new Error('QuotaExceededError');
+      originalSetItem(key, value);
+    };
+    const setItemSpies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(blockSourceWrite),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blockSourceWrite),
+    ];
+    try {
+      const firstStart = await importFresh();
+      firstStart.backend._backendUrl = 'https://origin.test/api';
+      // 无法固化来源：本次启动保持未归属，记录原样保留
+      expect(firstStart.autoSync.hasPendingAccountSync('77')).toBe(false);
+      expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
+    } finally {
+      setItemSpies.forEach((spy) => spy.mockRestore());
+    }
+
+    // 之后连接 Y 并重启：仍未归属，绝不按 Y 猜测绑定
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://other.test/api');
+    const secondStart = await importFresh();
+    secondStart.backend._backendUrl = 'https://other.test/api';
+    expect(secondStart.autoSync.hasPendingAccountSync('77')).toBe(false);
+    expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
   });
 
   it('locks the unbound state immediately when the persisted URL is unknown (round-14 [20])', async () => {

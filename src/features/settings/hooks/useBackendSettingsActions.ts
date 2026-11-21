@@ -127,6 +127,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       return;
     }
     const previousUrl = backend.backendUrl;
+    // R15 finding 13（CodeRabbit）：探测失败回滚（init(previousUrl)）必须先校验
+    // 连接所有权——连接代次在探测窗口内被其他流程推进（含 X→Z→X）时不得覆盖。
+    const previousConnectionGeneration = backend.connectionGeneration;
     // R14 finding 25：探测会把输入框密钥写入全局 store——失败的探测必须先恢复
     // 原密钥再回滚连接，否则之后发往原后端的请求会携带错误密钥（401）。
     const previousSecret = typeof useAppStore.getState === 'function'
@@ -154,13 +157,41 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
         const healthData = await checkConnection(false, trimmedUrl || undefined, { deferConnectedStatus: true });
         if (!healthData) {
           restoreStagedSecret();
-          await backend.init(previousUrl ?? undefined);
-          toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+          // R15 finding 13（CodeRabbit）：回滚前校验连接所有权——探测自身的
+          // init 至多提交一次落点（非空输入固定为候选地址；失败落 null；被
+          // 更新的探测取代则不提交）。落点地址与连接代次必须与「从 previousUrl
+          // 出发的一次提交」一致；等待期间被其他流程接管（提交了其他地址或
+          // 代次推进，含 X→Z→X）时丢弃本次结果，不重新初始化连接。
+          const landedUrl = backend.backendUrl;
+          const landedGeneration = backend.connectionGeneration;
+          const rollbackCandidates: Array<string | null> = expectedUrl !== null
+            ? [expectedUrl, null]
+            : [previousUrl, null, backend.persistedUrl];
+          const probeOwnsConnection = rollbackCandidates.some((candidateUrl) => (
+            landedUrl === candidateUrl
+            && landedGeneration === previousConnectionGeneration + (candidateUrl === previousUrl ? 0 : 1)
+          ));
+          if (probeOwnsConnection) {
+            await backend.init(previousUrl ?? undefined);
+          } else {
+            console.warn('Connection probe rollback discarded: backend connection was taken over during probe', {
+              landed: landedUrl,
+              previous: previousUrl,
+            });
+          }
+          setStatus('disconnected');
+          setHealth(null);
+          if (probeOwnsConnection) {
+            toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+          }
           return false;
         }
         // R14 finding 26：健康检查必须命中固定目标——init(X) 被其他探测取代
         //（探测代次失效）时 checkHealth 读到的是另一地址，丢弃本次结果。
         const probedUrl = backend.backendUrl;
+        // R15 finding 13：认证失败回滚与提交前的复核同时校验连接代次
+        //（X→Z→X 地址复原但代次推进，仅比地址识别不出）。
+        const probedConnectionGeneration = backend.connectionGeneration;
         if (probedUrl === null || (expectedUrl !== null && probedUrl !== expectedUrl)) {
           restoreStagedSecret();
           setStatus('disconnected');
@@ -172,8 +203,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
           const authOk = secretInput ? await backend.verifyAuth() : true;
           if (!authOk) throw new Error('Authentication failed');
           // R14 finding 26：提交成功结果前确认当前后端仍为探测命中的地址；
+          // R15 finding 13：连接代次一并校验（X→Z→X 仅比地址识别不出）。
           // 已变化则丢弃结果——不写存储、不提示成功、不触发 token 恢复/同步。
-          if (backend.backendUrl !== probedUrl) {
+          if (backend.backendUrl !== probedUrl || backend.connectionGeneration !== probedConnectionGeneration) {
             restoreStagedSecret();
             setStatus('disconnected');
             setHealth(null);
@@ -189,10 +221,25 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
           return true;
         } catch {
           restoreStagedSecret();
-          await backend.init(previousUrl ?? undefined);
+          // R15 finding 13（CodeRabbit）：认证失败/异常的回滚同样先校验连接
+          // 所有权——当前地址与连接代次仍等于探测落点（探测仍持有连接）时才
+          // 恢复 previousUrl；已被其他流程接管时丢弃旧探测结果，不重新初始化
+          // 连接，也不显示本次探测的失败提示。
+          const probeOwnsConnection = backend.backendUrl === probedUrl
+            && backend.connectionGeneration === probedConnectionGeneration;
+          if (probeOwnsConnection) {
+            await backend.init(previousUrl ?? undefined);
+          } else {
+            console.warn('Connection probe rollback discarded: backend connection was taken over during verifyAuth', {
+              landed: backend.backendUrl,
+              probed: probedUrl,
+            });
+          }
           setStatus('disconnected');
           setHealth(null);
-          toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+          if (probeOwnsConnection) {
+            toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+          }
           return false;
         }
       });

@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Category, Repository, VectorSearchConfig } from '../../../types';
 import {
   applyListsToRepositories,
@@ -181,6 +181,15 @@ describe('useSearchActions.aiSearch (vector pipeline)', () => {
     // R12（finding 15）：runSync 现在区分「本地星标已写入」与「后端写入失败」，
     // 默认桩必须模拟真实成功返回值。
     mocks.forceSyncToBackend.mockResolvedValue(true);
+    // R15 finding 14：稠密向量召回不得以无范围查询执行——向量分支按账号范围
+    // 守卫（账号代次辅助读取的是真实 zustand store），本组用例必须在真实 store
+    // 中预置当前账号（数值 id），否则向量分支整体跳走词法兜底。
+    mocks.realStore?.setState({ user: { id: 1, login: 'me', avatar_url: '' } });
+  });
+
+  afterEach(() => {
+    // 恢复真实 store 的未登录态，避免泄漏进后续 describe 的账号代次校验
+    mocks.realStore?.setState({ user: null });
   });
 
   it('passes repositories, config and the outer signal to the pipeline, then preserves relevance order', async () => {

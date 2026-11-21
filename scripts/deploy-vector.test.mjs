@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -118,16 +119,87 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     }
   });
 
-  it('deploy.mjs overrides ACCOUNT_METADATA_INDEXED via --var on both enable and rollback deploys', () => {
-    // R2 review：deployWorker 必须在 true/false 两个方向都显式传 --var 覆盖，
-    // 回滚部署不得继承本地 wrangler.toml 中可能被手动改成的 "true"。
-    const src = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
-    assert.match(
-      src,
-      /deployArgs = \['deploy', '--var', `ACCOUNT_METADATA_INDEXED:\$\{accountMetadataIndexed \? 'true' : 'false'\}`\]/,
-      'deployWorker must build an explicit --var override for both directions'
+  it('deploy.mjs passes ACCOUNT_METADATA_INDEXED true/false to the executor on enable and auto-rollback (R15 finding 30)', () => {
+    // R15 finding 30（CodeRabbit）：旧的源码文本断言在实现错误地传入 true 时依然
+    // 通过（deployWorker 的模板本身能生成两种值）。这里注入命令执行器——通过
+    // `node --import` 预加载 spawnSync 替身（scripts/deploy-vector-spawn-stub.mjs，
+    // 记录参数并返回罐头结果，绝不执行真实 wrangler deploy），对快速部署做行为级
+    // 断言：启用部署实际传入 ACCOUNT_METADATA_INDEXED:true，验证失败后的自动
+    // 回滚实际传入 ACCOUNT_METADATA_INDEXED:false；同时以关闭的 stdin + 超时
+    // 验证快速部署在失败路径上绝不等待输入（R2 review 的非交互约束）。
+    const stubPath = path.resolve(__dirname, 'deploy-vector-spawn-stub.mjs');
+    const deployEntry = path.resolve(WORKER_DIR, 'deploy.mjs');
+    const wranglerTomlPath = path.resolve(WORKER_DIR, 'wrangler.toml');
+    assert.ok(fs.existsSync(stubPath), 'spawn stub preload module must exist');
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-vector-behavior-'));
+    const configFile = path.join(tempDir, 'deploy-config.json');
+    const spawnLog = path.join(tempDir, 'spawn-log.jsonl');
+    // workerUrl 指向本机不可达端口：部署后验证快速失败（仅本机连接拒绝，无外网
+    // 请求）；indexName 与 wrangler.toml 现值一致——syncWranglerToml 检测到无需
+    // 改动时不写入，测试不修改仓库文件（仍以快照断言兜底）。
+    const wranglerTomlBefore = fs.readFileSync(wranglerTomlPath, 'utf-8');
+    fs.writeFileSync(configFile, JSON.stringify({
+      workerName: 'github-stars-manager-behavior-test',
+      workerUrl: 'http://127.0.0.1:1',
+      authToken: 'test-auth-token',
+      indexName: 'github-stars',
+      dimensions: 1536,
+      accountMetadataIndexed: false,
+      accountMetadataIndexVerified: false,
+    }), 'utf-8');
+
+    let res;
+    let spawnLogLines;
+    try {
+      res = spawnSync(process.execPath, ['--import', stubPath, deployEntry, '--quick', '--account-metadata-indexed=true', '--lang=en'], {
+        encoding: 'utf-8',
+        input: '',
+        timeout: 120000,
+        killSignal: 'SIGKILL',
+        env: {
+          ...process.env,
+          DEPLOY_CONFIG_FILE: configFile,
+          DEPLOY_SPAWN_LOG: spawnLog,
+        },
+      });
+      // 日志随临时目录一并清理，必须在 rmSync 之前读取
+      spawnLogLines = fs.readFileSync(spawnLog, 'utf-8')
+        .trim()
+        .split('\n')
+        .filter((line) => line.length > 0)
+        .map((line) => JSON.parse(line));
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      assert.equal(
+        fs.readFileSync(wranglerTomlPath, 'utf-8'),
+        wranglerTomlBefore,
+        'behavior test must not modify cloudflare-worker/wrangler.toml'
+      );
+    }
+
+    // 失败路径绝不等待输入：进程在超时内自行退出（未被 SIGKILL，无 ETIMEDOUT）
+    assert.equal(res.signal, null, 'quick deploy must not hang waiting for input on the failure path');
+    assert.equal(res.error, undefined, 'quick deploy must complete without spawn errors');
+    assert.ok(res.status !== 0, 'explicitly requested enable that failed verification must exit non-zero');
+
+    const calls = spawnLogLines;
+    const varOverrideOf = (call) => {
+      const index = call.args.indexOf('--var');
+      return index >= 0 ? call.args[index + 1] : null;
+    };
+    const deployCalls = calls.filter((call) => call.args.includes('deploy') && call.args.includes('--var'));
+    assert.ok(deployCalls.length >= 2, 'enable deploy and auto-rollback deploy must both be recorded');
+    assert.equal(
+      varOverrideOf(deployCalls[0]),
+      'ACCOUNT_METADATA_INDEXED:true',
+      'enable deploy must actually pass ACCOUNT_METADATA_INDEXED:true to the executor'
     );
-    assert.ok(!src.includes("['deploy'];"), 'rollback must not deploy without the explicit override');
+    assert.equal(
+      varOverrideOf(deployCalls[1]),
+      'ACCOUNT_METADATA_INDEXED:false',
+      'auto-rollback after failed verification must actually pass ACCOUNT_METADATA_INDEXED:false'
+    );
   });
 
   it('deploy.mjs keeps --quick non-interactive on verification failure and gates unverified flags', () => {

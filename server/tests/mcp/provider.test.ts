@@ -651,9 +651,12 @@ describe('MCP provider discovery', () => {
     it('returns structured unavailable result instead of rejecting when backfill transaction fails', async () => {
       const db = await setupVectorDb();
       try {
-        // 用只读触发器/代理使事务写入失败，验证 vectorSearch 返回 available: false 而不 reject
+        // R15（审计 24）：故障注入点放在索引标记清除之后——用 partition_meta 的
+        // 写入触发器使「快照版本 / 完成标记」写入失败，验证事务中已执行的仓库
+        // 更新确实被整体回滚（而不是「还没开始就失败」）：原 vector_indexed_at
+        // 保持不变、快照版本未推进、完成标记未写入。
         db.exec(`
-          CREATE TRIGGER fail_backfill BEFORE UPDATE ON repositories
+          CREATE TRIGGER fail_backfill BEFORE INSERT ON partition_meta
           BEGIN SELECT RAISE(ABORT, 'simulated db write failure'); END;
         `);
         getDbMock.mockReturnValue(db);
@@ -666,7 +669,12 @@ describe('MCP provider discovery', () => {
 
         const result = await provider.vectorSearch('retrieval', {});
         expect(result).toEqual({ available: false, reason: 'vector_backfill_failed' });
-        // 失败回滚，未写入完成标记，可重试
+        // 失败回滚：已执行的 vector_indexed_at 清除被撤销（保持原值），快照版本
+        // 未推进，完成标记未写入——状态可重试
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBe('2025-01-01T00:00:00Z');
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
+          .toBeUndefined();
         expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
           .toBeUndefined();
       } finally {

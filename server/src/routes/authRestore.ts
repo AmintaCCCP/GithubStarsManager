@@ -208,10 +208,24 @@ router.post('/api/sync/auth', async (req, res) => {
       });
       return;
     }
-    const bodyAccountId = typeof (req.body as Record<string, unknown> | undefined)?.account_id === 'string'
-      ? ((req.body as Record<string, unknown>).account_id as string).trim()
-      : '';
+    const bodyAccountIdRaw = (req.body as Record<string, unknown> | undefined)?.account_id;
+    const bodyAccountId = typeof bodyAccountIdRaw === 'string' ? bodyAccountIdRaw.trim() : '';
     const headerAccountId = req.header('x-github-account-id')?.trim() ?? '';
+    // Issue #612 R15（审计 8）：无有效账号头时必须区分请求体 account_id 字段缺失
+    // 与字段无效——显式提供的无效值（如 "forty-two"）直接拒绝，绝不当作「未选择
+    // 账号」进入无头兼容分支（否则唯一可恢复账号的 PAT 会返回给选错账号的调用
+    // 方）。合法账号头保持优先：头部有效时请求体账号选择仅作冗余，其无效值忽略。
+    // 字段真正缺失（未发送 / null / 空串）的旧客户端兼容分支保留不变。
+    if (!/^\d+$/.test(headerAccountId)
+      && typeof bodyAccountIdRaw === 'string'
+      && bodyAccountId !== ''
+      && !/^\d+$/.test(bodyAccountId)) {
+      res.status(409).json({
+        error: 'account_id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
     // Issue #612 A19：请求体 account_id 与请求头 x-github-account-id 按同一优先级
     // 解析出唯一显式账号；无账号头且未提供 account_id 的旧客户端兼容恢复与全局活跃
     // 账号解析分开，无法安全确定目标账号时不返回其他账号的 PAT，要求显式选择账号。

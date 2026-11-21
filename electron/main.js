@@ -6,6 +6,7 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 }
 const path = require('path');
+const { pathToFileURL } = require('url');
 const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
@@ -84,6 +85,11 @@ const {
 
 let mainWindow;
 let tray = null;
+// 第 15 轮审计修复：主窗口实际加载的应用入口 URL（生产 loadFile 的目标、
+// did-fail-load 的包内 fallback、开发 dev server）。file: 一概信任会让主窗口
+// 导航到应用包外的本地 HTML 后仍通过导航与凭据 IPC 校验——导航放行与
+// gh-accounts:* IPC 校验都必须与本入口匹配（见 isAppMainPageUrl）。
+let appEntryPageUrl = null;
 // True only when the user explicitly quits (tray menu / Cmd+Q / before-quit).
 // Distinguishes "hide to tray" from "really exit" for close-to-tray (#345).
 let isQuitting = false;
@@ -187,6 +193,8 @@ function createWindow() {
     if (!fallbackAttempted && !alreadyOnFallback && fs.existsSync(fallbackPath)) {
       fallbackAttempted = true;
       console.log('Loading fallback page:', fallbackPath);
+      // 包内 fallback 是可信入口：did-fail-load 后信任边界随之更新。
+      appEntryPageUrl = pathToFileURL(fallbackPath).href;
       mainWindow.loadFile(fallbackPath);
     }
   });
@@ -251,6 +259,7 @@ function createWindow() {
   });
 
   if (isDev) {
+    appEntryPageUrl = 'http://localhost:5173/';
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
@@ -278,6 +287,8 @@ function createWindow() {
 
     if (indexPath) {
       console.log('Loading application from:', indexPath);
+      // 记录实际加载的应用入口：导航放行与凭据 IPC 校验的信任边界（第 15 轮审计修复）。
+      appEntryPageUrl = pathToFileURL(indexPath).href;
       mainWindow.loadFile(indexPath).catch(error => {
         console.error('Failed to load file:', error);
         // 加载失败时显示错误页面
@@ -393,7 +404,8 @@ function createWindow() {
     if (event.isMainFrame) {
       // 第 14 轮审计修复：主帧导航到非应用来源必须阻止——远程页面仍会加载
       // preload 暴露的 electronAPI（含 ghAccounts），可凭 gh-accounts:get 取回
-      // 全部账号 PAT。应用自身页面（生产 file://、开发 Vite 回环地址）放行；
+      // 全部账号 PAT。应用自身页面（生产为实际加载的 file:// 应用入口、开发
+      // Vite 回环地址；第 15 轮审计修复：file: 不再一概信任）放行；
       // 外部链接继续由 setWindowOpenHandler 走系统浏览器，data:/about: 等
       // 兜底错误页由主进程 loadURL/loadFile 发起（不触发本事件），不受影响。
       if (!isAppMainPageUrl(event.url)) event.preventDefault();
@@ -909,12 +921,26 @@ ipcMain.handle('x-auth:clear', async () => {
 // 第 14 轮审计修复：gh-accounts:* 仅接受应用自身页面的调用。preload 在主帧
 // 暴露 electronAPI，但主帧可能被引导导航到远程页面（此时 preload 仍会在该
 // 页面注入桥）——仅凭「主窗口主帧」不足以确认调用方可信，必须基于
-// event.senderFrame 的 URL 校验调用页面属于应用自身（生产为 file:// 应用包
-// 内页面，开发为 Vite dev server 回环地址）；来源不符一律拒绝。
+// event.senderFrame 的 URL 校验调用页面属于应用自身（生产为实际加载的
+// file:// 应用入口，开发为 Vite dev server 回环地址；第 15 轮审计修复：
+// file: 不再一概信任，见 isAppMainPageUrl）；来源不符一律拒绝。
 function isAppMainPageUrl(rawUrl) {
   try {
     const url = new URL(rawUrl);
-    if (url.protocol === 'file:') return true;
+    // 第 15 轮审计修复：只信任实际加载的应用入口——file: 一概信任会让主窗口
+    // 导航到应用包外的本地 HTML 后仍通过此处校验，该页面可凭 preload 暴露的
+    // ghAccounts.get() 取回全部账号 PAT。file: 页面必须与入口的规范化协议/
+    // 主机/文件路径一致（hash 路由变化放行）；入口尚未记录时一律拒绝。
+    if (url.protocol === 'file:') {
+      if (!appEntryPageUrl) return false;
+      const entry = new URL(appEntryPageUrl);
+      if (entry.protocol !== url.protocol || entry.hostname !== url.hostname) return false;
+      const stripHash = (u) => {
+        const hashIndex = u.href.indexOf('#');
+        return hashIndex === -1 ? u.href : u.href.slice(0, hashIndex);
+      };
+      return stripHash(entry) === stripHash(url);
+    }
     if (isDev && url.protocol === 'http:' && url.port === '5173' && isLoopbackHost(url.hostname)) return true;
     return false;
   } catch {

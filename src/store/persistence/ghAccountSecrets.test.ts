@@ -494,4 +494,146 @@ describe('syncGhAccountTokensFromState (R2-B1)', () => {
       Object.defineProperty(window, 'localStorage', { writable: true, value: originalStorage });
     }
   });
+
+  it('full clear keeps logout markers registered while the clear was in flight (round-15 audit [6])', async () => {
+    // 全量清除等待 IPC 期间：普通保存（含 42 的旧 PAT）先入队，退出请求随后
+    // 登记待删标记。清除成功只提交其发起时观察到的标记——新登记的退出标记
+    // 必须保留，否则随后执行的普通保存会把旧 PAT 写回磁盘，且应用在退出请求
+    // 执行前关闭时磁盘上留有旧 PAT 却没有可屏蔽它的标记。
+    window.localStorage.clear();
+    let releaseClear!: (value: { success: boolean }) => void;
+    let releaseSave!: (value: { success: boolean }) => void;
+    const clearMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<{ success: boolean }>((resolve) => { releaseClear = resolve; }))
+      .mockResolvedValue({ success: true });
+    const saveMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<{ success: boolean }>((resolve) => { releaseSave = resolve; }))
+      .mockResolvedValue({ success: true });
+    setBridge({
+      get: vi.fn().mockResolvedValue({
+        status: 'loaded',
+        tokens: { '42': 'ghp_42_old', '7': 'ghp_7' },
+      }),
+      save: saveMock,
+      clear: clearMock,
+    });
+    const secrets = await importFresh();
+    await secrets.loadGhAccountTokens();
+
+    // 全量清除入队并在 bridge.clear 上阻塞。
+    const clearPromise = secrets.clearGhAccountTokens();
+    await vi.waitFor(() => expect(clearMock).toHaveBeenCalledTimes(1));
+
+    // 普通保存入队；退出请求随后登记 42 的待删标记。
+    const save = secrets.syncGhAccountTokensFromState({
+      user: { id: 7 },
+      githubToken: 'ghp_7',
+      savedAccounts: { '7': { githubToken: 'ghp_7' }, '42': { githubToken: 'ghp_42_old' } },
+    });
+    const logout = secrets.syncGhAccountTokensFromState(
+      { user: null, githubToken: null, savedAccounts: {} },
+      ['42'],
+    );
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+
+    releaseClear({ success: true });
+    // 清除提交后，排在后面的普通保存开始执行并阻塞：此刻新登记的退出标记
+    // 必须仍然存在（清除未移除其发起之后登记的意图）。
+    await vi.waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+
+    releaseSave({ success: true });
+    await expect(save).resolves.toBe(true);
+    await expect(logout).resolves.toBe(true);
+    // 排队在清除之后的普通保存看到退出标记：42 的旧 PAT 不得写回磁盘
+    //（两次保存的载荷都不含 42；最后一次是退出请求自己的删除保存）。
+    expect(saveMock).toHaveBeenCalledTimes(2);
+    expect(saveMock).toHaveBeenNthCalledWith(1, { '7': 'ghp_7' });
+    expect(saveMock).toHaveBeenLastCalledWith({ '7': 'ghp_7' });
+    // 退出标记由退出请求提交，且已确认持久化。
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
+    expect(window.localStorage.getItem('gsm.pendingGhAccountRemovals')).toBeNull();
+    // 全量清除本身也成功完成（不得因退出请求的并发登记而失败）。
+    await expect(clearPromise).resolves.toBeUndefined();
+  });
+
+  it('restores persisted removal markers at startup and filters the old disk PAT (round-15 audit [7])', async () => {
+    // 第一次启动：登出 42 的加密删除失败——标记已持久化，磁盘旧 PAT 保留。
+    window.localStorage.clear();
+    let releaseFinalSave!: (value: { success: boolean }) => void;
+    const saveMock = vi.fn()
+      .mockResolvedValueOnce({ success: false, error: 'disk busy' })
+      .mockImplementationOnce(() => new Promise<{ success: boolean }>((resolve) => { releaseFinalSave = resolve; }))
+      .mockResolvedValue({ success: true });
+    setBridge({
+      get: vi.fn().mockResolvedValue({
+        status: 'loaded',
+        tokens: { '42': 'ghp_42_disk_old', '7': 'ghp_7' },
+      }),
+      save: saveMock,
+    });
+    const secrets = await importFresh();
+    await secrets.loadGhAccountTokens();
+    const removalFailed = await secrets.syncGhAccountTokensFromState(
+      { user: null, githubToken: null, savedAccounts: {} },
+      ['42'],
+    );
+    expect(removalFailed).toBe(false);
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+    expect(JSON.parse(window.localStorage.getItem('gsm.pendingGhAccountRemovals') ?? '[]')).toEqual(['42']);
+
+    // 重启（重新加载真实模块）：持久化标记必须恢复——否则加载器会把磁盘上
+    // 已退出账号的旧 PAT 重新回填会话。
+    const restarted = await importFresh();
+    expect(restarted.hasPendingGhAccountSecretRemovals()).toBe(true);
+    expect(restarted.getPendingGhAccountSecretRemovalIds()).toEqual(['42']);
+    const loaded = await restarted.loadGhAccountTokens();
+    // 加载结果过滤持久化标记命中的账号（磁盘旧 PAT 不回填）。
+    expect(loaded).toEqual({ status: 'loaded', tokens: { '7': 'ghp_7' } });
+
+    // 重启后的下一次保存（重试删除）：磁盘载荷不再包含 42 的旧 PAT；标记只在
+    // 加密保存确认成功后清除。
+    const finalSave = restarted.syncGhAccountTokensFromState(
+      { user: { id: 7 }, githubToken: 'ghp_7', savedAccounts: { '7': { githubToken: 'ghp_7' } } },
+      ['42'],
+    );
+    await vi.waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    // 写入尚未确认：标记仍在（重启后继续屏蔽）。
+    expect(restarted.hasPendingGhAccountSecretRemovals()).toBe(true);
+    releaseFinalSave({ success: true });
+    await expect(finalSave).resolves.toBe(true);
+    expect(saveMock).toHaveBeenLastCalledWith({ '7': 'ghp_7' });
+    expect(restarted.hasPendingGhAccountSecretRemovals()).toBe(false);
+    expect(window.localStorage.getItem('gsm.pendingGhAccountRemovals')).toBeNull();
+  });
+
+  it('warns and starts without markers when the persisted marker data is corrupt (round-15 audit [7])', async () => {
+    // 损坏数据处理规则：不可解析 ⇒ 明确告警后按无标记启动（不静默丢弃）。
+    // 告警发生在模块初始化（启动恢复）阶段：先重置注册表并挂好 logger spy，
+    // 再加载被测模块。
+    window.localStorage.clear();
+    window.localStorage.setItem('gsm.pendingGhAccountRemovals', 'not-json{');
+    try {
+      setBridge({
+        get: vi.fn().mockResolvedValue({ status: 'loaded', tokens: { '42': 'ghp_42_disk_old' } }),
+        save: vi.fn().mockResolvedValue({ success: true }),
+      });
+      vi.resetModules();
+      const freshLogger = await import('../../services/logger');
+      const warnSpy = vi.spyOn(freshLogger.logger, 'warn').mockImplementation(() => {});
+      const secrets = await import('./ghAccountSecrets');
+      expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
+      const loaded = await secrets.loadGhAccountTokens();
+      // 无可恢复标记：磁盘 PAT 照常加载（损坏数据不得改变加载语义）。
+      expect(loaded).toEqual({ status: 'loaded', tokens: { '42': 'ghp_42_disk_old' } });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'store.ghAccountSecrets',
+        expect.stringContaining('persisted gh-account removal markers'),
+        expect.objectContaining({ error: expect.any(String) }),
+      );
+      warnSpy.mockRestore();
+    } finally {
+      window.localStorage.removeItem('gsm.pendingGhAccountRemovals');
+    }
+  });
 });

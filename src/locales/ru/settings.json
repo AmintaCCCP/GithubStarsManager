@@ -28,7 +28,8 @@
     "restore-failed": "Восстановление не удалось",
     "account-changed-during-restore": "Аккаунт изменился во время восстановления. Восстановление было прервано для защиты данных.",
     "gist-data-in-the-backup-contained-invalid-entries-th": "Данные Gist в резервной копии содержали недопустимые записи; затронутые поля пропущены и сохраняют прежние значения.",
-    "fork-data-in-the-backup-contained-invalid-entries-th": "Данные Fork в резервной копии содержали недопустимые записи; затронутые поля пропущены и сохраняют прежние значения."
+    "fork-data-in-the-backup-contained-invalid-entries-th": "Данные Fork в резервной копии содержали недопустимые записи; затронутые поля пропущены и сохраняют прежние значения.",
+    "unbound-top-level-backup-data-skipped-activeaccountid-null": "Данные верхнего уровня резервной копии без привязки к аккаунту (activeAccountId=null) были пропущены и не восстановлены."
   },
   "useDesktopActions": {
     "load-failed": "Загрузка не удалась",

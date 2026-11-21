@@ -28,7 +28,8 @@
     "restore-failed": "Falha na recuperação",
     "account-changed-during-restore": "A conta foi trocada durante a restauração. A restauração foi abortada para proteger seus dados.",
     "gist-data-in-the-backup-contained-invalid-entries-th": "Os dados de Gist do backup continham entradas inválidas; os campos afetados foram ignorados e mantêm seus valores anteriores.",
-    "fork-data-in-the-backup-contained-invalid-entries-th": "Os dados de Fork do backup continham entradas inválidas; os campos afetados foram ignorados e mantêm seus valores anteriores."
+    "fork-data-in-the-backup-contained-invalid-entries-th": "Os dados de Fork do backup continham entradas inválidas; os campos afetados foram ignorados e mantêm seus valores anteriores.",
+    "unbound-top-level-backup-data-skipped-activeaccountid-null": "Os dados de nível superior do backup sem conta vinculada (activeAccountId=null) foram ignorados e não foram restaurados."
   },
   "useDesktopActions": {
     "load-failed": "Falha no carregamento",

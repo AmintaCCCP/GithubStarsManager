@@ -23,6 +23,9 @@ const mocks = vi.hoisted(() => ({
   forceSyncToBackend: vi.fn(),
   markPendingAccountSync: vi.fn(),
   markPendingRepositoryDeletion: vi.fn(),
+  // R15 finding 28：后端地址可配置——待删除/待补推标记登记的复合键依赖发起
+  // 时的 backend.backendUrl，用例需要断言具体地址而不是 expect.any(String)。
+  backend: { backendUrl: null as string | null },
   unstarRepository: vi.fn(),
   getRepositoryReadme: vi.fn(),
   loggerInfo: vi.fn(),
@@ -66,10 +69,20 @@ vi.mock('../../../services/autoSync', () => ({
   withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
 }));
 
+vi.mock('../../../services/backendAdapter', () => ({
+  backend: mocks.backend,
+}));
+
 vi.mock('../../../services/githubApi', () => ({
   GitHubApiService: class {
     unstarRepository = mocks.unstarRepository;
     getRepositoryReadme = mocks.getRepositoryReadme;
+    // R15 finding 28：backend mock 使真实 githubApiFactory 在 backendUrl 非空时
+    // 走后端代理附着路径——类桩必须提供三个附着方法（no-op），否则
+    // createGitHubApiService 在 unstar 的 try 内抛 TypeError，请求根本不会发出。
+    setBackendUrl = vi.fn();
+    setBackendAuthToken = vi.fn();
+    setBackendAccountId = vi.fn();
   },
 }));
 
@@ -153,6 +166,7 @@ describe('useRepositoryCardActions', () => {
     mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
       selector ? selector(storeState) : storeState
     )) as typeof useAppStore);
+    mocks.backend.backendUrl = null;
     mocks.confirm.mockResolvedValue(true);
     mocks.forceSyncToBackend.mockResolvedValue(undefined);
     mocks.unstarRepository.mockResolvedValue(undefined);
@@ -643,6 +657,9 @@ describe('useRepositoryCardActions account switch guards', () => {
     mocks.unstarRepository.mockImplementation(() => new Promise<void>((resolve) => {
       releaseUnstar = resolve;
     }));
+    // R15 finding 28：配置明确的后端地址——待删除/待补推标记必须登记发起时
+    // 的 (账号, 后端) 复合键，断言具体地址而不是 expect.any(String)。
+    mocks.backend.backendUrl = 'https://backend.example.test';
     const { result } = renderActions();
     let promise!: Promise<void>;
     await act(async () => {
@@ -675,7 +692,10 @@ describe('useRepositoryCardActions account switch guards', () => {
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
     // C29：为发起账号保留删除状态——登记 (发起账号, 发起时后端) 待补推标记
-    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', expect.any(String));
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', 'https://backend.example.test');
+    // R15 finding 28：待删除标记同样必须登记——它是防止后端旧记录在下次同步
+    // 后重新出现的关键，缺失时本用例不得通过（单独验证该标记）。
+    expect(mocks.markPendingRepositoryDeletion).toHaveBeenCalledWith('1', repository.id, 'https://backend.example.test');
   });
 
   it('drops the stale similar result after A→B→A (generation advanced)', async () => {

@@ -7,13 +7,14 @@ import { resolveTheme } from '../store/selectors';
 import { useOptionalDialog } from '../hooks/useDialog';
 import { useShallow } from 'zustand/react/shallow';
 import { normalizeBackendRestoreAccount, useLoginActions, type BackendAuthRestoreAccount } from '../features/lifecycle/hooks/useLoginActions';
-import { useAccountSwitchActions } from '../features/lifecycle/hooks/useAccountSwitchActions';
+import { markPendingBackendCredentialAlign, useAccountSwitchActions } from '../features/lifecycle/hooks/useAccountSwitchActions';
 import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
 import {
   accountIdKey,
   captureAccountWorkspace,
   getAccountSessionGeneration,
+  isSavedAccountRemovedInSession,
   workspaceHasRetainableData,
   type AccountWorkspace,
 } from '../store/helpers/accountWorkspace';
@@ -369,6 +370,18 @@ export const LoginScreen: React.FC = () => {
       const backendUnavailableAfterFailedRestore = previousBackendRestoreFailedRef.current
         && !getBackendUrl();
       if (!ok || backendUnavailableAfterFailedRestore) {
+        // 审计修复（R15 finding 12）：syncTokenToBackend 返回 ok:false（含内部
+        // 捕获异常的失败返回）时，为刚提交的当前账号登记待对齐标记——提示文案
+        // 承诺「从账号菜单重试」，Header 的重试入口以该标记为准（单账号用户
+        // 否则没有重试入口）。markPendingBackendCredentialAlign 为 features 域
+        // 公开导出（写入成员变化即通知订阅者，Header 立即重算重试入口）；
+        // 后端不可用的 ok:true 分支（R14 finding 10）无后端可对齐，不登记。
+        if (!ok) {
+          const loggedInAccountId = accountIdKey(user);
+          if (loggedInAccountId) {
+            markPendingBackendCredentialAlign(loggedInAccountId);
+          }
+        }
         // 审计修复（R14 finding 10）：普通 PAT 登录已先 setUser 提交本地会话——
         // 真实 App 中登录页随即卸载，登录页本地的 setError 无法再显示。复用
         // 快捷登录的全局 toast 告知用户后端凭据未能更新（本地会话保留，不撤销）。
@@ -604,9 +617,14 @@ export const LoginScreen: React.FC = () => {
           // 「保留本地」：跳过拉取并直接提交工作区与登录态。目标账号有自己的
           // 归档快照时，清掉 park 未能归档的无主残留（park 在确认前已执行，
           // 实时工作区此时已归档进目标账号快照），让 setUser 恢复 B 自己的
-          // 快照（B14）；目标账号无归档且顶层是用户显式要求保留的无主旧版缓存
-          // 时原样保留——绝不能在用户选择「保留本地」后仍丢弃这些数据。
-          if (targetHasParkedData) {
+          // 快照（B14）。
+          // 审计修复（R15 finding 10）：顶层仍是用户显式要求保留的无主旧版缓存
+          // 时（park 未能归档、无单独的丢弃确认），绝不清空——无主缓存独立
+          // 保留为登录后的实时工作区（switchAccountWorkspace 对可保留顶层保持
+          // 现状），绝不自动并入目标账号，目标账号归档原样留在
+          // accountWorkspaces 供后续切换恢复；顶层无可保留数据时才清空并恢复
+          // 目标归档。
+          if (targetHasParkedData && !workspaceHasRetainableData(useAppStore.getState())) {
             discardPartialLoginWorkspace();
           }
           setGitHubToken(result.githubToken);
@@ -651,6 +669,21 @@ export const LoginScreen: React.FC = () => {
         const normalizedAccount = await normalizeBackendRestoreAccount(account);
         if (getAccountSessionGeneration() !== registerSessionGeneration) break;
         if (!normalizedAccount) continue;
+        // 审计修复（R15 finding 11）：恢复开始后用户可能在登记等待期间移除某个
+        // 账号——removeSavedAccount 的非当前账号分支不推进会话代次，仅靠上方
+        // 的代次复核拦不住迟到的登记写入（被移除账号会连同其 PAT 重新写回
+        // savedAccounts 并同步加密存储）。异步处理完成后、写入前查会话级移除
+        // 登记并跳过（store 域机制：removeSavedAccount 登记 / upsertSavedAccount
+        // 撤销登记；helpers.isSavedAccountRemovedInSession 为提交回写前的点查，
+        // 返回 true 时消费方必须跳过 upsert）。备份条目的 accountId 与规范化后
+        // 的实际写入目标 ID 任一已登记移除即跳过，其余账号照常登记。
+        const normalizedAccountId = accountIdKey(normalizedAccount.user);
+        if (
+          (typeof account.accountId === 'string' && isSavedAccountRemovedInSession(account.accountId))
+          || (normalizedAccountId !== null && isSavedAccountRemovedInSession(normalizedAccountId))
+        ) {
+          continue;
+        }
         upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
       }
     } catch (error) {
@@ -795,10 +828,14 @@ export const LoginScreen: React.FC = () => {
         }
       } else if (!liveBelongsToTarget && targetHasParkedData) {
         // 「保留本地」：跳过拉取；仅当目标账号确有归档快照要恢复时才清理
-        // park 未能归档的无主残留，让 setUser 恢复目标归档。目标账号无归档
-        // 且顶层是用户显式要求保留的无主旧版缓存时原样保留——绝不能在用户
-        // 选择「保留本地」后仍丢弃这些数据。
-        discardPartialLoginWorkspace();
+        // park 未能归档的无主残留，让 setUser 恢复目标归档。
+        // 审计修复（R15 finding 10）：与 handleBackendConnect 的保留本地分支
+        // 同一语义——顶层仍是用户显式要求保留的无主旧版缓存时绝不清空（无
+        // 单独的丢弃确认，也不自动并入目标账号），无主缓存独立保留，目标归档
+        // 留在 accountWorkspaces；顶层无可保留数据时才清理并恢复目标归档。
+        if (!workspaceHasRetainableData(useAppStore.getState())) {
+          discardPartialLoginWorkspace();
+        }
       }
       setGitHubToken(githubToken);
       setUser(user);

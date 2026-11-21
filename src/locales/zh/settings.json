@@ -28,7 +28,8 @@
     "restore-failed": "恢复失败",
     "account-changed-during-restore": "恢复期间账号已切换，已中止本次恢复以保护数据安全。",
     "gist-data-in-the-backup-contained-invalid-entries-th": "备份中的 Gist 数据包含无效条目；相关字段已跳过，保留恢复前的值。",
-    "fork-data-in-the-backup-contained-invalid-entries-th": "备份中的 Fork 数据包含无效条目；相关字段已跳过，保留恢复前的值。"
+    "fork-data-in-the-backup-contained-invalid-entries-th": "备份中的 Fork 数据包含无效条目；相关字段已跳过，保留恢复前的值。",
+    "unbound-top-level-backup-data-skipped-activeaccountid-null": "备份中无账号归属（activeAccountId=null）的顶层数据已跳过，未恢复。"
   },
   "useDesktopActions": {
     "load-failed": "加载失败",

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -207,8 +207,11 @@ describe('Header account switcher', () => {
 
     const trigger = screen.getByRole('button', { name: 'header.switch-account' });
     expect(trigger).toBeTruthy();
-    // 触发器包含头像与用户名
-    expect(screen.getAllByAltText('Alice').length).toBeGreaterThan(0);
+    // 审计修复（R15 finding 25）：头像与用户名必须位于切换按钮内部——用
+    // within(trigger) 限定断言范围（页面级 getAllByAltText 拦不住元素被移出
+    // 按钮的回归，且未覆盖按钮内用户名）
+    expect(within(trigger).getByAltText('Alice')).toBeTruthy();
+    expect(within(trigger).getByText('Alice')).toBeTruthy();
 
     await userEvent.click(trigger);
     expect(screen.getByText('header.switch-account')).toBeTruthy();

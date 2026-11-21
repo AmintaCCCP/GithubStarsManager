@@ -377,14 +377,23 @@ export class VectorSearchService {
    */
   async query(
     vector: number[],
-    options: { topK?: number; threshold?: number; accountId?: string } = {},
+    options: { topK?: number; threshold?: number; accountId?: string; wide?: boolean } = {},
     signal?: AbortSignal,
   ): Promise<VectorQueryResult[]> {
-    const { topK = 20, threshold = 0.35, accountId } = options;
+    const { topK = 20, threshold = 0.35, accountId, wide } = options;
     const result = await this.request<{ matches: VectorQueryResult[] }>('/query', {
       method: 'POST',
       // accountId 让 Worker 在 topK 之前按归属过滤（多账号共享索引）。
-      body: JSON.stringify({ vector, topK, threshold, ...(accountId ? { accountId } : {}) }),
+      // wide（第 15 轮审计修复 [20]）：宽候选池——Worker 改用
+      // returnMetadata:'indexed' 以允许 topK > 50（旧版 Worker 会按原上限
+      // 截断，向后兼容）；客户端只消费 metadata.accountId。
+      body: JSON.stringify({
+        vector,
+        topK,
+        threshold,
+        ...(accountId ? { accountId } : {}),
+        ...(wide ? { wide: true } : {}),
+      }),
     }, signal);
     return result.matches;
   }

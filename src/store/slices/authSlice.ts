@@ -10,6 +10,8 @@ import {
   applyAccountWorkspace,
   bumpAccountSessionGeneration,
   captureAccountWorkspace,
+  clearRemovedSavedAccountRegistration,
+  registerRemovedSavedAccount,
   switchAccountWorkspace,
   workspaceHasRetainableData,
 } from '../helpers/accountWorkspace';
@@ -201,6 +203,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
       upsertSavedAccount: (user, githubToken) => {
         const accountId = accountIdKey(user);
         if (!accountId) return;
+        // 第 15 轮审计 [11] 机制侧：显式（重新）登记账号凭据即撤销该账号的
+        // 会话级移除登记——用户重新添加同一账号后，后续异步流程照常放行。
+        clearRemovedSavedAccountRegistration(accountId);
         const { savedAccounts } = get();
         const existing = savedAccounts[accountId];
         const now = nowIso();
@@ -347,6 +352,11 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
       removeSavedAccount: (accountId) => {
         const current = get();
         const currentAccountId = accountIdKey(current.user);
+        // 第 15 轮审计 [11] 机制侧：移除即登记到会话级「已移除账号」集合——
+        // 异步流程（LoginScreen 登记循环等）在 await 期间用户移除账号后，提交
+        // upsert 前可查询该登记并跳过回写，防止已移除账号被复活。会话级登记
+        // 不推进会话代次（非当前账号移除不得作废无关在途任务）。
+        registerRemovedSavedAccount(accountId);
         // 第 12 轮审计 ISSUE-1(C)：移除账号即让该账号的 v19 迁移输入失效——
         // 与登出同语义，后续 partialize 不得把旧 PAT 回填进分片。
         forgetV19MigrationInputs([accountId]);

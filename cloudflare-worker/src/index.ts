@@ -19,6 +19,13 @@ interface QueryRequest {
   topK?: number;
   threshold?: number;
   accountId?: string;
+  /**
+   * 宽候选池（第 15 轮审计修复 [20]）：客户端无法证明覆盖账号索引的全部
+   * 写入来源，按既定决策不做破坏性 cleanup，已删除仓库的旧向量会长期占用
+   * topK 名额。宽池请求改用 returnMetadata:'indexed'（topK 上限 100），
+   * 让客户端扩大召回候选池、降低冗余向量挤掉有效仓库的概率。
+   */
+  wide?: boolean;
 }
 
 interface DeleteRequest {
@@ -32,6 +39,8 @@ interface UpsertRequest {
 // returnMetadata:'all' caps topK at 50 on Vectorize V2 indexes; clamp requests
 // to avoid passing an out-of-range topK and being silently truncated.
 const QUERY_TOPK_LIMIT = 50;
+// 'indexed' metadata mode raises the cap to 100 (第 15 轮审计修复 [20])。
+const QUERY_TOPK_LIMIT_WIDE = 100;
 const QUERY_DEFAULT_TOPK = 20;
 
 const CORS_HEADERS: Record<string, string> = {
@@ -87,16 +96,21 @@ export default {
 
       // POST /query — 向量相似度查询
       if (request.method === 'POST' && url.pathname === '/query') {
-        const { vector, topK = QUERY_DEFAULT_TOPK, threshold = 0.35, accountId } = (await request.json()) as QueryRequest;
+        const { vector, topK = QUERY_DEFAULT_TOPK, threshold = 0.35, accountId, wide } = (await request.json()) as QueryRequest;
         if (!Array.isArray(vector) || vector.length === 0) {
           return jsonResponse({ success: false, error: 'vector array required' }, 400);
         }
         // returnMetadata:'all' caps topK at 50 (Vectorize V2 limits); clamp so
         // an oversized/negative/NaN topK degrades gracefully instead of erroring.
+        // 第 15 轮审计修复 [20]：wide 请求改用 'indexed'（上限 100）——
+        // 客户端只消费 metadata.accountId（已建立元数据索引），其余字段
+        // 本就由本地仓库数据水合。
+        const widePool = wide === true;
+        const topKLimit = widePool ? QUERY_TOPK_LIMIT_WIDE : QUERY_TOPK_LIMIT;
         const requestedTopK = typeof topK === 'number' && Number.isFinite(topK)
           ? Math.floor(topK)
           : QUERY_DEFAULT_TOPK;
-        const clampedTopK = Math.min(Math.max(requestedTopK, 1), QUERY_TOPK_LIMIT);
+        const clampedTopK = Math.min(Math.max(requestedTopK, 1), topKLimit);
         // 账号范围过滤必须在 topK 之前生效（Vectorize 的 filter 语义），
         // 否则其他账号的高分向量会占满候选名额；若 accountId 元数据索引尚未
         // 就绪，直接拒绝按账号过滤的查询，避免静默漏召回或退回无范围查询。
@@ -120,7 +134,7 @@ export default {
         const accountFilter = requestedAccountId ? { accountId: requestedAccountId } : undefined;
         const matches = await env.VECTORIZE.query(vector, {
           topK: clampedTopK,
-          returnMetadata: 'all' as const,
+          returnMetadata: (widePool ? 'indexed' : 'all') as 'all' | 'indexed',
           ...(accountFilter ? { filter: accountFilter } : {}),
         });
         // 过滤低分结果

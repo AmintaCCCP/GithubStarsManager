@@ -17,7 +17,12 @@ const mocks = vi.hoisted(() => ({
   useAppStore: Object.assign(vi.fn(), { setState: vi.fn() }),
   // R14 finding 26：模拟适配器的连接状态——init 按 real 契约提交地址
   //（手动探测固定目标/漂移判定依赖 backendUrl 反映提交结果）。
-  backendState: { backendUrl: 'https://stored.example/api' as string | null },
+  // R15 finding 13：探测失败回滚的所有权校验依赖连接代次——mock 复现真实
+  // 适配器的 commitBackendUrl 语义（地址变化时代次 +1，同地址提交不推进）。
+  backendState: {
+    backendUrl: 'https://stored.example/api' as string | null,
+    connectionGeneration: 0,
+  },
 }));
 
 vi.mock('../../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
@@ -26,6 +31,9 @@ vi.mock('../../../services/backendAdapter', () => ({
     configuredUrl: 'https://stored.example/api',
     get backendUrl() {
       return mocks.backendState.backendUrl;
+    },
+    get connectionGeneration() {
+      return mocks.backendState.connectionGeneration;
     },
     isAvailable: false,
     init: mocks.backendInit,
@@ -74,10 +82,16 @@ describe('useBackendSettingsActions 后端地址配置', () => {
     vi.clearAllMocks();
     storeState.backendApiSecret = null;
     mocks.backendState.backendUrl = 'https://stored.example/api';
+    mocks.backendState.connectionGeneration = 0;
     mocks.backendInit.mockImplementation(async (url?: string) => {
       // 模拟适配器 init 的提交语义：preferredUrl 规整化后提交；留空走
       // 自动探测回退到存储地址（health 失败的提交语义由具体用例另行覆盖）。
-      mocks.backendState.backendUrl = url ? normalizeBackendUrl(url) : 'https://stored.example/api';
+      // R15 finding 13：与真实 commitBackendUrl 一致——仅地址变化时推进代次。
+      const next = url ? normalizeBackendUrl(url) : 'https://stored.example/api';
+      if (mocks.backendState.backendUrl !== next) {
+        mocks.backendState.backendUrl = next;
+        mocks.backendState.connectionGeneration += 1;
+      }
     });
     mocks.backendCheckHealth.mockResolvedValue({ version: '1.0.0', timestamp: '2026-09-05T00:00:00Z' });
     mocks.backendVerifyAuth.mockResolvedValue(true);

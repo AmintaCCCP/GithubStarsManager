@@ -225,6 +225,11 @@ export const useBulkRepositoryActions = ({
     }
 
     await forceSyncToBackend();
+    // R15 finding 2：同步等待期间可能切号——完成提示只发给发起会话（已完成的
+    // 写入与对账保留，会话未变时照常提示，会话已变更不再显示旧账号的结果）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+      return true;
+    }
     const failures = formatFailures(language, failedRepositories);
     toast(
       t('useBulkRepositoryActions.successfully-unstarred-v1-repositories-failures', { v1: successIds.length, failures: failures }),
@@ -238,6 +243,8 @@ export const useBulkRepositoryActions = ({
 
     // 账号代次校验（Issue #611）：本地写入为同步执行，入口保存并复核一次快照
     const startedAccountId = peekCurrentAccountId();
+    // R15 finding 2：完成提示按发起会话归属——A→B→A 只有会话代次能识别。
+    const startedGeneration = getAccountSessionGeneration();
     if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
@@ -255,6 +262,8 @@ export const useBulkRepositoryActions = ({
     }
 
     await forceSyncToBackend();
+    // R15 finding 2：同步等待期间可能切号——完成提示只发给发起会话（已完成的写入保留）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return true;
     const failures = formatFailures(language, failedRepositories);
     toast(
       t('useBulkRepositoryActions.successfully-restored-successcount-repositories', { successCount: successCount, failures: failures }),
@@ -266,6 +275,8 @@ export const useBulkRepositoryActions = ({
   const categorize = useCallback(async (repositories: Repository[], categoryName: string) => {
     // 账号代次校验（Issue #611）：入口保存并复核一次快照
     const startedAccountId = peekCurrentAccountId();
+    // R15 finding 2：完成提示按发起会话归属——A→B→A 只有会话代次能识别。
+    const startedGeneration = getAccountSessionGeneration();
     if (!isCurrentAccount(startedAccountId)) return false;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {
@@ -281,6 +292,8 @@ export const useBulkRepositoryActions = ({
     }
 
     await forceSyncToBackend();
+    // R15 finding 2：同步等待期间可能切号——完成提示只发给发起会话（已完成的写入保留）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return true;
     const successCount = repositories.length - failedRepositories.length;
     const failures = formatFailures(language, failedRepositories);
     toast(
@@ -293,6 +306,8 @@ export const useBulkRepositoryActions = ({
   const subscribe = useCallback(async (repositories: Repository[]) => {
     // 账号代次校验（Issue #611）：入口保存并复核一次快照
     const startedAccountId = peekCurrentAccountId();
+    // R15 finding 2：完成提示按发起会话归属——A→B→A 只有会话代次能识别。
+    const startedGeneration = getAccountSessionGeneration();
     if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     for (const repository of repositories) {
@@ -308,6 +323,8 @@ export const useBulkRepositoryActions = ({
     }
 
     await forceSyncToBackend();
+    // R15 finding 2：同步等待期间可能切号——完成提示只发给发起会话（已完成的写入保留）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return true;
     toast(
       t('useBulkRepositoryActions.successfully-subscribed-to-successcount-reposito', { successCount: successCount }),
       'success',
@@ -324,6 +341,8 @@ export const useBulkRepositoryActions = ({
 
     // 账号代次校验（Issue #611）：入口保存并复核一次快照
     const startedAccountId = peekCurrentAccountId();
+    // R15 finding 2：完成提示按发起会话归属——A→B→A 只有会话代次能识别。
+    const startedGeneration = getAccountSessionGeneration();
     if (!isCurrentAccount(startedAccountId)) return false;
     batchUnsubscribeReleases(subscribedRepositories.map((repository) => repository.id));
     const failedRepositories: string[] = [];
@@ -337,6 +356,8 @@ export const useBulkRepositoryActions = ({
     }
 
     await forceSyncToBackend();
+    // R15 finding 2：同步等待期间可能切号——完成提示只发给发起会话（已完成的写入保留）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return true;
     const successCount = subscribedRepositories.length - failedRepositories.length;
     const failures = formatFailures(language, failedRepositories);
     toast(
@@ -349,6 +370,8 @@ export const useBulkRepositoryActions = ({
   const lockCategory = useCallback(async (repositories: Repository[]) => {
     // 账号代次校验（Issue #611）：入口保存并复核一次快照
     const startedAccountId = peekCurrentAccountId();
+    // R15 finding 2：完成提示按发起会话归属——A→B→A 只有会话代次能识别。
+    const startedGeneration = getAccountSessionGeneration();
     if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     let skippedCount = 0;
@@ -369,6 +392,8 @@ export const useBulkRepositoryActions = ({
     }
 
     await forceSyncToBackend();
+    // R15 finding 2：同步等待期间可能切号——完成提示只发给发起会话（已完成的写入保留）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return true;
     const skipped = skippedCount > 0
       ? (t('useBulkRepositoryActions.skipped-skippedcount-repositories-without-custom', { skippedCount: skippedCount }))
       : '';
@@ -383,6 +408,8 @@ export const useBulkRepositoryActions = ({
   const unlockCategory = useCallback(async (repositories: Repository[]) => {
     // 账号代次校验（Issue #611）：入口保存并复核一次快照
     const startedAccountId = peekCurrentAccountId();
+    // R15 finding 2：完成提示按发起会话归属——A→B→A 只有会话代次能识别。
+    const startedGeneration = getAccountSessionGeneration();
     if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
@@ -397,6 +424,8 @@ export const useBulkRepositoryActions = ({
     }
 
     await forceSyncToBackend();
+    // R15 finding 2：同步等待期间可能切号——完成提示只发给发起会话（已完成的写入保留）。
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return true;
     const failures = formatFailures(language, failedRepositories);
     toast(
       t('useBulkRepositoryActions.successfully-unlocked-categories-for-successcoun', { successCount: successCount, failures: failures }),

@@ -450,3 +450,42 @@ export const isCurrentAccountSession = (
   expectedGeneration: number,
 ): boolean => expectedGeneration === _accountSessionGeneration && isCurrentAccount(expectedAccountId);
 
+// ── 会话级「已移除账号」登记（第 15 轮审计 [11] 机制侧）──
+/**
+ * removeSavedAccount 把被移除账号 ID 记入本会话级集合（不持久化）：异步流程
+ *（如 LoginScreen 的后端账号登记循环）在 await 期间用户移除账号 B 后，消费方
+ * 提交 upsert 前可据此判断「该账号已被移除」并跳过回写，防止已移除账号在
+ * 登记循环中复活（savedAccounts 重新出现 + 旧 PAT 被写回安全存储）。
+ * 特意不用「推进/校验会话代次」实现——非当前账号的移除不得无条件递增会话
+ * 代次（会作废无关账号在途任务的结果，见第 12 轮 R12 finding 16 语义）。
+ * 生命周期：removeSavedAccount 登记（各分支都要）；upsertSavedAccount 显式
+ * （重新）登记账号凭据时清除——用户重新添加同一账号即视为撤销移除。
+ */
+const removedSavedAccountIds = new Set<string>();
+
+/** 登记一个本会话内被移除的账号 ID（幂等）。 */
+export const registerRemovedSavedAccount = (accountId: string): void => {
+  removedSavedAccountIds.add(accountId);
+};
+
+/** 清除某账号的移除登记（用户重新添加同一账号时由 upsertSavedAccount 调用）。 */
+export const clearRemovedSavedAccountRegistration = (accountId: string): void => {
+  removedSavedAccountIds.delete(accountId);
+};
+
+/**
+ * 提交回写前的点查：该账号是否在本会话内被移除且尚未被重新登记。
+ * 返回 true 时消费方必须跳过对该账号的 upsertSavedAccount / 凭据回写。
+ */
+export const isSavedAccountRemovedInSession = (accountId: string): boolean =>
+  removedSavedAccountIds.has(accountId);
+
+/**
+ * 当前会话级移除登记快照。需要精确判断「某次 await 期间被移除」的消费方
+ *（如 autoSync 的身份写入）在等待前取快照、提交前再取一次做差集：
+ * 提交时目标 ID ∈ (now − before) ⇒ 本次等待期间被移除 ⇒ 跳过写入；
+ * ID ∈ before ⇒ 更早被移除（是否跳过由消费方语义决定——重新登记后 ID
+ * 会从 now 中消失，重新添加后的写入照常放行）。
+ */
+export const getRemovedSavedAccountIdsSnapshot = (): string[] => Array.from(removedSavedAccountIds);
+

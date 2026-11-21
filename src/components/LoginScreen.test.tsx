@@ -5,6 +5,10 @@ import { defaultReleaseSourceSettings } from '../types';
 import { TooltipProvider } from './ui/tooltip';
 import { DialogProvider } from '../hooks/useDialog';
 import { useAppStore } from '../store/useAppStore';
+import {
+  hasPendingBackendCredentialAlign,
+  resetPendingBackendCredentialAlignForTest,
+} from '../features/lifecycle/hooks/useAccountSwitchActions';
 
 const mocks = vi.hoisted(() => ({
   safeReadText: vi.fn(),
@@ -684,6 +688,10 @@ describe('LoginScreen 后端登录', () => {
     // 会把 PAT 发给仍活动的候选后端 B）
     await waitFor(() => expect(screen.getByRole('button', { name: '连接到GitHub' })).toBeDisabled());
     fireEvent.keyDown(patInput, { key: 'Enter' });
+    // 审计修复（R15 finding 26）：syncTokenToBackend 在 authenticateWithGitHub
+    // 之后才调用——回滚挂起时两者都不得启动，仅断言后者证明不了 PAT 流程
+    // （认证）未被发起
+    expect(mocks.authenticateWithGitHub).not.toHaveBeenCalled();
     expect(mocks.syncTokenToBackend).not.toHaveBeenCalled();
 
     // 回滚完成：提交入口恢复
@@ -1179,6 +1187,8 @@ describe('LoginScreen 已保存账号快捷登录', () => {
       email: null,
     });
     mocks.syncTokenToBackend.mockReset().mockResolvedValue({ ok: false });
+    // 待对齐标记是 features 模块级登记：用例前后清理，避免跨用例泄漏
+    resetPendingBackendCredentialAlignForTest();
     render(
       <DialogProvider>
         <TooltipProvider>
@@ -1199,6 +1209,11 @@ describe('LoginScreen 已保存账号快捷登录', () => {
     expect(useAppStore.getState().user?.login).toBe('octo-pat');
     expect(useAppStore.getState().isAuthenticated).toBe(true);
     expect(useAppStore.getState().githubToken).toBe('ghp_pat');
+    // 审计修复（R15 finding 12）：同步失败为当前账号登记待对齐标记——Header
+    // 据此为单账号用户提供提示文案所述的重试入口（round-15 [11] 机制同源：
+    // 会话级登记，测试后清理避免跨用例泄漏）
+    expect(hasPendingBackendCredentialAlign('5')).toBe(true);
+    resetPendingBackendCredentialAlignForTest();
   });
 });
 

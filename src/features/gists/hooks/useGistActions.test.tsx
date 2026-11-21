@@ -498,6 +498,11 @@ describe('useGistActions account switch guards', () => {
     (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
       '1': { gists: [{ ...gist, starred: true }], starredGists: [{ ...gist, starred: true }] },
     };
+    // R15 finding 27：为账号 B 准备可区分的实时数据（同 ID、不同内容）——
+    // 若实现经 useAppStore.setState 同时改写 B 的实时列表，仅断言 updateGist
+    // 未被调用捕获不到，必须在请求完成后直接比较两个实时列表。
+    storeState.gists = [{ ...gist, description: 'B live copy' }];
+    storeState.starredGists = [{ ...gist, description: 'B starred live copy' }];
     const { result } = renderHook(() => useGistActions());
     const onUnstarred = vi.fn();
     await act(async () => { await result.current.unstarGist(gist, onUnstarred); });
@@ -507,6 +512,9 @@ describe('useGistActions account switch guards', () => {
     expect(onUnstarred).not.toHaveBeenCalled();
     expect(storeState.updateGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
+    // 账号 B 的实时列表未被本次迟到写回触碰
+    expect(storeState.gists).toEqual([{ ...gist, description: 'B live copy' }]);
+    expect(storeState.starredGists).toEqual([{ ...gist, description: 'B starred live copy' }]);
     // 切回 A 时归档快照换入实时列表——归档必须已反映 GitHub 的取消星标结果
     const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string; starred?: boolean }>; starredGists: Array<{ id: string; starred?: boolean }> }> }).accountWorkspaces['1'];
     expect(parked.gists[0].starred).toBe(false);
@@ -524,6 +532,11 @@ describe('useGistActions account switch guards', () => {
     (storeState as unknown as { accountWorkspaces: Record<string, unknown> }).accountWorkspaces = {
       '1': { gists: [gist], starredGists: [gist] },
     };
+    // R15 finding 27：为账号 B 准备可区分的实时数据（同 ID、不同内容）——
+    // 若实现经 useAppStore.setState 同时改写 B 的实时列表，仅断言
+    // deleteGist 未被调用捕获不到，必须在请求完成后直接比较两个实时列表。
+    storeState.gists = [{ ...gist, description: 'B live copy' }];
+    storeState.starredGists = [{ ...gist, description: 'B starred live copy' }];
     const { result } = renderHook(() => useGistActions());
     const onDeleted = vi.fn();
     await act(async () => { await result.current.deleteGist(gist, onDeleted); });
@@ -533,6 +546,9 @@ describe('useGistActions account switch guards', () => {
     expect(onDeleted).not.toHaveBeenCalled();
     expect(storeState.deleteGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
+    // 账号 B 的实时列表未被本次迟到写回触碰
+    expect(storeState.gists).toEqual([{ ...gist, description: 'B live copy' }]);
+    expect(storeState.starredGists).toEqual([{ ...gist, description: 'B starred live copy' }]);
     const parked = (storeState as unknown as { accountWorkspaces: Record<string, { gists: Array<{ id: string }>; starredGists: Array<{ id: string }> }> }).accountWorkspaces['1'];
     expect(parked.gists).toHaveLength(0);
     expect(parked.starredGists).toHaveLength(0);

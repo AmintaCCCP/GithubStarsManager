@@ -75,6 +75,14 @@ export interface VectorSearchPipelineResult {
 }
 
 export const RECALL_TOP_K = 50;
+/**
+ * 第 15 轮审计修复 [20]：稠密召回请求的候选池上限——比最终候选数大一倍，
+ * 让已删除仓库残留的冗余向量（客户端无法证明覆盖全部写入来源，按第 12 轮
+ * 决策不做破坏性 cleanup）不至于占满 topK 名额。Worker 对
+ * `returnMetadata:'all'` 的 topK 上限为 50，宽池请求改用 'indexed'（上限
+ * 100）；客户端只消费 metadata.accountId，不受其余字段被裁剪的影响。
+ */
+export const RECALL_QUERY_TOP_K = 100;
 export const LLM_CANDIDATE_LIMIT = 15;
 export const RRF_K = 60;
 export const RELATIVE_FUSION_CUTOFF = 0.65;
@@ -835,7 +843,9 @@ export async function runVectorSearchPipeline(
           stageSignal => options.vectorService.query(
             vectors[0],
             {
-              topK: RECALL_TOP_K,
+              // 第 15 轮审计修复 [20]：宽候选池抵消冗余向量对召回名额的占用
+              topK: RECALL_QUERY_TOP_K,
+              wide: true,
               threshold,
               ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
             },
@@ -884,7 +894,9 @@ export async function runVectorSearchPipeline(
             stageSignal => options.vectorService.query(
               vectors[0],
               {
-                topK: RECALL_TOP_K,
+                // 第 15 轮审计修复 [20]：宽候选池抵消冗余向量对召回名额的占用
+                topK: RECALL_QUERY_TOP_K,
+                wide: true,
                 threshold,
                 ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
               },

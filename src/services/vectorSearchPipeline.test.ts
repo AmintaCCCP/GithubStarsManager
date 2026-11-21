@@ -167,7 +167,8 @@ describe('vectorSearchPipeline', () => {
 
     expect(embed).toHaveBeenNthCalledWith(1, ['github readme skill'], 'query', expect.any(AbortSignal));
     expect(embed).toHaveBeenNthCalledWith(2, [analysis.idealDescription], 'query', expect.any(AbortSignal));
-    expect(query).toHaveBeenNthCalledWith(1, [0.1], { topK: 50, threshold: 0.35 }, expect.any(AbortSignal));
+    // 第 15 轮审计修复 [20]：稠密召回使用宽候选池（100，wide 标记）
+    expect(query).toHaveBeenNthCalledWith(1, [0.1], { topK: 100, wide: true, threshold: 0.35 }, expect.any(AbortSignal));
     expect(result?.repositories[0].id).toBe(1);
     expect(result?.scoreMap.get('1')).toBe(1);
     expect(result?.diagnostics.analysisUsed).toBe(true);

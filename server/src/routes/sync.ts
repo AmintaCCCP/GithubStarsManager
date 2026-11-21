@@ -503,14 +503,25 @@ router.post('/api/sync/import', async (req, res) => {
       credentialVersionBefore?: number;
     }> = [];
     if (Array.isArray(accountWorkspacesRaw)) {
-      for (const ws of accountWorkspacesRaw) {
+      // Issue #612 R15（审计 9）：无效的工作区账号 ID（非字符串 / 不符合规则的
+      // 字符串 / 缺失）直接返回 400 并指出条目索引——不再静默跳过，否则调用方
+      // 无法区分成功恢复与整份工作区未恢复。未提供 account_workspaces 的旧备份
+      // 不受影响（本分支根本不进入）。
+      for (let i = 0; i < accountWorkspacesRaw.length; i++) {
+        const ws = accountWorkspacesRaw[i];
         if (!ws || typeof ws !== 'object' || Array.isArray(ws)) {
-          res.status(400).json({ error: 'Invalid account workspace entry', code: 'INVALID_ACCOUNT_WORKSPACE' });
+          res.status(400).json({ error: `Invalid account workspace entry at index ${i}`, code: 'INVALID_ACCOUNT_WORKSPACE' });
           return;
         }
         const wsObj = ws as Record<string, unknown>;
         const id = typeof wsObj.account_id === 'string' ? wsObj.account_id : '';
-        if (!id || !/^\d+$|^(default)$/.test(id)) continue;
+        if (!id || !/^\d+$|^(default)$/.test(id)) {
+          res.status(400).json({
+            error: `Account workspace entry at index ${i} has an invalid account_id (${String(wsObj.account_id)}): expected a numeric string or 'default'`,
+            code: 'INVALID_ACCOUNT_WORKSPACE',
+          });
+          return;
+        }
         // Issue #612 A4：'default' 分区在目标服务器可被首个登录账号自动认领。
         // 两种情况来源归属都无法核验，数据一律不写入（数字账号工作区仍原样恢复）：
         // ① 请求本身不在 default 分区；
@@ -521,14 +532,23 @@ router.post('/api/sync/import', async (req, res) => {
         workspaceEntries.push({ accountId: id, workspace: wsObj, unverifiedOwner: unverifiedDefault });
       }
     } else if (accountWorkspacesRaw && typeof accountWorkspacesRaw === 'object') {
+      // Issue #612 R15（审计 9）：对象形式中的无效键同样返回 400 并指出键名，
+      // 不再静默跳过。
       for (const [id, ws] of Object.entries(accountWorkspacesRaw)) {
         if (!ws || typeof ws !== 'object' || Array.isArray(ws)) {
-          res.status(400).json({ error: 'Invalid account workspace entry', code: 'INVALID_ACCOUNT_WORKSPACE' });
+          res.status(400).json({ error: `Invalid account workspace entry at key (${id})`, code: 'INVALID_ACCOUNT_WORKSPACE' });
           return;
         }
-        if (!/^\d+$|^(default)$/.test(id)) continue;
+        if (!/^\d+$|^(default)$/.test(id)) {
+          res.status(400).json({
+            error: `Account workspace key (${id}) is not a valid account ID: expected a numeric string or 'default'`,
+            code: 'INVALID_ACCOUNT_WORKSPACE',
+          });
+          return;
+        }
         const wsObj = ws as Record<string, unknown>;
-        if (wsObj.account_id !== undefined && wsObj.account_id !== null && String(wsObj.account_id) !== id) {
+        if (wsObj.account_id !== undefined && wsObj.account_id !== null
+          && (typeof wsObj.account_id !== 'string' || wsObj.account_id !== id)) {
           res.status(400).json({
             error: `Account workspace account_id (${String(wsObj.account_id)}) does not match key (${id})`,
             code: 'INVALID_ACCOUNT_WORKSPACE',

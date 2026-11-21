@@ -1,6 +1,6 @@
 import { backend, normalizeBackendRestoreAccount } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
-import { accountIdKey, getAccountSessionGeneration, isCurrentAccountSession } from '../store/helpers/accountWorkspace';
+import { accountIdKey, getAccountSessionGeneration, isCurrentAccountSession, isSavedAccountRemovedInSession } from '../store/helpers/accountWorkspace';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { normalizeAssetFilters } from '../utils/assetFilters';
 import { createGitHubApiService } from './githubApiFactory';
@@ -44,14 +44,29 @@ interface FrozenWindowBuffers {
   resetGeneration: number;
 }
 const _frozenWindowStack: FrozenWindowBuffers[] = [];
-// 冻结阶段开始前的状态（[19]）：最后一个窗口退出时恢复整个阶段开始前的值，
-// 而不是最后进入窗口自己看到的值（其 previousSwitching 可能为内层窗口置的 true）。
-let _preFrozenSwitching = false;
-let _preFrozenBookkeeping = false;
+// 第 15 轮审计修复 [19]：_isSwitchingAccount 的统一持有者计数——异步切换守卫
+// 与冻结窗口都可能持有该标志，二者交错进出时保存/还原会把仍活动持有者的状态
+// 破坏（最后退出者恢复自己进入时的旧值，标志在无活动窗口/守卫时卡死，自动
+// 拉取持续暂停）。标志始终重算自当前持有者集合：最后一个持有者退出才复位。
+let _activeSwitchGuards = 0;
+// 第一个持有者进入前的簿记状态（最后一个持有者退出时恢复）。
+let _preHoldersBookkeeping = false;
+// 冻结缓冲的阶段前引用（仅缓冲本身；切换/簿记标志由统一重算管理）。
 let _preFrozenEditAccounts: Set<string> = new Set<string>();
 let _preFrozenDirtySettingKeys: Map<string, Set<string>> = new Map();
 let _preFrozenDirtySettingValues: Map<string, Record<string, unknown>> = new Map();
 let _preFrozenDirtySettingVersions: Map<string, Map<string, number>> = new Map();
+
+/**
+ * 第 15 轮审计修复 [19]：按当前持有者集合重算切换/簿记标志——
+ * - 有任一持有者（切换守卫或冻结窗口）→ _isSwitchingAccount = true；
+ * - 冻结窗口仍活跃 → 簿记标记保持 false（窗口捕获模式，真实编辑进入缓冲）；
+ * - 仅剩切换守卫或全部退出 → 恢复第一个持有者进入前的簿记状态。
+ */
+function recomputeSwitchHoldingFlags(): void {
+  _isSwitchingAccount = _activeSwitchGuards > 0 || _frozenWindowStack.length > 0;
+  _isAccountSwitchBookkeeping = _frozenWindowStack.length > 0 ? false : _preHoldersBookkeeping;
+}
 
 // 冻结窗口内的真实编辑缓冲（R4 审计修复）：记录编辑发生时的活跃账号
 // （GitHub 数值 ID 字符串）。窗口退出时按恢复结果分流：恢复失败（回滚原
@@ -87,14 +102,18 @@ let _frozenEditVersionSeq = 0;
  * alignment-window edits are pushed under the (now active) account's header.
  */
 export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T> {
-  const previous = _isSwitchingAccount;
-  const previousBookkeeping = _isAccountSwitchBookkeeping;
+  // 第 15 轮审计修复 [19]：守卫与冻结窗口统一持有者计数——交错进出时不再按
+  // 各自进入前的旧值还原（会把仍活动持有者的状态破坏并卡死切换标志）。
+  if (_activeSwitchGuards === 0 && _frozenWindowStack.length === 0) {
+    _preHoldersBookkeeping = _isAccountSwitchBookkeeping;
+  }
+  _activeSwitchGuards += 1;
   _isSwitchingAccount = true;
   try {
     return await fn();
   } finally {
-    _isSwitchingAccount = previous;
-    _isAccountSwitchBookkeeping = previousBookkeeping;
+    _activeSwitchGuards -= 1;
+    recomputeSwitchHoldingFlags();
     // 对齐窗口内被静音的用户编辑：守卫释放后立即补推，绝不能静默丢弃。
     //（拉取应用阶段写入的 _hasPendingPush 已由 syncFromBackend 的 finally 排空，
     // 这里只需处理订阅器记录的窗口内本地编辑。）
@@ -131,9 +150,10 @@ export async function withAccountSwitchFrozen<T>(
 ): Promise<T> {
   // 第 14 轮审计修复 [19]：整个冻结阶段开始前捕获切换/簿记状态与缓冲引用——
   // 最后一个窗口退出时恢复该状态，而不是最后进入窗口自己看到的值。
+  // 第 15 轮审计修复 [19]：切换/簿记标志改由持有者计数统一重算（与切换守卫
+  // 共享），此处只捕获缓冲的阶段前引用与簿记前值。
   if (_frozenWindowStack.length === 0) {
-    _preFrozenSwitching = _isSwitchingAccount;
-    _preFrozenBookkeeping = _isAccountSwitchBookkeeping;
+    _preHoldersBookkeeping = _isAccountSwitchBookkeeping;
     _preFrozenEditAccounts = _frozenWindowEditAccounts;
     _preFrozenDirtySettingKeys = _frozenWindowDirtySettingKeys;
     _preFrozenDirtySettingValues = _frozenWindowDirtySettingValues;
@@ -180,10 +200,11 @@ export async function withAccountSwitchFrozen<T>(
     // 第 14 轮审计修复 [19]：仍有窗口时保持切换状态；最后一个窗口退出时恢复
     // 整个冻结阶段开始前的状态（而非该窗口自己进入时看到的 previousSwitching
     // ——它可能是内层窗口置位的 true，会让轮询在无窗口时持续跳过自动拉取）。
+    // 第 15 轮审计修复 [19]：切换/簿记标志由持有者计数统一重算——仍有守卫时
+    // 保持切换状态，全部持有者退出才复位（守卫与冻结窗口交错退出不再卡死标志）。
     const frozenWindowsRemain = _frozenWindowStack.length > 0;
     _isAccountSwitchFrozen = frozenWindowsRemain;
-    _isSwitchingAccount = frozenWindowsRemain ? true : _preFrozenSwitching;
-    _isAccountSwitchBookkeeping = frozenWindowsRemain ? false : _preFrozenBookkeeping;
+    recomputeSwitchHoldingFlags();
     // 第 14 轮审计修复 [23]：清空全部数据（_resetGeneration 递增）发生在窗口
     // 生命周期内时，退出绝不把旧窗口的编辑写回磁盘——重置后恢复刚删除的
     // 待推记录会让旧数据复活。窗口本身始终释放；仅代次一致时保存编辑。
@@ -203,6 +224,16 @@ export async function withAccountSwitchFrozen<T>(
       }
     }
   }
+}
+
+/**
+ * 第 15 轮审计修复 [19]（探测互斥接缝）：是否有任一异步切换守卫或冻结窗口
+ * 持有切换标志。设置页连接探测（features 域 useBackendSettingsActions）可据此
+ * 在账号切换进行中拒绝发起新探测，避免探测的连接提交与切换流程的会话/连接
+ * 变更并发交错；探测自身已包裹冻结窗口，标志在其退出后由持有者计数复位。
+ */
+export function isAccountSwitchInProgress(): boolean {
+  return _isSwitchingAccount;
 }
 
 /**
@@ -272,6 +303,9 @@ interface PushAttemptOutcome {
   attempted: boolean;
   /** 本次推送实际失败的分片名（最后一次尝试）。 */
   failedShards: string[];
+  /** 第 15 轮审计修复 [18]：推送发起时捕获的待推记录版本与本次发送的设置值。 */
+  recordRevision?: number;
+  sentSettingValues?: Record<string, unknown>;
 }
 interface SyncPushResult extends PushAttemptOutcome {
   pushed: boolean;
@@ -618,6 +652,11 @@ const PENDING_SYNC_ACCOUNTS_KEY = 'gsm.pendingSyncAccounts';
 // 之后即使用户连接了其他后端并重启（persistedUrl 变为该后端），这些记录也绝
 // 不绑定到新后端（「绝不会自动补推到新后端」的约定在重启后仍然成立）。
 const LEGACY_PENDING_SYNC_EVALUATED_KEY = 'gsm.pendingSyncLegacyEvaluated';
+// 第 15 轮审计修复 [17]：遗留待推记录的迁移来源 URL——必须在绑定记录之前
+// 先固化。记录写回因配额失败时该来源键仍然保留，下次启动按它绑定原后端，
+// 绝不用「下次启动时的 persistedUrl」猜测归属（用户可能已连接另一个后端，
+// 猜测会把原后端的待推编辑发送到新后端）。
+const PENDING_SYNC_MIGRATION_SOURCE_KEY = 'gsm.pendingSyncMigrationSource';
 
 function pendingSyncCompositeKey(accountId: string, backendUrl: string): string {
   return `${backendUrl}\n${accountId}`;
@@ -726,11 +765,26 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
     // 新后端，也绝不会自动补推到新后端（restorePendingSettingDirtyKeys 仍按
     // 原有迁移语义恢复其脏键保护，只影响拉取合并的保留方向，不产生写入）。
     let migrationBackendUrl: string | null = null;
+    // 第 15 轮审计修复 [17]：迁移来源必须可验证——优先使用上次启动已固化的
+    // 来源 URL；只有从未固化过来源时才考虑本次启动的 persistedUrl，并在绑定
+    // 之前先把它固化为来源（写入失败则不绑定，保留未归属状态）。
+    let migrationSourcePersisted = false;
     try {
-      const persisted = backend.persistedUrl;
-      migrationBackendUrl = typeof persisted === 'string' && persisted ? persisted : null;
+      const storedSource = window.localStorage.getItem(PENDING_SYNC_MIGRATION_SOURCE_KEY);
+      if (typeof storedSource === 'string' && storedSource) {
+        migrationBackendUrl = storedSource;
+        migrationSourcePersisted = true;
+      }
     } catch {
-      migrationBackendUrl = null;
+      // 存储不可用：按未固化来源处理
+    }
+    if (!migrationBackendUrl) {
+      try {
+        const persisted = backend.persistedUrl;
+        migrationBackendUrl = typeof persisted === 'string' && persisted ? persisted : null;
+      } catch {
+        migrationBackendUrl = null;
+      }
     }
     // 第 13 轮审计修复 [42]：空 URL（未归属）记录只在「能确认原后端」的首次
     // 加载中绑定持久化 URL（原单一后端迁移语义）。若本次启动已无法确认（无
@@ -748,6 +802,22 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
     }
     const canRebindUnboundRecords = !unboundKeepEvaluated;
     let rebound = false;
+    // 第 15 轮审计修复 [17]：绑定前先固化迁移来源——来源写不进去就保持未归属
+    //（宁可不迁移，也不能让重启后的 URL 猜测把旧记录绑到另一个后端）。
+    if (
+      migrationBackendUrl
+      && canRebindUnboundRecords
+      && [...entries.values()].some((entry) => entry.backendUrl === '')
+      && !migrationSourcePersisted
+    ) {
+      try {
+        window.localStorage.setItem(PENDING_SYNC_MIGRATION_SOURCE_KEY, migrationBackendUrl);
+        migrationSourcePersisted = true;
+      } catch {
+        // 无法固化来源：本次启动保持未归属，绝不按下次启动的 URL 猜测归属
+        migrationBackendUrl = null;
+      }
+    }
     if (migrationBackendUrl) {
       for (const [key, entry] of [...entries]) {
         if (entry.backendUrl !== '') continue;
@@ -799,12 +869,28 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
             // 存储不可用：下次启动重试评估（迁移写回已成功，重试为幂等空操作）
           }
         }
+        // 第 15 轮审计修复 [17]：记录已带着目标 URL 落盘，迁移来源不再需要；
+        // 写回失败时保留来源键，下次启动按原后端重试（绝不用新连接的 URL）。
+        if (writeBackOk) {
+          try {
+            window.localStorage.removeItem(PENDING_SYNC_MIGRATION_SOURCE_KEY);
+          } catch {
+            // 存储不可用：来源键残留只会让下次启动做幂等重绑
+          }
+        }
       } else if (!unboundKeepEvaluated) {
         // 原后端已知且无需迁移（无空 URL 记录）：评估即完成。
         try {
           window.localStorage.setItem(LEGACY_PENDING_SYNC_EVALUATED_KEY, '1');
         } catch {
           // 存储不可用：下次启动重试评估
+        }
+        // 第 15 轮审计修复 [17]：没有待绑定的未归属记录，来源键（可能因上次
+        // 写回成功但清除失败而残留）一并清理。
+        try {
+          window.localStorage.removeItem(PENDING_SYNC_MIGRATION_SOURCE_KEY);
+        } catch {
+          // 存储不可用：残留来源键不影响后续启动
         }
       }
     } else if (!unboundKeepEvaluated) {
@@ -841,6 +927,23 @@ const _pendingSyncAccounts = loadPendingSyncAccounts();
 // 外层窗口晚退出时其陈旧值不得覆盖内层窗口稍后保存的新值。不随记录持久化：
 // 重启后不存在「退出顺序交错」问题，未携带版本的合并一律接受。
 const pendingSettingValueVersions = new Map<string, Map<string, number>>();
+
+// 第 15 轮审计修复 [18]：待推记录的写入版本（仅内存）——任何对某 (账号, 后端)
+// 记录的持久化变更（mark/clear/字段确认）都会抬升版本。推送发起时捕获版本，
+// 确认时版本已变说明请求在途期间记录被更新（例如冻结窗口保存了新值 v2），
+// 此时只清除本次请求实际确认且值未被更新的字段，绝不按请求启动时的快照
+// 删除持久记录中的新值或整条记录。
+const pendingSyncRecordRevisions = new Map<string, number>();
+let _pendingSyncRecordRevisionSeq = 0;
+
+function bumpPendingSyncRecordRevision(key: string): void {
+  _pendingSyncRecordRevisionSeq += 1;
+  pendingSyncRecordRevisions.set(key, _pendingSyncRecordRevisionSeq);
+}
+
+function getPendingSyncRecordRevision(key: string): number {
+  return pendingSyncRecordRevisions.get(key) ?? 0;
+}
 
 /**
  * 记录账号级待推状态（补推成功前必须保留，跨重启持久化）。
@@ -903,6 +1006,7 @@ export function markPendingAccountSync(
       ...(nextDirty && nextDirty.length > 0 ? { dirtySettingKeys: nextDirty } : {}),
       ...(nextValues ? { dirtySettingValues: nextValues } : {}),
     });
+    bumpPendingSyncRecordRevision(key);
     persistPendingSyncAccounts();
     return;
   }
@@ -914,6 +1018,7 @@ export function markPendingAccountSync(
       ? { dirtySettingValues: normalizePendingSettingValues(acceptedValues) }
       : {}),
   });
+  bumpPendingSyncRecordRevision(key);
   persistPendingSyncAccounts();
 }
 
@@ -921,6 +1026,7 @@ export function markPendingAccountSync(
 export function clearPendingAccountSync(
   accountId: string | null | undefined,
   targetBackendUrl = backend.backendUrl ?? '',
+  expectedRecordRevision?: number,
 ): void {
   if (!accountId) return;
   // 第 14 轮审计修复 [21]：成功推送只清除与已确认目标精确匹配的待推记录——
@@ -928,8 +1034,24 @@ export function clearPendingAccountSync(
   // 不能证明未知来源的编辑已送达（其脏键也不再恢复为当前后端的出站项，见
   // restorePendingSettingDirtyKeys）。未归属记录保留到显式处理或清空全部数据。
   const exactKey = pendingSyncCompositeKey(accountId, targetBackendUrl);
+  // 第 15 轮审计修复 [18]：整条记录确认同样核对请求启动时捕获的记录版本——
+  // 推送在途期间记录被更新（冻结窗口保存了新值）时，本次成功只证明旧值已
+  // 送达，绝不能删除整条记录把新值一并丢弃。
+  if (expectedRecordRevision !== undefined
+    && getPendingSyncRecordRevision(exactKey) !== expectedRecordRevision) {
+    return;
+  }
+  // 仍有未确认的脏键（例如请求在途期间冻结窗口保存、字段确认按值保留的键）：
+  // 推送确认路径必须保留整条记录，等待下一次推送送达这些字段。显式消费
+  //（consumePendingAccountSync / 切换冲刷）不传版本，仍按调用方意图清除。
+  const existing = _pendingSyncAccounts.get(exactKey);
+  if (expectedRecordRevision !== undefined
+    && existing?.dirtySettingKeys && existing.dirtySettingKeys.length > 0) {
+    return;
+  }
   if (_pendingSyncAccounts.delete(exactKey)) {
     pendingSettingValueVersions.delete(exactKey);
+    bumpPendingSyncRecordRevision(exactKey);
     persistPendingSyncAccounts();
   }
 }
@@ -944,14 +1066,33 @@ function clearPendingSettingDirtyKeys(
   accountId: string,
   targetBackendUrl: string,
   pushedVersions: ReadonlyMap<string, number>,
+  options?: {
+    /** 请求启动时捕获的记录版本（第 15 轮 [18]）。 */
+    recordRevision?: number;
+    /** 本次请求实际发送的设置值快照——记录版本变化时用于判定字段是否被更新。 */
+    sentValues?: Readonly<Record<string, unknown>>;
+  },
 ): void {
   const key = pendingSyncCompositeKey(accountId, targetBackendUrl);
   const existing = _pendingSyncAccounts.get(key);
   if (!existing?.dirtySettingKeys) return;
+  // 第 15 轮审计修复 [18]：请求在途期间记录被更新（例如冻结窗口保存了 v2）
+  // 时，`_dirtySettingKeyVersions` 未必感知（冻结窗口用独立版本表），单靠
+  // 版本比较会删除记录中的新值。此时改为按值判定：只有持久记录中的值仍等于
+  // 本次实际发送的值（说明没有更新的编辑）才清除该键。
+  const recordRevisionChanged = options?.recordRevision !== undefined
+    && getPendingSyncRecordRevision(key) !== options.recordRevision;
   const remainingDirty = existing.dirtySettingKeys.filter((dirtyKey) => {
     const pushedVersion = pushedVersions.get(dirtyKey);
     // 未在本次请求中携带的键无法确认已写入，保留保护。
     if (pushedVersion === undefined) return true;
+    if (recordRevisionChanged) {
+      const persistedValue = existing.dirtySettingValues?.[dirtyKey];
+      // 记录没有该字段的值快照：无法证明未被更新，保留保护。
+      if (persistedValue === undefined) return true;
+      const sentValue = options?.sentValues?.[dirtyKey];
+      return JSON.stringify(persistedValue) !== JSON.stringify(sentValue);
+    }
     return _dirtySettingKeyVersions.get(dirtyKey) !== pushedVersion;
   });
   const remainingSet = new Set(remainingDirty);
@@ -965,6 +1106,7 @@ function clearPendingSettingDirtyKeys(
     ...(remainingDirty.length > 0 ? { dirtySettingKeys: remainingDirty } : {}),
     ...(Object.keys(remainingValues).length > 0 ? { dirtySettingValues: remainingValues } : {}),
   });
+  bumpPendingSyncRecordRevision(key);
   persistPendingSyncAccounts();
 }
 
@@ -1230,6 +1372,9 @@ export function clearPendingSyncState(): void {
   // 第 14 轮审计修复 [12]：待推记录连同其值版本一并清除（清空全部数据后不得
   // 有陈旧版本残留阻挡后续窗口编辑的值合并）。
   pendingSettingValueVersions.clear();
+  // 第 15 轮审计修复 [18]：记录写入版本随记录一起清除（在途推送的完成回调
+  // 由 [15] 的重置代次门控拦截，不会再用旧版本做确认判定）。
+  pendingSyncRecordRevisions.clear();
   _settingsUnavailableKeys.clear();
   _settingsLoadedKeys.clear();
   _aiConfigsLoadedKeys.clear();
@@ -1486,6 +1631,12 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
           break;
         }
         if (!normalizedAccount) continue;
+        // 第 15 轮审计修复 [11]：await 期间用户移除了该账号时绝不写回——
+        // removeSavedAccount 的非当前账号分支不推进会话代次，仅靠上方代次
+        // 检查拦不住（组件域 LoginScreen 的登记循环同款处理）。
+        if (isSavedAccountRemovedInSession(accountIdKey(normalizedAccount.user) ?? '')) {
+          continue;
+        }
         upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
       }
     }
@@ -2229,7 +2380,9 @@ async function syncToBackendWithResult(
       && !_hasPendingPush
       && (backend.backendUrl ?? '') === pushBackendUrl
     ) {
-      clearPendingAccountSync(pushAccountId, pushBackendUrl);
+      // 第 15 轮审计修复 [18]：整条记录确认核对最后一轮推送启动时捕获的记录
+      // 版本——在途期间被冻结窗口更新过的记录必须保留（新值尚未送达）。
+      clearPendingAccountSync(pushAccountId, pushBackendUrl, outcome.recordRevision);
     }
     return {
       pushed: succeeded,
@@ -2263,7 +2416,7 @@ function isSnapshotConflictError(error: unknown): boolean {
   return !!e && (e.statusCode === 409 || e.code === 'SNAPSHOT_CONFLICT');
 }
 
-async function syncRepositoriesWithServerMerge(localRepos: Repository[], accountId: string): Promise<void> {
+async function syncRepositoriesWithServerMerge(localRepos: Repository[], accountId: string): Promise<string> {
   let lastConflictError: unknown = null;
   let effectiveLocalRepos = localRepos;
   const pushSessionGeneration = getAccountSessionGeneration();
@@ -2371,7 +2524,11 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
         }
         clearPendingRepositoryDeletions(accountId, targetBackendUrl, confirmedPendingDeleted);
       }
-      return;
+      // 第 15 轮审计修复 [16]：返回本次成功 PUT 对应的本地快照指纹——不能
+      // 用推送发起时的快照（GET 等待期间新增的仓库已随 PUT 写入）或合并载荷
+      //（含仅远端仓库）作为去重基线，否则 PUT 等待期间的本地删除会被误判
+      //「已同步」而漏写。
+      return repositoryPayloadHash(effectiveLocalRepos);
     } catch (err) {
       if (!isSnapshotConflictError(err) || attempt === SNAPSHOT_CONFLICT_MAX_ATTEMPTS) {
         throw err;
@@ -2450,6 +2607,11 @@ async function pushToBackend(
   _hasPendingLocalChanges = false;
   setRepositorySyncVisualState(true);
   const pushGeneration = _syncGeneration;
+  // 第 15 轮审计修复 [15]：发起推送时捕获重置代次——清空全部数据（递增
+  // _resetGeneration）发生在推送在途期间时，旧请求的完成回调只结算给发起它
+  // 的调用方，绝不写回全局指纹、待推标志或重试计时器（否则清空后的状态被
+  // 旧请求复活，或污染新会话的去重基线）。
+  const pushResetGeneration = _resetGeneration;
   const pushStartTime = Date.now();
   try {
     // 等一个微任务再取快照（与旧版对账 await 的时序等价）：同一宏任务内、
@@ -2526,6 +2688,12 @@ async function pushToBackend(
         )
       : fullSettingsPayload;
     const settingsSkipped = settingsUnavailable && Object.keys(settingsPayload).length === 0;
+    // 第 15 轮审计修复 [18]：捕获请求启动时的待推记录版本与本次发送的设置值
+    // ——成功确认据此判断请求在途期间记录是否被更新（例如冻结窗口保存了新值）。
+    outcome.recordRevision = getPendingSyncRecordRevision(
+      pendingSyncCompositeKey(pushAccountId, pushBackendUrl),
+    );
+    outcome.sentSettingValues = settingsPayload as Record<string, unknown>;
     // 第 12 轮审计修复：手动同步（forceVerify）在设置分片尚未对齐时不得把
     // 「仅写入脏键子集」报告为完整成功——其余设置既未校验也未写入。部分写入
     // 本身保留（安全：只含本机明确编辑过的键），但结果按未完成上报：手动调用
@@ -2586,6 +2754,22 @@ async function pushToBackend(
     ]);
     const [reposSync, releasesSync, aiSync, webdavSync, embeddingSync, vectorSearchSync, settingsSync] = results;
 
+    // 第 15 轮审计修复 [15]：推送在途期间清空了全部数据——结果只结算给旧
+    // 调用方（含失败分片信息），不更新任何全局状态：待推标志/重试计时器已由
+    // clearPendingSyncState 清空，指纹基线属于被清空前的会话，写回会让排队
+    // 推送误判「已同步」。
+    if (_resetGeneration !== pushResetGeneration) {
+      outcome.failedShards = results.flatMap((result, index) => (
+        result.status === 'rejected' ? [PUSH_SHARD_NAMES[index]] : []
+      ));
+      for (const shard of manualUnverifiedShards) {
+        if (!outcome.failedShards.includes(shard)) {
+          outcome.failedShards = [...outcome.failedShards, shard];
+        }
+      }
+      return results.every(result => result.status === 'fulfilled') && manualUnverifiedShards.length === 0;
+    }
+
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
       // 记录失败分片名（审计修复 C41）：forceSyncToBackend(reportFailures) 抛错时
@@ -2636,7 +2820,9 @@ async function pushToBackend(
     // （推送基线与会话删除集合由 syncRepositoriesWithServerMerge 在成功时按
     // 实际写入载荷提交——合并保留下来的远端仓库也在基线内。）
     if (reposSync.status === 'fulfilled' && reposSync.value !== skipped) {
-      _lastHash.repos = reposHash;
+      // 第 15 轮审计修复 [16]：使用对账函数返回的「成功 PUT 对应的本地快照
+      // 指纹」——推送发起时捕获的 reposHash 已因等待期间的本地增删而过期。
+      _lastHash.repos = reposSync.value;
       _lastReposHashKey = currentReposHashKey;
     }
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
@@ -2652,7 +2838,16 @@ async function pushToBackend(
     if (settingsSync.status === 'fulfilled' && settingsSync.value !== skipped) {
       // 审计修复（C4）：先基于仍保留在 _dirtySettingKeyVersions 中的编辑版本更新持久化记录，
       // 再按 pushedVersion 匹配清除内存版本，保留请求在途期间产生的新版本。
-      clearPendingSettingDirtyKeys(pushAccountId, pushBackendUrl, dirtySettingVersionsAtPush);
+      clearPendingSettingDirtyKeys(pushAccountId, pushBackendUrl, dirtySettingVersionsAtPush, {
+        recordRevision: outcome.recordRevision,
+        sentValues: outcome.sentSettingValues,
+      });
+      // 第 15 轮审计修复 [18]：字段确认本身是记录的一次合法写入——同步抬高
+      // 本次推送的版本基线，否则随后的整条记录确认会把自己的写入误判为
+      // 「并发更新」而永远保留记录。
+      outcome.recordRevision = getPendingSyncRecordRevision(
+        pendingSyncCompositeKey(pushAccountId, pushBackendUrl),
+      );
       for (const [dirtyKey, pushedVersion] of dirtySettingVersionsAtPush) {
         if ((_dirtySettingKeyVersions.get(dirtyKey) ?? 0) !== pushedVersion) continue;
         _dirtySettingKeys.delete(dirtyKey);
@@ -2670,7 +2865,10 @@ async function pushToBackend(
     return failures.length === 0 && manualUnverifiedShards.length === 0;
   } catch (err) {
     logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err, { durationMs: Date.now() - pushStartTime });
-    _hasPendingLocalChanges = true;
+    // 第 15 轮审计修复 [15]：清空数据后的旧请求失败不得复活待推标志。
+    if (_resetGeneration === pushResetGeneration) {
+      _hasPendingLocalChanges = true;
+    }
     return false;
   } finally {
     setRepositorySyncVisualState(false);

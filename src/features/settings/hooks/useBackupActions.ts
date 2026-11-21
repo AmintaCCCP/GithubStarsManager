@@ -934,7 +934,8 @@ export const useBackupActions = (): BackupActions => {
         warnings.push(`${rejectedBackupTokenCount} backup GitHub PAT(s) could not be verified for their account and require re-authorization`);
       }
       if (hasSkippedUnboundTopLevelData) {
-        warnings.push('skipped unbound top-level backup data with activeAccountId=null');
+        // R15 finding 4：无归属顶层数据跳过的警告本地化（触发条件不变）。
+        warnings.push(t('useBackupActions.unbound-top-level-backup-data-skipped-activeaccountid-null'));
       }
       // 审计修复（CodeRabbit）：Gist 数据含无效条目被拒绝时必须告知用户
       // （对应字段保留恢复前的值）。

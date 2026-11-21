@@ -203,6 +203,22 @@ describe('PR-07 Store modularization compatibility', () => {
     for (const entry of savedEntries) {
       expect(entry.githubToken ?? '').toBe('');
     }
+    // 第 15 轮审计 [23]：直接断言键 '42' 的记录——仅按值检查时，持久化把账号
+    // 写到错误键下测试仍会通过。账号 ID、用户资料与非敏感元数据必须原样保留，
+    // PAT 剥除后为空串。
+    const savedAccount42 = (persisted.savedAccounts ?? {}) as Record<string, {
+      accountId?: string;
+      user?: { id: number; login: string; name: string };
+      githubToken?: string;
+      addedAt?: string;
+      lastUsedAt?: string;
+    } | undefined>;
+    expect(savedAccount42['42']).toBeDefined();
+    expect(savedAccount42['42']?.accountId).toBe('42');
+    expect(savedAccount42['42']?.user).toMatchObject({ id: 42, login: 'octocat', name: 'Octocat' });
+    expect(savedAccount42['42']?.githubToken ?? '').toBe('');
+    expect(savedAccount42['42']?.addedAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(savedAccount42['42']?.lastUsedAt).toBe('2026-01-01T00:00:00.000Z');
     expect(persisted.analyzingGistIds).toEqual(['gist-1']);
     expect(persisted.proxyConfig).toMatchObject({ password: 'proxy-password' });
     expect(persisted.rpcDownloadConfig).toMatchObject({ secret: 'rpc-secret' });

@@ -105,12 +105,18 @@ const notifyPendingBackendCredentialAlignChange = (): void => {
   for (const listener of [..._pendingBackendCredentialAlignListeners]) listener();
 };
 
-/** 仅在成员真正增删时通知（幂等写入不抬版本，避免无谓重渲染）。 */
-const markPendingBackendCredentialAlign = (accountId: string): void => {
+/**
+ * R15 跨域协调（finding 12 接口侧）：公开登记待对齐标记的入口——普通 PAT
+ * 登录（syncTokenToBackend 返回 ok:false）后为当前账号登记标记，使 Header
+ * 的重试入口可见。语义与内部封装一致：幂等写入（已存在时不抬订阅版本），
+ * 写入即通知订阅者（配合 subscribePendingBackendCredentialAlign /
+ * getPendingBackendCredentialAlignVersion 供 useSyncExternalStore 消费）。
+ */
+export function markPendingBackendCredentialAlign(accountId: string): void {
   if (pendingBackendCredentialAlignAccounts.has(accountId)) return;
   pendingBackendCredentialAlignAccounts.add(accountId);
   notifyPendingBackendCredentialAlignChange();
-};
+}
 
 const clearPendingBackendCredentialAlign = (accountId: string): void => {
   if (!pendingBackendCredentialAlignAccounts.delete(accountId)) return;

@@ -1169,3 +1169,158 @@ describe('round 14 audit fixes (frozen window stack, pending merge, push chain)'
     await syncToBackend();
   });
 });
+
+describe('round 15 audit fixes (reset gating, PUT fingerprint, record revision)', () => {
+  let originalState: ReturnType<typeof useAppStore.getState>;
+  let unsubscribe: (() => void) | undefined;
+  const adapter = backend as unknown as { backendUrl?: string };
+
+  beforeEach(() => {
+    originalState = useAppStore.getState();
+    vi.useFakeTimers();
+    clearPendingSyncState();
+    vi.mocked(backend.syncRepositories).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncReleases).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncAIConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncWebDAVConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncEmbeddingConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncVectorSearchConfig).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncSettings).mockReset().mockResolvedValue({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
+    vi.mocked(backend.fetchRepositories).mockReset().mockResolvedValue({ repositories: [], total: 0 });
+    vi.mocked(backend.fetchReleases).mockReset().mockResolvedValue({ releases: [], total: 0 });
+    vi.mocked(backend.fetchAIConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchWebDAVConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchEmbeddingConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchVectorSearchConfig).mockReset().mockResolvedValue({
+      enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '',
+      indexMode: 'description', readmeMaxChars: 6000, searchThreshold: 0.35,
+      searchTopK: 30, enableHyDE: true, enableReranking: true,
+    });
+    vi.mocked(backend.fetchSettings).mockReset().mockResolvedValue({});
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+      },
+      repositories: [],
+      releases: [],
+      aiConfigs: [],
+      webdavConfigs: [],
+      customCategories: [],
+      categoryOrder: [],
+    } as never);
+    resetSyncHashes();
+    adapter.backendUrl = 'http://origin';
+    unsubscribe = startAutoSync();
+  });
+
+  afterEach(() => {
+    if (unsubscribe) {
+      stopAutoSync(unsubscribe);
+      unsubscribe = undefined;
+    }
+    vi.useRealTimers();
+    useAppStore.setState(originalState);
+    clearPendingSyncState();
+    delete adapter.backendUrl;
+  });
+
+  const pendingRecords = (): unknown[] => (
+    JSON.parse(window.localStorage.getItem('gsm.pendingSyncAccounts') ?? '[]') as unknown[]
+  );
+
+  it('settles an in-flight push to its caller but writes no baseline after a full data reset (round-15 [15])', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    let releaseFetch!: (value: { repositories: Repository[]; total: number }) => void;
+    vi.mocked(backend.fetchRepositories).mockImplementationOnce(
+      () => new Promise((resolve) => { releaseFetch = resolve; }),
+    );
+
+    const push = forceSyncToBackend({ reportFailures: true });
+    await vi.waitFor(() => expect(backend.fetchRepositories).toHaveBeenCalled());
+    // 推送在途期间清空全部数据（递增重置代次并清空待推状态）
+    clearPendingSyncState();
+    releaseFetch({ repositories: [], total: 0 });
+    // 结果仍结算给旧调用方（对账在重置后被中止 ⇒ 失败上报），
+    await expect(push).rejects.toThrow('Failed to sync to backend');
+
+    // 但绝不写回待推标志/重试计时器：退避窗口内不得自行复活推送
+    // （syncRepositories 只由仓库对账写入调用，轮询拉取不会命中）
+    vi.mocked(backend.syncRepositories).mockClear();
+    // 只推进到首个退避重试窗口（2s）之后、5s 轮询之前，隔离出「旧请求调度
+    // 重试」这一条路径（轮询拉取本身是合法行为）。
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+
+    // 且指纹基线未被旧请求写入：相同仓库的显式推送仍必须真正对账写入
+    await syncToBackend();
+    expect(backend.syncRepositories).toHaveBeenCalled();
+  });
+
+  it('records the local snapshot actually written by the PUT so a later local delete triggers another write (round-15 [16])', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    let releaseFetch!: (value: { repositories: Repository[]; total: number }) => void;
+    vi.mocked(backend.fetchRepositories).mockImplementationOnce(
+      () => new Promise((resolve) => { releaseFetch = resolve; }),
+    );
+    let releasePut!: () => void;
+    vi.mocked(backend.syncRepositories).mockImplementationOnce(
+      () => new Promise<void>((resolve) => { releasePut = resolve; }),
+    );
+
+    const push = forceSyncToBackend({ reportFailures: true });
+    await vi.waitFor(() => expect(backend.fetchRepositories).toHaveBeenCalled());
+    // GET 等待期间用户新增仓库 2：本次 PUT 会写入 [1,2]
+    useAppStore.setState({ repositories: [createRepository(1), createRepository(2)] });
+    releaseFetch({ repositories: [], total: 0 });
+    await vi.waitFor(() => expect(backend.syncRepositories).toHaveBeenCalled());
+    const putPayload = vi.mocked(backend.syncRepositories).mock.calls[0][0] as Repository[];
+    expect(putPayload.map((repo) => repo.id)).toEqual([1, 2]);
+    // PUT 等待期间用户又删除仓库 2
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    releasePut();
+    await expect(push).resolves.toBe(true);
+
+    // 去重基线必须是 PUT 时的 [1,2]：同一推送链的排空轮看到当前 [1] 与之
+    // 不同 ⇒ 必须再写一次把删除送达（若按推送发起时的 [1] 记基线，排空轮会
+    // 误判「未变化」而跳过，远端残留仓库 2）。
+    const payloadIds = vi.mocked(backend.syncRepositories).mock.calls
+      .map((call) => (call[0] as Repository[]).map((repo) => repo.id));
+    expect(payloadIds).toEqual([[1, 2], [1]]);
+  });
+
+  it('keeps a frozen-window value saved while the settings PUT was in flight (round-15 [18])', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    // 冻结窗口保存 v1 并退出 → (A, origin) 记录带脏键与值
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['v1'] });
+    }, 'http://origin');
+
+    let releaseSettings!: (value: { tokenUpdateSkipped: boolean; tokenUpdateSuperseded: boolean }) => void;
+    vi.mocked(backend.syncSettings).mockImplementationOnce(
+      () => new Promise((resolve) => { releaseSettings = resolve; }),
+    );
+
+    const push = forceSyncToBackend({ reportFailures: true });
+    await vi.waitFor(() => expect(backend.syncSettings).toHaveBeenCalled());
+    const sentPayload = vi.mocked(backend.syncSettings).mock.calls[0][0] as { categoryOrder?: string[] };
+    expect(sentPayload.categoryOrder).toEqual(['v1']);
+
+    // PUT 在途：另一冻结窗口保存 v2 并退出（独立版本表，不推进会话脏键版本）
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['v2'] });
+    }, 'http://origin');
+
+    releaseSettings({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
+    await expect(push).resolves.toBe(true);
+
+    // v1 的迟到成功响应只确认 v1：记录中必须保留 v2 与整条记录
+    const persisted = pendingRecords() as Array<[string, string, string[], Record<string, string[]>]>;
+    const record = persisted.find((entry) => entry[0] === '1' && entry[1] === 'http://origin');
+    expect(record).toBeDefined();
+    expect(record?.[2]).toEqual(['categoryOrder']);
+    expect(record?.[3]).toEqual({ categoryOrder: ['v2'] });
+  });
+});

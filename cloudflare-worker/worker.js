@@ -53,12 +53,15 @@ export default {
 
       // POST /query — 向量相似度查询
       if (request.method === 'POST' && url.pathname === '/query') {
-        const { vector, topK = 20, threshold = 0.3, accountId } = await request.json();
+        const { vector, topK = 20, threshold = 0.3, accountId, wide } = await request.json();
         if (!Array.isArray(vector) || vector.length === 0) {
           return jsonResponse({ success: false, error: 'vector array required' }, 400);
         }
-        // returnMetadata:'all' caps topK at 50; clamp to avoid silent truncation
-        const clampedTopK = Math.min(topK, 50);
+        // returnMetadata:'all' caps topK at 50; clamp to avoid silent truncation.
+        // 第 15 轮审计修复 [20]：wide 请求改用 'indexed'（上限 100）——客户端
+        // 只消费 metadata.accountId，其余字段由本地仓库数据水合。
+        const widePool = wide === true;
+        const clampedTopK = Math.min(topK, widePool ? 100 : 50);
         // 账号过滤必须先于 topK 生效，避免其他账号的向量占满候选名额；
         // 若 accountId 元数据索引尚未就绪，拒绝按账号过滤的查询。
         // R13 review：accountId 字段已提供但不是非空字符串（如数字 42）时返回
@@ -81,7 +84,7 @@ export default {
         const accountFilter = requestedAccountId ? { accountId: requestedAccountId } : undefined;
         const matches = await env.VECTORIZE.query(vector, {
           topK: clampedTopK,
-          returnMetadata: 'all',
+          returnMetadata: widePool ? 'indexed' : 'all',
           ...(accountFilter ? { filter: accountFilter } : {}),
         });
         // 过滤低分结果
