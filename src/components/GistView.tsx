@@ -168,8 +168,15 @@ export const GistView: React.FC = () => {
     }
   };
 
-  const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput) => {
+  // 审计修复（R14 finding 2）：保存状态与完成回调绑定到发起保存的会话——
+  // 保存请求在途时用户可关闭编辑器并经补授权切换账号；submitGist 的过期会话
+  // 分支会正常返回（远端改动已按发起账号落账），旧保存的完成回调若不校验
+  // 会话就会关闭/重置当前会话刚打开的编辑器（覆盖未保存草稿）。此处以发起
+  // 时刻的会话标识为凭据：完成后仅当仍是同一会话才允许编辑器关闭。
+  const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput): Promise<boolean> => {
+    const initiatingSessionId = user?.id ?? null;
     await submitGist(input, editingGist);
+    return (useAppStore.getState().user?.id ?? null) === initiatingSessionId;
   };
 
   return (
@@ -440,7 +447,11 @@ export const GistView: React.FC = () => {
       </section>
 
       <GistDetailModal gist={detailGist} isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} />
+      {/* 审计修复（R14 finding 2）：key 把编辑器实例（含 isSaving 保存状态与
+          草稿字段）绑定到发起会话——账号切换即重挂载，旧保存的 isSaving 复位
+          落在已卸载实例上（no-op），绝不影响当前会话编辑器的保存按钮状态。 */}
       <GistEditorModal
+        key={sessionAccountId ?? 'anonymous'}
         gist={editingGist}
         isOpen={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}

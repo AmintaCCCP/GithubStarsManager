@@ -1061,7 +1061,9 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
 
     await user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
 
-    expect(await screen.findByText('useBackupActions.account-changed-during-restore')).toBeInTheDocument();
+    // 审计修复（R14 finding 3）：提示键显式带 settings 命名空间前缀（本组件的
+    // t 绑定 app 命名空间且无 fallbackNS），断言随之更新为带前缀键
+    expect(await screen.findByText('settings:useBackupActions.account-changed-during-restore')).toBeInTheDocument();
     // 导入被拒绝：实时仓库未被旧预览的替换结果覆盖
     expect(useAppStore.getState().repositories[0].ai_summary).toBe('alice-live');
     expect(useAppStore.getState().repositories.some((r: Repository) => r.id === 9)).toBe(false);
@@ -1222,7 +1224,8 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
       resolvePersist(true);
       await clickPromise;
 
-      expect(await screen.findByText('useBackupActions.account-changed-during-restore')).toBeInTheDocument();
+      // 审计修复（R14 finding 3）：同上——提示键显式带 settings 命名空间前缀
+      expect(await screen.findByText('settings:useBackupActions.account-changed-during-restore')).toBeInTheDocument();
       // 后续写入（仓库替换）未执行：备份仓库绝不落入新会话
       expect(useAppStore.getState().repositories.some((r: Repository) => r.id === 77)).toBe(false);
       // 实时仓库未被替换

@@ -390,4 +390,108 @@ describe('syncGhAccountTokensFromState (R2-B1)', () => {
     expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
     expect(saveMock).toHaveBeenLastCalledWith({ '7': 'ghp_7_next' });
   });
+
+  it('never lets an earlier queued save consume a newer logout marker (round-14 audit [8])', async () => {
+    // 常规保存先入队（在更早的队列操作之后等待），退出请求在其执行前登记
+    // 待删标记。较早的保存开始执行时不得把该标记当作重新授权写回旧 PAT，
+    // 也不得清除它——否则进程若在该保存与退出删除之间退出，重启后会回填
+    // 已退出账号的旧 PAT。
+    window.localStorage.clear();
+    let releaseFirstSave!: (value: { success: boolean }) => void;
+    const saveMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<{ success: boolean }>((resolve) => { releaseFirstSave = resolve; }))
+      .mockResolvedValue({ success: true });
+    setBridge({
+      get: vi.fn().mockResolvedValue({
+        status: 'loaded',
+        tokens: { '42': 'ghp_42_old', '7': 'ghp_7' },
+      }),
+      save: saveMock,
+    });
+    const secrets = await importFresh();
+    await secrets.loadGhAccountTokens();
+
+    // 占住队列的保存（bridge.save 挂起）。
+    const blocking = secrets.syncGhAccountTokensFromState({
+      user: { id: 7 },
+      githubToken: 'ghp_7_new',
+      savedAccounts: { '7': { githubToken: 'ghp_7_new' } },
+    });
+    await vi.waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+
+    // 常规全量同步入队（仍含 42 的旧 PAT），排队等待；退出请求随后登记标记。
+    const earlierSave = secrets.syncGhAccountTokensFromState({
+      user: { id: 7 },
+      githubToken: 'ghp_7_new',
+      savedAccounts: { '7': { githubToken: 'ghp_7_new' }, '42': { githubToken: 'ghp_42_old' } },
+    });
+    const logout = secrets.syncGhAccountTokensFromState(
+      { user: null, githubToken: null, savedAccounts: {} },
+      ['42'],
+    );
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+
+    releaseFirstSave({ success: true });
+    await expect(blocking).resolves.toBe(true);
+    await expect(earlierSave).resolves.toBe(true);
+    await expect(logout).resolves.toBe(true);
+
+    // 较早的保存绝不能把退出标记当作重新授权：42 的旧 PAT 不得写回磁盘
+    //（第 2 次保存是较早的常规同步，载荷不含 42）。
+    expect(saveMock).toHaveBeenNthCalledWith(2, { '7': 'ghp_7_new' });
+    // 待删标记未被较早的保存清除，由退出请求自己的队列操作完成删除并提交。
+    expect(saveMock).toHaveBeenLastCalledWith({ '7': 'ghp_7_new' });
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
+    // 标记变更已确认持久化（跨重启不再回填）。
+    expect(window.localStorage.getItem('gsm.pendingGhAccountRemovals')).toBeNull();
+  });
+
+  it('warns instead of silently ignoring a failed removal-marker persist (round-14 audit [7])', async () => {
+    // localStorage 写入失败时必须明确上报（标记只在内存，重启后旧 PAT 可能恢复）。
+    window.localStorage.clear();
+    // 测试环境的 window.localStorage 可能是 Node 实验性全局的拷贝（spyOn 无法
+    // 拦截其 setItem），沿用 setup.ts 的 defineProperty 方式整体替换存储；
+    // 其余方法显式委托原存储，保证模块初始化读取行为不变。
+    const originalStorage = window.localStorage;
+    const throwingStorage = {
+      getItem: (key: string) => originalStorage.getItem(key),
+      setItem: () => {
+        throw new Error('quota exceeded');
+      },
+      removeItem: (key: string) => originalStorage.removeItem(key),
+      clear: () => originalStorage.clear(),
+      key: (index: number) => originalStorage.key(index),
+      get length() {
+        return originalStorage.length;
+      },
+    } as Storage;
+    Object.defineProperty(window, 'localStorage', { writable: true, value: throwingStorage });
+    try {
+      setBridge({
+        get: vi.fn().mockResolvedValue({ status: 'loaded', tokens: { '42': 'ghp_42_old' } }),
+        save: vi.fn().mockResolvedValue({ success: false, error: 'disk busy' }),
+      });
+      const secrets = await importFresh();
+      // importFresh 重置模块注册表：需在其后取同一实例的 logger 再做 spy。
+      const freshLogger = await import('../../services/logger');
+      const warnSpy = vi.spyOn(freshLogger.logger, 'warn').mockImplementation(() => {});
+      await secrets.loadGhAccountTokens();
+
+      const ok = await secrets.syncGhAccountTokensFromState(
+        { user: null, githubToken: null, savedAccounts: {} },
+        ['42'],
+      );
+      expect(ok).toBe(false);
+      // 标记仍在内存（屏蔽继续生效），但持久化失败已被明确告警。
+      expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'store.ghAccountSecrets',
+        expect.stringContaining('credential may be restored from disk after restart'),
+        expect.objectContaining({ pendingRemovalIds: ['42'] }),
+      );
+      warnSpy.mockRestore();
+    } finally {
+      Object.defineProperty(window, 'localStorage', { writable: true, value: originalStorage });
+    }
+  });
 });

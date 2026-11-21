@@ -1003,7 +1003,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     if (importPreview.openedAccountId !== currentAccountIdAtImport
       || getAccountSessionGeneration() !== openedSessionGeneration) {
       addLog(t('dataManagementPanel.import-data'), false, 'session changed while import preview was open');
-      showError(t('useBackupActions.account-changed-during-restore'));
+      // 审计修复（R14 finding 3）：本组件的 t 绑定 app 命名空间（SettingsPanel
+      // useT('app')），i18n 未配置 fallbackNS——该键只在 settings 命名空间，
+      // 必须显式带命名空间前缀，否则界面显示原始键名。
+      showError(t('settings:useBackupActions.account-changed-during-restore'));
       setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
       return;
     }
@@ -1442,7 +1445,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           return false;
         }
         addLog(t('dataManagementPanel.import-data'), false, reason);
-        showError(t('useBackupActions.account-changed-during-restore'));
+        // 审计修复（R14 finding 3）：同上——t 绑定 app 命名空间，键只在
+        // settings 命名空间，显式带前缀才能解析译文。
+        showError(t('settings:useBackupActions.account-changed-during-restore'));
         setImportPreview({ data: null, isOpen: false, fileName: '', openedAccountId: null, openedSessionGeneration: null });
         return true;
       };
@@ -1683,21 +1688,29 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
         // Import special configs (proxy, RPC, backend secret) only if they exist in backup
         if (importedData.proxyConfig) {
+          // 审计修复（R14 finding 1）：掩码/缺失备份密钥的本机回退值必须读取
+          // 所有等待（PAT 核对、凭据写入）结束后的实时凭据——回退到导入开始时
+          // 捕获的旧快照会把等待期间另一入口轮换的新代理密码回滚成旧值。
+          // 备份明确包含的真实密钥仍优先采用（与 AI/WebDAV 密钥同一方案）。
+          const liveProxyConfig = useAppStore.getState().proxyConfig;
           const restoredProxy = {
             ...importedData.proxyConfig,
             password: wasIncluded && isRealSecret(importedData.proxyConfig.password)
               ? importedData.proxyConfig.password
-              : store.proxyConfig.password
+              : liveProxyConfig.password
           };
           useAppStore.setState({ proxyConfig: restoredProxy });
         }
 
         if (importedData.rpcDownloadConfig) {
+          // 审计修复（R14 finding 1）：同代理密码——RPC secret 的本机回退值读取
+          // 等待结束后的实时凭据，绝不用旧快照覆盖等待期间轮换的新密钥。
+          const liveRpcDownloadConfig = useAppStore.getState().rpcDownloadConfig;
           const restoredRpc = {
             ...importedData.rpcDownloadConfig,
             secret: wasIncluded && isRealSecret(importedData.rpcDownloadConfig.secret)
               ? importedData.rpcDownloadConfig.secret
-              : store.rpcDownloadConfig.secret
+              : liveRpcDownloadConfig.secret
           };
           useAppStore.setState({ rpcDownloadConfig: restoredRpc });
         }

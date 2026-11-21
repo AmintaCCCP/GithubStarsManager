@@ -19,6 +19,7 @@
  * 不会被抹掉。
  */
 
+import { logger } from '../../services/logger';
 import { forgetV19MigrationInputs, getV19MigrationInputs } from './v19MigrationInputs';
 
 const GH_ACCOUNT_ID_PATTERN = /^\d{1,20}$/;
@@ -79,37 +80,50 @@ let knownDiskTokens: GhAccountTokenMap | null = null;
 
 const PENDING_REMOVED_ACCOUNTS_KEY = 'gsm.pendingGhAccountRemovals';
 
-const readPersistedPendingRemovals = (): string[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(PENDING_REMOVED_ACCOUNTS_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((id): id is string => typeof id === 'string' && GH_ACCOUNT_ID_PATTERN.test(id));
-  } catch {
-    return [];
-  }
-};
-
-const persistPendingRemovals = (ids: Set<string>): void => {
-  if (typeof window === 'undefined') return;
+/**
+ * 把待删标记写入可确认的持久化存储，返回是否确认写入成功（第 14 轮审计修复）。
+ * localStorage 写入失败（配额/隐私模式/存储损坏）时标记只存在于内存——若本次
+ * 加密存储删除同样失败，重启后水化会返回仍在磁盘上的旧 PAT 并重新回填该账号。
+ * 调用方必须把该失败明确上报（不得静默吞掉），提示「重启后凭据仍可能恢复」。
+ */
+const persistPendingRemovals = (ids: Map<string, number>): boolean => {
+  if (typeof window === 'undefined') return false;
   try {
     if (ids.size === 0) {
       window.localStorage.removeItem(PENDING_REMOVED_ACCOUNTS_KEY);
     } else {
-      window.localStorage.setItem(PENDING_REMOVED_ACCOUNTS_KEY, JSON.stringify(Array.from(ids)));
+      window.localStorage.setItem(PENDING_REMOVED_ACCOUNTS_KEY, JSON.stringify(Array.from(ids.keys())));
     }
+    return true;
   } catch {
-    // ignore storage errors
+    return false;
   }
 };
 
 /**
- * 待提交的删除列表（跨重启持久化）：保存失败时保留待删除账号，
- * 重启后水化读取会先过滤这些账号，直到后续安全存储保存确认删除成功后才清除。
+ * 待提交的删除列表（跨重启持久化），值为每次登记时的意图版本（单调递增）：
+ * 保存失败时保留待删除账号，重启后水化读取会先过滤这些账号，直到后续安全
+ * 存储保存确认删除成功后才清除。第 14 轮审计修复：每个删除意图带独立版本——
+ * 保存请求只允许提交「发起时已登记且此后未被更新」的标记；入队等待期间新
+ * 登记的意图（如退出请求）不得被较早排队的常规保存当作重新授权写回旧 PAT
+ * 后清除。
  */
-const pendingRemovedAccountIds = new Set<string>(readPersistedPendingRemovals());
+const pendingRemovedAccountIds = new Map<string, number>();
+
+let removalIntentVersion = 0;
+
+/** 登记一个待删意图（重复登记产生新版本，使旧请求的提交权失效）。 */
+const registerPendingRemoval = (accountId: string): void => {
+  removalIntentVersion += 1;
+  pendingRemovedAccountIds.set(accountId, removalIntentVersion);
+};
+
+/** 待删标记未能持久化时的明确告警（第 14 轮审计修复：不得静默吞掉）。 */
+const warnUnpersistedRemovalMarker = (): void => {
+  logger.warn('store.ghAccountSecrets', 'pending gh-account removal marker could not be persisted; if the encrypted deletion also fails, the credential may be restored from disk after restart', {
+    pendingRemovalIds: getPendingGhAccountSecretRemovalIds(),
+  });
+};
 
 /**
  * 串行队列：把 load / save / clear 的读取基底、合并、删除、写入与镜像更新
@@ -134,7 +148,7 @@ export const hasPendingGhAccountSecretRemovals = (): boolean => pendingRemovedAc
  * 输入 / 回填运行时 Token 时屏蔽这些账号——登出/移除后即使分片写入是陈旧的，
  * 旧 PAT 也不得被重新收作迁移输入或一键恢复来源。
  */
-export const getPendingGhAccountSecretRemovalIds = (): string[] => Array.from(pendingRemovedAccountIds);
+export const getPendingGhAccountSecretRemovalIds = (): string[] => Array.from(pendingRemovedAccountIds.keys());
 
 /** 丢弃非法键（非数字 ID）与非法值（空/超长/含控制字符）的条目。 */
 const sanitizeTokenMap = (tokens: GhAccountTokenMap | null | undefined): GhAccountTokenMap => {
@@ -200,6 +214,9 @@ export const loadGhAccountTokens = (): Promise<GhAccountsLoadResult> =>
  * - 磁盘镜像未知（尚未成功读取）⇒ 先读后写；读取失败则中止写入，绝不以
  *   部分映射覆写磁盘；
  * - 保存成功后才清除已应用的 pendingRemovedAccountIds；抛错时磁盘与待删列表均保留；
+ * - 第 14 轮审计修复：删除意图按登记版本提交——保存请求只清除「发起时已登记
+ *   且此后未被更新」的标记；入队等待期间新登记的意图（如退出请求）由其所属
+ *   请求提交，较早排队的常规保存不得把其当作重新授权写回旧 PAT 后清除；
  * - 本次保存为带待删标记的账号写入新 Token（替换）时，候选映射保留新值，
  *   但标记取消同样延迟到写入确认——替换失败时旧 PAT 仍被屏蔽（第 12 轮审计修复）。
  */
@@ -219,24 +236,38 @@ export const saveGhAccountTokens = (
     let registered = false;
     for (const accountId of removedAccountIds) {
       if (GH_ACCOUNT_ID_PATTERN.test(accountId)) {
-        pendingRemovedAccountIds.add(accountId);
+        registerPendingRemoval(accountId);
         registered = true;
       }
     }
-    if (registered) persistPendingRemovals(pendingRemovedAccountIds);
+    if (registered && !persistPendingRemovals(pendingRemovedAccountIds)) {
+      // 第 14 轮审计修复：标记未持久化时不得静默——本次加密删除若同样失败，
+      // 重启后旧 PAT 会重新回填会话，必须明确上报该风险。
+      warnUnpersistedRemovalMarker();
+    }
   }
+  // 第 14 轮审计修复：快照本请求发起时已登记的删除意图版本。队列操作执行时，
+  // 只有版本与快照一致的标记才可视为本请求可处理的意图（替换或提交清除）；
+  // 入队等待期间新登记的意图（如退出请求）归其所属请求提交。
+  const observedRemovalVersions = new Map(pendingRemovedAccountIds);
   return enqueueGhAccountsOp(async () => {
   const bridge = getBridge();
   if (!bridge) return;
   const sanitized = sanitizeTokenMap(tokens);
   // 记录本次显式删除并立即持久化：写入失败（含进程退出）时旧 PAT 的屏蔽
-  // 标记必须已经生效，重启后水化读取不会把它回填进会话。
+  // 标记必须已经生效，重启后水化读取不会把它回填进会话。（第 13 轮起登记
+  // 通常已在调用时完成——此处仅为桥在调用后才可用的兜底补录，已登记标记
+  // 不更新版本，避免破坏本请求的提交权判定。）
+  let newlyRegistered = false;
   for (const accountId of removedAccountIds) {
-    if (GH_ACCOUNT_ID_PATTERN.test(accountId)) {
-      pendingRemovedAccountIds.add(accountId);
+    if (GH_ACCOUNT_ID_PATTERN.test(accountId) && !pendingRemovedAccountIds.has(accountId)) {
+      registerPendingRemoval(accountId);
+      newlyRegistered = true;
     }
   }
-  persistPendingRemovals(pendingRemovedAccountIds);
+  if (newlyRegistered && !persistPendingRemovals(pendingRemovedAccountIds)) {
+    warnUnpersistedRemovalMarker();
+  }
   // 第 12 轮审计修复：本次保存又为同账号写入了有效 Token 时，候选映射允许
   // 新 PAT 替换旧值（该账号不进入本次删除列表；若同一次调用还显式列出了该
   // 账号，仍按删除处理），但其待删标记的取消延迟到加密写入确认成功之后——
@@ -250,7 +281,12 @@ export const saveGhAccountTokens = (
   for (const accountId of Object.keys(sanitized)) {
     // 显式删除优先：同一次保存既要求删除又提供了新 Token 时按删除处理
     //（与第 11 轮及更早的语义一致），绝不把新 Token 写回被删除的账号。
-    if (pendingRemovedAccountIds.has(accountId) && !explicitlyRemoved.has(accountId)) {
+    if (explicitlyRemoved.has(accountId)) continue;
+    // 第 14 轮审计修复：只有「发起时已登记且此后未被更新」的标记才可视为
+    // 重新授权替换——入队等待期间新登记的删除意图（版本不在快照中或已更新）
+    // 不得被较早排队的保存写回旧 PAT。
+    const currentVersion = pendingRemovedAccountIds.get(accountId);
+    if (currentVersion !== undefined && currentVersion === observedRemovalVersions.get(accountId)) {
       replacedAccounts.add(accountId);
     }
   }
@@ -268,7 +304,7 @@ export const saveGhAccountTokens = (
   const payload: GhAccountTokenMap = { ...base, ...sanitized };
   // 应用的删除 = 全部待删标记 − 本次被新 PAT 替换的账号（显式删除与同账号
   // 重授权同时出现时，删除优先——与既有语义一致）。
-  const appliedRemovals = Array.from(pendingRemovedAccountIds)
+  const appliedRemovals = Array.from(pendingRemovedAccountIds.keys())
     .filter((accountId) => !replacedAccounts.has(accountId));
   for (const accountId of appliedRemovals) {
     delete payload[accountId];
@@ -277,14 +313,23 @@ export const saveGhAccountTokens = (
   if (!result.success) {
     throw new Error(result.error ?? 'gh-accounts save failed');
   }
-  // 加密写入确认成功后才提交待删标记变更：已删除项与被替换项一并清除。
+  // 加密写入确认成功后才提交待删标记变更；且只提交「发起时已登记且此后
+  // 版本未被更新」的标记（含被本请求从磁盘删除的与被新 PAT 替换的）——
+  // bridge.save 等待期间新登记/更新的删除意图归其所属请求提交，绝不被
+  // 较早排队的保存清除（第 14 轮审计修复）。
   for (const accountId of appliedRemovals) {
-    pendingRemovedAccountIds.delete(accountId);
+    if (observedRemovalVersions.get(accountId) === pendingRemovedAccountIds.get(accountId)) {
+      pendingRemovedAccountIds.delete(accountId);
+    }
   }
   for (const accountId of replacedAccounts) {
-    pendingRemovedAccountIds.delete(accountId);
+    if (observedRemovalVersions.get(accountId) === pendingRemovedAccountIds.get(accountId)) {
+      pendingRemovedAccountIds.delete(accountId);
+    }
   }
-  persistPendingRemovals(pendingRemovedAccountIds);
+  if (!persistPendingRemovals(pendingRemovedAccountIds)) {
+    warnUnpersistedRemovalMarker();
+  }
   knownDiskTokens = { ...payload };
   ghAccountTokensFullyLoaded = true;
   // ISSUE-1：本次成功写入的账号不再需要跨重启保留旧迁移输入（新值已在磁盘）。

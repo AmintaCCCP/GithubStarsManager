@@ -222,9 +222,11 @@ const savedAccountsForShard = (
  * 每次桌面端水化收尾时检查内存中尚存的账号凭据：
  * - 无残留 Token：存在待删凭据时先重试应用删除（安全存储恢复后清除旧密文），
  *   然后按「迁移输入为空」收敛确认标记；
- * - 有残留 Token：重试迁入 safeStorage，成功账号逐项退出迁移输入（ISSUE-1：
- *   不能因本次保存成功就无条件确认），输入清空后才恢复剥除语义；失败则保留
- *   分片中的迁移输入与内存 Token，下次启动再次重试。
+ * - 有残留 Token：重试迁入 safeStorage（第 14 轮审计修复：旧迁移输入走补写
+ *   语义 fillMissingGhAccountTokens，只有重新授权的运行时 PAT 才允许覆盖写入），
+ *   成功账号逐项退出迁移输入（ISSUE-1：不能因本次保存成功就无条件确认），
+ *   输入清空后才恢复剥除语义；失败则保留分片中的迁移输入与内存 Token，下次
+ *   启动再次重试。
  * 同时清理已不存在于 savedAccounts 的孤儿迁移输入：账号记录已被移除时，
  * 其旧 PAT 既无法回填也无法用于弹窗恢复，不应无限期阻止确认。
  */
@@ -272,12 +274,39 @@ const retryUnconfirmedV19TokenSave = async (): Promise<void> => {
     return;
   }
   try {
-    // R2-B1 合并写入语义同样适用于重试：只补写确认映射中缺失/最新的条目，
-    // 不覆写磁盘上其他账号的 Token。
-    await saveGhAccountTokens(tokens);
-    // ISSUE-1：只让本次成功写入的账号退出迁移输入；仍有其他账号未落盘时
+    // 第 14 轮审计修复：重试必须区分两类输入——
+    // - 旧迁移输入（运行时值与迁移输入一致）：继续走第 13 轮的补写语义
+    //   （fillMissingGhAccountTokens），磁盘已有值（新凭据已确认落盘）一律
+    //   保留，绝不用迁移失败分支恢复的旧 PAT 覆盖；返回的 settled 为磁盘
+    //   确认值，并用其恢复会话。
+    // - 重新授权的运行时 PAT（与迁移输入不同或无迁移输入）：才允许走
+    //   saveGhAccountTokens 的覆盖写入。
+    const migrationInputs = getV19MigrationInputs() ?? {};
+    const reauthTokens: GhAccountTokenMap = {};
+    const migrationTokens: GhAccountTokenMap = {};
+    for (const [accountId, token] of Object.entries(tokens)) {
+      if (migrationInputs[accountId] === token) {
+        migrationTokens[accountId] = token;
+      } else {
+        reauthTokens[accountId] = token;
+      }
+    }
+    const confirmedTokens: GhAccountTokenMap = {};
+    if (Object.keys(reauthTokens).length > 0) {
+      // R2-B1 合并写入语义同样适用于重试：只补写确认映射中缺失/最新的条目，
+      // 不覆写磁盘上其他账号的 Token。
+      await saveGhAccountTokens(reauthTokens);
+      Object.assign(confirmedTokens, reauthTokens);
+    }
+    if (Object.keys(migrationTokens).length > 0) {
+      const settled = await fillMissingGhAccountTokens(migrationTokens);
+      // 用磁盘确认的值恢复会话：磁盘已有值优先（旧迁移 PAT 不回退已落盘的新凭据）。
+      restoreSessionWithDiskConfirmedTokens(settled);
+      Object.assign(confirmedTokens, settled);
+    }
+    // ISSUE-1：只让本次已确认落盘的账号退出迁移输入；仍有其他账号未落盘时
     // 保持未确认态，分片继续保留它们的旧 PAT 供下次启动重试。
-    markV19MigrationTokensSaved(tokens);
+    markV19MigrationTokensSaved(confirmedTokens);
   } catch (err) {
     logger.warn('store.hydrate', 'v19 gh-accounts migration retry failed; legacy tokens kept in persisted snapshot', {
       error: err instanceof Error ? err.message : String(err),
@@ -305,6 +334,38 @@ const seedV19MigrationInputsFromPersistedShard = (persistedState: unknown): void
     if (typeof token === 'string' && token.trim()) seeds[accountId] = token;
   }
   mergeV19MigrationInputs(seeds);
+};
+
+/**
+ * 第 14 轮审计修复：补写确认后用磁盘确认值恢复会话。迁移失败分支会把旧迁移
+ * PAT 回填进内存；补写确认后磁盘上可能已有更新的凭据（旧迁移输入绝不能回退
+ * 已落盘的新 PAT）。运行时仍持有与磁盘确认值不同的旧 PAT 时，先清空对应条目
+ *（含当前登录账号的顶层会话 Token），再由 restorePersistedAccountTokens 用
+ * 磁盘确认值回填——否则会话中的旧 PAT 会在后续状态派生写入时覆盖磁盘上的
+ * 新凭据（与 reconcileLoadedDiskTokensWithMigrationInputs 同一收敛模式）。
+ */
+const restoreSessionWithDiskConfirmedTokens = (confirmed: GhAccountTokenMap): void => {
+  if (Object.keys(confirmed).length === 0) return;
+  const currentAccountId = accountIdKey(useAppStore.getState().user);
+  useAppStore.setState((state) => {
+    let changed = false;
+    const savedAccounts = { ...state.savedAccounts };
+    for (const [accountId, token] of Object.entries(confirmed)) {
+      const entry = savedAccounts[accountId];
+      if (!entry?.githubToken || entry.githubToken === token) continue;
+      savedAccounts[accountId] = { ...entry, githubToken: '' };
+      changed = true;
+    }
+    const confirmedCurrentToken = currentAccountId ? confirmed[currentAccountId] : undefined;
+    if (currentAccountId && typeof confirmedCurrentToken === 'string' && confirmedCurrentToken
+      && typeof state.githubToken === 'string' && state.githubToken
+      && state.githubToken !== confirmedCurrentToken) {
+      return { savedAccounts, githubToken: null };
+    }
+    return changed ? { savedAccounts } : {};
+  });
+  const { restorePersistedAccountTokens } = useAppStore.getState();
+  restorePersistedAccountTokens(confirmed);
 };
 
 /**

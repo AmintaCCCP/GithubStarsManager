@@ -238,16 +238,18 @@ export const useLoginActions = (): LoginActions => {
     // 服务端回退全局 active_account_id——旧账号 A 的凭据会被新账号 B 的
     // Token/user_profile 覆盖。
     const accountId = accountIdKey(user);
-    // R13 审计修复：syncSettings 可能返回 200 + token_update_skipped（PAT 校验
-    // 超时/被并发覆盖跳过写入）——此时后端分区仍保留旧 PAT，与本流程刚校验的
-    // Token 不一致。与账号切换路径（alignTargetAccountOnBackend）同一语义视为
-    // 凭据未对齐：抛错让登录流程进入失败回滚，绝不继续提交登录。
+    // R13 审计修复：syncSettings 可能返回 200 + token_update_skipped / token_
+    // update_superseded（PAT 校验超时或凭据写回被并发请求取代）——此时后端
+    // 分区仍保留旧 PAT，与本流程刚校验的 Token 不一致。与恢复路径
+    // （syncTokenToBackend）和账号切换路径（alignTargetAccountOnBackend）同一
+    // 语义：两个标志都视为凭据未对齐，抛错让登录流程进入失败回滚，绝不继续
+    // 提交登录。
     const syncResult = await backend.syncSettings({
       github_token: token,
       ...(accountId ? { active_account_id: accountId } : {}),
       user_profile: user,
     }, undefined, accountId);
-    if (syncResult?.tokenUpdateSkipped === true) {
+    if (syncResult?.tokenUpdateSkipped === true || syncResult?.tokenUpdateSuperseded === true) {
       throw new Error('Backend token update was skipped; credentials are not aligned.');
     }
     // R2-B12：候选后端完成 Token 设置不等于登录提交成功——严格仓库拉取失败

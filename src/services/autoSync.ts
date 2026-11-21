@@ -30,23 +30,40 @@ let _isAccountSwitchBookkeeping = false;
 // 会立即推送），改记入窗口缓冲按归属账号归档。
 let _isAccountSwitchFrozen = false;
 
-// 冻结窗口深度（第 13 轮审计修复）：并发/嵌套窗口用引用计数管理冻结与守卫
-// 标志——布尔保存/还原在窗口退出顺序交错时会把仍活跃窗口的标志复位为 false，
-// 编辑由此泄漏到会话级待推通道；深度归零才复位。
-let _frozenWindowDepth = 0;
+// 冻结窗口栈（第 13 轮引用计数 + 第 14 轮 [15] 改进）：每个活跃窗口持有自己的
+// 缓冲并入栈；订阅器写入栈顶窗口的缓冲，退出按窗口身份移除并把缓冲指向仍
+// 活跃的最新窗口——并发窗口退出顺序交错时，等待中窗口的后续编辑仍进入其
+// 自身缓冲（旧实现按进入前引用还原，编辑会落进已失效缓冲并在退出时丢失）。
+interface FrozenWindowBuffers {
+  editAccounts: Set<string>;
+  dirtySettingKeys: Map<string, Set<string>>;
+  dirtySettingValues: Map<string, Record<string, unknown>>;
+  dirtySettingVersions: Map<string, Map<string, number>>;
+  originBackendUrl: string;
+  /** 窗口进入时的重置代次：清空全部数据后退出绝不持久化旧窗口的编辑（[23]）。 */
+  resetGeneration: number;
+}
+const _frozenWindowStack: FrozenWindowBuffers[] = [];
+// 冻结阶段开始前的状态（[19]）：最后一个窗口退出时恢复整个阶段开始前的值，
+// 而不是最后进入窗口自己看到的值（其 previousSwitching 可能为内层窗口置的 true）。
+let _preFrozenSwitching = false;
+let _preFrozenBookkeeping = false;
+let _preFrozenEditAccounts: Set<string> = new Set<string>();
+let _preFrozenDirtySettingKeys: Map<string, Set<string>> = new Map();
+let _preFrozenDirtySettingValues: Map<string, Record<string, unknown>> = new Map();
+let _preFrozenDirtySettingVersions: Map<string, Map<string, number>> = new Map();
 
 // 冻结窗口内的真实编辑缓冲（R4 审计修复）：记录编辑发生时的活跃账号
 // （GitHub 数值 ID 字符串）。窗口退出时按恢复结果分流：恢复失败（回滚原
 // 后端）→ 调用方在复原连接后立即补推；恢复成功（切到新后端）→ 并入
 // _pendingSyncAccounts，下次进入该账号先补推再拉取。窗口内绝不推送。
-// 第 13 轮审计修复：并发/嵌套窗口各自持有独立缓冲（进入时安装、退出时
-// 还原并按各自 origin 分流），不再共享单一缓冲。
+// 第 13 轮审计修复：并发/嵌套窗口各自持有独立缓冲；第 14 轮 [15]：指向
+// 栈顶（仍活跃的最新窗口）而非进入前引用。
 let _frozenWindowEditAccounts = new Set<string>();
 
 // 冻结窗口内的设置脏键缓冲（审计修复 C4）：按编辑发生时的活跃账号记录窗口内
 // 修改过的设置键。窗口退出时随 markPendingAccountSync 的 dirtySettingKeys
 // 一起按 (accountId, backendUrl) 持久化，重启后拉取仍能保留这些本地编辑值。
-// 并发/嵌套窗口各自持有独立缓冲（第 13 轮审计修复）。
 let _frozenWindowDirtySettingKeys = new Map<string, Set<string>>();
 
 // 冻结窗口内的设置待推「值」缓冲（R12 跨域修复，finding 3）：同账号从 X 恢复
@@ -54,8 +71,13 @@ let _frozenWindowDirtySettingKeys = new Map<string, Set<string>>();
 // 本地工作区的 categoryOrder 等字段，切回 X 时脏键仍在但原值已无法恢复。
 // 这里在编辑发生的瞬间按账号保存每个脏键的新值；窗口退出时随 (accountId,
 // backendUrl) 一起持久化，重试该后端时写回工作区并随推送发送。
-// 并发/嵌套窗口各自持有独立缓冲（第 13 轮审计修复）。
 let _frozenWindowDirtySettingValues = new Map<string, Record<string, unknown>>();
+
+// 冻结窗口内的设置待推「值」编辑版本缓冲（第 14 轮审计修复 [12]）：窗口退出
+// 顺序不代表编辑顺序——外层窗口晚于内层退出时，其捕获的陈旧值不得覆盖内层
+// 稍后保存的新值。编辑瞬间记录单调递增版本，合并时只接受版本更新的值。
+let _frozenWindowDirtySettingVersions = new Map<string, Map<string, number>>();
+let _frozenEditVersionSeq = 0;
 
 /**
  * Wrap an account switch sequence so the Store subscription treats all state
@@ -107,23 +129,29 @@ export async function withAccountSwitchFrozen<T>(
   fn: () => Promise<T>,
   originBackendUrl: string = backend.backendUrl ?? '',
 ): Promise<T> {
-  const previousSwitching = _isSwitchingAccount;
-  const previousBookkeeping = _isAccountSwitchBookkeeping;
-  const previousEditBuffer = _frozenWindowEditAccounts;
-  const previousDirtyKeyBuffer = _frozenWindowDirtySettingKeys;
-  const previousDirtyValueBuffer = _frozenWindowDirtySettingValues;
-  // 第 13 轮审计修复（并发冻结窗口）：每个窗口持有自己的缓冲并在退出时按
-  // 自己的 origin 分流——并发/嵌套窗口不再共享一个缓冲，非最外层退出也不会
-  // 吞掉缓冲（旧实现只有最外层退出分流，并发窗口退出顺序交错时编辑会被
-  // 归属到错误的 origin 或整体丢失）。订阅器写入的是「当前窗口」的缓冲
-  // （进入时安装、退出时还原），编辑归属窗口的 origin 语义不变。
-  const windowEditAccounts = new Set<string>();
-  const windowDirtySettingKeys = new Map<string, Set<string>>();
-  const windowDirtySettingValues = new Map<string, Record<string, unknown>>();
-  _frozenWindowEditAccounts = windowEditAccounts;
-  _frozenWindowDirtySettingKeys = windowDirtySettingKeys;
-  _frozenWindowDirtySettingValues = windowDirtySettingValues;
-  _frozenWindowDepth += 1;
+  // 第 14 轮审计修复 [19]：整个冻结阶段开始前捕获切换/簿记状态与缓冲引用——
+  // 最后一个窗口退出时恢复该状态，而不是最后进入窗口自己看到的值。
+  if (_frozenWindowStack.length === 0) {
+    _preFrozenSwitching = _isSwitchingAccount;
+    _preFrozenBookkeeping = _isAccountSwitchBookkeeping;
+    _preFrozenEditAccounts = _frozenWindowEditAccounts;
+    _preFrozenDirtySettingKeys = _frozenWindowDirtySettingKeys;
+    _preFrozenDirtySettingValues = _frozenWindowDirtySettingValues;
+    _preFrozenDirtySettingVersions = _frozenWindowDirtySettingVersions;
+  }
+  const window: FrozenWindowBuffers = {
+    editAccounts: new Set<string>(),
+    dirtySettingKeys: new Map<string, Set<string>>(),
+    dirtySettingValues: new Map<string, Record<string, unknown>>(),
+    dirtySettingVersions: new Map<string, Map<string, number>>(),
+    originBackendUrl,
+    resetGeneration: _resetGeneration,
+  };
+  _frozenWindowStack.push(window);
+  _frozenWindowEditAccounts = window.editAccounts;
+  _frozenWindowDirtySettingKeys = window.dirtySettingKeys;
+  _frozenWindowDirtySettingValues = window.dirtySettingValues;
+  _frozenWindowDirtySettingVersions = window.dirtySettingVersions;
   _isSwitchingAccount = true;
   _isAccountSwitchFrozen = true;
   // 冻结窗口内不再全程置簿记标记：guardSync 覆盖的簿记写入自带标记并自行
@@ -132,25 +160,47 @@ export async function withAccountSwitchFrozen<T>(
   try {
     return await fn();
   } finally {
-    _frozenWindowDepth -= 1;
-    // 引用计数取代布尔保存/还原：并发窗口中先退出的窗口不再把仍活跃窗口的
-    // 冻结/守卫标志复位为 false（旧实现按进入前值还原，标志被并发退出破坏）。
-    const frozenWindowsRemain = _frozenWindowDepth > 0;
+    // 第 14 轮审计修复 [15]：按窗口身份移除已退出的窗口，编辑缓冲切换到仍
+    // 活跃的最新窗口——并发窗口退出顺序交错时（X 先进先出、Y 等待中），Y 的
+    // 后续编辑仍进入其自身缓冲并在退出时持久化，绝不落入已失效缓冲丢失。
+    const windowIndex = _frozenWindowStack.indexOf(window);
+    if (windowIndex >= 0) _frozenWindowStack.splice(windowIndex, 1);
+    const activeTop = _frozenWindowStack[_frozenWindowStack.length - 1];
+    if (activeTop) {
+      _frozenWindowEditAccounts = activeTop.editAccounts;
+      _frozenWindowDirtySettingKeys = activeTop.dirtySettingKeys;
+      _frozenWindowDirtySettingValues = activeTop.dirtySettingValues;
+      _frozenWindowDirtySettingVersions = activeTop.dirtySettingVersions;
+    } else {
+      _frozenWindowEditAccounts = _preFrozenEditAccounts;
+      _frozenWindowDirtySettingKeys = _preFrozenDirtySettingKeys;
+      _frozenWindowDirtySettingValues = _preFrozenDirtySettingValues;
+      _frozenWindowDirtySettingVersions = _preFrozenDirtySettingVersions;
+    }
+    // 第 14 轮审计修复 [19]：仍有窗口时保持切换状态；最后一个窗口退出时恢复
+    // 整个冻结阶段开始前的状态（而非该窗口自己进入时看到的 previousSwitching
+    // ——它可能是内层窗口置位的 true，会让轮询在无窗口时持续跳过自动拉取）。
+    const frozenWindowsRemain = _frozenWindowStack.length > 0;
     _isAccountSwitchFrozen = frozenWindowsRemain;
-    _isSwitchingAccount = frozenWindowsRemain ? true : previousSwitching;
-    _isAccountSwitchBookkeeping = frozenWindowsRemain ? false : previousBookkeeping;
-    _frozenWindowEditAccounts = previousEditBuffer;
-    _frozenWindowDirtySettingKeys = previousDirtyKeyBuffer;
-    _frozenWindowDirtySettingValues = previousDirtyValueBuffer;
-    for (const accountId of windowEditAccounts) {
-      // 审计修复（C4）：窗口内编辑过的设置脏键随待推标记一起持久化，
-      // 恢复失败/成功分流后拉取合并仍能保留这些本地编辑值。
-      // R12 finding 3：脏键对应的「值」也一起持久化——同账号切到另一后端后
-      // 目标后端的拉取会覆盖本地工作区，只有保存值才能在重试原后端时恢复。
-      markPendingAccountSync(accountId, originBackendUrl, {
-        dirtySettingKeys: [...(windowDirtySettingKeys.get(accountId) ?? [])],
-        dirtySettingValues: windowDirtySettingValues.get(accountId),
-      });
+    _isSwitchingAccount = frozenWindowsRemain ? true : _preFrozenSwitching;
+    _isAccountSwitchBookkeeping = frozenWindowsRemain ? false : _preFrozenBookkeeping;
+    // 第 14 轮审计修复 [23]：清空全部数据（_resetGeneration 递增）发生在窗口
+    // 生命周期内时，退出绝不把旧窗口的编辑写回磁盘——重置后恢复刚删除的
+    // 待推记录会让旧数据复活。窗口本身始终释放；仅代次一致时保存编辑。
+    if (_resetGeneration === window.resetGeneration) {
+      for (const accountId of window.editAccounts) {
+        // 审计修复（C4）：窗口内编辑过的设置脏键随待推标记一起持久化，
+        // 恢复失败/成功分流后拉取合并仍能保留这些本地编辑值。
+        // R12 finding 3：脏键对应的「值」也一起持久化——同账号切到另一后端后
+        // 目标后端的拉取会覆盖本地工作区，只有保存值才能在重试原后端时恢复。
+        // 第 14 轮审计修复 [12]：值快照带编辑版本——合并只接受版本更新的值。
+        const windowVersions = window.dirtySettingVersions.get(accountId);
+        markPendingAccountSync(accountId, window.originBackendUrl, {
+          dirtySettingKeys: [...(window.dirtySettingKeys.get(accountId) ?? [])],
+          dirtySettingValues: window.dirtySettingValues.get(accountId),
+          ...(windowVersions ? { dirtySettingVersions: Object.fromEntries(windowVersions) } : {}),
+        });
+      }
     }
   }
 }
@@ -697,13 +747,6 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
       unboundKeepEvaluated = false;
     }
     const canRebindUnboundRecords = !unboundKeepEvaluated;
-    if (!unboundKeepEvaluated) {
-      try {
-        window.localStorage.setItem(LEGACY_PENDING_SYNC_EVALUATED_KEY, '1');
-      } catch {
-        // 存储不可用：保持旧绑定语义（下次启动重试评估）
-      }
-    }
     let rebound = false;
     if (migrationBackendUrl) {
       for (const [key, entry] of [...entries]) {
@@ -736,14 +779,41 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
         rebound = true;
       }
       if (rebound) {
+        let writeBackOk = false;
         try {
           localStorage.setItem(
             PENDING_SYNC_ACCOUNTS_KEY,
             JSON.stringify([...entries.values()].map(serializePendingSyncRecord)),
           );
+          writeBackOk = true;
         } catch {
           // 存储不可用时忽略：本次会话内绑定仍然生效，下次启动重试迁移
         }
+        // 第 14 轮审计修复 [20]：原后端已知时，迁移写回成功后才记录评估完成
+        // ——写回失败（如配额不足）不记录，重启后仍会重试迁移，遗留记录的自
+        // 动恢复不因标记提前写入而永久丢失。
+        if (writeBackOk && !unboundKeepEvaluated) {
+          try {
+            window.localStorage.setItem(LEGACY_PENDING_SYNC_EVALUATED_KEY, '1');
+          } catch {
+            // 存储不可用：下次启动重试评估（迁移写回已成功，重试为幂等空操作）
+          }
+        }
+      } else if (!unboundKeepEvaluated) {
+        // 原后端已知且无需迁移（无空 URL 记录）：评估即完成。
+        try {
+          window.localStorage.setItem(LEGACY_PENDING_SYNC_EVALUATED_KEY, '1');
+        } catch {
+          // 存储不可用：下次启动重试评估
+        }
+      }
+    } else if (!unboundKeepEvaluated) {
+      // 第 14 轮审计修复 [20]：URL 未知时仍立即锁定未归属状态——遗留记录在
+      // 本次启动保持未归属，绝不因之后持久化的其他后端 URL 绑定到该后端。
+      try {
+        window.localStorage.setItem(LEGACY_PENDING_SYNC_EVALUATED_KEY, '1');
+      } catch {
+        // 存储不可用：保持旧绑定语义（下次启动重试评估）
       }
     }
     return entries;
@@ -765,23 +835,55 @@ const persistPendingSyncAccounts = (): void => {
 
 const _pendingSyncAccounts = loadPendingSyncAccounts();
 
+// 待推设置「值」的字段级编辑版本（第 14 轮审计修复 [12]，仅内存）：按复合键
+// → 字段 → 版本记录。窗口退出顺序不代表编辑顺序——并发/嵌套窗口中同一账号
+// 同一字段可能被多个窗口先后捕获，合并时只接受版本更新（或首次记录）的值，
+// 外层窗口晚退出时其陈旧值不得覆盖内层窗口稍后保存的新值。不随记录持久化：
+// 重启后不存在「退出顺序交错」问题，未携带版本的合并一律接受。
+const pendingSettingValueVersions = new Map<string, Map<string, number>>();
+
 /**
  * 记录账号级待推状态（补推成功前必须保留，跨重启持久化）。
  * dirtySettingKeys（C4）：待推设置的脏键随标记一起按 (accountId, backendUrl)
  * 持久化，重启后由 restorePendingSettingDirtyKeys 恢复进会话脏键集合。
  * dirtySettingValues（R12 finding 3）：同一批脏键的值快照；同账号切换后端时
  * 目标后端的拉取不得让这些待推值丢失，重试原后端时按此快照恢复。
+ * dirtySettingVersions（第 14 轮 [12]）：值快照的字段级编辑版本——合并时只
+ * 接受版本更新的值，确保合并顺序由编辑先后决定而非窗口退出顺序。
  */
 export function markPendingAccountSync(
   accountId: string,
   targetBackendUrl = backend.backendUrl ?? '',
-  options?: { dirtySettingKeys?: string[]; dirtySettingValues?: PendingSettingValues },
+  options?: {
+    dirtySettingKeys?: string[];
+    dirtySettingValues?: PendingSettingValues;
+    dirtySettingVersions?: Record<string, number>;
+  },
 ): void {
   const key = pendingSyncCompositeKey(accountId, targetBackendUrl);
   const dirtySettingKeys = options?.dirtySettingKeys?.filter(
     (key): key is typeof SETTING_DIRTY_KEYS[number] => (SETTING_DIRTY_KEYS as readonly string[]).includes(key),
   );
   const incomingValues = normalizePendingSettingValues(options?.dirtySettingValues);
+  const incomingVersions = options?.dirtySettingVersions ?? {};
+  // 第 14 轮审计修复 [12]：按版本过滤 incoming 值——仅接受版本更新（或首次
+  // 记录/未携带版本）的字段，陈旧窗口的值绝不覆盖更新编辑的值。
+  const acceptedValues: PendingSettingValues = {};
+  for (const [fieldKey, fieldValue] of Object.entries(incomingValues ?? {})) {
+    const storedVersion = pendingSettingValueVersions.get(key)?.get(fieldKey);
+    const incomingVersion = incomingVersions[fieldKey];
+    if (storedVersion !== undefined
+      && incomingVersion !== undefined
+      && incomingVersion < storedVersion) {
+      continue;
+    }
+    acceptedValues[fieldKey] = fieldValue;
+    if (incomingVersion !== undefined) {
+      const fieldVersions = pendingSettingValueVersions.get(key) ?? new Map<string, number>();
+      fieldVersions.set(fieldKey, incomingVersion);
+      pendingSettingValueVersions.set(key, fieldVersions);
+    }
+  }
   const existing = _pendingSyncAccounts.get(key);
   if (existing) {
     // 已有记录：合并脏键（并集），绝不丢失先前窗口记录的编辑字段
@@ -789,11 +891,11 @@ export function markPendingAccountSync(
     const nextDirty = dirtySettingKeys
       ? [...mergedDirty]
       : existing.dirtySettingKeys;
-    // 值快照按「同一键后写覆盖先写」合并：同一窗口内对同一字段的多次编辑取
-    // 最后一次的值；未提供新值时保留既有快照。
+    // 值快照按「同一键后写覆盖先写」合并（已按编辑版本过滤 incoming）：
+    // 同一字段的多次编辑以版本最新者为准；未提供新值时保留既有快照。
     const mergedValues = {
       ...normalizePendingSettingValues(existing.dirtySettingValues),
-      ...incomingValues,
+      ...acceptedValues,
     };
     const nextValues = normalizePendingSettingValues(mergedValues);
     _pendingSyncAccounts.set(key, {
@@ -808,7 +910,9 @@ export function markPendingAccountSync(
     accountId,
     backendUrl: targetBackendUrl,
     ...(dirtySettingKeys && dirtySettingKeys.length > 0 ? { dirtySettingKeys } : {}),
-    ...(incomingValues ? { dirtySettingValues: incomingValues } : {}),
+    ...(normalizePendingSettingValues(acceptedValues)
+      ? { dirtySettingValues: normalizePendingSettingValues(acceptedValues) }
+      : {}),
   });
   persistPendingSyncAccounts();
 }
@@ -819,11 +923,13 @@ export function clearPendingAccountSync(
   targetBackendUrl = backend.backendUrl ?? '',
 ): void {
   if (!accountId) return;
-  const removedExact = _pendingSyncAccounts.delete(pendingSyncCompositeKey(accountId, targetBackendUrl));
-  const removedLegacy = targetBackendUrl !== ''
-    ? _pendingSyncAccounts.delete(pendingSyncCompositeKey(accountId, ''))
-    : false;
-  if (removedExact || removedLegacy) {
+  // 第 14 轮审计修复 [21]：成功推送只清除与已确认目标精确匹配的待推记录——
+  // 来源未知（backendUrl ''）的记录不因某一次后端的推送成功而删除：该成功
+  // 不能证明未知来源的编辑已送达（其脏键也不再恢复为当前后端的出站项，见
+  // restorePendingSettingDirtyKeys）。未归属记录保留到显式处理或清空全部数据。
+  const exactKey = pendingSyncCompositeKey(accountId, targetBackendUrl);
+  if (_pendingSyncAccounts.delete(exactKey)) {
+    pendingSettingValueVersions.delete(exactKey);
     persistPendingSyncAccounts();
   }
 }
@@ -871,9 +977,11 @@ function restorePendingSettingDirtyKeys(accountId: string): void {
   const currentBackend = backend.backendUrl ?? '';
   for (const entry of [..._pendingSyncAccounts.values()]) {
     if (entry.accountId !== accountId || !entry.dirtySettingKeys) continue;
-    // 仅恢复属于当前后端的记录（与 hasPendingAccountSync 的复合键语义一致）；
-    // 旧版记录（backendUrl ''）按迁移语义一并恢复。
-    if (entry.backendUrl !== currentBackend && entry.backendUrl !== '') continue;
+    // 第 14 轮审计修复 [22]：只恢复与当前后端精确匹配的记录——来源未知
+    //（backendUrl ''）记录的脏键不得登记为当前后端的出站待推项：该编辑从未
+    // 归属于当前后端，恢复会让设置推送把当前工作区值写到该后端。未归属记录
+    // 保持待推语义，由显式处理或清空全部数据清理。
+    if (entry.backendUrl !== currentBackend) continue;
     // 恢复即视为一次「保护寄存器」写入：分配新版本，旧请求的成功响应无法
     // 凭旧版本清除这些键（R2-C2）。
     markDirtySettingKeys(entry.dirtySettingKeys);
@@ -1119,9 +1227,15 @@ export function clearPendingSyncState(): void {
   _pendingRepoDeletions.clear();
   _dirtySettingKeys.clear();
   _dirtySettingKeyVersions.clear();
+  // 第 14 轮审计修复 [12]：待推记录连同其值版本一并清除（清空全部数据后不得
+  // 有陈旧版本残留阻挡后续窗口编辑的值合并）。
+  pendingSettingValueVersions.clear();
   _settingsUnavailableKeys.clear();
   _settingsLoadedKeys.clear();
   _aiConfigsLoadedKeys.clear();
+  // 第 14 轮审计修复 [13]：WebDAV 配置分片与 AI 相同——新对齐会话必须重新
+  // 读取后端 WebDAV 配置后才能推送空列表。
+  _webdavConfigsLoadedKeys.clear();
   try {
     localStorage.removeItem(PUSHED_REPO_IDS_KEY);
     localStorage.removeItem(LEGACY_PUSHED_REPO_IDS_KEY);
@@ -1191,6 +1305,10 @@ export function resetSyncHashes(): void {
   _settingsLoadedKeys.clear();
   // AI 配置分片同理：新对齐会话必须重新读取后端 AI 配置后才能推送空列表。
   _aiConfigsLoadedKeys.clear();
+  // 第 14 轮审计修复 [13]：WebDAV 配置分片同理——曾读取过空列表而强制拉取
+  // 失败时，旧标记仍会让后续设置编辑触发未对齐空列表的 bulk PUT，清空远端
+  // 其他设备添加的配置。
+  _webdavConfigsLoadedKeys.clear();
   _accountsSeenNonEmptyRepos.clear();
   _accountsObservedBackendRepos.clear();
   if (_pushRetryTimer) {
@@ -1861,6 +1979,8 @@ export async function syncFromBackend(options: {
       // R2-C3：已确认取消 Star、等待后端确认删除的仓库不得被拉取合并复活
       //（本地已重新加星时以本地为准）。过滤掉的条目排一次推送，让后端确认删除。
       const pendingDeleted = fetchedAccountId ? pendingDeletedRepoIds(fetchedAccountId) : undefined;
+      const applyBaselineKey = fetchedAccountId ? pushedRepoBaselineKey(fetchedAccountId) : null;
+      const applySessionDeleted = applyBaselineKey ? _sessionDeletedRepoIds.get(applyBaselineKey) : undefined;
       const localIdsNow = new Set(localRepos.map(repo => repo.id));
       const backendReposForApply = pendingDeleted && pendingDeleted.size > 0
         ? backendRepos.filter(repo => !pendingDeleted.has(repo.id) || localIdsNow.has(repo.id))
@@ -1877,6 +1997,25 @@ export async function syncFromBackend(options: {
           ? backendReposForApply
           : mergeRepositoriesPreservingLocalMetadata(backendReposForApply, localRepos);
         state.setRepositories(merged, options.force ? { allowEmpty: true } : undefined);
+        // 第 14 轮审计修复 [24]：拉取静音应用远端快照后，推送基线中「本地与
+        // 本次应用列表都不含、且不存在未确认本地删除记录」的仓库是远端造成的
+        // 移除——从基线摘除，避免之后本机新增其他仓库的全量 PUT 依据陈旧基线
+        // 把另一台设备重新添加的仓库当作本地删除物理删除。本地删除有独立的
+        // _sessionDeletedRepoIds / pendingRepoDeletions 记录，基线摘除只影响
+        // 「本地消失」的归因，不影响删除确认流程。
+        const applyBaseline = applyBaselineKey ? _lastPushedRepoIds.get(applyBaselineKey) : undefined;
+        if (applyBaseline) {
+          const mergedIds = new Set(merged.map(repo => repo.id));
+          const appliedIds = new Set(backendReposForApply.map(repo => repo.id));
+          let baselineChanged = false;
+          for (const id of [...applyBaseline]) {
+            if (mergedIds.has(id) || appliedIds.has(id)) continue;
+            if (applySessionDeleted?.has(id) || pendingDeleted?.has(id)) continue;
+            applyBaseline.delete(id);
+            baselineChanged = true;
+          }
+          if (baselineChanged) persistPushedRepoIds();
+        }
         // Commit the RAW backend hash, not the merged one. The merge preserves
         // local-only metadata (e.g. vector_indexed_at) the backend never stores,
         // so hashing `merged` here made the next poll's backend hash differ
@@ -2071,7 +2210,13 @@ async function syncToBackendWithResult(
     // Requests and edits arriving after the snapshot need a fresh push.
     // Failed writes stay pending for retry without an automatic retry loop.
     while (_hasPendingPush || (succeeded && _hasPendingLocalChanges)) {
-      if (_isAccountSwitchFrozen) break;
+      if (_isAccountSwitchFrozen) {
+        // 第 14 轮审计修复 [17]：冻结中断推送循环——排队中的 forceVerify 未
+        // 执行时，严格调用方绝不能沿用普通推送的成功结果（手动同步会误报
+        // 「同步完成」）。校验保持排队，解冻后的下一次推送链会执行它。
+        if (_pendingForceVerify) succeeded = false;
+        break;
+      }
       forceVerify = _pendingForceVerify;
       _pendingForceVerify = false;
       succeeded = await pushToBackend({ forceVerify }, outcome);
@@ -2120,6 +2265,7 @@ function isSnapshotConflictError(error: unknown): boolean {
 
 async function syncRepositoriesWithServerMerge(localRepos: Repository[], accountId: string): Promise<void> {
   let lastConflictError: unknown = null;
+  let effectiveLocalRepos = localRepos;
   const pushSessionGeneration = getAccountSessionGeneration();
   const pushResetGeneration = _resetGeneration;
   // 第 12 轮审计修复：推送发起时的凭据身份——同账号凭据替换（setGitHubToken
@@ -2144,7 +2290,13 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
       throw new Error('Incomplete backend repository snapshot');
     }
     markAccountBackendReposObserved(accountId);
-    const localIds = new Set(localRepos.map((repo) => repo.id));
+    // 第 14 轮审计修复 [16]：每次对账前重新验证本地仓库快照——SNAPSHOT_CONFLICT
+    // 重试沿用发起时的旧载荷会把等待期间用户重新加星/新增的仓库排除在 PUT 之外
+    //（远端仍在的仓库被当作本地删除物理删除，且删除时清理的发行记录无法保证
+    // 恢复）。快照已变化时放弃旧载荷，以当前快照重新对账。
+    const currentLocalRepos = useAppStore.getState().repositories;
+    if (currentLocalRepos !== effectiveLocalRepos) effectiveLocalRepos = currentLocalRepos;
+    const localIds = new Set(effectiveLocalRepos.map((repo) => repo.id));
     // 上次成功推送后本地消失的仓库 + 本会话内本地删除的仓库 = 用户显式删除，
     // 即使尚无历史基线，也不得因远端仍有而复活。
     const baselineKey = pushedRepoBaselineKey(accountId);
@@ -2161,7 +2313,7 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
     const confirmedPendingDeleted = new Set(pendingDeleted ?? []);
     const remoteById = new Map(remote.repositories.map((repo) => [repo.id, repo]));
     // 合并同一仓库时保留远端更新更晚的用户编辑字段，避免未编辑的旧本地副本覆盖另一设备的更新
-    const mergedLocalRepos = localRepos.map((localRepo) => {
+    const mergedLocalRepos = effectiveLocalRepos.map((localRepo) => {
       const remoteRepo = remoteById.get(localRepo.id);
       if (!remoteRepo) return localRepo;
       const remoteEditedNewer = Boolean(remoteRepo.last_edited)
@@ -2320,6 +2472,14 @@ async function pushToBackend(
     // 待推设置值写回工作区，再取快照构造载荷——否则发送的是另一后端覆盖后
     // 的值，用户在原后端的编辑会永久丢失。
     if (pushAccountId) restorePendingSettingValues(pushAccountId, pushBackendUrl);
+    // 第 14 轮审计修复 [18]：先恢复冻结窗口持久化的待推脏键，再构造设置载荷
+    // ——customCategories 只在脏键命中时随完整载荷发送（[51]），恢复顺序颠倒
+    // 会让恢复的字段被排除在载荷外，而写入成功的确认逻辑按版本快照清除待推
+    // 记录，会把未发送字段当作已写入，冻结窗口的编辑永久丢失。恢复键分配新
+    // 版本（R2-C2），随后捕获的版本快照覆盖它们，确认逻辑只清除实际发送的键。
+    if (pushAccountId && hasPendingAccountSync(pushAccountId)) {
+      restorePendingSettingDirtyKeys(pushAccountId);
+    }
     const state = useAppStore.getState();
     const forceVerify = options.forceVerify === true;
     // 仓库分片未变化（例如只改了设置）时不要发送 isFullSync 全量快照：
@@ -2349,9 +2509,7 @@ async function pushToBackend(
     };
     // R2-C6：按 (账号, 后端) 正向记录成功加载状态；首次成功读取前先恢复持久化脏键，
     // 仅发送明确编辑过的字段，避免把本地默认值（如空 customCategories）作为完整快照推送。
-    if (pushAccountId && hasPendingAccountSync(pushAccountId)) {
-      restorePendingSettingDirtyKeys(pushAccountId);
-    }
+    // （脏键恢复已前移到载荷构造之前，见第 14 轮审计修复 [18]。）
     // R2-C2：在构造设置请求的同一时刻记录脏键版本快照——必须先恢复持久化脏键
     //（恢复会为这些键分配新版本）再捕获版本，否则恢复键与快照版本不匹配，
     // 本次 PUT 已确认的值会被保留为待推，重试可能把旧值重新发送到后端。
@@ -2397,6 +2555,16 @@ async function pushToBackend(
         backendUrl: pushBackendUrl,
       });
     }
+    // 第 14 轮审计修复 [14]：forceVerify 模式下，因 AI/WebDAV 配置读取失败而
+    // 安全跳过的配置分片视为未验证——skipped 是已兑现结果，不报告会让设置页
+    // 把「未校验」显示为「同步成功」。自动推送保留现有保护（跳过不视为失败）。
+    const aiManualUnverified = forceVerify && aiSkipped;
+    const webdavManualUnverified = forceVerify && webdavSkipped;
+    const manualUnverifiedShards = [
+      ...(settingsManualUnverified ? ['settings' as const] : []),
+      ...(aiManualUnverified ? ['aiConfigs' as const] : []),
+      ...(webdavManualUnverified ? ['webdavConfigs' as const] : []),
+    ];
 
     // 从这里开始本次推送确实发出了写入尝试（R2-C5）。
     outcome.attempted = true;
@@ -2425,8 +2593,10 @@ async function pushToBackend(
       outcome.failedShards = results.flatMap((result, index) => (
         result.status === 'rejected' ? [PUSH_SHARD_NAMES[index]] : []
       ));
-      if (settingsManualUnverified && !outcome.failedShards.includes('settings')) {
-        outcome.failedShards = [...outcome.failedShards, 'settings'];
+      for (const shard of manualUnverifiedShards) {
+        if (!outcome.failedShards.includes(shard)) {
+          outcome.failedShards = [...outcome.failedShards, shard];
+        }
       }
       logger.warn('sync.pushToBackend', `Synced to backend with ${failures.length} error(s)`, { failureCount: failures.length, durationMs: Date.now() - pushStartTime });
       _hasPendingLocalChanges = true;
@@ -2437,7 +2607,7 @@ async function pushToBackend(
       if (_syncGeneration === pushGeneration) {
         schedulePendingAccountSyncRetry(pushAccountId);
       }
-    } else if (settingsManualUnverified) {
+    } else if (manualUnverifiedShards.length > 0) {
       // 第 12 轮审计修复：所有已发分片成功但设置未对齐——按未完成上报（含
       // 分片名供调用方诊断），保留待推状态等待设置对齐后的完整写入。
       // 第 13 轮审计修复 [48]：不再置 _hasPendingLocalChanges——该标志表示
@@ -2445,12 +2615,15 @@ async function pushToBackend(
       // 上方被清理，没有编辑却拦截拉取会让设置永远无法自动对齐（死锁）。
       // 已确认写入的部分安全保留；轮询的下一次普通拉取重新读取设置完成对齐
       //（markSettingsLoaded），请求在途期间的新编辑仍由脏键保护在读取时保留。
-      logger.warn('sync.pushToBackend', 'Manual sync finished with a partial settings write; settings are not yet aligned with the backend', {
+      // 第 14 轮审计修复 [14]：AI/WebDAV 因未对齐而跳过的分片同样按未验证
+      // 上报（自动推送不受影响，保留对未对齐空列表的保护）。
+      logger.warn('sync.pushToBackend', 'Manual sync finished with unverified shards; skipped shards are not yet aligned with the backend', {
         accountId: pushAccountId,
         backendUrl: pushBackendUrl,
+        unverifiedShards: [...manualUnverifiedShards],
         durationMs: Date.now() - pushStartTime,
       });
-      outcome.failedShards = [...outcome.failedShards, 'settings'];
+      outcome.failedShards = [...outcome.failedShards, ...manualUnverifiedShards];
     } else {
       logger.info('sync.pushToBackend', 'Synced to backend', { durationMs: Date.now() - pushStartTime });
       _pushRetryDelay = 2000;
@@ -2492,8 +2665,9 @@ async function pushToBackend(
       }
     }
     // 第 12 轮审计修复：手动同步在设置未对齐时不得报告完整成功（部分脏键
-    // 写入已完成，但其余设置未校验未写入）。
-    return failures.length === 0 && !settingsManualUnverified;
+    // 写入已完成，但其余设置未校验未写入）。第 14 轮审计修复 [14]：因未对齐
+    // 而跳过的 AI/WebDAV 分片在 forceVerify 下同样不报告完整成功。
+    return failures.length === 0 && manualUnverifiedShards.length === 0;
   } catch (err) {
     logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err, { durationMs: Date.now() - pushStartTime });
     _hasPendingLocalChanges = true;
@@ -2626,14 +2800,23 @@ export function startAutoSync(): () => void {
               // 拉取会覆盖本地工作区，仅记录脏键无法在切回原后端（X）时恢复
               // 用户当时的设置内容。
               const windowValues = _frozenWindowDirtySettingValues.get(editAccountId) ?? {};
+              // 第 14 轮审计修复 [12]：同时记录本次编辑的字段版本——窗口退出
+              // 顺序不代表编辑顺序，合并时只接受版本更新的值（外层窗口晚于
+              // 内层退出时，陈旧值不得覆盖内层稍后保存的新值）。
+              const windowVersions = _frozenWindowDirtySettingVersions.get(editAccountId)
+                ?? new Map<string, number>();
+              _frozenEditVersionSeq += 1;
+              const editVersion = _frozenEditVersionSeq;
               const editState = state as unknown as Record<string, unknown>;
               for (const key of dirtySettingKeys) {
                 windowKeys.add(key);
                 // 同一键在窗口内多次编辑时保留最后一次写入的值。
                 if (editState[key] !== undefined) windowValues[key] = editState[key];
+                windowVersions.set(key, editVersion);
               }
               _frozenWindowDirtySettingKeys.set(editAccountId, windowKeys);
               _frozenWindowDirtySettingValues.set(editAccountId, windowValues);
+              _frozenWindowDirtySettingVersions.set(editAccountId, windowVersions);
             }
           }
         } else {

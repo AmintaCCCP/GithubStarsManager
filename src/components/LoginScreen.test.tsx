@@ -710,7 +710,18 @@ describe('LoginScreen 后端登录', () => {
           gists: [],
           starredGists: [],
           selectedGistCategory: 'all',
-          releases: [],
+          // 审计修复（R14 finding 29）：releases 是本用例的成功分片——旧值不能
+          // 是 []，否则「成功分片清空旧数据」与「实现错误保留旧值」不可区分
+          releases: [{
+            id: 9002,
+            tag_name: 'v0.9',
+            name: null,
+            body: null,
+            published_at: '2025-12-01T00:00:00Z',
+            html_url: 'https://github.com/o/r/releases/v0.9',
+            assets: [],
+            repository: { id: 301, full_name: 'o/r', name: 'r' },
+          }],
           releaseSubscriptions: [],
           releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
           readReleases: [],
@@ -751,7 +762,8 @@ describe('LoginScreen 后端登录', () => {
     expect(archive?.hiddenDefaultCategoryIds).toEqual(['hidden-3']);
     expect(archive?.categoryOrder).toEqual(['cat-3']);
     expect(archive?.defaultCategoryOverrides['cat-3']?.name).toBe('Cat 3 Override');
-    // releases 分片成功：照常覆盖为拉取值（后端无发布记录 → 清空）
+    // releases 分片成功：照常覆盖为拉取值——旧记录被成功的空分片清除
+    //（审计修复 R14 finding 29：与「实现错误保留旧值」可区分）
     expect(archive?.releases).toEqual([]);
     // 保留的归档随后 setUser 落回实时工作区（不会回退为清空后的默认值）
     expect(useAppStore.getState().customCategories.map((c) => c.id)).toEqual(['cat-3']);
@@ -785,7 +797,9 @@ describe('LoginScreen 后端登录', () => {
           readReleases: [],
           forks: [],
           readForks: [],
-          customCategories: [],
+          // 审计修复（R14 finding 29）：customCategories 是本用例的成功分片——
+          // 旧值不能是 []，否则「成功分片清空旧数据」与「实现错误保留旧值」不可区分
+          customCategories: [{ id: 'cat-stale', name: 'Stale Cat', icon: '', isCustom: true, keywords: [] }],
           hiddenDefaultCategoryIds: [],
           categoryOrder: [],
           defaultCategoryOverrides: {},
@@ -817,7 +831,8 @@ describe('LoginScreen 后端登录', () => {
     const archive = useAppStore.getState().accountWorkspaces['3'];
     // releases 分片失败：原归档的发布记录保持原值
     expect(archive?.releases.map((r) => r.id)).toEqual([9001]);
-    // settings 分片成功：照常覆盖为拉取值（后端无自定义分类 → 清空）
+    // settings 分片成功：照常覆盖为拉取值——旧分类记录被成功的空分片清除
+    //（审计修复 R14 finding 29：与「实现错误保留旧值」可区分）
     expect(archive?.customCategories).toEqual([]);
   });
 
@@ -1121,6 +1136,69 @@ describe('LoginScreen 已保存账号快捷登录', () => {
     expect(await screen.findByText('已登录该账号，但后端凭据未能更新。请稍后从账号菜单重试。')).toBeInTheDocument();
     expect(useAppStore.getState().user?.login).toBe('bob');
     expect(switchActionMocks.switchToAccount).toHaveBeenCalledWith('2');
+  });
+
+  // 审计修复（R14 finding 10）：普通 PAT 登录先 setUser 提交本地会话（真实
+  // App 中登录页随即卸载）——syncTokenToBackend 失败必须经全局 toast 提示
+  // 后端凭据未更新，不得只依赖卸载后无法显示的 setError，也不得撤销已提交
+  // 的本地会话。
+  it('普通 PAT 登录凭据同步失败时经全局 toast 提示，本地会话保留 (R14 finding 10)', async () => {
+    useAppStore.setState({
+      user: null,
+      githubToken: null,
+      isAuthenticated: false,
+      hasHydrated: true,
+      backendApiSecret: null,
+      savedAccounts: {},
+      accountWorkspaces: {},
+      repositories: [],
+      searchResults: [],
+      gists: [],
+      starredGists: [],
+      releases: [],
+      forks: [],
+      customCategories: [],
+      categoryOrder: [],
+      hiddenDefaultCategoryIds: [],
+      defaultCategoryOverrides: {},
+      categoryListIdMap: {},
+      lastSync: null,
+      language: 'zh',
+      currentView: 'repositories',
+      selectedCategory: 'all',
+      releaseSubscriptions: new Set<number>(),
+      readReleases: new Set<number>(),
+      readForks: new Set<number>(),
+      releaseSourceSettings: { ...defaultReleaseSourceSettings },
+    });
+    mocks.authenticateWithGitHub.mockReset().mockResolvedValue({
+      id: 5,
+      login: 'octo-pat',
+      name: 'Octo Pat',
+      avatar_url: '',
+      email: null,
+    });
+    mocks.syncTokenToBackend.mockReset().mockResolvedValue({ ok: false });
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <App />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText('GitHub Personal Access Token'), {
+      target: { value: 'ghp_pat' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '连接到GitHub' }));
+
+    // 登录页已卸载（App 主界面接管）：凭据同步失败经全局 DialogProvider（常驻，
+    // 卸载后仍可见）展示，复用快捷登录同一文案
+    expect(await screen.findByText('已登录该账号，但后端凭据未能更新。请稍后从账号菜单重试。')).toBeInTheDocument();
+    // 本地会话保留（不撤销）
+    expect(useAppStore.getState().user?.login).toBe('octo-pat');
+    expect(useAppStore.getState().isAuthenticated).toBe(true);
+    expect(useAppStore.getState().githubToken).toBe('ghp_pat');
   });
 });
 

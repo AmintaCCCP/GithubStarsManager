@@ -292,4 +292,71 @@ describe('ghAccountsStorage save, load, clear', () => {
     assert.equal(saveEncryptedGhAccounts(ctx, ['42']).success, false);
     assert.equal(storage.size, 0);
   });
+
+  it('rejects non-plain objects (Date/Map) so they cannot act as a clear instruction (audit R14)', () => {
+    const { ctx, storage } = makeCtx();
+    const filePath = path.join('/test/data', GH_ACCOUNTS_FILENAME);
+    const existingPayload = Buffer.from('ENC:existing', 'utf-8');
+    storage.set(filePath, existingPayload);
+
+    // Date 可通过结构化克隆且 typeof === 'object'，但 Object.entries 不返回
+    // 令牌条目——旧行为会把它当空映射清空整份凭据并报告成功。
+    const dateRes = saveEncryptedGhAccounts(ctx, new Date('2026-01-01T00:00:00.000Z'));
+    assert.equal(dateRes.success, false);
+    assert.match(dateRes.error, /invalid/);
+
+    const mapRes = saveEncryptedGhAccounts(ctx, new Map([['42', 'ghp_token']]));
+    assert.equal(mapRes.success, false);
+    assert.match(mapRes.error, /invalid/);
+
+    // 传入非普通对象时原文件不得被修改（既不清空也不重写）。
+    assert.equal(storage.size, 1);
+    assert.equal(storage.get(filePath), existingPayload);
+
+    // 显式空对象的清除语义保持不变。
+    assert.deepEqual(saveEncryptedGhAccounts(ctx, {}), { success: true });
+    assert.equal(storage.size, 0);
+  });
+
+  it('refuses to save PATs when Linux falls back to the basic_text backend (audit R14)', () => {
+    const { ctx, storage } = makeCtx();
+
+    const basicTextCtx = {
+      ...ctx,
+      platform: 'linux',
+      safeStorage: {
+        ...ctx.safeStorage,
+        getSelectedStorageBackend: () => 'basic_text',
+      },
+    };
+    const res = saveEncryptedGhAccounts(basicTextCtx, { '42': 'ghp_token_1' });
+    assert.equal(res.success, false);
+    assert.match(res.error, /basic_text/);
+    assert.equal(storage.size, 0);
+
+    // 其它密钥环后端（非 basic_text）不受影响。
+    const keyringCtx = {
+      ...ctx,
+      platform: 'linux',
+      safeStorage: {
+        ...ctx.safeStorage,
+        getSelectedStorageBackend: () => 'gnome_libsecret',
+      },
+    };
+    assert.deepEqual(saveEncryptedGhAccounts(keyringCtx, { '42': 'ghp_token_1' }), { success: true });
+    assert.equal(storage.size, 1);
+
+    // getSelectedStorageBackend 异常时按「非 basic_text」处理，回到既有可用性检查。
+    const throwingCtx = {
+      ...ctx,
+      platform: 'linux',
+      safeStorage: {
+        ...ctx.safeStorage,
+        getSelectedStorageBackend: () => {
+          throw new Error('backend probe failed');
+        },
+      },
+    };
+    assert.deepEqual(saveEncryptedGhAccounts(throwingCtx, { '43': 'github_pat_x' }), { success: true });
+  });
 });

@@ -6,6 +6,7 @@ import {
   consumePendingAccountSync,
   forceSyncToBackend,
   hasPendingAccountSync,
+  markPendingAccountSync,
   prepareForAccountSwitch,
   resetSyncHashes,
   startAutoSync,
@@ -861,5 +862,310 @@ describe('vacuum account sessions never push an empty full-sync snapshot before 
     expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
     const pushedRepos = vi.mocked(backend.syncRepositories).mock.calls[0][0] as Repository[];
     expect(pushedRepos.map((repo) => repo.id)).toContain(9);
+  });
+});
+
+/**
+ * 第 14 轮审计修复回归：冻结窗口栈化（缓冲指向/阶段状态/重置代次）、待推
+ * 设置按编辑版本合并、评估标记时序、精确键清除与脏键恢复范围、推送链严格
+ * 结果、冲突重试快照重验、基线删除归因、webdav 对齐标记重置与 forceVerify
+ * 未验证分片上报。
+ */
+describe('round 14 audit fixes (frozen window stack, pending merge, push chain)', () => {
+  let originalState: ReturnType<typeof useAppStore.getState>;
+  let unsubscribe: (() => void) | undefined;
+  const adapter = backend as unknown as { backendUrl?: string };
+
+  beforeEach(() => {
+    originalState = useAppStore.getState();
+    vi.useFakeTimers();
+    clearPendingSyncState();
+    vi.mocked(backend.syncRepositories).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncReleases).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncAIConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncWebDAVConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncEmbeddingConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncVectorSearchConfig).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncSettings).mockReset().mockResolvedValue({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
+    vi.mocked(backend.fetchRepositories).mockReset().mockResolvedValue({ repositories: [], total: 0 });
+    vi.mocked(backend.fetchReleases).mockReset().mockResolvedValue({ releases: [], total: 0 });
+    vi.mocked(backend.fetchAIConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchWebDAVConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchEmbeddingConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchVectorSearchConfig).mockReset().mockResolvedValue({
+      enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '',
+      indexMode: 'description', readmeMaxChars: 6000, searchThreshold: 0.35,
+      searchTopK: 30, enableHyDE: true, enableReranking: true,
+    });
+    vi.mocked(backend.fetchSettings).mockReset().mockResolvedValue({});
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+      },
+      repositories: [],
+      releases: [],
+      aiConfigs: [],
+      webdavConfigs: [],
+      customCategories: [],
+      categoryOrder: [],
+    } as never);
+    resetSyncHashes();
+    adapter.backendUrl = 'http://origin';
+    unsubscribe = startAutoSync();
+  });
+
+  afterEach(() => {
+    if (unsubscribe) {
+      stopAutoSync(unsubscribe);
+      unsubscribe = undefined;
+    }
+    vi.useRealTimers();
+    useAppStore.setState(originalState);
+    clearPendingSyncState();
+    delete adapter.backendUrl;
+  });
+
+  const pendingRecords = (): unknown[] => (
+    JSON.parse(window.localStorage.getItem('gsm.pendingSyncAccounts') ?? '[]') as unknown[]
+  );
+
+  it('merges pending setting values by edit order, not by frozen-window exit order (round-14 [12])', async () => {
+    // 外层窗口先编辑 v1，内层窗口稍后编辑 v2；内层先退出保存 v2，外层晚退出
+    // 的陈旧 v1 不得按退出顺序覆盖内层的新值。
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['outer-v1'] });
+      await withAccountSwitchFrozen(async () => {
+        useAppStore.setState({ categoryOrder: ['inner-v2'] });
+      }, 'http://origin');
+    }, 'http://origin');
+
+    const persisted = pendingRecords() as Array<[string, string, string[], Record<string, string[]>]>;
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0][3]).toEqual({ categoryOrder: ['inner-v2'] });
+  });
+
+  it('hands the edit buffers to the still-active window when a concurrent window exits first (round-14 [15])', async () => {
+    // X 先进入（origin X）先退出、Y 后进入（origin Y）仍在等待：X 退出后发生
+    // 的编辑必须落入 Y 的缓冲并在 Y 退出时持久化——不得落入已失效缓冲丢失。
+    let enterY!: () => void;
+    const yEntered = new Promise<void>((resolve) => { enterY = resolve; });
+    let exitXGate!: (value: void) => void;
+    const xDone = new Promise<void>((resolve) => { exitXGate = resolve; });
+
+    const xPromise = withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['edit-in-x'] });
+      enterY();
+      await xDone;
+    }, 'http://x');
+
+    await yEntered;
+    const yPromise = withAccountSwitchFrozen(async () => {
+      exitXGate();
+      await xPromise;
+      // X 已完全退出：此刻的编辑必须仍被捕获（Y 的缓冲仍是活跃缓冲）
+      useAppStore.setState({ categoryOrder: ['edit-in-y'] });
+    }, 'http://y');
+
+    await yPromise;
+    await xPromise;
+
+    const persisted = pendingRecords() as Array<[string, string, string[]]>;
+    const recordFor = (url: string) => persisted.find((entry) => entry[1] === url);
+    expect(recordFor('http://x')?.[2]).toEqual(['categoryOrder']);
+    expect(recordFor('http://y')?.[2]).toEqual(['categoryOrder']);
+    // 值归属：切回各自 origin 时恢复的必须是各自窗口内的编辑
+    expect(pendingRecords()).toHaveLength(2);
+  });
+
+  it('restores the pre-freeze switch state when the last concurrent window exits (round-14 [19])', async () => {
+    // X 先进先出、Y 后进后出：Y 保存的 previousSwitching 是 true——最后退出
+    // 时必须恢复整个冻结阶段开始前的状态（false），否则轮询持续跳过自动拉取。
+    let enterY!: () => void;
+    const yEntered = new Promise<void>((resolve) => { enterY = resolve; });
+    let exitXGate!: (value: void) => void;
+    const xDone = new Promise<void>((resolve) => { exitXGate = resolve; });
+
+    const xPromise = withAccountSwitchFrozen(async () => {
+      enterY();
+      await xDone;
+    }, 'http://x');
+    await yEntered;
+    const yPromise = withAccountSwitchFrozen(async () => {
+      exitXGate();
+      await xPromise;
+    }, 'http://y');
+    await yPromise;
+    await xPromise;
+
+    // 阶段结束后轮询恢复：5s 轮询必须发起一次普通拉取
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(backend.fetchRepositories).toHaveBeenCalled();
+  });
+
+  it('does not persist frozen-window edits captured before a full data reset (round-14 [23])', async () => {
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['edit-before-reset'] });
+      // 清空全部数据发生在窗口生命周期内：递增重置代次并清空待推记录
+      clearPendingSyncState();
+    }, 'http://origin');
+
+    // 窗口退出释放，但旧窗口的编辑绝不写回磁盘（重置后不得复活）
+    expect(pendingRecords()).toEqual([]);
+    expect(hasPendingAccountSync('1')).toBe(false);
+  });
+
+  it('keeps unknown-origin pending records on a confirmed push and does not restore their dirty keys for outbound push (round-14 [21][22])', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    // 精确匹配记录（无脏键）+ 来源未知（backendUrl ''）记录（带脏键）
+    markPendingAccountSync('1', 'http://origin');
+    markPendingAccountSync('1', '', { dirtySettingKeys: ['categoryOrder'] });
+
+    await syncToBackend();
+
+    // [21]：成功推送只清除精确匹配记录；来源未知记录保留
+    const persisted = pendingRecords() as Array<[string, string, string?]>;
+    expect(persisted).toContainEqual(['1', '', ['categoryOrder']]);
+    expect(persisted).not.toContainEqual(['1', 'http://origin']);
+    // [22]：未知来源脏键未恢复为当前后端的出站待推项——设置未对齐且无脏键
+    // ⇒ 设置分片整体跳过（绝不把当前工作区值写到未归属后端的语义下外发）
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+  });
+
+  it('restores persisted dirty keys before constructing the settings payload so restored fields are sent (round-14 [18])', async () => {
+    // 非空仓库列表：绕过空推送保护，让补推真正发出
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    // 冻结窗口同时编辑 categoryOrder 与 customCategories：值+脏键按 (1, origin) 持久化
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({
+        categoryOrder: ['frozen-order'],
+        customCategories: [{ id: 'cat-frozen', name: 'Frozen', icon: 'folder', keywords: [], isCustom: true }],
+      });
+    }, 'http://origin');
+
+    // 不经过拉取（设置未对齐）直接补推：恢复的值与脏键必须先于载荷构造恢复
+    await syncToBackend();
+    const settingsCalls = vi.mocked(backend.syncSettings).mock.calls;
+    expect(settingsCalls.length).toBeGreaterThan(0);
+    const lastPayload = settingsCalls[settingsCalls.length - 1][0] as {
+      categoryOrder?: string[];
+      customCategories?: Array<{ id: string }>;
+    };
+    expect(lastPayload.categoryOrder).toEqual(['frozen-order']);
+    expect(lastPayload.customCategories?.[0]?.id).toBe('cat-frozen');
+  });
+
+  it('clears the webdav alignment marker on hash reset so a failed forced pull cannot push an empty list (round-14 [13])', async () => {
+    // 第一次拉取：远端 WebDAV 为空 → 读取标记置位
+    await syncFromBackend();
+    // 新对齐会话（resetSyncHashes）后强制拉取的 WebDAV 请求失败：旧标记必须清除
+    resetSyncHashes();
+    vi.mocked(backend.fetchWebDAVConfigs).mockRejectedValueOnce(new Error('webdav fetch failed'));
+    await syncFromBackend({ force: true });
+    // 设置编辑触发推送：未对齐空列表必须跳过 WebDAV 写入（保护远端其他设备配置）
+    useAppStore.setState({ categoryOrder: ['edited'] });
+    cancelPendingAccountSwitchPush();
+    await syncToBackend();
+    expect(backend.syncWebDAVConfigs).not.toHaveBeenCalled();
+  });
+
+  it('reports skipped AI/WebDAV shards as unverified in forceVerify mode while keeping the auto-push protection (round-14 [14])', async () => {
+    // 设置已对齐（拉取成功），AI/WebDAV 读取失败且本机列表为空
+    vi.mocked(backend.fetchAIConfigs).mockRejectedValueOnce(new Error('ai down'));
+    vi.mocked(backend.fetchWebDAVConfigs).mockRejectedValueOnce(new Error('webdav down'));
+    await syncFromBackend();
+
+    // 手动同步：跳过的配置分片按未验证上报（绝不报告同步成功）
+    await expect(forceSyncToBackend({ forceVerify: true, reportFailures: true })).rejects.toMatchObject({
+      failedShards: expect.arrayContaining(['aiConfigs', 'webdavConfigs']),
+    });
+    // 自动推送保留现有保护：跳过不视为失败
+    await expect(syncToBackend()).resolves.toBe(true);
+    expect(backend.syncAIConfigs).not.toHaveBeenCalled();
+    expect(backend.syncWebDAVConfigs).not.toHaveBeenCalled();
+  });
+
+  it('re-validates the local repository snapshot before retrying a conflicted full PUT (round-14 [16])', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    vi.mocked(backend.fetchRepositories)
+      .mockResolvedValueOnce({ repositories: [], total: 0, revision: 1 })
+      .mockResolvedValueOnce({ repositories: [createRepository(2)], total: 1, revision: 2 });
+    vi.mocked(backend.syncRepositories)
+      .mockImplementationOnce(() => {
+        // 首个 PUT 在途期间用户新增仓库 3，随后服务端返回快照冲突
+        useAppStore.setState({ repositories: [createRepository(1), createRepository(3)] });
+        return Promise.reject(Object.assign(new Error('conflict'), { statusCode: 409 }));
+      })
+      .mockResolvedValueOnce(undefined);
+
+    await syncToBackend();
+
+    // 重试载荷基于当前快照 [1,3] 重新对账，并保留远端的 2（随后一次重推是
+    // 在途变更的合法补推，不影响本次断言）
+    expect(vi.mocked(backend.syncRepositories).mock.calls.length).toBeGreaterThan(1);
+    const retryPayload = vi.mocked(backend.syncRepositories).mock.calls[1][0] as Repository[];
+    expect(retryPayload.map((repo) => repo.id).sort((a, b) => a - b)).toEqual([1, 2, 3]);
+  });
+
+  it('does not treat remote-pull removals as local deletions when pushing after another device re-added a repo (round-14 [24])', async () => {
+    // 1. 首次成功推送 [1,2] → 推送基线 {1,2}
+    useAppStore.setState({ repositories: [createRepository(1), createRepository(2)] });
+    await syncToBackend();
+    // 取消 seeding 遗留的防抖定时器（否则其会拦截下一步的拉取）
+    cancelPendingAccountSwitchPush();
+    expect(vi.mocked(backend.syncRepositories)).toHaveBeenCalledTimes(1);
+
+    // 2. 另一设备删除 2：本机后台拉取静音应用 [1]（不产生本地删除记录）
+    vi.mocked(backend.fetchRepositories).mockResolvedValueOnce({
+      repositories: [createRepository(1)], total: 1, revision: 2,
+    });
+    await syncFromBackend();
+    expect(useAppStore.getState().repositories.map((repo) => repo.id)).toEqual([1]);
+
+    // 3. 另一设备重新添加 2；本机新增 3 并推送：陈旧基线不得把 2 当本地删除
+    vi.mocked(backend.fetchRepositories).mockResolvedValueOnce({
+      repositories: [createRepository(1), createRepository(2)], total: 2, revision: 3,
+    });
+    useAppStore.setState({ repositories: [createRepository(1), createRepository(3)] });
+    await syncToBackend();
+
+    const lastPayload = vi.mocked(backend.syncRepositories).mock.calls.at(-1)![0] as Repository[];
+    expect(lastPayload.map((repo) => repo.id).sort((a, b) => a - b)).toEqual([1, 2, 3]);
+  });
+
+  it('returns an unfinished result to strict callers when a queued forceVerify is skipped by a frozen window (round-14 [17])', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    let releaseRepoSync!: () => void;
+    const repoSyncInvoked = new Promise<void>((resolve) => {
+      vi.mocked(backend.syncRepositories).mockImplementationOnce(() => new Promise<void>((resolve2) => {
+        releaseRepoSync = resolve2;
+        resolve();
+      }));
+    });
+
+    const plainPush = syncToBackend();
+    await repoSyncInvoked; // 普通推送已挂在 syncRepositories 上
+    // 普通推送在途：手动同步把 forceVerify 排入同一推送链
+    const strictSync = forceSyncToBackend({ forceVerify: true, reportFailures: true })
+      .then(() => null, (err: Error) => err);
+    // 连接探测冻结同步：普通推送完成后，排队的校验不得执行
+    let releaseWindow!: () => void;
+    const windowDone = new Promise<void>((resolve) => { releaseWindow = resolve; });
+    void withAccountSwitchFrozen(async () => { await windowDone; }, 'http://origin');
+
+    releaseRepoSync();
+    await plainPush;
+    const strictError = await strictSync;
+
+    // 严格调用方收到明确的未完成结果（普通推送的成功不得冒充校验成功）
+    expect(strictError).toBeInstanceOf(Error);
+    expect((strictError as Error & { pushAttempted?: boolean }).pushAttempted).toBe(true);
+
+    // 解冻后排空的排队校验
+    releaseWindow();
+    await windowDone;
+    await syncToBackend();
   });
 });

@@ -26,7 +26,12 @@ interface GistEditorModalProps {
   gist: Gist | null;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (input: GistCreateInput | GistUpdateInput) => Promise<void>;
+  /**
+   * 保存提交。解析值 = 保存所属会话是否仍是当前会话（R14 finding 2）：
+   * 仅 true 时完成回调才允许关闭编辑器——保存请求在途期间用户可切号，
+   * 过期会话的完成回调不得关闭/重置当前会话的编辑器（避免覆盖未保存草稿）。
+   */
+  onSubmit: (input: GistCreateInput | GistUpdateInput) => Promise<boolean>;
 }
 
 /**
@@ -93,8 +98,10 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
     if (!canSubmit || isSaving) return;
     setIsSaving(true);
     try {
-      if (gist) {
-        await onSubmit({
+      // 审计修复（R14 finding 2）：保存完成后仅在保存所属会话仍是当前会话时
+      // 关闭编辑器——过期会话的完成回调不得关闭/重置当前会话的编辑器。
+      const shouldClose = gist
+        ? await onSubmit({
           description,
           files: files.map(file => ({
             filename: file.filename.trim(),
@@ -102,9 +109,8 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
             content: file.content,
             deleted: file.deleted,
           })),
-        });
-      } else {
-        await onSubmit({
+        })
+        : await onSubmit({
           description,
           public: isPublic,
           files: visibleFiles.map(file => ({
@@ -112,8 +118,9 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
             content: file.content,
           })),
         });
+      if (shouldClose) {
+        onClose();
       }
-      onClose();
     } finally {
       setIsSaving(false);
     }

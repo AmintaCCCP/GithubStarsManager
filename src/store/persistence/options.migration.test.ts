@@ -100,6 +100,8 @@ describe('v19 token migration persistence contract', () => {
     // 收尾回调（迁移失败分支 → restore → 迁移重试），保存恢复后确认置位。
     vi.mocked(saveGhAccountTokens).mockClear();
     vi.mocked(saveGhAccountTokens).mockResolvedValue(undefined);
+    // 阶段一的迁移保存已调用过补写 mock：清空调用记录，让下方断言只反映重试。
+    vi.mocked(fillMissingGhAccountTokens).mockClear();
     useAppStore.setState({
       savedAccounts: savedAccountsWithToken('ghp_legacy_token'),
       user: mirrorUser,
@@ -111,15 +113,18 @@ describe('v19 token migration persistence contract', () => {
     hydrateCallback(undefined, null);
     await flushMigrationSave();
     // 迁移重试把分片中保留的旧 PAT 重新迁入 safeStorage（原 PAT 可取得）。
-    expect(vi.mocked(saveGhAccountTokens)).toHaveBeenLastCalledWith({ '42': 'ghp_legacy_token' });
-    // 确认后恢复 B7 剥除语义：持久化分片不含任何明文 PAT。
-    expect(persistSavedAccounts('ghp_confirmed_token')['42']?.githubToken).toBe('');
+    // 第 14 轮审计修复：重试对旧迁移输入走补写语义（fillMissingGhAccountTokens），
+    // 只有重新授权的运行时 PAT 才走覆盖写入。
+    expect(vi.mocked(fillMissingGhAccountTokens)).toHaveBeenLastCalledWith({ '42': 'ghp_legacy_token' });
+    // 确认后恢复 B7 剥除语义：持久化分片不含任何明文 PAT。运行时 PAT 传空串
+    // 使断言可区分「确认后剥除」与「未确认时回填迁移输入」（第 14 轮 [28]）。
+    expect(persistSavedAccounts('')['42']?.githubToken).toBe('');
 
     // 阶段三：确认态下的后续迁移（新启动）——分片照常剥除，不回退确认门控。
     vi.mocked(saveGhAccountTokens).mockResolvedValueOnce(undefined);
     appPersistenceOptions.migrate!(v18Snapshot(), 18);
     await flushMigrationSave();
-    expect(persistSavedAccounts('ghp_confirmed_token')['42']?.githubToken).toBe('');
+    expect(persistSavedAccounts('')['42']?.githubToken).toBe('');
   });
 
   it('creates a savedAccounts entry for mirror-migrated credentials so switchAccount can select the account', () => {
@@ -197,8 +202,10 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
     __resetV19TokenSaveStateForTest();
     useAppStore.setState({ user: null, githubToken: null, isAuthenticated: false, savedAccounts: {} } as never);
     mergePersisted({ user: null, savedAccounts: savedAccountsWithToken('ghp_legacy_token') });
-    vi.mocked(saveGhAccountTokens).mockClear();
-    vi.mocked(saveGhAccountTokens).mockRejectedValue(new Error('still down'));
+    // 第 14 轮审计修复：重试对旧迁移输入走补写语义——失败模拟随之移到
+    // fillMissingGhAccountTokens（saveGhAccountTokens 只承载重新授权的运行时 PAT）。
+    vi.mocked(fillMissingGhAccountTokens).mockClear();
+    vi.mocked(fillMissingGhAccountTokens).mockRejectedValue(new Error('still down'));
     hydrate();
     await flushMigrationSave();
     // 第二次启动重试仍失败：分片必须继续保留旧 PAT（第三次启动的重试输入），
@@ -209,11 +216,11 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
     __resetV19TokenSaveStateForTest();
     useAppStore.setState({ user: null, githubToken: null, isAuthenticated: false, savedAccounts: {} } as never);
     mergePersisted({ user: null, savedAccounts: savedAccountsWithToken('ghp_legacy_token') });
-    vi.mocked(saveGhAccountTokens).mockClear();
-    vi.mocked(saveGhAccountTokens).mockResolvedValue(undefined);
+    vi.mocked(fillMissingGhAccountTokens).mockClear();
+    vi.mocked(fillMissingGhAccountTokens).mockImplementation(async (tokens: Record<string, string>) => ({ ...tokens }));
     hydrate();
     await flushMigrationSave();
-    expect(vi.mocked(saveGhAccountTokens)).toHaveBeenCalledWith({ '42': 'ghp_legacy_token' });
+    expect(vi.mocked(fillMissingGhAccountTokens)).toHaveBeenCalledWith({ '42': 'ghp_legacy_token' });
     // 确认后恢复 B7 剥除语义。
     expect(persistFromState('ghp_legacy_token')['42']?.githubToken).toBe('');
   });
@@ -333,5 +340,59 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
     } finally {
       window.localStorage.removeItem('github-stars-manager-auth');
     }
+  });
+
+  it('E: 迁移重试对旧迁移输入走补写，绝不以恢复的旧 PAT 覆盖磁盘新凭据（round-14 [9]）', async () => {
+    // 磁盘已有账号 42 的新 PAT；旧分片带 42 的旧 PAT 与 44 的待迁移 PAT。
+    // 首次补写遇瞬时故障（44 尚未落盘），失败分支把旧输入恢复进内存；重试
+    // 必须继续走补写语义保留磁盘上 42 的新 PAT，并用磁盘确认值恢复会话。
+    const diskTokens: Record<string, string> = { '42': 'ghp_disk_new_42' };
+    let fillAttempts = 0;
+    vi.mocked(fillMissingGhAccountTokens).mockImplementation(async (tokens: Record<string, string>) => {
+      fillAttempts += 1;
+      if (fillAttempts === 1) throw new Error('transient write failure');
+      const settled: Record<string, string> = {};
+      for (const [accountId, token] of Object.entries(tokens)) {
+        const diskToken = diskTokens[accountId];
+        settled[accountId] = typeof diskToken === 'string' && diskToken ? diskToken : token;
+      }
+      return settled;
+    });
+    const secondUser: GitHubUser = { ...mirrorUser, id: 44, login: 'second-user' };
+    const migrated = appPersistenceOptions.migrate!({
+      savedAccounts: {
+        ...savedAccountsWithToken('ghp_legacy_42'),
+        '44': {
+          accountId: '44',
+          user: secondUser,
+          githubToken: 'ghp_legacy_44',
+          addedAt: '2026-01-01T00:00:00.000Z',
+          lastUsedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    } as never, 18);
+    await flushMigrationSave();
+
+    useAppStore.setState({ user: null, githubToken: null, isAuthenticated: false, savedAccounts: {} } as never);
+    mergePersisted(migrated as PersistedShard);
+    hydrate();
+    await flushMigrationSave();
+
+    // 失败分支已把旧迁移 PAT 回填内存（可重试状态）；重试只走补写——覆盖
+    // 写入的 saveGhAccountTokens 绝不能被旧迁移输入触发（否则恢复写入后
+    // 会用 42 的旧 PAT 覆盖磁盘上的新 PAT）。
+    expect(fillAttempts).toBe(2);
+    expect(vi.mocked(fillMissingGhAccountTokens)).toHaveBeenLastCalledWith({
+      '42': 'ghp_legacy_42',
+      '44': 'ghp_legacy_44',
+    });
+    expect(vi.mocked(saveGhAccountTokens)).not.toHaveBeenCalled();
+    // 会话以磁盘确认值收敛：42 恢复为磁盘上的新 PAT，44 保持新写入的迁移值。
+    expect(useAppStore.getState().savedAccounts['42']?.githubToken).toBe('ghp_disk_new_42');
+    expect(useAppStore.getState().savedAccounts['44']?.githubToken).toBe('ghp_legacy_44');
+    // 确认收敛：确认后分片剥除，不再回填迁移输入。
+    const shard = persistCurrentState();
+    expect(shard['42']?.githubToken ?? '').toBe('');
+    expect(shard['44']?.githubToken ?? '').toBe('');
   });
 });

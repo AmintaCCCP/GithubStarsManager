@@ -26,10 +26,21 @@ function getGhAccountsPath(userDataPath, pathModule) {
 const GH_ACCOUNT_ID_PATTERN = /^\d{1,20}$/;
 const GH_TOKEN_PATTERN = /^[\x21-\x7E]{1,512}$/;
 
+/**
+ * 只接受普通键值对象（Object.prototype 或 null 原型）。渲染进程参数不可信：
+ * Date/Map 等结构化克隆产物同样通过 `typeof === 'object'`，但 Object.entries
+ * 不会返回令牌条目——它们会被归一化为空映射并触发「清空全部凭据」的保存
+ * 语义。显式 `{}` 的清除语义保持不变。
+ */
+function isPlainObject(value) {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 /** Validate and normalize a token map; returns null when the payload is invalid. */
 function normalizeGhAccounts(value) {
   if (value === null || value === undefined) return {};
-  if (typeof value !== 'object' || Array.isArray(value)) return null;
+  if (typeof value !== 'object' || Array.isArray(value) || !isPlainObject(value)) return null;
   const tokens = {};
   const entries = Object.entries(value);
   for (const [accountId, token] of entries) {
@@ -68,7 +79,7 @@ function removeGhAccountsFiles({ fs, pathModule, userDataPath }) {
   return { success: true };
 }
 
-function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }, tokens) {
+function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage, platform = process.platform }, tokens) {
   const filePath = getGhAccountsPath(userDataPath, pathModule);
   const normalized = normalizeGhAccounts(tokens);
   if (normalized === null) {
@@ -79,6 +90,22 @@ function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }, 
   // clear-path cleanup so an interrupted write's temp file cannot survive.
   if (accountIds.length === 0) {
     return removeGhAccountsFiles({ fs, pathModule, userDataPath });
+  }
+  // Linux 上密钥环缺失时 safeStorage 可能选择 basic_text 后端（固定明文口令，
+  // 不提供预期的磁盘保护），isEncryptionAvailable() 在该后端下仍返回 true——
+  // PAT 绝不落盘到明文后端，沿用「凭据未保存到磁盘」的失败语义。platform 仅
+  // 为单元测试可注入（默认取真实 process.platform），与其余注入依赖一致。
+  let selectedStorageBackend = null;
+  try {
+    selectedStorageBackend = safeStorage?.getSelectedStorageBackend?.() ?? null;
+  } catch {
+    selectedStorageBackend = null;
+  }
+  if (platform === 'linux' && selectedStorageBackend === 'basic_text') {
+    return {
+      success: false,
+      error: 'SafeStorage is using the basic_text (plain-text) backend on this system; credentials not saved to disk.',
+    };
   }
   if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
     return {

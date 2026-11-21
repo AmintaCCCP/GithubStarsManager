@@ -273,12 +273,8 @@ describe('useVectorSearchActions account switch guards', () => {
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
     mocks.cleanup.mockResolvedValue({ deleted: 0, partial: false });
     mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536, accountScopedCleanup: true });
-    // R5：后端权威快照核对默认通过（与完全同步的后端等价），与外层 describe 一致
-    mocks.backend.isAvailable = true;
-    mocks.backend.fetchRepositories.mockImplementation(async () => ({
-      repositories: storeState.repositories,
-      total: storeState.repositories.length,
-    }));
+    // R14 finding 31：破坏性删除已整体停用，清理分支不再读取后端权威快照
+    //（原 R5 后端快照夹具随四个重复用例的合并一并移除）。
     mocks.needsReindex.mockReset();
     mocks.needsReindex.mockReturnValue(false);
   });
@@ -372,69 +368,22 @@ describe('useVectorSearchActions account switch guards', () => {
     expect(mocks.setVectorSearchStatus).toHaveBeenCalled();
   });
 
-  it('skips vector cleanup when no authoritative starred list is available (R5)', async () => {
-    // R5（CodeRabbit Major）：两台设备可以在不启用后端同步的情况下共享同一
-    // GitHub 账号与 Worker——本地「起止快照一致 + lastSync」不能替代权威列表，
-    // 无法核对时一律跳过删除并保留已上传向量。
-    mocks.backend.isAvailable = false;
-    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
-    const { result } = renderHook(() => useVectorSearchActions());
-
-    await act(async () => { await result.current.rebuildIndex(draft); });
-
-    expect(mocks.backend.fetchRepositories).not.toHaveBeenCalled();
-    expect(mocks.cleanup).not.toHaveBeenCalled();
-    // 索引本身照常完成并更新本账号状态
-    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
-      isIndexing: false,
-      result: expect.objectContaining({ indexed: 1 }),
-    }));
-  });
-
-  it('skips vector cleanup when the backend authoritative snapshot diverges from the local list', async () => {
-    // 权威列表与本地列表不一致（另一台设备已加星新仓库）时不执行删除
-    mocks.backend.fetchRepositories.mockResolvedValue({
-      repositories: [{ id: 1 }, { id: 2 }],
-      total: 2,
-    });
+  it('rebuild uploads without calling vector cleanup', async () => {
+    // R12/R5/R2-C24 收敛（R14 finding 31）：破坏性删除在 runIndex 中已整体
+    // 停用——清理分支只写警告日志并保留上传结果，不读取后端快照、lastSync
+    // 或星标同步状态，因此任何夹具（后端不可用/权威快照分歧/无同步依据/
+    // 同步在途）下执行路径相同，不再为不存在的分支保留误导性用例。
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
     expect(mocks.cleanup).not.toHaveBeenCalled();
+    // 上传结果照常保留并落盘
     expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
       isIndexing: false,
       result: expect.objectContaining({ indexed: 1 }),
     }));
-  });
-
-  it('skips cleanup when the list has no authoritative sync basis (R2-C24)', async () => {
-    // 从未成功同步（lastSync 为空）或仍在加载的列表可能只是部分快照：即使
-    // 运行前后 ID 集合相等，也不能据此物理删除向量，上传结果必须保留。
-    storeState.lastSync = null;
-    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
-    const { result } = renderHook(() => useVectorSearchActions());
-
-    await act(async () => { await result.current.rebuildIndex(draft); });
-
-    expect(mocks.cleanup).not.toHaveBeenCalled();
-    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
-      isIndexing: false,
-      result: expect.objectContaining({ indexed: 1 }),
-    }));
-  });
-
-  it('skips cleanup when a star sync is in flight during indexing (R2-C24)', async () => {
-    mocks.indexAllRepos.mockImplementation(async () => {
-      storeState.isSyncingStars = true;
-      return { indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] };
-    });
-    const { result } = renderHook(() => useVectorSearchActions());
-
-    await act(async () => { await result.current.rebuildIndex(draft); });
-
-    expect(mocks.cleanup).not.toHaveBeenCalled();
   });
 
   it('passes the owning account to indexAllRepos for account-scoped vector IDs (R4)', async () => {

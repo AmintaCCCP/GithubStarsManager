@@ -708,7 +708,7 @@ describe('useAccountSwitchActions audit fixes', () => {
     // mocks.syncToBackend 只替换 autoSync 对外导出的函数，模块内部绑定的
     // 守卫冲刷/重试仍调用真实实现，仅断言导出调用次数发现不了窗口内推送。
     // 在每个写入分片方法上记录发起时的后端 URL 与载荷键。
-    const backendWrites: Array<{ method: string; url: string | null; payloadKeys: string[] }> = [];
+    const backendWrites: Array<{ method: string; url: string | null; payloadKeys: string[]; payload: unknown }> = [];
     for (const method of [
       'syncRepositories',
       'syncReleases',
@@ -723,6 +723,7 @@ describe('useAccountSwitchActions audit fixes', () => {
           method,
           url: mocks.backend.backendUrl,
           payloadKeys: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+          payload,
         });
         return undefined;
       });
@@ -747,11 +748,20 @@ describe('useAccountSwitchActions audit fixes', () => {
       // 候选后端零推送：窗口内编辑绝不外发（整个恢复流程 syncToBackend 未被调用）
       expect(mocks.syncToBackend).not.toHaveBeenCalled();
       // 写入边界复核：数据分片在候选 URL 上零写入；syncSettings 在候选 URL 上
-      // 仅允许恢复提交后的 B 账号凭据对齐载荷（github_token/active_account_id/
-      // user_profile），绝不含窗口内 A 的设置编辑（categoryOrder）。
+      // 恰好写入一次且仅允许恢复提交后的 B 账号凭据对齐载荷（github_token/
+      // active_account_id/user_profile），绝不含窗口内 A 的设置编辑
+      //（categoryOrder）——键名不变而值串号（如 A 的 github_token /
+      // active_account_id 写到候选后端）的回归同样会被捕获。
       expect(backendWrites.filter((write) => write.method !== 'syncSettings' && write.url === 'https://candidate.example/api')).toEqual([]);
-      for (const write of backendWrites.filter((candidate) => candidate.method === 'syncSettings' && candidate.url === 'https://candidate.example/api')) {
+      const candidateCredentialWrites = backendWrites.filter((candidate) => candidate.method === 'syncSettings' && candidate.url === 'https://candidate.example/api');
+      expect(candidateCredentialWrites).toHaveLength(1);
+      for (const write of candidateCredentialWrites) {
         expect(write.payloadKeys).not.toContain('categoryOrder');
+        expect(write.payload).toMatchObject({
+          github_token: 'ghp_b',
+          active_account_id: '2',
+          user_profile: userB,
+        });
       }
       // 待推记录按原后端 X 登记：停留在候选后端 Y 上不可见、未被消费
       expect(hasPendingAccountSync('1')).toBe(false);

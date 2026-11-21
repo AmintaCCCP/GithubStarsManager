@@ -369,6 +369,10 @@ export const LoginScreen: React.FC = () => {
       const backendUnavailableAfterFailedRestore = previousBackendRestoreFailedRef.current
         && !getBackendUrl();
       if (!ok || backendUnavailableAfterFailedRestore) {
+        // 审计修复（R14 finding 10）：普通 PAT 登录已先 setUser 提交本地会话——
+        // 真实 App 中登录页随即卸载，登录页本地的 setError 无法再显示。复用
+        // 快捷登录的全局 toast 告知用户后端凭据未能更新（本地会话保留，不撤销）。
+        dialog?.toast(t('app:accountModal.backend-credential-sync-failed'), 'error');
         setError(t('loginScreen.signed-in-but-failed-to-save-github-token-to-bac'));
       }
 

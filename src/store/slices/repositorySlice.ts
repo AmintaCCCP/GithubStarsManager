@@ -213,8 +213,15 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           accountIdKey(get().user) === sessionAccountId
           && getAccountSessionGeneration() === sessionGeneration
         );
-        // 重入保护：已有回写进行中时直接返回，避免并发创建重复 list 并互相覆盖成员
-        if (state.listsPush.isRunning) return;
+        // 重入保护：已有回写进行中时直接返回，避免并发创建重复 list 并互相覆盖成员。
+        // 第 14 轮审计修复：isRunning 也可能在任务结束后残留——同账号提交新 PAT
+        // 会递增会话代次但不清除 listsPush，旧推送任务在请求完成/失败后因会话
+        // 检查跳过状态复位，只释放远端槽。此时 listsRemoteOpSlots 已为空
+        //（槽位在任务 finally 中必被释放 ⇒ 空槽表 ⟺ 无任何在途推送任务），残留
+        // 状态不得阻塞下一轮推送；仍有在途任务（任一账号的槽存在）时保持原有的
+        // 提前返回。绕过残留状态的新推送由 runPushTask 整体覆写 listsPush，
+        // 旧任务已结束，不存在清除新任务状态的问题。
+        if (state.listsPush.isRunning && listsRemoteOpSlots.size > 0) return;
         if (!isSessionActive()) return;
         if (!state.githubToken) {
           set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.not-connected-to-github-yet') } });

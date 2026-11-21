@@ -120,4 +120,51 @@ describe('loadPendingSyncAccounts legacy record migration (audit fix)', () => {
     expect(persisted[0][1]).toBe('https://persisted.test/api');
     expect(persisted[0][2]).toEqual(['categoryOrder']);
   });
+
+  it('delays the evaluation marker until the legacy migration write-back succeeds (round-14 [20])', async () => {
+    // 原后端 URL 已知 + 迁移写回失败（配额）：评估标记不得提前写入——否则
+    // 重启后即使配额恢复也跳过迁移，原后端的待推编辑失去自动恢复。
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://persisted.test/api');
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['77']]));
+    // 拦截待推记录键的写入（模块经裸 localStorage 与 window.localStorage 两条
+    // 路径访问，两条都要拦截；其余键透传），模拟配额不足的写回失败。
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const blockPendingSyncWrite = (key: string, value: string) => {
+      if (key === PENDING_SYNC_ACCOUNTS_KEY) throw new Error('QuotaExceededError');
+      originalSetItem(key, value);
+    };
+    const setItemSpies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(blockPendingSyncWrite),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blockPendingSyncWrite),
+    ];
+    try {
+      const firstStart = await importFresh();
+      firstStart.backend._backendUrl = 'https://persisted.test/api';
+      // 本次会话内绑定已生效（内存），但存储写回失败：标记不得记录评估完成
+      expect(window.localStorage.getItem(LEGACY_PENDING_SYNC_EVALUATED_KEY)).toBeNull();
+      expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
+    } finally {
+      setItemSpies.forEach((spy) => spy.mockRestore());
+    }
+
+    // 配额恢复后的下一次启动：迁移重试成功，写回与标记一并完成
+    const secondStart = await importFresh();
+    secondStart.backend._backendUrl = 'https://persisted.test/api';
+    expect(secondStart.autoSync.hasPendingAccountSync('77')).toBe(true);
+    expect(window.localStorage.getItem(LEGACY_PENDING_SYNC_EVALUATED_KEY)).toBe('1');
+    expect(JSON.parse(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY) ?? '[]'))
+      .toEqual([['77', 'https://persisted.test/api']]);
+  });
+
+  it('locks the unbound state immediately when the persisted URL is unknown (round-14 [20])', async () => {
+    window.localStorage.removeItem(BACKEND_URL_STORAGE_KEY);
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['77']]));
+
+    const { autoSync, backend } = await importFresh();
+    backend._backendUrl = 'https://unrelated.test/api';
+    // URL 未知：评估标记立即写入（遗留记录锁定为未归属，绝不绑定后续后端）
+    expect(window.localStorage.getItem(LEGACY_PENDING_SYNC_EVALUATED_KEY)).toBe('1');
+    expect(autoSync.hasPendingAccountSync('77')).toBe(false);
+    expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
+  });
 });

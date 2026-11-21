@@ -390,7 +390,15 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('will-frame-navigate', (event) => {
-    if (event.isMainFrame) return;
+    if (event.isMainFrame) {
+      // 第 14 轮审计修复：主帧导航到非应用来源必须阻止——远程页面仍会加载
+      // preload 暴露的 electronAPI（含 ghAccounts），可凭 gh-accounts:get 取回
+      // 全部账号 PAT。应用自身页面（生产 file://、开发 Vite 回环地址）放行；
+      // 外部链接继续由 setWindowOpenHandler 走系统浏览器，data:/about: 等
+      // 兜底错误页由主进程 loadURL/loadFile 发起（不触发本事件），不受影响。
+      if (!isAppMainPageUrl(event.url)) event.preventDefault();
+      return;
+    }
     if (!event.url.startsWith(`${PAGE_SCHEME}://`)) {
       event.preventDefault();
       return;
@@ -897,7 +905,35 @@ ipcMain.handle('x-auth:clear', async () => {
 
 // 审计修复（B7/CWE-922）：GitHub 账号 Token 只经 safeStorage 加密文件
 //（gh-accounts.enc）持久化，浏览器持久化分片不再保存明文 PAT。
-ipcMain.handle('gh-accounts:save', async (_event, tokens) => {
+//
+// 第 14 轮审计修复：gh-accounts:* 仅接受应用自身页面的调用。preload 在主帧
+// 暴露 electronAPI，但主帧可能被引导导航到远程页面（此时 preload 仍会在该
+// 页面注入桥）——仅凭「主窗口主帧」不足以确认调用方可信，必须基于
+// event.senderFrame 的 URL 校验调用页面属于应用自身（生产为 file:// 应用包
+// 内页面，开发为 Vite dev server 回环地址）；来源不符一律拒绝。
+function isAppMainPageUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol === 'file:') return true;
+    if (isDev && url.protocol === 'http:' && url.port === '5173' && isLoopbackHost(url.hostname)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function isAppMainPageFrame(event) {
+  if (!mainWindow || event.sender !== mainWindow.webContents) return false;
+  const frame = event.senderFrame;
+  if (!frame || frame !== mainWindow.webContents.mainFrame) return false;
+  return isAppMainPageUrl(frame.url);
+}
+
+ipcMain.handle('gh-accounts:save', async (event, tokens) => {
+  if (!isAppMainPageFrame(event)) {
+    console.warn('[gh-accounts:save] rejected: caller is not the app main page');
+    return { success: false, error: 'gh-accounts IPC requires the app main page' };
+  }
   // 第 12 轮审计修复：渲染进程参数不可信——preload 转发的 undefined（渲染端
   // 未传映射）不得按空映射处理：存储函数会把 undefined 归一化为空映射并删除
   // 磁盘上的全部账号 PAT。主进程校验参数：缺少令牌映射（undefined/null）拒绝
@@ -911,7 +947,13 @@ ipcMain.handle('gh-accounts:save', async (_event, tokens) => {
   return result;
 });
 
-ipcMain.handle('gh-accounts:get', async () => {
+ipcMain.handle('gh-accounts:get', async (event) => {
+  if (!isAppMainPageFrame(event)) {
+    console.warn('[gh-accounts:get] rejected: caller is not the app main page');
+    // 结构化 error 载荷（R2-B1）：渲染端把「磁盘状态未知」与「无 Token」区分开，
+    // 非应用页面拿不到任何凭据内容。
+    return { status: 'error', error: 'gh-accounts IPC requires the app main page' };
+  }
   // 审计修复（R2-B1）：加载结果结构化——missing（无文件）/ loaded（有效映射）/
   // error（读取失败，渲染端不得据此覆写磁盘）。不再把读取失败折叠为
   // 「磁盘上没有 Token」。
@@ -926,7 +968,11 @@ ipcMain.handle('gh-accounts:get', async () => {
   return result;
 });
 
-ipcMain.handle('gh-accounts:clear', async () => {
+ipcMain.handle('gh-accounts:clear', async (event) => {
+  if (!isAppMainPageFrame(event)) {
+    console.warn('[gh-accounts:clear] rejected: caller is not the app main page');
+    return { success: false, error: 'gh-accounts IPC requires the app main page' };
+  }
   const result = clearEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData') });
   console.log('[gh-accounts:clear] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
   return result;

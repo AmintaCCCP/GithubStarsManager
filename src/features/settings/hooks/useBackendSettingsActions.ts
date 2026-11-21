@@ -106,6 +106,11 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
   }, []);
 
   useEffect(() => {
+    // R14 finding 26：挂载探测不得在手动探测进行中改变后端目标——手动探测已
+    // 固定目标并独占探测代次，挂载 init(undefined) 会取代其 init（探测代次
+    // 失效）或提交另一地址，导致界面显示与实际后端错位。手动探测自身会写入
+    // status/health，本次挂载探测直接跳过（不引入新的恢复行为）。
+    if (_connectionProbeInFlight) return;
     void checkConnection(true);
   }, [checkConnection]);
 
@@ -122,8 +127,25 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       return;
     }
     const previousUrl = backend.backendUrl;
-    state.setBackendApiSecret(secretInput || null);
+    // R14 finding 25：探测会把输入框密钥写入全局 store——失败的探测必须先恢复
+    // 原密钥再回滚连接，否则之后发往原后端的请求会携带错误密钥（401）。
+    const previousSecret = typeof useAppStore.getState === 'function'
+      ? useAppStore.getState().backendApiSecret
+      : state.backendApiSecret;
+    const stagedSecret = secretInput || null;
+    // R14 finding 26：手动探测固定目标地址——非空输入时 X = 规整化后的输入
+    // 地址；留空时沿用自动探测（无固定预期地址，按实际提交地址继续）。
+    const expectedUrl = trimmedUrl ? normalizeBackendUrl(trimmedUrl) : null;
+    state.setBackendApiSecret(stagedSecret);
     _connectionProbeInFlight = true;
+    // 探测失败/被丢弃时恢复原密钥；仅当全局密钥仍是本次暂存值（无并发流程
+    // 改写）时才回写，避免覆盖并发流程已写入的密钥。
+    const restoreStagedSecret = () => {
+      if (typeof useAppStore.getState !== 'function'
+        || useAppStore.getState().backendApiSecret === stagedSecret) {
+        state.setBackendApiSecret(previousSecret);
+      }
+    };
     try {
       // 探测与失败回滚全程冻结自动推送，防止探测期间启动的新推送在两步之间切换后端把旧快照写入新后端
       const probeSucceeded = await withAccountSwitchFrozen(async () => {
@@ -131,13 +153,33 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
         // previous auto-detect behavior (remembered URL, else same-origin).
         const healthData = await checkConnection(false, trimmedUrl || undefined, { deferConnectedStatus: true });
         if (!healthData) {
+          restoreStagedSecret();
           await backend.init(previousUrl ?? undefined);
           toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+          return false;
+        }
+        // R14 finding 26：健康检查必须命中固定目标——init(X) 被其他探测取代
+        //（探测代次失效）时 checkHealth 读到的是另一地址，丢弃本次结果。
+        const probedUrl = backend.backendUrl;
+        if (probedUrl === null || (expectedUrl !== null && probedUrl !== expectedUrl)) {
+          restoreStagedSecret();
+          setStatus('disconnected');
+          setHealth(null);
+          console.warn('Connection probe discarded: backend target drifted during probe', { expected: expectedUrl, actual: probedUrl });
           return false;
         }
         try {
           const authOk = secretInput ? await backend.verifyAuth() : true;
           if (!authOk) throw new Error('Authentication failed');
+          // R14 finding 26：提交成功结果前确认当前后端仍为探测命中的地址；
+          // 已变化则丢弃结果——不写存储、不提示成功、不触发 token 恢复/同步。
+          if (backend.backendUrl !== probedUrl) {
+            restoreStagedSecret();
+            setStatus('disconnected');
+            setHealth(null);
+            console.warn('Connection probe discarded: backend target changed during verifyAuth', { probed: probedUrl, actual: backend.backendUrl });
+            return false;
+          }
           // Health and auth both passed — remember the address (shared with the
           // login screen prefill).
           backend.rememberActiveUrl();
@@ -146,6 +188,7 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
           toast(t('useBackendSettingsActions.backend-connection-successful'), 'success');
           return true;
         } catch {
+          restoreStagedSecret();
           await backend.init(previousUrl ?? undefined);
           setStatus('disconnected');
           setHealth(null);

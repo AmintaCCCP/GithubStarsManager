@@ -98,6 +98,7 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
       '1:101', '1:102',          // 当前账号（发起 cleanup 的设备）
       '2:201', '2:202',          // 其他设备上传的其他账号向量——绝不删除
       '999:301',                 // 本机未登记的账号前缀——绝不删除
+      '10:301',                  // 第 14 轮审计修复 [32]：前缀相近的其他账号——绝不删除
     ]);
     const result = await postCleanup(worker, env, {
       keepIds: ['1:101'],        // 102 已被 unstar → 可删除
@@ -105,6 +106,8 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     });
 
     expect(result.deleted).toBe(1);
+    // 完整删除列表断言：实现若错误地只用 startsWith('1') 忽略冒号分隔符，
+    // '10:301' 会被误删，此断言即失败（第 14 轮审计修复 [32]）。
     expect(env.deleted).toEqual(['1:102']);
   });
 
