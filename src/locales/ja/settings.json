@@ -27,7 +27,8 @@
     "data-restored-from-backup-repositories-v1-releas": "バックアップから復元されたデータ: ウェアハウス {{v1}}、リリース {{v2}}、カスタム分類 {{v3}}。",
     "restore-failed": "回復に失敗しました",
     "account-changed-during-restore": "復元中にアカウントが切り替えられたため、データ保護のため今回の復元を中止しました。",
-    "gist-data-in-the-backup-contained-invalid-entries-th": "バックアップの Gist データに無効なエントリが含まれていたため、該当フィールドはスキップされ、以前の値が保持されています。"
+    "gist-data-in-the-backup-contained-invalid-entries-th": "バックアップの Gist データに無効なエントリが含まれていたため、該当フィールドはスキップされ、以前の値が保持されています。",
+    "fork-data-in-the-backup-contained-invalid-entries-th": "バックアップの Fork データに無効なエントリが含まれていたため、該当フィールドはスキップされ、以前の値が保持されています。"
   },
   "useDesktopActions": {
     "load-failed": "読み込みに失敗しました",

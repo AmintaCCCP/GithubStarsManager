@@ -56,9 +56,33 @@ export const validateBackupRepositories = (
   const validated: Repository[] = [];
   for (const item of value) {
     if (!isValidBackupRepository(item)) return null;
-    validated.push(item);
+    // 第 13 轮审计修复 [93]：备份携带的 vector_indexed_at 是导出时刻所在向量
+    // Worker 的索引时间——恢复到本机（可能已切换 Worker/重建索引）后该时间
+    // 指向的向量不可假设仍存在。清除后恢复仓库视为未索引，下次增量索引重传
+    //（本地 JSON 导入与工作区恢复两路径共用本函数，语义一致）。
+    validated.push({ ...item, vector_indexed_at: undefined });
   }
   return validated;
+};
+
+/**
+ * Gist 列表条目的结构校验（第 13 轮审计修复 [56]）：与导入面板顶层 gists 的
+ * 写入前校验同一规则（id 为非空字符串、files 为普通对象）——账号工作区内的
+ * accountWorkspaces[*].gists 此前只过数组外壳检查，含 null / 空对象的条目会
+ * 进入工作区并写进实时状态与归档快照，消费侧（gistUtils 等）读取条目属性时
+ * 抛 TypeError。返回值语义与 validateBackupRepositories 一致。
+ */
+export const isValidBackupGistEntry = (entry: unknown): boolean => {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+  const gist = entry as { id?: unknown; files?: unknown };
+  return typeof gist.id === 'string' && gist.id.length > 0
+    && !!gist.files && typeof gist.files === 'object' && !Array.isArray(gist.files);
+};
+
+export const validateBackupGists = (value: unknown): unknown[] | null | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) return null;
+  return value.every(isValidBackupGistEntry) ? value : null;
 };
 
 
@@ -118,7 +142,9 @@ export const mergeWorkspacesById = (
   return {
     ...local,
     repositories: mergeList(local.repositories, incoming.repositories),
-    gists: mergeList(local.gists, incoming.gists),
+    // 第 13 轮审计修复 [56]：合并模式的 gists 追加前过滤无效条目（null/空
+    // 对象）——合并逻辑此前不会过滤，无效条目会被追加进本机 Gist 列表。
+    gists: mergeList(local.gists, incoming.gists.filter((gist) => isValidBackupGistEntry(gist))),
     starredGists: mergeList(local.starredGists, incoming.starredGists),
     releases: mergeList(local.releases, incoming.releases),
     forks: mergeList(local.forks, incoming.forks),
@@ -240,6 +266,14 @@ export const applyAccountWorkspaceForTypes = (
   const liveFieldIsArray = (key: string): boolean => !rawFields || rawFieldIsArray(rawFields, key);
   const liveFieldIsObject = (key: string): boolean => !rawFields
     || (Object.prototype.hasOwnProperty.call(rawFields, key) && isPlainObject(rawFields[key]));
+  // 第 13 轮审计修复 [94]：实时恢复补丁复用归档恢复的标量判断——仅凭字段存在
+  // 就写入会把无效值（如 syncModeConfigured: "false"）写进实时状态，而同一
+  // 输入在归档路径会被拒绝，两条路径对同一输入给出不一致结果。rawFields 缺省
+  // （merge 分支）保持旧行为；提供时无效值被忽略（保留本机值），合法的 false
+  // 与 lastSync: null 仍被接受。
+  const liveScalarField = (key: string, isValid: (value: unknown) => boolean): boolean => (
+    !rawFields || (Object.prototype.hasOwnProperty.call(rawFields, key) && isValid(rawFields[key]))
+  );
   const patch: Partial<AccountWorkspaceRuntime> = {};
   if (selectedTypes.includes('repositories')) {
     const validatedRepositories = rawFields
@@ -249,19 +283,23 @@ export const applyAccountWorkspaceForTypes = (
       patch.repositories = validatedRepositories;
       patch.searchResults = validatedRepositories;
     }
-    if (rawHas('lastSync')) patch.lastSync = workspace.lastSync;
-    if (liveFieldIsArray('gists')) {
+    if (liveScalarField('lastSync', (value) => value === null || typeof value === 'string')) patch.lastSync = workspace.lastSync;
+    // 第 13 轮审计修复 [56]：工作区 gists 含无效条目（null/空对象）时跳过该
+    // 字段——不得覆盖现有 Gist，也绝不把无效条目写进实时状态；与归档路径
+    // （applyValidatedWorkspaceFields）对同一输入保持一致。rawFields 缺省
+    // （merge 分支）保持旧行为，由 mergeWorkspacesById 的条目过滤兜底。
+    if (liveFieldIsArray('gists') && validateBackupGists(rawFields?.gists) !== null) {
       patch.gists = workspace.gists;
       patch.gistSearchResults = workspace.gists;
     }
     if (liveFieldIsArray('starredGists')) patch.starredGists = workspace.starredGists;
-    if (rawHas('selectedGistCategory')) patch.selectedGistCategory = workspace.selectedGistCategory;
+    if (liveScalarField('selectedGistCategory', (value) => typeof value === 'string')) patch.selectedGistCategory = workspace.selectedGistCategory;
     if (liveFieldIsArray('forks')) {
       patch.forks = workspace.forks;
     }
     if (liveFieldIsArray('readForks')) patch.readForks = new Set(workspace.readForks);
-    if (rawHas('syncMode')) patch.syncMode = workspace.syncMode;
-    if (rawHas('syncModeConfigured')) patch.syncModeConfigured = workspace.syncModeConfigured;
+    if (liveScalarField('syncMode', (value) => value === 'stars' || value === 'stars-and-lists')) patch.syncMode = workspace.syncMode;
+    if (liveScalarField('syncModeConfigured', (value) => typeof value === 'boolean')) patch.syncModeConfigured = workspace.syncModeConfigured;
   }
   if (selectedTypes.includes('releases') && liveFieldIsArray('releases')) {
     patch.releases = workspace.releases;
@@ -333,13 +371,20 @@ const applyValidatedWorkspaceFields = (
   if (validatedRepositories === null) {
     throw new Error('Invalid repositories in backup workspace');
   }
+  // 第 13 轮审计修复 [56]：工作区 gists 与 repositories 相同的字段级校验——
+  // 字段存在但含无效条目（null/空对象）时按「未提供」处理（保留本机值），
+  // 绝不让无效条目进入账号工作区或覆盖现有 Gist；显式 [] 仍是有效清空语义。
+  // 与实时路径（applyAccountWorkspaceForTypes）对同一输入保持一致。
+  const validatedGists = includeRepos && rawHas('gists')
+    ? validateBackupGists(rawAccount.gists)
+    : undefined;
   return {
     ...local,
     ...(Array.isArray(validatedRepositories) ? { repositories: validatedRepositories } : {}),
     ...(includeRepos && rawHas('lastSync') && (rawAccount.lastSync === null || typeof rawAccount.lastSync === 'string')
       ? { lastSync: incoming.lastSync }
       : {}),
-    ...(includeRepos && rawIsArray('gists') ? { gists: incoming.gists } : {}),
+    ...(includeRepos && Array.isArray(validatedGists) ? { gists: incoming.gists } : {}),
     ...(includeRepos && rawIsArray('starredGists') ? { starredGists: incoming.starredGists } : {}),
     ...(includeRepos && rawHas('selectedGistCategory') && typeof rawAccount.selectedGistCategory === 'string'
       ? { selectedGistCategory: incoming.selectedGistCategory }

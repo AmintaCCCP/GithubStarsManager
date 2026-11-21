@@ -276,6 +276,35 @@ describe('useRepositoryCardActions', () => {
     );
   });
 
+  it('localizes the dense-index failure toast by reason code when the pipeline throws (R13 finding 74)', async () => {
+    // 空结果错误路径：管道抛出的 Error 携带稳定原因代码——catch 按代码渲染
+    // 本地化提示，不再把英文诊断文本直接展示给用户。
+    const pipelineError = new Error('Vector index is not ready for account-scoped recall') as Error & { denseIndexUnavailableReasonCode?: string };
+    pipelineError.denseIndexUnavailableReasonCode = 'metadata-index-not-ready';
+    mocks.runSimilarRepositoryPipeline.mockRejectedValue(pipelineError);
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith(
+      '相似仓库结果可能不完整：向量 accountId 元数据索引尚未就绪。请创建并验证 accountId 元数据索引、回填存量向量，并在部署中启用 ACCOUNT_METADATA_INDEXED。',
+      'error',
+    );
+  });
+
+  it('keeps the raw error fallback for non-index failures without a reason code (R13 finding 74)', async () => {
+    mocks.runSimilarRepositoryPipeline.mockRejectedValue(new Error('network unavailable'));
+    const { result } = renderActions();
+
+    await act(async () => {
+      await result.current.findSimilar();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith('network unavailable', 'error');
+  });
+
   it('stores the PR-03 failure patch and preserves the failure toast on AI errors', async () => {
     mocks.analyzeRepository.mockRejectedValue(new Error('model unavailable'));
     const { result } = renderActions();
@@ -514,9 +543,13 @@ describe('useRepositoryCardActions account switch guards', () => {
         releases: Array<{ id: number; repository: { id: number } }>;
       }>;
     };
-    stateWithWorkspaces.repositories = [restarred];
-    stateWithWorkspaces.searchResults = [restarred];
-    stateWithWorkspaces.releases = [{ id: 101, repository: { id: restarred.id } }];
+    // R13 审计修复（CodeRabbit）：先用 original 初始化实时列表——重新加星
+    // 必须发生在远端请求发出之后（切回账号 A 时写入 restarred），这样即使
+    // 对账读取的是请求开始时的快照，断言也无法通过，从而验证对账读取的是
+    // 请求完成时的记录。
+    stateWithWorkspaces.repositories = [original];
+    stateWithWorkspaces.searchResults = [original];
+    stateWithWorkspaces.releases = [{ id: 101, repository: { id: original.id } }];
     stateWithWorkspaces.accountWorkspaces = {
       '1': { repositories: [], releases: [] },
       '2': { repositories: [], releases: [] },
@@ -540,6 +573,9 @@ describe('useRepositoryCardActions account switch guards', () => {
     switchToB();
     bumpAccountSessionGeneration();
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    // 切回账号 A 后用户重新加星并同步：实时列表更新为 restarred
+    stateWithWorkspaces.repositories = [restarred];
+    stateWithWorkspaces.searchResults = [restarred];
     await act(async () => {
       releaseUnstar();
       await promise;

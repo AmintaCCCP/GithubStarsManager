@@ -327,6 +327,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           // 账号（否则 pushCategoriesToLists 的重入保护会永久阻止新账号发起
           // 推送）；此刻新会话尚不可能已开始推送，重置不会误清新会话状态。
           listsPush: listsPushIdle,
+          // 第 13 轮审计修复（components 域 [102] 接缝）：星标同步进行中标志随
+          // 账号会话重置——旧账号的在途同步标记残留会禁用新账号的同步入口；
+          // 过期 finally 清理由同步完成回调的归属校验拦截（repositorySlice）。
+          isSyncingStars: false,
           analysisProgress: { current: 0, total: 0 },
           vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
           similarView: null,

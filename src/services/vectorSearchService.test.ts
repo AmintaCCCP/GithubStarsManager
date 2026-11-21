@@ -9,6 +9,7 @@ import {
   embedWithFallback,
   indexAllRepos,
   needsReindex,
+  __resetInMemoryAccountScopeMigrationForTest,
   EMBEDDING_FORMAT_VERSION,
   VectorSearchService,
 } from './vectorSearchService';
@@ -485,13 +486,17 @@ describe('indexAllRepos 账号隔离向量 ID（R4 审计修复）', () => {
     expect(upserted[1].metadata.accountId).toBe('42');
   });
 
-  it('falls back to legacy unprefixed IDs when no owning account is available', async () => {
+  it('falls back to legacy unprefixed IDs and attributes metadata to the default account when no owning account is available', async () => {
     const { upsert, service } = makeVectorServiceWithMock();
     await indexAllRepos(scopedRepos(), makeIndexClient(), service, {});
 
     const upserted = upsert.mock.calls[0][0] as Array<{ id: string; metadata: { accountId?: string } }>;
+    // 第 13 轮跨域接缝（server 域 [68]）：匿名上传保持 legacy 无前缀 ID，但
+    // metadata 记入 'default' 归属——服务端按归属投影候选时匿名向量不再无法
+    // 归属（仅 metadata，不改 ID 形态）。
     expect(upserted.map((v) => v.id)).toEqual(['1', '2']);
-    expect(upserted[0].metadata.accountId).toBeUndefined();
+    expect(upserted[0].metadata.accountId).toBe('default');
+    expect(upserted[1].metadata.accountId).toBe('default');
   });
 
   it('reports numeric repo ids to onRepoIndexed for account-prefixed vectors', async () => {
@@ -599,6 +604,9 @@ describe('indexAllRepos account-scope migration (audit fix)', () => {
 
   beforeEach(() => {
     window.localStorage.removeItem(MIGRATION_KEY);
+    // 第 13 轮审计修复：迁移完成记录新增会话内内存副本——每个用例清空它，
+    // 避免前序用例 markAccountScopeMigrationDone 的内存标记串扰本用例判定。
+    __resetInMemoryAccountScopeMigrationForTest();
   });
 
   afterEach(() => {
@@ -730,9 +738,11 @@ describe('indexAllRepos account-scope migration (audit fix)', () => {
     // 按全量候选补写——否则 W2 上内容未变化的仓库会被 needsReindex 排除，其
     // 账号范围向量永远不会写入 W2，语义搜索静默缺结果。
     window.localStorage.setItem(MIGRATION_KEY, JSON.stringify({ '42': 'https://w1.example.com' }));
-    // W1：已迁移，增量路径沿用（只有未索引的新仓库入列）
+    // W1：已迁移，增量路径沿用。对照组同时包含「已索引且未变化的仓库 1」与
+    // 「未索引的仓库 2」——若实现忽略 W1 的完成记录强制全量补写，W1 会返回
+    // [1, 2]，本断言即失败（第 13 轮审计修复：防止迁移后重复生成 embedding）。
     const result1 = await indexAllRepos(
-      [makeRepository(2, { vector_indexed_at: undefined })],
+      [makeRepository(1), makeRepository(2, { vector_indexed_at: undefined })],
       makeIndexClient(),
       makeVectorService('https://w1.example.com'),
       {
@@ -743,6 +753,7 @@ describe('indexAllRepos account-scope migration (audit fix)', () => {
         accountId: '42',
       },
     );
+    // W1 只上传未索引的仓库 2，已索引且未变化的仓库 1 不重复生成 embedding
     expect(result1.indexedRepoIds).toEqual([2]);
 
     // 切到 W2：旧记录不再豁免，重新按全量候选补写带账号前缀的向量
@@ -796,5 +807,42 @@ describe('indexAllRepos account-scope migration (audit fix)', () => {
     });
 
     expect(isAccountScopeMigrationDone('42', 'https://worker.example.com')).toBe(false);
+  });
+
+  it('keeps the migration record in memory when localStorage persistence fails (round-13 audit fix)', async () => {
+    // 第 13 轮审计修复：localStorage 写入失败（隐私模式/配额）时迁移完成标记
+    // 退化为会话内标记——本次会话的读取路径合并内存记录，后续增量索引仍能
+    // 识别已完成迁移，不会对全部已分析仓库重复生成 Embedding。
+    // 环境里裸 localStorage 与 window.localStorage 可能是不同对象（Node 实验
+    // 全局 vs shim）：两个入口都清一次键并都拦截写入，保证用例确定性。
+    window.localStorage.removeItem(MIGRATION_KEY);
+    localStorage.removeItem(MIGRATION_KEY);
+    const setItemSpies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      }),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      }),
+    ];
+    try {
+      const client = makeIndexClient();
+      const vectorService = makeVectorService('https://worker.example.com');
+
+      await indexAllRepos([makeRepository(1), makeRepository(2)], client, vectorService, {
+        incremental: false,
+        formatVersion: EMBEDDING_FORMAT_VERSION,
+        currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+        indexMode: 'description',
+        accountId: '42',
+      });
+
+      // 持久化失败：磁盘记录不存在，但会话内内存记录使迁移判定仍然成立。
+      expect(window.localStorage.getItem(MIGRATION_KEY)).toBeNull();
+      expect(isAccountScopeMigrationDone('42', 'https://worker.example.com')).toBe(true);
+      expect(isAccountScopeMigrationDone('42')).toBe(true);
+    } finally {
+      setItemSpies.forEach((spy) => spy.mockRestore());
+    }
   });
 });

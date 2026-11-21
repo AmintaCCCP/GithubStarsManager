@@ -64,6 +64,7 @@
     "click-to-sign-in": "Zum Anmelden klicken",
     "token-required": "Token erforderlich",
     "select-account-to-restore": "Konto für die Wiederherstellung auswählen",
-    "multiple-accounts-exist-on-this-backend-select-th": "Auf diesem Backend existieren mehrere Konten; wähle das Konto aus, das wiederhergestellt werden soll."
+    "multiple-accounts-exist-on-this-backend-select-th": "Auf diesem Backend existieren mehrere Konten; wähle das Konto aus, das wiederhergestellt werden soll.",
+    "multiple-accounts-exist-on-this-backend-close-th": "Auf diesem Backend existieren mehrere Konten. Schließe diesen Dialog und wähle auf der Anmeldeseite das Konto aus, das wiederhergestellt werden soll."
   }
 }

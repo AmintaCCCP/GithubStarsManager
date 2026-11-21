@@ -53,6 +53,18 @@ const backupGistEntriesAreValid = (value: unknown): boolean => {
 };
 
 /**
+ * R13 审计修复（CodeRabbit）：恢复写入实时状态/归档前校验 Fork 数组的每个
+ * 条目——null/非对象条目会让 Fork 视图与 useForkTimelineActions 对
+ * entry.fork / entry.owner 的直接取值抛 TypeError（受影响账号无法打开 Fork
+ * 页），且持久化读取同样不过滤空条目，重启后问题仍会出现。与 gists 路径
+ * 同一规则：含任一无效条目即拒绝整个字段（保留本机现有值）。
+ */
+const backupForkEntriesAreValid = (value: unknown): boolean => {
+  if (!Array.isArray(value)) return false;
+  return value.every((entry) => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry));
+};
+
+/**
  * 备份文件名解析（R12 finding 11/23）：
  * - 新版：`github-stars-backup-<ISO 去冒号点>-<账号tag>.json`
  * - 旧版：`github-stars-backup-YYYY-MM-DD.json`（时间未知，账号 ID 无法从
@@ -65,16 +77,22 @@ const LEGACY_BACKUP_NAME_RE = /^github-stars-backup-(\d{4}-\d{2}-\d{2})\.json$/;
 const parseBackupName = (file: string): { timestamp: number | null; accountTag: string | null } => {
   const newMatch = NEW_BACKUP_NAME_RE.exec(file);
   if (newMatch) {
+    // R13 审计修复：正则只约束字段位数，月份 99 等非法时间 Date.parse 返回
+    // NaN——排序只识别 null，NaN 会在比较中被当作 0，可排在有效备份之后被
+    // 默认选中。无效时间按无法解析处理，账号 tag 也不参与账号优先推荐。
+    const timestamp = Date.parse(`${newMatch[1]}T${newMatch[2]}:${newMatch[3]}:${newMatch[4]}.${newMatch[5]}Z`);
+    const timestampValid = !Number.isNaN(timestamp);
     return {
-      timestamp: Date.parse(`${newMatch[1]}T${newMatch[2]}:${newMatch[3]}:${newMatch[4]}.${newMatch[5]}Z`),
-      accountTag: newMatch[6],
+      timestamp: timestampValid ? timestamp : null,
+      accountTag: timestampValid ? newMatch[6] : null,
     };
   }
   const legacyMatch = LEGACY_BACKUP_NAME_RE.exec(file);
   if (legacyMatch) {
     // 旧版只有日期：按当日结束排序，避免同日的旧版备份被新版早晨备份压过
     //（finding 23 的具体场景），并明确表示「同日顺序未知」。
-    return { timestamp: Date.parse(`${legacyMatch[1]}T23:59:59.999Z`), accountTag: null };
+    const legacyTimestamp = Date.parse(`${legacyMatch[1]}T23:59:59.999Z`);
+    return { timestamp: Number.isNaN(legacyTimestamp) ? null : legacyTimestamp, accountTag: null };
   }
   return { timestamp: null, accountTag: null };
 };
@@ -170,6 +188,22 @@ export const useBackupActions = (): BackupActions => {
     }
     setIsBackingUp(true);
     try {
+      // 审计修复（R13 finding 53）：includeKeysInBackup（含升级保留的旧设置）
+      // 不等于授权上传 GitHub PAT——WebDAV 备份将包含非空 PAT 时逐次请用户
+      // 明确授权（默认拒绝），与本地导出路径（DataManagementPanel）同一授权
+      // 语义与文案；未授权时 savedAccounts 的 Token 一律脱敏，绝不默认明文上传。
+      const savedAccountsForBackup = useAppStore.getState().savedAccounts;
+      let patAuthorized = false;
+      if (
+        state.includeKeysInBackup
+        && Object.values(savedAccountsForBackup ?? {}).some((account) => !!account?.githubToken?.trim())
+      ) {
+        patAuthorized = await confirm(
+          t('app:dataManagementPanel.pat-export-authorization-title'),
+          t('app:dataManagementPanel.pat-export-authorization-desc'),
+          { type: 'warning' },
+        );
+      }
       const backupData = {
         repositories: state.repositories,
         releases: state.releases,
@@ -215,7 +249,9 @@ export const useBackupActions = (): BackupActions => {
           captureAccountWorkspace(useAppStore.getState()),
           true,
         ),
-        savedAccounts: maskSavedAccountsForBackup(useAppStore.getState().savedAccounts, state.includeKeysInBackup),
+        // Token 明文上传需要 includeKeysInBackup 与本次 PAT 授权同时成立；
+        // 任一不满足时一律脱敏（掩码值在恢复端按非真实密钥跳过，不回填会话）。
+        savedAccounts: maskSavedAccountsForBackup(savedAccountsForBackup, state.includeKeysInBackup && patAuthorized),
         exportedAt: new Date().toISOString(),
         version: '1.3',
       };
@@ -236,7 +272,7 @@ export const useBackupActions = (): BackupActions => {
     } finally {
       setIsBackingUp(false);
     }
-  }, [activeConfig, state, t, toast]);
+  }, [activeConfig, confirm, state, t, toast]);
 
   const listBackups = useCallback(async (): Promise<{ files: string[]; recommended: string | null }> => {
     if (!activeConfig) return { files: [], recommended: null };
@@ -382,6 +418,13 @@ export const useBackupActions = (): BackupActions => {
         if (rawGists !== undefined && !backupGistEntriesAreValid(rawGists)) {
           gistPayloadRejected = true;
         }
+      }
+      // R13 审计修复（CodeRabbit）：Fork 数据含无效条目时同样在结果提示中警示
+      // ——分流前统一校验顶层 forks 字段，跨账号归档分支与同账号恢复路径共用
+      // 该标记（两处写入前均已拒绝无效字段）。
+      let forkPayloadRejected = false;
+      if (backupData.forks !== undefined && !backupForkEntriesAreValid(backupData.forks)) {
+        forkPayloadRejected = true;
       }
       // R2-C8：登记账号/写入工作区前逐份校验各账号工作区的仓库数据（与顶层
       // 恢复和本地 JSON 导入共用 validateBackupRepositories）。非数组或含无效
@@ -537,7 +580,9 @@ export const useBackupActions = (): BackupActions => {
           ...(Array.isArray(backupData.starredGists) && backupGistEntriesAreValid(backupData.starredGists)
             ? { starredGists: backupData.starredGists as import('../../../types').Gist[] }
             : {}),
-          ...(Array.isArray(backupData.forks)
+          // R13 审计修复（CodeRabbit）：Fork 条目逐个校验通过才随归档写入，
+          // 含 null/非对象条目时按「未提供」处理（沿用原快照）。
+          ...(Array.isArray(backupData.forks) && backupForkEntriesAreValid(backupData.forks)
             ? { forks: backupData.forks as import('../../../types').ForkRepo[] }
             : {}),
           ...(Array.isArray(backupData.readForks)
@@ -601,7 +646,14 @@ export const useBackupActions = (): BackupActions => {
             gistPayloadRejected = true;
           }
         }
-        if (Array.isArray(backupData.forks)) useAppStore.setState({ forks: backupData.forks as import('../../../types').ForkRepo[] });
+        // R13 审计修复（CodeRabbit）：写入实时状态前逐条校验 Fork 条目——含
+        // null/非对象条目时拒绝该字段（保留本机现有值），绝不让无效条目进入
+        // 实时状态（与上方 gists 校验同一规则）。
+        if (Array.isArray(backupData.forks)) {
+          if (backupForkEntriesAreValid(backupData.forks)) {
+            useAppStore.setState({ forks: backupData.forks as import('../../../types').ForkRepo[] });
+          }
+        }
         if (Array.isArray(backupData.readForks)) {
           useAppStore.setState({ readForks: new Set(backupData.readForks.filter((id): id is number => typeof id === 'number')) });
         }
@@ -820,15 +872,25 @@ export const useBackupActions = (): BackupActions => {
         && normalizedBackupWorkspaces[liveAccountId]
         ? normalizedBackupWorkspaces[liveAccountId]
         : undefined;
-      const restoredRepoCount = topLevelApplied
+      // R13 审计修复（CodeRabbit）：跨账号恢复时归档进 backupAccountId 工作区
+      // 的数据同样计入摘要——A 恢复仅含 B 的备份此前只查 A 的工作区显示 0。
+      // 只计备份实际提供的字段（缺失字段沿用该账号原快照，不属于本次恢复）。
+      const archivedRepoCount = restoreTargetsOtherAccount ? (backupRepositories?.length ?? 0) : 0;
+      const archivedReleaseCount = restoreTargetsOtherAccount
+        ? ((backupData.releases as unknown[] | undefined)?.length ?? 0)
+        : 0;
+      const archivedCategoryCount = restoreTargetsOtherAccount
+        ? ((backupData.customCategories as unknown[] | undefined)?.length ?? 0)
+        : 0;
+      const restoredRepoCount = (topLevelApplied
         ? (backupRepositories?.length ?? appliedLiveWorkspace?.repositories.length ?? 0)
-        : (appliedLiveWorkspace?.repositories.length ?? 0);
-      const restoredReleaseCount = topLevelApplied
+        : (appliedLiveWorkspace?.repositories.length ?? 0)) + archivedRepoCount;
+      const restoredReleaseCount = (topLevelApplied
         ? ((backupData.releases as unknown[] | undefined)?.length ?? appliedLiveWorkspace?.releases.length ?? 0)
-        : (appliedLiveWorkspace?.releases.length ?? 0);
-      const restoredCategoryCount = topLevelApplied
+        : (appliedLiveWorkspace?.releases.length ?? 0)) + archivedReleaseCount;
+      const restoredCategoryCount = (topLevelApplied
         ? ((backupData.customCategories as unknown[] | undefined)?.length ?? appliedLiveWorkspace?.customCategories.length ?? 0)
-        : (appliedLiveWorkspace?.customCategories.length ?? 0);
+        : (appliedLiveWorkspace?.customCategories.length ?? 0)) + archivedCategoryCount;
       const hasNonEmptyArray = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
       const hasNonEmptyObject = (value: unknown): boolean => (
         Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0
@@ -847,6 +909,10 @@ export const useBackupActions = (): BackupActions => {
         || hasNonEmptyArray(backupData.readReleases)
         || hasNonEmptyArray(backupData.customCategories)
         || hasNonEmptyArray(backupData.hiddenDefaultCategoryIds)
+        // R13 审计修复（CodeRabbit）：无归属顶层的分类顺序与覆盖项同样被跳过
+        // （不写入当前账号），单独存在时也必须提示未恢复。
+        || hasNonEmptyArray(backupData.categoryOrder)
+        || hasNonEmptyObject(backupData.defaultCategoryOverrides)
         || hasNonEmptyObject(backupData.categoryListIdMap)
         || (Boolean(releaseSourceObj) && (
           hasNonEmptyArray(releaseSourceObj!.enabledSourceIds)
@@ -875,7 +941,12 @@ export const useBackupActions = (): BackupActions => {
       if (gistPayloadRejected) {
         warnings.push(t('useBackupActions.gist-data-in-the-backup-contained-invalid-entries-th'));
       }
-      if (ghTokenPersistFailed || rejectedBackupTokenCount > 0 || gistPayloadRejected) {
+      // R13 审计修复（CodeRabbit）：Fork 数据含无效条目被拒绝时同样告知用户
+      // （对应字段保留恢复前的值）。
+      if (forkPayloadRejected) {
+        warnings.push(t('useBackupActions.fork-data-in-the-backup-contained-invalid-entries-th'));
+      }
+      if (ghTokenPersistFailed || rejectedBackupTokenCount > 0 || gistPayloadRejected || forkPayloadRejected) {
         toast(`${summaryMessage} (${warnings.join('; ')})`, 'warning');
       } else if (hasSkippedUnboundTopLevelData) {
         toast(`${summaryMessage} (${warnings.join('; ')})`, 'info');

@@ -85,6 +85,57 @@ function LoginCardPattern() {
   );
 }
 
+/**
+ * syncBackendData（useLoginActions 透传 services/autoSync 的 syncFromBackend）
+ * 返回的分片成败——结构与 autoSync 的 SyncFromBackendPullResult 一致（D 域接口
+ * 透传；视图层按结构引用，不直接 import 业务服务，字段增删由调用侧类型检查守卫）。
+ * null = 拉取未执行/被丢弃/失败。
+ */
+interface LoginPullShardResult {
+  shards: {
+    settings: boolean;
+    releases: boolean;
+  };
+}
+
+/**
+ * 审计修复（R13 finding 36）：覆盖恢复拉取自被 park/discard 清空的顶层——
+ * settings 或 releases 分片读取失败时（syncFromBackend 只记录该分片不可用，
+ * 不抛错），applyBackendSettings/setReleases 不执行，顶层保留空默认值；直接
+ * 把 captureAccountWorkspace 结果写入目标账号归档会用默认值覆盖该账号原有的
+ * 分类与发布数据。写入归档前把「读取失败」分片对应的目标账号原归档字段
+ * （accountWorkspaces[target] = park 刚归档的本机实时数据或既有归档快照）
+ * 叠加回拉取快照：失败分片的字段保持原归档值，成功分片照常覆盖为拉取值
+ * （数据为空≠失败）。回退字段集 = 两个分片实际写入顶层工作区的字段
+ * （applyBackendSettings 的 settings 覆盖面 ∩ AccountWorkspace：
+ * customCategories/hiddenDefaultCategoryIds/categoryOrder/defaultCategoryOverrides/
+ * releaseSourceSettings；setReleases 的 releases）；可选全局配置分片
+ * （ai/webdav/embedding/vectorSearch）按 finding 语义不纳入强制回退。
+ * pullResult 为 null（拉取未执行/被丢弃/失败）时保持现行为——严格拉取路径的
+ * 丢弃与失败已抛错走既有回滚，此处不重复处理。
+ */
+const overlayUnfetchedShardsFromPreviousArchive = (
+  pullResult: LoginPullShardResult | null | undefined,
+  pulledWorkspace: AccountWorkspace,
+  previousArchive: AccountWorkspace | undefined,
+): AccountWorkspace => {
+  if (!pullResult || !previousArchive) return pulledWorkspace;
+  const overlaySettings = !pullResult.shards.settings;
+  const overlayReleases = !pullResult.shards.releases;
+  if (!overlaySettings && !overlayReleases) return pulledWorkspace;
+  return {
+    ...pulledWorkspace,
+    ...(overlaySettings ? {
+      customCategories: previousArchive.customCategories,
+      hiddenDefaultCategoryIds: previousArchive.hiddenDefaultCategoryIds,
+      categoryOrder: previousArchive.categoryOrder,
+      defaultCategoryOverrides: previousArchive.defaultCategoryOverrides,
+      releaseSourceSettings: previousArchive.releaseSourceSettings,
+    } : {}),
+    ...(overlayReleases ? { releases: previousArchive.releases } : {}),
+  };
+};
+
 export const LoginScreen: React.FC = () => {
   const {
     authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken,
@@ -127,6 +178,20 @@ export const LoginScreen: React.FC = () => {
   // 转交 2：候选连接之前的持久化后端 URL——账号选择/重试路径的失败回滚需要
   // 成对还原（R2-B7），重试时不能把已提交的候选 URL 当回滚目标。
   const candidatePreviousPersistedUrlRef = useRef<string | null | undefined>(undefined);
+  // 审计修复（R13 finding 35）：定向恢复必须沿用产生账号列表的候选 URL 与
+  // API Key——延迟返回的剪贴板读取可以在账号列表出现后改写输入框状态，重试
+  // 若重新读取输入状态，会把改写后的 URL/密钥连同选定账号一起传给
+  // restoreBackendSession。首次提交（无选定账号）时保存本次提交的候选凭据，
+  // 定向重试一律使用保存值；用户返回凭据页面再次提交时刷新保存值（新候选）。
+  const candidateSubmittedUrlRef = useRef<string | null>(null);
+  const candidateSubmittedSecretRef = useRef<string | null>(null);
+  // 审计修复（R13 finding 82）：候选连接回滚失败标记——复原探测失败时活动
+  // 连接可能仍是候选后端或本地空连接，后续 PAT 登录不得把「未写入任何后端」
+  // 的 syncTokenToBackend { ok: true } 当作同步成功显示。
+  const previousBackendRestoreFailedRef = useRef(false);
+  // 审计修复（R13 finding 81）：定向恢复选定账号后进入补 Token 步骤时固定的
+  // 目标账号——补 Token 提交的 PAT 必须属于该账号才可写入其分区并登录。
+  const [tokenSetupTargetAccount, setTokenSetupTargetAccount] = useState<{ accountId: string; login: string | null } | null>(null);
   // 转交 2：恢复歧义时服务端返回的可选账号列表；null 表示当前无账号选择状态。
   const [restoreAccountCandidates, setRestoreAccountCandidates] = useState<BackendAuthRestoreAccount[] | null>(null);
   const [isRestoringPreviousBackend, setIsRestoringPreviousBackend] = useState(false);
@@ -242,12 +307,22 @@ export const LoginScreen: React.FC = () => {
       candidatePreviousUrlRef.current = undefined;
       candidatePreviousSecretRef.current = undefined;
       candidatePreviousPersistedUrlRef.current = undefined;
+      candidateSubmittedUrlRef.current = null;
+      candidateSubmittedSecretRef.current = null;
       setIsRestoringPreviousBackend(true);
-      void rollbackBackendConnection(restoreUrl, restoreSecret).finally(() => {
+      // 审计修复（R13 finding 82）：回滚失败必须与成功区分——rollback 复原
+      // 探测失败时保持现有连接（活动连接可能仍是候选后端，或本地空连接）。
+      // 复原完成后核对活动后端 URL 是否已回到候选之前的值；失败时登记标记，
+      // 后续 PAT 登录据其判定「未写入任何后端」的同步结果。
+      void rollbackBackendConnection(restoreUrl, restoreSecret).then(() => {
+        const restoreTargetUrl = restoreUrl === null ? null : normalizeBackendUrl(restoreUrl);
+        previousBackendRestoreFailedRef.current = (getBackendUrl() ?? null) !== restoreTargetUrl;
+      }).finally(() => {
         setIsRestoringPreviousBackend(false);
       });
     }
     setReauthAccountId(null);
+    setTokenSetupTargetAccount(null);
     // 转交 2：离开账号选择步骤时清除候选账号列表。
     setRestoreAccountCandidates(null);
     setLoginMode(mode);
@@ -287,8 +362,13 @@ export const LoginScreen: React.FC = () => {
       // syncTokenToBackend checks backend availability itself at call time and
       // returns { ok: true } when the backend is unreachable-by-design; only a
       // real failure surfaces the warning banner below.
+      // 审计修复（R13 finding 82）：候选连接回滚失败后原连接可能仍不可用——
+      // 此时 syncTokenToBackend 不写入任何后端也返回 { ok: true }，不得把该
+      // 结果当作「已同步到后端」。
       const { ok } = await syncTokenToBackend(token);
-      if (!ok) {
+      const backendUnavailableAfterFailedRestore = previousBackendRestoreFailedRef.current
+        && !getBackendUrl();
+      if (!ok || backendUnavailableAfterFailedRestore) {
         setError(t('loginScreen.signed-in-but-failed-to-save-github-token-to-bac'));
       }
 
@@ -319,8 +399,12 @@ export const LoginScreen: React.FC = () => {
   // 候选连接此刻已处于活跃状态，实时读取到的 URL/密钥/持久化 URL 都是候选值，
   // 绝不能当作回滚目标（R2-B5/B11/R2-B7 语义保持）。
   const handleBackendConnect = async (retryAccountId?: string) => {
-    const url = backendUrl.trim();
-    const apiKey = backendApiKey.trim();
+    // onClick 直传的事件对象不是账号 ID：仅接受字符串形参作为重试账号。
+    const isFirstAttempt = typeof retryAccountId !== 'string';
+    // 审计修复（R13 finding 35）：定向重试沿用首次提交保存的候选凭据，绝不
+    // 重新读取可能已被延迟剪贴板写入改写的输入框状态。
+    const url = isFirstAttempt ? backendUrl.trim() : (candidateSubmittedUrlRef.current ?? '');
+    const apiKey = isFirstAttempt ? backendApiKey.trim() : (candidateSubmittedSecretRef.current ?? '');
     if (!url || !apiKey) {
       setError(t('loginScreen.please-enter-the-backend-url-and-api-key'));
       return;
@@ -332,8 +416,13 @@ export const LoginScreen: React.FC = () => {
     // 审计修复（R2-B8）：候选连接回滚完成前不得发起连接（活动连接可能仍是
     // 候选后端 B）。
     if (isRestoringPreviousBackend) return;
-    // onClick 直传的事件对象不是账号 ID：仅接受字符串形参作为重试账号。
-    const selectedAccountId = typeof retryAccountId === 'string' ? retryAccountId : undefined;
+    const selectedAccountId = isFirstAttempt ? undefined : retryAccountId;
+    if (isFirstAttempt) {
+      // 首次提交创建新候选连接：保存本次提交的候选凭据供定向重试使用
+      //（finding 35）；返回凭据页面再次提交时刷新保存值。
+      candidateSubmittedUrlRef.current = url;
+      candidateSubmittedSecretRef.current = apiKey;
+    }
 
     setIsLoading(true);
     setError('');
@@ -341,7 +430,6 @@ export const LoginScreen: React.FC = () => {
     // restoreBackendSession 的 apiSecret 选项在候选 URL 提交后才对请求可见；
     // /health 探测阶段的请求仍读原密钥。失败回滚时 URL 与密钥必须成对恢复
     //（R2-B5/B11），否则原密钥会被发往候选后端（轮询/诊断请求仍在运行）。
-    const isFirstAttempt = selectedAccountId === undefined;
     const previousApiSecret = isFirstAttempt
       ? useAppStore.getState().backendApiSecret
       : candidatePreviousSecretRef.current;
@@ -408,6 +496,14 @@ export const LoginScreen: React.FC = () => {
         // 记录候选之前的连接与密钥以便离开设置步骤时成对复原（R2-B5）。
         candidatePreviousUrlRef.current = previousBackendUrl;
         candidatePreviousSecretRef.current = previousApiSecret;
+        // 审计修复（R13 finding 81）：定向恢复进入补 Token 步骤时固定所选
+        // 账号——补 Token 提交的 PAT 必须属于该账号才可写入其分区并登录。
+        setTokenSetupTargetAccount(selectedAccountId
+          ? {
+              accountId: selectedAccountId,
+              login: restoreAccountCandidates?.find((candidate) => candidate?.accountId === selectedAccountId)?.user?.login ?? null,
+            }
+          : null);
         setTokenSetupReason(result.status === 'restored-token-invalid' ? 'invalid' : 'missing');
         setBackendStep('githubToken');
         return;
@@ -457,15 +553,23 @@ export const LoginScreen: React.FC = () => {
         }
         // 审计修复（B13）：以显式账号 ID 拉取（不提前 setUser 生成请求头），
         // 拉取成功后统一提交工作区与登录态。
-        await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
+        const pullResult = await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
         // 同步更新目标账号归档为刚拉取的快照：即使后端返回空快照，随后 setUser
         // 切换工作区时也不会回退到该账号的旧归档。
+        // 审计修复（R13 finding 36）：settings/releases 分片读取失败时，目标
+        // 账号原归档的对应字段保持原值（叠加回拉取快照），绝不被清空顶层的
+        // 默认值覆盖；成功分片照常覆盖为拉取值。
         if (nextAccountId) {
           const pulledWorkspace = captureAccountWorkspace(useAppStore.getState());
+          const archivedWorkspace = overlayUnfetchedShardsFromPreviousArchive(
+            pullResult,
+            pulledWorkspace,
+            useAppStore.getState().accountWorkspaces[nextAccountId],
+          );
           useAppStore.setState((state) => ({
             accountWorkspaces: {
               ...state.accountWorkspaces,
-              [nextAccountId]: pulledWorkspace,
+              [nextAccountId]: archivedWorkspace,
             },
           }));
         }
@@ -600,6 +704,19 @@ export const LoginScreen: React.FC = () => {
     // 必须还原持久化键，绝不留下指向候选后端的持久化 URL。
     const previousPersistedUrl = getPersistedUrl();
     try {
+      // 审计修复（R13 finding 81）：定向恢复选中的账号进入补 Token 步骤时，
+      // 先直连核对提交 PAT 的真实身份——与所选账号不一致时返回失败，绝不
+      // 写入任何设置（syncSettings）或登录（与 restoreBackendSession 定向
+      // 恢复的 accountIdKey(user) !== accountId 拒绝语义同一约束）。
+      if (tokenSetupTargetAccount) {
+        const probedUser = await authenticateWithGitHub(githubToken);
+        if (accountIdKey(probedUser) !== tokenSetupTargetAccount.accountId) {
+          setError(t('app:accountModal.account-mismatch', {
+            login: tokenSetupTargetAccount.login ?? tokenSetupTargetAccount.accountId,
+          }));
+          return;
+        }
+      }
       // R2 防护（Issue #611）：先归档当前已登录账号（边缘态：持久化了 user 但
       // 停留在登录页），再向后端写入新 Token——否则 setupBackendGitHubToken 的
       // settings 写入会携带旧账号请求头，把新账号的 Token 写进旧账号分区。
@@ -654,13 +771,21 @@ export const LoginScreen: React.FC = () => {
           // 清理无主顶层残留，避免后端未返回 customCategories 等字段时混入目标账号工作区。
           discardPartialLoginWorkspace();
         }
-        await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
+        // 审计修复（R13 finding 36）：补 Token 流程的覆盖拉取与 startPull 同一
+        // 语义——settings/releases 分片读取失败时目标账号原归档的对应字段保持
+        // 原值，绝不被清空顶层的默认值覆盖；成功分片照常覆盖为拉取值。
+        const pullResult = await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
         if (nextAccountId) {
           const pulledWorkspace = captureAccountWorkspace(useAppStore.getState());
+          const archivedWorkspace = overlayUnfetchedShardsFromPreviousArchive(
+            pullResult,
+            pulledWorkspace,
+            useAppStore.getState().accountWorkspaces[nextAccountId],
+          );
           useAppStore.setState((state) => ({
             accountWorkspaces: {
               ...state.accountWorkspaces,
-              [nextAccountId]: pulledWorkspace,
+              [nextAccountId]: archivedWorkspace,
             },
           }));
         }
@@ -797,7 +922,10 @@ export const LoginScreen: React.FC = () => {
           <p className="text-sm text-muted-foreground">{t('loginScreen.ai-powered-repository-management')}</p>
         </div>
 
-        {savedAccountList.length > 0 && (
+        {/* 审计修复（R13 finding 80 / Issue #611）：单账号保持原登录界面——
+            常规账号选择卡片仅在保存了多个账号时显示；单账号仍从原登录表单
+            补充 PAT（快捷登录入口不改变单账号的界面与交互）。 */}
+        {savedAccountList.length > 1 && (
           <Card className="mb-4 border-border bg-card/60 p-3 shadow-sm">
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {t('loginScreen.saved-accounts')}

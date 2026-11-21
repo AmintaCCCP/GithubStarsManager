@@ -69,6 +69,10 @@ const savedAccount = (id: string, user: GitHubUser, token: string): SavedAccount
 const liveState = {
   user: userA,
   accountWorkspaces: {
+    // 第 13 轮审计修复 [31]：为当前账号 1 添加一份 ai_summary 不同的归档快照——
+    // buildFullWorkspaces 先展开 accountWorkspaces 再用同 ID 账号的实时状态
+    // 覆盖，夹具缺账号 1 时合并顺序反转断言仍会通过，无法发现优先级回归。
+    '1': workspaceOf([repo(1, 'stale-archived-ai')]),
     '2': workspaceOf([repo(2, 'bob-ai')]),
   },
   repositories: [repo(1, 'alice-ai')],
@@ -227,7 +231,9 @@ describe('multi-account backup helpers (Issue #611)', () => {
     const backupWorkspace: AccountWorkspace = {
       ...workspaceOf([repo(2, 'backup-full')]),
       lastSync: '2026-04-01T00:00:00.000Z',
-      gists: [{ id: 'gist-backup' } as never],
+      // 第 13 轮审计修复 [56]：工作区 gists 条目按导入面板同一规则校验
+      //（id 非空字符串 + files 普通对象），夹具补齐真实形状。
+      gists: [{ id: 'gist-backup', files: {} } as never],
       starredGists: [{ id: 'starred-backup' } as never],
       selectedGistCategory: 'starred',
       releases: [{ id: 201, repository: { id: 2 } } as never],
@@ -310,6 +316,25 @@ describe('multi-account backup helpers (Issue #611)', () => {
     );
     expect(patchWithEmpty.repositories).toEqual([]);
     expect(patchWithEmpty.searchResults).toEqual([]);
+  });
+
+  it('clears vector_indexed_at from restored repositories so the next incremental index re-uploads them (round-13 audit fix [93])', () => {
+    // 备份携带的 vector_indexed_at 属于导出时刻的向量 Worker——恢复后不可假设
+    // 该向量仍存在。校验/恢复路径统一清除，恢复仓库视为未索引。
+    const restored = replaceWorkspacesForSelectedTypes(
+      { '2': workspaceOf([repo(2, 'local-old')]) },
+      { '2': { repositories: [{ ...repo(2, 'backup-indexed'), vector_indexed_at: '2026-05-01T00:00:00.000Z' }] } },
+      ['repositories'],
+    );
+    expect(restored['2'].repositories[0].ai_summary).toBe('backup-indexed');
+    expect(restored['2'].repositories[0].vector_indexed_at).toBeUndefined();
+
+    const patch = applyAccountWorkspaceForTypes(
+      { ...workspaceOf([{ ...repo(2, 'live'), vector_indexed_at: '2026-06-01T00:00:00.000Z' } as Repository]) },
+      ['repositories'],
+      { repositories: [{ ...repo(3, 'imported-indexed'), vector_indexed_at: '2026-05-02T00:00:00.000Z' }] },
+    );
+    expect(patch.repositories?.[0].vector_indexed_at).toBeUndefined();
   });
 
   it('applies only workspace fields for the selected import types', () => {

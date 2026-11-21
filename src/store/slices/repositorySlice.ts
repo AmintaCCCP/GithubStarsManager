@@ -447,11 +447,15 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             }
 
             // 9. 覆盖写入（保留非托管 list 成员），逐仓库更新进度
+            // 第 13 轮审计修复 [77]：整集替换写入经服务层同账号队列串行且在途
+            // fetch 不被交接中止——被取代的旧任务在写入完成后到达这里，必须
+            // 检查 signal.aborted 立即停止（其已完成的写入落在服务端队列里，
+            // 仍先于新任务的写入），不再依赖 fetch 以 AbortError 拒绝来中断循环。
             let updatedCount = 0;
             let done = 0;
             const total = reposToUpdate.size;
             for (const [key, targetIds] of reposToUpdate) {
-              if (!isSessionActive()) {
+              if (!isSessionActive() || signal.aborted) {
                 controller.abort();
                 return;
               }
@@ -469,7 +473,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
                 continue;
               }
               await api.updateUserListsForItem(itemId, finalListIds, signal);
-              if (!isSessionActive()) {
+              if (!isSessionActive() || signal.aborted) {
                 controller.abort();
                 return;
               }

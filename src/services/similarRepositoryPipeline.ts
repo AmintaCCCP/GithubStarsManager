@@ -479,6 +479,20 @@ export async function runSimilarRepositoryPipeline(
       return { matches, success: true };
     } catch (error) {
       if (isAbortError(error) || signal.aborted) throw abortError();
+      // 第 13 轮审计修复 [73]：/status 返回就绪后 Worker 仍可能在账号范围查询
+      // 时回滚（ACCOUNT_METADATA_NOT_INDEXED）——保留错误码并映射为
+      // metadata-index-not-ready，设置 indexUnavailable 提示调用方结果不完整；
+      // 保留本地候选，绝不改用无范围查询。
+      if ((error as { code?: unknown } | null)?.code === 'ACCOUNT_METADATA_NOT_INDEXED') {
+        logger.warn('vector-search', `${prefix} dense query rejected: accountId metadata index is not ready`, { error });
+        return {
+          matches: [],
+          success: false,
+          error: DENSE_INDEX_METADATA_NOT_READY_ERROR,
+          indexUnavailable: true,
+          reason: 'metadata-index-not-ready',
+        };
+      }
       logger.warn('vector-search', `${prefix} dense recall failed, continuing`, { error });
       return { matches: [], success: false, error: safeErrorMessage(error) };
     }
@@ -564,9 +578,20 @@ export async function runSimilarRepositoryPipeline(
     && lexical.length === 0
     && structured.length === 0
   ) {
-    throw new Error(
-      exactOutcome.error || profileOutcome.error || 'Similar repository retrieval failed',
-    );
+    const message = exactOutcome.error || profileOutcome.error || 'Similar repository retrieval failed';
+    const error = new Error(message) as Error & { denseIndexUnavailableReasonCode?: DenseIndexUnavailableReason };
+    // 第 13 轮审计修复 [74]：索引未就绪且无本地候选的错误路径携带稳定原因
+    // 代码——展示层（useRepositoryCardActions 的 catch）按代码渲染本地化提示，
+    // 而不是直接显示英文 error.message。非索引类错误不携带代码（保持旧行为）。
+    const failureReason = exactOutcome.indexUnavailable
+      ? exactOutcome.reason
+      : profileOutcome.indexUnavailable
+        ? profileOutcome.reason
+        : undefined;
+    if (failureReason) {
+      error.denseIndexUnavailableReasonCode = failureReason;
+    }
+    throw error;
   }
 
   const profileUsable = hasUsableProfile(profile);

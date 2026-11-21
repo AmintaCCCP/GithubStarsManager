@@ -69,7 +69,12 @@ function buildImportedCategoryIds(
   db: ReturnType<typeof getDb>,
   targetAccountId: string,
   categories: Record<string, unknown>[],
-): { ids: Array<string | number | null>; conflicts: Array<{ id: string; name: string }> } {
+): {
+  ids: Array<string | number | null>;
+  conflicts: Array<{ id: string; name: string }>;
+  /** Issue #612 R13（审计 67）：生成 ID 条目应写入的规范化名称；显式 ID 条目为 null（名称保持原样）。 */
+  generatedNames: Array<string | null>;
+} {
   const usedIds = new Set<string>();
   const resolved: Array<string | number | null> = categories.map((c) => {
     if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
@@ -83,6 +88,7 @@ function buildImportedCategoryIds(
     }
     return null;
   });
+  const generatedNames: Array<string | null> = categories.map(() => null);
 
   const conflicts: Array<{ id: string; name: string }> = [];
   const targetNameById = (id: string): string | null => {
@@ -111,17 +117,23 @@ function buildImportedCategoryIds(
         continue;
       }
       const targetName = targetNameById(candidate);
-      if (targetName === null || targetName === rawName) break;
-      // 同 ID 不同名：无法确认是同一条旧分类——保留目标记录，换下一个候选 ID
+      // Issue #612 R13（审计 67）：ID 由 trim 后的名称生成，而分类写入可能保留
+      // 备份中的原始名称——冲突检查按同一规范化表示（trim 后）比较，否则相同
+      // 备份重试仅因首尾空格差异被误判为异名冲突，生成 #2 副本并随重试递增。
+      // 真正的异名冲突仍换下一个候选 ID 并保留目标分类。
+      if (targetName === null || targetName.trim() === rawName) break;
       conflicts.push({ id: candidate, name: rawName });
       candidate = `${baseId}#${suffix}`;
       suffix++;
     }
     usedIds.add(candidate);
     resolved[i] = candidate;
+    // 写入与 ID 生成使用同一规范化名称表示：重复导入时存储值与生成 ID 的名称
+    // 基准一致（配合上方的 trim 比较同时兼容旧版本写入的原始名称）。
+    generatedNames[i] = rawName;
   }
 
-  return { ids: resolved, conflicts };
+  return { ids: resolved, conflicts, generatedNames };
 }
 
 const toSharedBit = (value: unknown): number => (value === true || value === 1) ? 1 : 0;
@@ -547,13 +559,17 @@ router.post('/api/sync/import', async (req, res) => {
         const repository = r.repository as { id?: unknown; full_name?: unknown; name?: unknown } | undefined;
         const repoId = r.repo_id ?? repository?.id;
         // Issue #612 A8：tag_name 为 NOT NULL，缺失/无效时提前给出可定位的 400。
+        // Issue #612 R13（审计 66）：repo_full_name / repo_name 与顶层 releases
+        // 使用同一规则——去除首尾空白后必须非空，否则仅含空白的名称（' '）会
+        // 通过工作区校验写入数据库，导出后出现在顶层 releases 中，再次导入被
+        // 顶层的 trim() 检查拒绝整个备份。
         if (typeof r.id !== 'number' || !Number.isInteger(r.id) || r.id <= 0
           || typeof repoId !== 'number' || !Number.isInteger(repoId) || repoId <= 0
           || typeof (r.tag_name as unknown) !== 'string' || !(r.tag_name as string).trim()
           || typeof (r.repo_full_name ?? repository?.full_name) !== 'string'
-          || !(r.repo_full_name ?? repository?.full_name)
+          || !((r.repo_full_name ?? repository?.full_name) as string).trim()
           || typeof (r.repo_name ?? repository?.name) !== 'string'
-          || !(r.repo_name ?? repository?.name)) {
+          || !((r.repo_name ?? repository?.name) as string).trim()) {
           res.status(400).json({
             error: 'Each release must have a valid positive integer id / repo_id / non-empty tag_name / repo_full_name / repo_name',
             code: 'RELEASE_ID_REQUIRED',
@@ -948,7 +964,7 @@ router.post('/api/sync/import', async (req, res) => {
           INSERT OR REPLACE INTO categories (id, name, description, icon, keywords, color, sort_order, is_custom, account_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
-        const { ids: catIds, conflicts: topLevelCatConflicts } = buildImportedCategoryIds(db, accountId, cats);
+        const { ids: catIds, conflicts: topLevelCatConflicts, generatedNames: topLevelCatNames } = buildImportedCategoryIds(db, accountId, cats);
         for (const conflict of topLevelCatConflicts) {
           categoryIdConflicts.push({ account_id: accountId, ...conflict });
         }
@@ -967,7 +983,9 @@ router.post('/api/sync/import', async (req, res) => {
           catStmt.run(
             // Issue #612 R2-A19：旧版分类 id 为 NULL/缺失时分配确定性稳定标识
             // （顶层与工作区共用），显式 ID 原样保留，避免 NOT NULL 约束回滚。
-            catId, c.name ?? '', c.description ?? null, c.icon ?? '📁',
+            // Issue #612 R13（审计 67）：生成 ID 的条目写入与 ID 生成同一规范化
+            // 名称（trim 后），重复导入不再因首尾空格差异误判冲突。
+            catId, topLevelCatNames[i] ?? (c.name ?? ''), c.description ?? null, c.icon ?? '📁',
             typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
             c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0,
             accountId
@@ -1047,6 +1065,11 @@ router.post('/api/sync/import', async (req, res) => {
       // （各账号分区自身的键已由 account_workspaces 按分区复原），统一恢复回
       // 全局表——默认分区/旧客户端/无头请求与 legacy 认领流程都依赖全局表，
       // 绝不能因存在工作区就静默丢弃这些默认分区设置。
+      // Issue #612 R13 审计（16）：记录本事务已恢复到全局 settings 表的键。
+      // default 工作区写入 account_settings 时镜像进全局表（下方 wsGlobalSettingsStmt），
+      // 其中的历史副本（旧版 account_settings('default') 残留）不得覆盖同一键
+      // 在顶层恢复的现行值。
+      const globalSettingsRestoredKeys = new Set<string>();
       const settings = data.settings as Record<string, unknown> | undefined;
       if (settings && typeof settings === 'object') {
         const globalSettingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
@@ -1101,6 +1124,7 @@ router.post('/api/sync/import', async (req, res) => {
                 continue;
               }
               globalSettingsStmt.run(key, encrypt(value, config.encryptionKey));
+              globalSettingsRestoredKeys.add(key);
               bumpAccountCredentialVersion(db, accountId);
             } else {
               // Issue #612 审计（962）：顶层 default 的 github_token 显式空值
@@ -1115,6 +1139,7 @@ router.post('/api/sync/import', async (req, res) => {
                 continue;
               }
               globalSettingsStmt.run(key, serializeSettingValue(value));
+              globalSettingsRestoredKeys.add(key);
               if (key === 'github_token') {
                 bumpAccountCredentialVersion(db, accountId);
               }
@@ -1147,6 +1172,7 @@ router.post('/api/sync/import', async (req, res) => {
               accountSettingsStmt.run(accountId, key, encrypted);
             } else {
               globalSettingsStmt.run(key, encrypted);
+              globalSettingsRestoredKeys.add(key);
             }
             bumpAccountCredentialVersion(db, accountId);
           } else if (key === 'github_token' && (value === null || value === undefined || value === '')) {
@@ -1169,12 +1195,14 @@ router.post('/api/sync/import', async (req, res) => {
               clearAccountTokenStmt.run(accountId);
             } else {
               globalSettingsStmt.run(key, serializeSettingValue(value));
+              globalSettingsRestoredKeys.add(key);
             }
             bumpAccountCredentialVersion(db, accountId);
           } else if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && accountId !== 'default') {
             accountSettingsStmt.run(accountId, key, serializeSettingValue(value));
           } else {
             globalSettingsStmt.run(key, serializeSettingValue(value));
+            globalSettingsRestoredKeys.add(key);
           }
           settingsCount++;
         }
@@ -1186,6 +1214,11 @@ router.post('/api/sync/import', async (req, res) => {
       // account_settings；跳过 '***' 掩码 Token，保留库中已有的加密 Token。
       // Issue #612 A20x：记录发生了仓库/发行版写入的工作区分区，事务末尾统一推进快照版本。
       const workspaceWrittenAccounts = new Set<string>();
+      // Issue #612 R13 审计（15b）：仅导入发行版（无仓库写入）的分区同样推进
+      // 快照版本，但绝不据此清除向量回填检查标记——仓库已正确索引的分区被清标
+      // 后，下一次 MCP 向量查询会重新探测并清空这些仓库的 vector_indexed_at，
+      // 触发不必要的全量重建。只有实际写入仓库的分区才清除（与顶层路径一致）。
+      const workspaceRepoWrittenAccounts = new Set<string>();
       if (workspaceEntries.length > 0) {
         const wsRepoStmt = db.prepare(`
           INSERT OR REPLACE INTO repositories (
@@ -1342,6 +1375,7 @@ router.post('/api/sync/import', async (req, res) => {
               );
               workspaceRepoCount++;
               workspaceWrittenAccounts.add(wsAccountId);
+              workspaceRepoWrittenAccounts.add(wsAccountId);
             }
           }
 
@@ -1371,7 +1405,7 @@ router.post('/api/sync/import', async (req, res) => {
 
           const wsCats = workspace.categories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsCats)) {
-            const { ids: wsCatIds, conflicts: wsCatConflicts } = buildImportedCategoryIds(db, wsAccountId, wsCats);
+            const { ids: wsCatIds, conflicts: wsCatConflicts, generatedNames: wsCatNames } = buildImportedCategoryIds(db, wsAccountId, wsCats);
             for (const conflict of wsCatConflicts) {
               categoryIdConflicts.push({ account_id: wsAccountId, ...conflict });
             }
@@ -1382,8 +1416,9 @@ router.post('/api/sync/import', async (req, res) => {
               wsCatStmt.run(
                 // Issue #612 R2-A19：旧版分类 id 为 NULL/缺失时分配确定性稳定
                 // 标识（与顶层路径共用），显式 ID 原样保留，避免 NOT NULL 约束
-                // 导致整个导入事务回滚。
-                wsAccountId, catId, c.name ?? '', c.description ?? null, c.icon ?? '📁',
+                // 导致整个导入事务回滚。生成 ID 的条目写入与 ID 生成同一规范化
+                // 名称（R13 审计 67，与顶层路径一致）。
+                wsAccountId, catId, wsCatNames[i] ?? (c.name ?? ''), c.description ?? null, c.icon ?? '📁',
                 typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
                 c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0
               );
@@ -1397,6 +1432,11 @@ router.post('/api/sync/import', async (req, res) => {
               // Issue #612 A9：内部认领状态键（含内嵌密文）只属于目标服务器自身，
               // 绝不随备份迁移——扩展到所有工作区，不再仅限 default。
               if (INTERNAL_SETTING_KEYS.has(key)) continue;
+              // Issue #612 R13 审计（16）：同一 default 设置键已由备份顶层全局设置
+              // 恢复时，跳过工作区中的历史副本（如旧版 account_settings('default')
+              // 残留），避免覆盖顶层恢复的现行值；顶层未恢复该键时仍照常写入，
+              // 支持仅由工作区提供的设置恢复。数字账号工作区写自身分区，不受影响。
+              if (wsAccountId === 'default' && globalSettingsRestoredKeys.has(key)) continue;
               if (key === 'github_token' && typeof value === 'string' && value.startsWith('***')) {
                 continue; // 掩码 Token：保留库中已有的 github_token_encrypted
               }
@@ -1537,7 +1577,12 @@ router.post('/api/sync/import', async (req, res) => {
       if (workspaceEntries.length > 0) {
         for (const wsAccountId of workspaceWrittenAccounts) {
           bumpAccountRevision(db, wsAccountId);
-          clearBackfillChecked(wsAccountId);
+          // Issue #612 R13 审计（15b）：仅实际写入仓库的分区清除回填检查标记；
+          // 仅写入发行版的分区保留标记（其仓库若已正确索引，无需触发重新探测
+          // 与全量重建）。仓库与发行版写入推进分区版本的行为保持不变。
+          if (workspaceRepoWrittenAccounts.has(wsAccountId)) {
+            clearBackfillChecked(wsAccountId);
+          }
         }
       }
       return {
@@ -1575,7 +1620,7 @@ router.post('/api/sync/import', async (req, res) => {
       res.status(409).json({
         error: importResult.topLevelDefaultBlocked
           ? 'Nothing was imported: the target default partition still has unclaimed legacy data, so the backup\'s repositories, releases, categories and account-level settings were skipped. Complete the legacy claim first (or re-send with an explicit X-GitHub-Account-Id after claiming) and retry the import.'
-          : 'Nothing was imported: the backup\'s default workspace was skipped because its ownership could not be verified for the requested numeric account. Restore the default workspace with a request resolved to the default partition (after completing the legacy claim); an explicit X-GitHub-Account-Id cannot make a backup default workspace owned by a numeric account.',
+          : 'Nothing was imported: the backup\'s default workspace was skipped because its ownership could not be verified for the requested numeric account. This instance cannot directly restore a backup default workspace once its own legacy default partition has been claimed: headerless imports resolve to the active numeric account and an explicit X-GitHub-Account-Id only accepts numeric account IDs, so no request can target the default partition. Restore the default workspace on a fresh instance before its legacy claim completes, or re-key the workspace to its owning numeric account in the backup.',
         code: 'LEGACY_DEFAULT_CLAIM_PENDING',
         skipped_partitions: skippedPendingClaim,
         reason: skippedReason,

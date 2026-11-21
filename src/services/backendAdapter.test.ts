@@ -84,12 +84,16 @@ function makeHealthOkResponse(): Response {
 }
 
 function makeJsonResponse(payload: unknown): Response {
+  const text = typeof payload === 'string' ? payload : JSON.stringify(payload);
   return {
     ok: true,
     status: 200,
     json: async () => payload,
+    // 第 13 轮审计修复 [33]：syncSettings 分离正文读取与 JSON 解析（res.text()
+    // + JSON.parse），测试桩需提供 text。
+    text: async () => text,
     headers: { forEach: () => {} },
-    clone: () => ({ text: async () => '' }),
+    clone: () => ({ text: async () => text }),
   } as unknown as Response;
 }
 
@@ -227,7 +231,9 @@ describe('syncSettings token 更新标志（server configs.ts 契约，审计修
         return {
           ok: true,
           status: 200,
-          json: () => new Promise((_resolve, reject) => {
+          // 第 13 轮审计修复 [33]：正文读取与解析分离——正文读取超时用 text()
+          // 模拟（json() 不再被调用）。
+          text: () => new Promise((_resolve, reject) => {
             deadlineSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
           }),
           headers: { forEach: () => {} },
@@ -261,7 +267,9 @@ describe('syncSettings token 更新标志（server configs.ts 契约，审计修
     vi.mocked(window.fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => { throw new SyntaxError('no body'); },
+      // 第 13 轮审计修复 [33]：正文完整读取（text 成功）但 JSON 非法 → 仍按
+      // 「无标志成功」处理（旧行为）；读取失败则抛错，不进入该分支。
+      text: async () => 'not-json{{',
       headers: { forEach: () => {} },
     } as unknown as Response);
 

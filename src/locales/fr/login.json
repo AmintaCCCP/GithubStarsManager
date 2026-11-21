@@ -64,6 +64,7 @@
     "click-to-sign-in": "Cliquez pour vous connecter",
     "token-required": "Jeton requis",
     "select-account-to-restore": "Sélectionnez le compte à restaurer",
-    "multiple-accounts-exist-on-this-backend-select-th": "Plusieurs comptes existent sur ce backend ; sélectionnez le compte à restaurer."
+    "multiple-accounts-exist-on-this-backend-select-th": "Plusieurs comptes existent sur ce backend ; sélectionnez le compte à restaurer.",
+    "multiple-accounts-exist-on-this-backend-close-th": "Plusieurs comptes existent sur ce backend. Fermez cette fenêtre, puis sélectionnez le compte à restaurer sur la page de connexion."
   }
 }

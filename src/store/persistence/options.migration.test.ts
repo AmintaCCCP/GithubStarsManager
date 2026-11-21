@@ -4,12 +4,15 @@ import type { GitHubUser } from '../../types';
 // 控制桌面端加密保存的成功/失败（v19 迁移落盘），验证 partialize 的
 // 「加密保存确认后才提交剥除 PAT 的快照」语义（审计修复：保存失败时保留
 // 原快照中的 Token 作为可重试状态，而不是被首次持久化永久清除）。
+// 第 13 轮审计修复：迁移保存改走补写语义（fillMissingGhAccountTokens），
+// mock 默认按「全部补写成功」返回 settled 映射。
 vi.mock('./ghAccountSecrets', () => ({
   hasGhAccountsBridge: vi.fn(() => true),
   hasPendingGhAccountSecretRemovals: vi.fn(() => false),
   getPendingGhAccountSecretRemovalIds: vi.fn((): string[] => []),
   loadGhAccountTokens: vi.fn(async () => ({ status: 'loaded' as const, tokens: {} })),
   saveGhAccountTokens: vi.fn(async () => undefined),
+  fillMissingGhAccountTokens: vi.fn(async (tokens: Record<string, string>) => ({ ...tokens })),
   syncGhAccountTokensFromState: vi.fn(async () => true),
 }));
 
@@ -17,7 +20,7 @@ vi.mock('./ghAccountSecrets', () => ({
 vi.mock('../useAppStore', async () => await vi.importActual('../useAppStore'));
 
 const { appPersistenceOptions, __resetV19TokenSaveStateForTest } = await import('./options');
-const { saveGhAccountTokens, loadGhAccountTokens, getPendingGhAccountSecretRemovalIds } = await import('./ghAccountSecrets');
+const { saveGhAccountTokens, loadGhAccountTokens, getPendingGhAccountSecretRemovalIds, fillMissingGhAccountTokens } = await import('./ghAccountSecrets');
 const { useAppStore } = await import('../useAppStore');
 
 const mirrorUser: GitHubUser = {
@@ -62,6 +65,7 @@ beforeEach(() => {
   __resetV19TokenSaveStateForTest();
   window.localStorage.removeItem('github-stars-manager-auth');
   vi.mocked(saveGhAccountTokens).mockReset().mockResolvedValue(undefined);
+  vi.mocked(fillMissingGhAccountTokens).mockReset().mockImplementation(async (tokens: Record<string, string>) => ({ ...tokens }));
   vi.mocked(loadGhAccountTokens).mockReset().mockResolvedValue({ status: 'loaded', tokens: {} });
   vi.mocked(getPendingGhAccountSecretRemovalIds).mockReset().mockReturnValue([]);
   useAppStore.setState({
@@ -77,7 +81,7 @@ describe('v19 token migration persistence contract', () => {
     // 阶段一：迁移加密保存失败——迁移后的内存态剥除明文（既有语义），但
     // 持久化分片必须保留迁移输入中的旧 PAT（可重试状态）；运行时注入的新 PAT
     // 绝不进入明文分片（第 12 轮审计修复：旧迁移输入与运行时凭据分离）。
-    vi.mocked(saveGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
+    vi.mocked(fillMissingGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
     const failedMigration = appPersistenceOptions.migrate!(v18Snapshot(), 18) as {
       savedAccounts?: Record<string, { githubToken?: string }>;
     };
@@ -132,8 +136,8 @@ describe('v19 token migration persistence contract', () => {
         savedAccounts?: Record<string, { accountId?: string; user?: GitHubUser; githubToken?: string }>;
       };
       // 身份敏感断言：加密存储必须收到镜像中账号 '42' 的明文 PAT——迁移没有
-      // 把 PAT 交给 saveGhAccountTokens 时凭据会直接丢失。
-      expect(vi.mocked(saveGhAccountTokens)).toHaveBeenLastCalledWith({ '42': 'ghp_mirror_token' });
+      // 把 PAT 交给补写保存时凭据会直接丢失（第 13 轮起迁移走补写语义）。
+      expect(vi.mocked(fillMissingGhAccountTokens)).toHaveBeenLastCalledWith({ '42': 'ghp_mirror_token' });
       const entry = migrated.savedAccounts?.['42'];
       expect(entry).toBeDefined();
       expect(entry?.accountId).toBe('42');
@@ -184,7 +188,7 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
 
   it('A: 跨两次启动保存失败后分片仍保留旧 PAT，第三次启动仍可重试并最终迁移', async () => {
     // 第一次启动：v18 → v19 迁移保存失败，分片保留旧 PAT。
-    vi.mocked(saveGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
+    vi.mocked(fillMissingGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
     appPersistenceOptions.migrate!(v18Snapshot(), 18);
     await flushMigrationSave();
     expect(persistFromState('')['42']?.githubToken).toBe('ghp_legacy_token');
@@ -215,7 +219,7 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
   });
 
   it('B: 未确认态重新授权后分片不回填旧 PAT，启动重试使用新 PAT', async () => {
-    vi.mocked(saveGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
+    vi.mocked(fillMissingGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
     appPersistenceOptions.migrate!(v18Snapshot(), 18);
     await flushMigrationSave();
 
@@ -239,7 +243,7 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
   });
 
   it('C: 未确认态登出后分片不再含该账号 PAT，重启后无法一键恢复', async () => {
-    vi.mocked(saveGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
+    vi.mocked(fillMissingGhAccountTokens).mockRejectedValueOnce(new Error('disk full'));
     appPersistenceOptions.migrate!(v18Snapshot(), 18);
     await flushMigrationSave();
 
@@ -262,10 +266,16 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
     expect(persistCurrentState()['42']?.githubToken ?? '').toBe('');
     vi.mocked(getPendingGhAccountSecretRemovalIds).mockReturnValue([]);
 
-    // 模拟重启：分片无 PAT ⇒ 迁移输入为空，重试不会再把旧 PAT 写回。
+    // 模拟重启：先保存当前分片再清空 store——分片无 PAT ⇒ 迁移输入为空，
+    // 重试不会再把旧 PAT 写回；账号 42 的元数据条目必须保留且 Token 为空。
+    const retainedShard = persistCurrentState();
     __resetV19TokenSaveStateForTest();
     useAppStore.setState({ user: null, githubToken: null, isAuthenticated: false, savedAccounts: {} } as never);
-    mergePersisted({ user: null, savedAccounts: persistCurrentState() });
+    mergePersisted({ user: null, savedAccounts: retainedShard });
+    // 登出后的重启不得丢账号条目（下拉列表/一键恢复占位依赖元数据），
+    // 也不得用空值回退掩盖「条目被整体删除」的回归。
+    expect(useAppStore.getState().savedAccounts['42']).toBeDefined();
+    expect(useAppStore.getState().savedAccounts['42']?.githubToken ?? '').toBe('');
     vi.mocked(saveGhAccountTokens).mockClear();
     vi.mocked(saveGhAccountTokens).mockResolvedValue(undefined);
     hydrate();
@@ -281,11 +291,17 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
       JSON.stringify({ user: mirrorAccountUser, githubToken: 'ghp_mirror_token', backendApiSecret: null }),
     );
     try {
-      // 快照迁移（42/44/43 多账号）失败；镜像迁移（仅 43）成功。
-      vi.mocked(saveGhAccountTokens).mockImplementation(async (tokens: Record<string, string>) => {
+      // 快照迁移（42/44/43 多账号）失败；镜像迁移（仅 43）成功。第 13 轮起
+      // 迁移保存（快照 + 镜像）走补写语义，失败规则保持一致：多账号一律失败。
+      const multiAccountFails = async (tokens: Record<string, string>) => {
         const ids = Object.keys(tokens);
-        if (ids.length === 1 && ids[0] === '43') return;
+        if (ids.length === 1 && ids[0] === '43') return { ...tokens };
         throw new Error('multi-account save failed');
+      };
+      vi.mocked(fillMissingGhAccountTokens).mockImplementation(multiAccountFails);
+      vi.mocked(saveGhAccountTokens).mockImplementation(async (tokens: Record<string, string>) => {
+        await multiAccountFails(tokens);
+        return undefined;
       });
       const migrated = appPersistenceOptions.migrate!({
         user: null,
@@ -309,7 +325,7 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
       await flushMigrationSave();
 
       // 镜像账号 43 已成功落盘并退出迁移输入；42/44 的重试输入必须保留。
-      expect(vi.mocked(saveGhAccountTokens)).toHaveBeenCalledWith({ '43': 'ghp_mirror_token' });
+      expect(vi.mocked(fillMissingGhAccountTokens)).toHaveBeenCalledWith({ '43': 'ghp_mirror_token' });
       const shard = persistCurrentState();
       expect(shard['43']?.githubToken ?? '').toBe('');
       expect(shard['42']?.githubToken).toBe('ghp_token_a');

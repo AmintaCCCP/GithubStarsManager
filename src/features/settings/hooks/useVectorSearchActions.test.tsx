@@ -215,11 +215,17 @@ describe('useVectorSearchActions', () => {
 
   it('excludes up-to-date repositories when no migration is pending', () => {
     storeState.vectorSearchConfig.embeddingFormatVersion = EMBEDDING_FORMAT_VERSION;
+    // R13 审计修复（CodeRabbit）：计数与上传路径复用同一迁移判定——登录账号
+    // 未完成账号范围迁移（localStorage 无记录）时全部合格仓库计入。本用例
+    // 验证「迁移已完成」前提下的逐仓计数：显式登记 (账号, Worker) 迁移记录。
+    (storeState.vectorSearchConfig as { workerUrl?: string }).workerUrl = 'https://worker.example.com';
+    localStorage.setItem('gsm.vectorAccountScopeMigrationDone', JSON.stringify({ '1': 'https://worker.example.com' }));
     storeState.repositories = [repository, { ...repository, id: 2 } as Repository];
     mocks.needsReindex.mockImplementation((repo: Repository) => repo.id === 2);
     const { result } = renderHook(() => useVectorSearchActions());
     expect(result.current.unindexedRepoCount).toBe(1);
     expect(result.current.incrementalTargetCount).toBe(1);
+    localStorage.removeItem('gsm.vectorAccountScopeMigrationDone');
   });
 
   it('reports zero unindexed repositories when vector search is disabled', () => {

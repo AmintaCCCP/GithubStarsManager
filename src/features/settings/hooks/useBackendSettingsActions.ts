@@ -22,6 +22,10 @@ import {
 
 type BackendStatus = 'connected' | 'disconnected' | 'checking';
 
+// R13 审计修复：完整连接探测的共享互斥——探测窗口（健康检查 + verifyAuth +
+// 认证失败回滚）内不得启动第二次探测。模块级标记在多个 hook 实例之间共享。
+let _connectionProbeInFlight = false;
+
 export interface BackendSettingsActions {
   status: BackendStatus;
   health: { version: string; timestamp: string } | null;
@@ -73,23 +77,32 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
   const [urlInput, setUrlInput] = useState(() => backend.configuredUrl?.replace(/\/api$/, '') || '');
   const [secretInput, setSecretInput] = useState(state.backendApiSecret || '');
 
-  const checkConnection = useCallback(async (syncToken: boolean, preferredUrl?: string) => {
+  const checkConnection = useCallback(async (
+    syncToken: boolean,
+    preferredUrl?: string,
+    // R13 审计修复：deferConnectedStatus 供完整探测使用——健康检查通过但
+    // verifyAuth 尚未完成时不置 connected（按钮保持忙碌禁用），由调用方在
+    // 认证通过后自行提交状态。
+    options?: { deferConnectedStatus?: boolean },
+  ) => {
     setStatus('checking');
     try {
       await backend.init(preferredUrl);
       const healthData = await backend.checkHealth();
       if (healthData) {
-        setStatus('connected');
-        setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+        if (options?.deferConnectedStatus !== true) {
+          setStatus('connected');
+          setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+        }
         if (syncToken) void syncLocalGitHubTokenToBackend();
-        return true;
+        return healthData;
       }
     } catch {
       // A disconnected backend must leave the settings screen usable.
     }
     setStatus('disconnected');
     setHealth(null);
-    return false;
+    return null;
   }, []);
 
   useEffect(() => {
@@ -97,6 +110,12 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
   }, [checkConnection]);
 
   const testConnection = useCallback(async () => {
+    // R13 审计修复：完整探测窗口（健康检查 + verifyAuth + 认证失败回滚）串行
+    // 执行——非空密钥时健康检查通过即置 connected 会让测试按钮提前恢复可点，
+    // 第二次探测与第一次的冻结窗口并发，窗口退出顺序错乱会留下错误的全局
+    // 冻结标志。这里以模块级互斥拒绝并发探测；状态在整个窗口保持 checking
+    // 忙碌态（认证与回滚完成前按钮不可用），成功/失败/回滚路径均释放互斥。
+    if (_connectionProbeInFlight) return;
     const trimmedUrl = urlInput.trim();
     if (trimmedUrl && !normalizeBackendUrl(trimmedUrl)) {
       toast(t('useBackendSettingsActions.invalid-backend-url-remote-backends-must-use-htt'), 'error');
@@ -104,36 +123,43 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     }
     const previousUrl = backend.backendUrl;
     state.setBackendApiSecret(secretInput || null);
-    // 探测与失败回滚全程冻结自动推送，防止探测期间启动的新推送在两步之间切换后端把旧快照写入新后端
-    const probeSucceeded = await withAccountSwitchFrozen(async () => {
-      // With an address entered, probe exactly that URL; empty keeps the
-      // previous auto-detect behavior (remembered URL, else same-origin).
-      const connected = await checkConnection(false, trimmedUrl || undefined);
-      if (!connected) {
-        await backend.init(previousUrl ?? undefined);
-        toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
-        return false;
+    _connectionProbeInFlight = true;
+    try {
+      // 探测与失败回滚全程冻结自动推送，防止探测期间启动的新推送在两步之间切换后端把旧快照写入新后端
+      const probeSucceeded = await withAccountSwitchFrozen(async () => {
+        // With an address entered, probe exactly that URL; empty keeps the
+        // previous auto-detect behavior (remembered URL, else same-origin).
+        const healthData = await checkConnection(false, trimmedUrl || undefined, { deferConnectedStatus: true });
+        if (!healthData) {
+          await backend.init(previousUrl ?? undefined);
+          toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+          return false;
+        }
+        try {
+          const authOk = secretInput ? await backend.verifyAuth() : true;
+          if (!authOk) throw new Error('Authentication failed');
+          // Health and auth both passed — remember the address (shared with the
+          // login screen prefill).
+          backend.rememberActiveUrl();
+          setStatus('connected');
+          setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+          toast(t('useBackendSettingsActions.backend-connection-successful'), 'success');
+          return true;
+        } catch {
+          await backend.init(previousUrl ?? undefined);
+          setStatus('disconnected');
+          setHealth(null);
+          toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
+          return false;
+        }
+      });
+      if (probeSucceeded) {
+        // These are deliberate manual settings actions; app-start restoration is not moved here.
+        void tryRestoreAuthFromBackend();
+        void syncLocalGitHubTokenToBackend();
       }
-      try {
-        const authOk = secretInput ? await backend.verifyAuth() : true;
-        if (!authOk) throw new Error('Authentication failed');
-        // Health and auth both passed — remember the address (shared with the
-        // login screen prefill).
-        backend.rememberActiveUrl();
-        toast(t('useBackendSettingsActions.backend-connection-successful'), 'success');
-        return true;
-      } catch {
-        await backend.init(previousUrl ?? undefined);
-        setStatus('disconnected');
-        setHealth(null);
-        toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
-        return false;
-      }
-    });
-    if (probeSucceeded) {
-      // These are deliberate manual settings actions; app-start restoration is not moved here.
-      void tryRestoreAuthFromBackend();
-      void syncLocalGitHubTokenToBackend();
+    } finally {
+      _connectionProbeInFlight = false;
     }
   }, [checkConnection, secretInput, state, t, toast, urlInput]);
 
@@ -200,6 +226,11 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     setIsSyncingFromBackend(true);
     try {
       const [repoData, releaseData, aiConfigData, webdavConfigData, settingsData] = await Promise.all([
+        // R13 finding 107：无参调用依赖新契约的「Store 当前用户」分区固定——
+        // 设置面板仅在已认证会话下渲染（App 层 !isAuthenticated 直接渲染
+        // LoginScreen），且确认弹窗等待期间切号/登出会推进代次，被上方
+        // isCurrentAccountSession 复核拦截（fetch 开始前返回），故 fetch 开始时
+        // Store 必有当前用户，无需显式账号参数。
         backend.fetchRepositories(),
         backend.fetchReleases(),
         backend.fetchAIConfigs(),

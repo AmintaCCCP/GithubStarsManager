@@ -40,7 +40,7 @@ export const useForkTimelineActions = () => {
   const [workflowsMap, setWorkflowsMap] = useState<Record<number, WorkflowDefinition[]>>({});
   const [loadingWorkflows, setLoadingWorkflows] = useState<Set<number>>(new Set());
   const workflowLoadInFlightRef = useRef<Map<number, AuthSessionGeneration>>(new Map());
-  const refreshRequestRef = useRef<{ id: number; session: AuthSessionGeneration } | null>(null);
+  const refreshRequestRef = useRef<{ id: number; session: AuthSessionGeneration; owner: { accountId: string | null; generation: number } } | null>(null);
   const refreshRequestIdRef = useRef(0);
   const branchRequestRef = useRef<{ id: number; forkId: number; session: AuthSessionGeneration } | null>(null);
   const branchRequestIdRef = useRef(0);
@@ -65,8 +65,13 @@ export const useForkTimelineActions = () => {
   const { captureSession, isCurrentSession } = useAuthSessionGeneration(authSessionIdentity);
   useEffect(() => {
     if (refreshRequestRef.current && !isCurrentSession(refreshRequestRef.current.session)) {
+      // R13 审计修复（CodeRabbit）：清理过期请求必须携带发起刷新时记录的归属
+      // 信息——无归属的 setForkIsRefreshing(false) 会在代次推进（同账号换凭据）
+      // 后被 store 侧归属校验拒绝（返回 {}），刷新标志滞留 true，刷新按钮与
+      // 账号选择框永久禁用。
+      const staleOwner = refreshRequestRef.current.owner;
       refreshRequestRef.current = null;
-      setForkIsRefreshing(false);
+      setForkIsRefreshing(false, staleOwner);
     }
     if (branchRequestRef.current && !isCurrentSession(branchRequestRef.current.session)) {
       branchRequestRef.current = null;
@@ -156,12 +161,15 @@ export const useForkTimelineActions = () => {
       return;
     }
     const requestSession = captureSession();
-    const refreshRequest = { id: ++refreshRequestIdRef.current, session: requestSession };
-    refreshRequestRef.current = refreshRequest;
-    const startTime = Date.now();
     // 交接项 2（R12）：刷新标志携带发起会话身份（账号 + 会话代次），过期
     // finally 不得清除新账号/新凭据会话正在进行的刷新标志。
     const refreshOwner = { accountId: peekCurrentAccountId(), generation: getAccountSessionGeneration() };
+    // R13 审计修复（CodeRabbit）：请求对象同时保存刷新标志的归属信息——
+    // 会话变化 effect 清理过期请求时以该归属调用 setForkIsRefreshing(false)，
+    // 使标志清理不再依赖当前会话代次。
+    const refreshRequest = { id: ++refreshRequestIdRef.current, session: requestSession, owner: refreshOwner };
+    refreshRequestRef.current = refreshRequest;
+    const startTime = Date.now();
     state.setForkIsRefreshing(true, refreshOwner);
     try {
       const api = createGitHubApiService(state.githubToken);

@@ -804,6 +804,12 @@
     "data-imported-successfully": "データのインポートが成功しました",
     "import-data": "データのインポート",
     "import-failed-please-try-again": "インポートに失敗しました。もう一度お試しください",
+    "pat-export-authorization-title": "GitHub トークンのエクスポート承認",
+    "pat-export-authorization-desc": "このエクスポートには、保存済みのすべてのアカウントの GitHub トークンが平文で含まれます。エクスポートのたびに明示的な承認が必要で、保存済みの「バックアップ/エクスポート時にキーを含める」設定は承認とはみなされません。",
+    "pat-export-deny": "拒否",
+    "pat-export-authorize": "承認",
+    "import-accounts-need-reauth": "データのインポートに成功しました。次のアカウントにはローカルの資格情報がなく、再認証が必要です：{{accounts}}",
+    "import-skipped-unattributed-top-level": "バックアップの最上位データはどのアカウントにも紐付いていないため書き込みをスキップしました。現在のアカウントのデータは影響を受けません。",
     "unanalyzed-repos-cannot-be-cleaned-directly-use": "未解析の倉庫は直接清掃することができませんので、AI解析機能を利用して処理してください。",
     "cleanup-data": "クリーンデータ",
     "data-cleanup-successful": "データのクリーニングが成功しました",
@@ -1440,7 +1446,7 @@
     "backend-credential-sync-failed": "アカウントにはログインしましたが、バックエンドの認証情報を更新できませんでした。後でアカウントメニューから再試行してください。"
   },
   "accountSwitch": {
-    "device-credential-removal-pending": "ログアウトしましたが、デバイス側の認証情報の削除が完了しませんでした。古い認証情報は引き続き無効化され、次回起動時に自動的に再試行されます。",
+    "device-credential-removal-pending": "ログアウトしましたが、デバイス側の認証情報の削除が完了しませんでした。古い認証情報は引き続きブロックされ、次回起動時に自動的に再試行されます。",
     "active-account-update-skipped": "この切り替えの途中で別のデバイスがバックエンドのアクティブアカウントを変更したため、バックエンドはこのアカウントに切り替わりませんでした。ローカルセッションはすでにこのアカウントです。アカウントメニューから再試行してバックエンドを同期してください。"
   }
 }

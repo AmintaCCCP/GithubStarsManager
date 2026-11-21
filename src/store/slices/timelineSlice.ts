@@ -242,7 +242,11 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
         // R12 finding 2：单条已读是唯一允许乐观 mark-all 回滚「保留并发新增」
         // 的写入来源；latest 模式连同同仓库其余 release 一并标记也属于单次
         // 用户已读操作。
-        recordReadReleasesWrite('single-read', newReadReleases);
+        // 第 13 轮审计修复 [106]：登记本次操作的目标 ID（clearedIds），不再只
+        // 记录整个 readReleases 集合引用——乐观 mark-all 的失败回滚据此把等待
+        // 期间用户单条已读的目标 ID 从撤销集合中排除（回滚只撤销全部已读乐观
+        // 更新独有的 ID）。展示层按此消费（features 域同步）。
+        recordReadReleasesWrite('single-read', newReadReleases, clearedIds);
         return { readReleases: newReadReleases, releases };
       }),
       // 资产级已读：仅从 release.updated_asset_ids 移除该资产 id，不动 readReleases/is_read。

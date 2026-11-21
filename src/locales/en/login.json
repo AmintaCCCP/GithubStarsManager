@@ -64,6 +64,7 @@
     "click-to-sign-in": "Click to sign in",
     "token-required": "Token required",
     "select-account-to-restore": "Select an account to restore",
-    "multiple-accounts-exist-on-this-backend-select-th": "Multiple accounts exist on this backend; select the account to restore."
+    "multiple-accounts-exist-on-this-backend-select-th": "Multiple accounts exist on this backend; select the account to restore.",
+    "multiple-accounts-exist-on-this-backend-close-th": "Multiple accounts exist on this backend. Close this dialog and select the account to restore on the login screen."
   }
 }

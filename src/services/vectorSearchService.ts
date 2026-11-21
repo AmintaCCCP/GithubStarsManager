@@ -294,6 +294,31 @@ const isAbortSignalLike = (value: unknown): value is AbortSignal => (
 
 type VectorSearchServiceConfig = Pick<VectorSearchConfig, 'workerUrl' | 'authToken'>;
 
+/**
+ * Worker 请求错误（第 13 轮审计修复 [71]/[73]）：保留响应体中的稳定错误码
+ * （如 ACCOUNT_METADATA_NOT_INDEXED——/status 探测通过后 Worker 仍可能在查询
+ * 时回滚），查询管道据此识别「账号元数据索引未就绪」并把稠密召回标记为降级。
+ */
+export class WorkerRequestError extends Error {
+  readonly code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'WorkerRequestError';
+    if (code) this.code = code;
+  }
+}
+
+/** 从 Worker 错误响应体（JSON 文本）中提取稳定错误码。 */
+const parseWorkerErrorCode = (rawBody: string): string | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(rawBody);
+    const code = (parsed as { code?: unknown } | null)?.code;
+    return typeof code === 'string' && code ? code : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export class VectorSearchService {
   private workerUrl: string;
   private authToken: string;
@@ -323,12 +348,16 @@ export class VectorSearchService {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      throw new Error(`Worker error ${response.status}: ${errText}`);
+      throw new WorkerRequestError(`Worker error ${response.status}: ${errText}`, parseWorkerErrorCode(errText));
     }
 
     const data = await response.json();
     if (data.success === false) {
-      throw new Error(data.error || 'Unknown worker error');
+      const code = (data as { code?: unknown }).code;
+      throw new WorkerRequestError(
+        data.error || 'Unknown worker error',
+        typeof code === 'string' && code ? code : undefined,
+      );
     }
     return data as T;
   }
@@ -473,7 +502,15 @@ const ACCOUNT_SCOPE_MIGRATION_KEY = 'gsm.vectorAccountScopeMigrationDone';
  */
 type AccountScopeMigrationRecord = Record<string, string>;
 
-const readMigrationDoneWorkers = (): AccountScopeMigrationRecord => {
+/**
+ * 会话内迁移完成记录（第 13 轮审计修复 [22]）：localStorage 写入失败（隐私
+ * 模式/配额）时退化为会话内标记——迁移成功后先同步更新内存，再尝试持久化；
+ * 读取路径合并内存与持久化记录，使写入失败后本次会话的后续增量索引仍能
+ * 识别已完成迁移，不会对全部已分析仓库重复生成 Embedding。
+ */
+let inMemoryMigrationDoneWorkers: AccountScopeMigrationRecord = {};
+
+const readPersistedMigrationDoneWorkers = (): AccountScopeMigrationRecord => {
   try {
     const raw = localStorage.getItem(ACCOUNT_SCOPE_MIGRATION_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : {};
@@ -490,11 +527,16 @@ const readMigrationDoneWorkers = (): AccountScopeMigrationRecord => {
   }
 };
 
+const readMigrationDoneWorkers = (): AccountScopeMigrationRecord => ({
+  ...readPersistedMigrationDoneWorkers(),
+  ...inMemoryMigrationDoneWorkers,
+});
+
 const persistMigrationDoneWorkers = (record: AccountScopeMigrationRecord): void => {
   try {
     localStorage.setItem(ACCOUNT_SCOPE_MIGRATION_KEY, JSON.stringify(record));
   } catch {
-    // 存储不可用（隐私模式/配额）时退化为会话内标记
+    // 存储不可用（隐私模式/配额）时退化为会话内标记（内存记录已同步更新）
   }
 };
 
@@ -517,9 +559,17 @@ export function isAccountScopeMigrationDone(
 function markAccountScopeMigrationDone(accountId: string, workerId?: string | null): void {
   const record = readMigrationDoneWorkers();
   if (record[accountId] !== undefined && record[accountId] === (workerId ?? '')) return;
-  record[accountId] = typeof workerId === 'string' && workerId ? workerId : '';
-  persistMigrationDoneWorkers(record);
+  const workerValue = typeof workerId === 'string' && workerId ? workerId : '';
+  // 第 13 轮审计修复 [22]：先同步更新内存记录（localStorage 写入失败时会话内
+  // 标记仍然生效），再尝试持久化；仅在上传成功后被调用，上传失败保持未完成。
+  inMemoryMigrationDoneWorkers[accountId] = workerValue;
+  persistMigrationDoneWorkers({ ...record, [accountId]: workerValue });
 }
+
+/** 仅供测试：清空会话内迁移完成记录，模拟一次全新的应用启动。 */
+export const __resetInMemoryAccountScopeMigrationForTest = (): void => {
+  inMemoryMigrationDoneWorkers = {};
+};
 
 /**
  * 拼接仓库文本用于 embedding
@@ -853,7 +903,11 @@ export async function indexAllRepos(
               // 历史/导入数据 license 可能是 GitHub 对象或数字；统一经 normalizeLicense
               // 降为 SPDX id / 哨兵，避免把 "[object Object]" 写入向量元数据。
               license: normalizeLicense(batch[j].license),
-              ...(accountId ? { accountId } : {}),
+              // 第 13 轮跨域接缝（server 域 [68]）：未登录（accountId 缺省）的上传
+              // 统一以 'default' 记入 metadata.accountId——服务端按归属投影候选时
+              // 匿名向量不再无法归属。仅写 metadata，不改向量 ID 形态（保持
+              // legacy 无前缀 ID，server 侧候选投影无需放行新前缀）。
+              accountId: accountId ?? 'default',
             },
           });
           vectorizeRepoIds.push(batch[j].id);

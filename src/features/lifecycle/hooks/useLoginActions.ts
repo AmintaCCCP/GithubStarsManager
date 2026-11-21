@@ -10,7 +10,7 @@ import {
   type BackendAuthRestore,
   type BackendAuthRestoreAccount,
 } from '../../../services/backendAdapter';
-import { drainInFlightBackendPulls as drainInFlightBackendPullsImpl, syncFromBackend, withAccountSwitchFrozen } from '../../../services/autoSync';
+import { drainInFlightBackendPulls as drainInFlightBackendPullsImpl, syncFromBackend, withAccountSwitchFrozen, type SyncFromBackendPullResult } from '../../../services/autoSync';
 import { accountIdKey } from '../../../store/helpers/accountWorkspace';
 import type { GitHubUser } from '../../../types';
 
@@ -63,7 +63,7 @@ export interface LoginActions {
    * 拉取成功后由调用方统一提交工作区与登录态；恢复失败时登录页保持在
    * 当前页面并可见错误。autoSync 侧支持见 HANDOFF-B-TO-C.md。
    */
-  syncBackendData: (options?: { targetAccountId?: string }) => Promise<void>;
+  syncBackendData: (options?: { targetAccountId?: string }) => Promise<SyncFromBackendPullResult | null>;
   /** 当前后端 URL：候选连接失败时用于成对恢复 URL 与 API 密钥。 */
   getBackendUrl: () => string | null;
   /** 持久化的后端 URL（R2-B7：候选认证前记录，失败回滚时还原）。 */
@@ -138,11 +138,17 @@ export const useLoginActions = (): LoginActions => {
       // 的唯一写入路径就是 PUT /api/settings 的 user_profile（Issue #611）。
       const { user } = useAppStore.getState();
       const accountId = accountIdKey(user);
-      await backend.syncSettings({
+      // R13 审计修复：服务端 PAT 校验超时/凭据被并发覆盖时仍返回 200 并携带
+      // token_update_skipped / token_update_superseded——此时后端分区仍保留旧
+      // PAT，绝不能按成功返回（登录页只在 ok=false 时显示警告横幅）。
+      const result = await backend.syncSettings({
         github_token: token,
         ...(accountId ? { active_account_id: accountId } : {}),
         ...(user ? { user_profile: user } : {}),
       });
+      if (result.tokenUpdateSkipped || result.tokenUpdateSuperseded) {
+        return { ok: false };
+      }
       return { ok: true };
     } catch (e) {
       console.warn('Failed to save GitHub token to backend:', e);
@@ -232,21 +238,40 @@ export const useLoginActions = (): LoginActions => {
     // 服务端回退全局 active_account_id——旧账号 A 的凭据会被新账号 B 的
     // Token/user_profile 覆盖。
     const accountId = accountIdKey(user);
-    await backend.syncSettings({
+    // R13 审计修复：syncSettings 可能返回 200 + token_update_skipped（PAT 校验
+    // 超时/被并发覆盖跳过写入）——此时后端分区仍保留旧 PAT，与本流程刚校验的
+    // Token 不一致。与账号切换路径（alignTargetAccountOnBackend）同一语义视为
+    // 凭据未对齐：抛错让登录流程进入失败回滚，绝不继续提交登录。
+    const syncResult = await backend.syncSettings({
       github_token: token,
       ...(accountId ? { active_account_id: accountId } : {}),
       user_profile: user,
     }, undefined, accountId);
+    if (syncResult?.tokenUpdateSkipped === true) {
+      throw new Error('Backend token update was skipped; credentials are not aligned.');
+    }
     // R2-B12：候选后端完成 Token 设置不等于登录提交成功——严格仓库拉取失败
     // 时必须保留原持久化 URL，持久化改由调用方在登录提交完成后经
     // rememberActiveBackendUrl 执行。
     return user;
   }, [authenticateWithGitHub]);
-  const syncBackendData = useCallback(async (options?: { targetAccountId?: string }) => {
+  const syncBackendData = useCallback(async (
+    options?: { targetAccountId?: string },
+  ): Promise<SyncFromBackendPullResult | null> => {
     // B13（HANDOFF-B-TO-C.md 已落地）：targetAccountId 为显式账号恢复——
     // 恢复拉取以已验证账号 ID 构造请求头，不依赖提前 setUser 生成请求头，
     // 登录态由调用方在拉取成功后统一提交。
-    await syncFromBackend({
+    // R13 审计修复：本包装恒为严格拉取（throwOnRepoFailure: true）。后端不可用
+    // 时 syncFromBackend 会静默返回，被登录页 startPull 当作拉取完成——先清理
+    // 工作区再把可能为空的顶层写入目标账号归档并提交登录。严格模式必须在此
+    // 抛错，让 startPull 的 catch 按 prePullWorkspace 还原本地状态。
+    if (!backend.isAvailable) {
+      throw new Error('Backend unavailable before strict pull');
+    }
+    // R13 finding 36：透传 syncFromBackend 的分片拉取结果（各分片 HTTP 读取
+    // 是否成功；null=拉取未执行/被丢弃/失败）——调用方（登录页）可据此区分
+    // 「拉取成功但某分片为空」与「分片读取失败」，忽略返回值的既有调用方不受影响。
+    return await syncFromBackend({
       force: true,
       throwOnRepoFailure: true,
       ...(options?.targetAccountId ? { targetAccountId: options.targetAccountId } : {}),

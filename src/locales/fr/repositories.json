@@ -209,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "Arrêter l'analyse de l'IA",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "Êtes-vous sûr de vouloir arrêter l’analyse de l’IA ? Les résultats analysés seront enregistrés.",
+    "analysis-task-already-running": "Une tâche d’analyse par IA est déjà en cours. Attendez qu’elle se termine ou arrêtez la tâche en cours avant de réessayer.",
     "no-failed-repositories-to-re-analyze": "Pas de référentiel avec une analyse échouée !",
     "all-repositories-have-been-analyzed": "Tous les entrepôts ont été analysés !",
     "no-repositories-to-analyze": "Il n'y a pas de référentiels à analyser !",

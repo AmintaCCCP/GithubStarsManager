@@ -843,6 +843,37 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     expect(useAppStore.getState().accountWorkspaces['2']).toBeDefined();
   });
 
+  it('re-persists device credentials when delete-all fails after clearing them (R13 finding 92)', async () => {
+    // clearGhAccountTokens 成功、后续步骤失败：内存账号与运行时 Token 保留，
+    // 但磁盘凭据已被删除且快照不含运行时 Token（重启后无可回填来源）——
+    // 失败路径必须按保留在内存中的账号重新落盘凭据，保证磁盘与内存一致。
+    const { removePersistedSnapshot } = await import('../../store/persistence/storage');
+    vi.mocked(removePersistedSnapshot).mockRejectedValueOnce(new Error('indexeddb locked'));
+    try {
+      render(<DataManagementPanel t={t} />);
+      fireEvent.click(screen.getByRole('button', { name: 'dataManagementPanel.delete-all-data-2' }));
+      fireEvent.change(screen.getByLabelText(/please-enter-your-github-username/), {
+        target: { value: 'alice' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'dataManagementPanel.confirm-delete' }));
+
+      expect(await screen.findByText('dataManagementPanel.delete-failed-please-try-again')).toBeInTheDocument();
+      expect(ghAccountSecretsMocks.clearGhAccountTokens).toHaveBeenCalledOnce();
+      // 内存态保留（等待用户重试续清）
+      expect(useAppStore.getState().user?.login).toBe('alice');
+      expect(useAppStore.getState().savedAccounts['1']?.githubToken).toBe('ghp_a');
+      // 磁盘凭据按保留在内存中的账号重新落盘（幂等全量同步恢复机制）
+      expect(ghAccountSecretsMocks.syncGhAccountTokensFromState).toHaveBeenCalledWith(expect.objectContaining({
+        savedAccounts: expect.objectContaining({
+          '1': expect.objectContaining({ githubToken: 'ghp_a' }),
+        }),
+      }));
+    } finally {
+      vi.mocked(removePersistedSnapshot).mockReset();
+      vi.mocked(removePersistedSnapshot).mockResolvedValue(undefined);
+    }
+  });
+
   it('derives import types from raw workspace fields for partial backups (activeAccountId + nested repositories only)', async () => {
     const user = userEvent.setup();
 
@@ -1009,7 +1040,11 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     const state = useAppStore.getState();
     // 同一备份内重复 ID 仅接受首条；本机已有条目不受影响
     expect(state.gists.filter((g: Gist) => g.id === 'gist-dup')).toHaveLength(1);
+    // 审计修复（R13 finding 30）：仅断言数量拦不住「保留第二条」的回归——
+    // 两个列表都必须断言保留记录是注释所述的首条（description 为 'first'）
+    expect(state.gists.find((g: Gist) => g.id === 'gist-dup')?.description).toBe('first');
     expect(state.gistSearchResults.filter((g: Gist) => g.id === 'gist-dup')).toHaveLength(1);
+    expect(state.gistSearchResults.find((g: Gist) => g.id === 'gist-dup')?.description).toBe('first');
   });
 
   it('aborts import when the session generation changed after the preview opened (same-account credential switch, R12)', async () => {

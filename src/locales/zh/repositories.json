@@ -209,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "停止AI分析",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "确定要停止 AI 分析吗？已分析的结果将会保存。",
+    "analysis-task-already-running": "AI 分析任务正在进行中，请等待其完成或停止当前任务后再试。",
     "no-failed-repositories-to-re-analyze": "没有分析失败的仓库！",
     "all-repositories-have-been-analyzed": "所有仓库都已经分析过了！",
     "no-repositories-to-analyze": "没有可分析的仓库！",

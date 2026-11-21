@@ -414,6 +414,16 @@ export const useRepositoryCardActions = ({
       if (isAbortError(error) || controller.signal.aborted) return;
       if (!isCurrentAccountSession(requestAccountId, requestGeneration)) return;
       console.error('Find similar repositories failed:', error);
+      // R13 finding 74：索引未就绪且无本地候选的错误携带稳定原因代码
+      //（similarRepositoryPipeline 抛出的 Error 扩展属性
+      // denseIndexUnavailableReasonCode）——按代码渲染本地化提示，不再把
+      // 英文诊断文本直接展示给用户；非索引类错误无代码，保持既有回退文案。
+      const reasonCode = (error as { denseIndexUnavailableReasonCode?: unknown } | null)
+        ?.denseIndexUnavailableReasonCode;
+      if (typeof reasonCode === 'string' && reasonCode.length > 0) {
+        toast(t(`useRepositoryCardActions.dense-index-unavailable-reason-${reasonCode}`), 'error');
+        return;
+      }
       const errorMessage = error instanceof Error && error.message
         ? error.message
         : (t('useRepositoryCardActions.failed-to-find-similar-repositories-please-check'));

@@ -1,7 +1,7 @@
 
 
 import { useT } from '../i18n/useT';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useSyncExternalStore } from 'react';
 import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X, ChevronDown, Check, UserPlus, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -12,7 +12,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { HeaderMenuId, AppState, SavedAccount } from '../types';
 import {
+  getPendingBackendCredentialAlignVersion,
   hasPendingBackendCredentialAlign,
+  subscribePendingBackendCredentialAlign,
   useAccountSwitchActions,
 } from '../features/lifecycle/hooks/useAccountSwitchActions';
 import { AddAccountModal } from './AddAccountModal';
@@ -89,8 +91,17 @@ export const Header: React.FC = () => {
   // 会话；后端凭据对齐失败会保留待对齐标记并提示重试——但切换菜单仅在多账号
   // 时渲染，单账号用户无法通过选择当前账号重试。当前账号存在待对齐标记时，
   // 即使只有一个账号也在资料区旁提供重试入口（复用 handleSwitchAccount：其
-  // 守卫对带待对齐标记的当前账号放行，重新走后端对齐）。标记为模块级集合，
-  // 切换失败/成功的路径都会经 isSwitchingMenu 触发重渲染，读取时刻足够新。
+  // 守卫对带待对齐标记的当前账号放行，重新走后端对齐）。
+  // 审计修复（R13 finding 84）：标记是模块级集合而非 React 状态——快捷登录
+  // 路径不经过 Header 的 isSwitchingMenu，对齐失败写入标记本身不触发 Header
+  // 重渲染。经 features 域的最小外部订阅（版本计数 + useSyncExternalStore）
+  // 让标记写入/清除立即触发本组件重算：版本变化即重渲染，重试入口不依赖
+  // 拉取副作用或无关重渲染带动。订阅只负责触发重算；成员判断仍走
+  // hasPendingBackendCredentialAlign 的既有语义（幂等写入不抬版本）。
+  useSyncExternalStore(
+    subscribePendingBackendCredentialAlign,
+    getPendingBackendCredentialAlignVersion,
+  );
   const currentSavedAccountEntry = currentAccountId
     ? savedAccountList.find((account) => account.accountId === currentAccountId) ?? null
     : null;

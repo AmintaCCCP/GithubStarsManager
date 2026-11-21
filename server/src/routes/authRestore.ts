@@ -6,6 +6,7 @@ import { logger } from '../services/logger.js';
 import {
   claimLegacyDefaultIfNeeded,
   getLegacyDefaultClaimedBy,
+  hasInvalidAccountHeader,
   resolveWritableAccountScope,
   collectNonDefaultPartitionIds,
 } from '../db/accountScope.js';
@@ -195,6 +196,18 @@ function readScopedToken(db: ReturnType<typeof getDb>, accountId: string): strin
 router.post('/api/sync/auth', async (req, res) => {
   try {
     const db = getDb();
+    // Issue #612 R13（审计 63）：先拒绝格式无效的账号头（已发送但值为空白或
+    // 非数字形态，如 `abc` / ''）再解析恢复目标——否则请求体中携带的 account_id
+    // 会被选中并返回该账号的恢复结果，与分类/设置/代理等路由对同一无效头返回
+    // 409 ACCOUNT_SCOPE_REQUIRED 的行为不一致。合法账号头优先、未发送账号头时
+    // 才从请求体选择账号的行为保持不变。
+    if (hasInvalidAccountHeader(req)) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
     const bodyAccountId = typeof (req.body as Record<string, unknown> | undefined)?.account_id === 'string'
       ? ((req.body as Record<string, unknown>).account_id as string).trim()
       : '';

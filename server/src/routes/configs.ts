@@ -17,6 +17,8 @@ import {
   fetchGitHubUserId,
   getAccountCredentialVersion,
   bumpAccountCredentialVersion,
+  getAccountProfileVersion,
+  bumpAccountProfileVersion,
   getActiveAccountVersion,
   bumpActiveAccountVersion,
   ACCOUNT_SCOPED_SETTING_KEYS,
@@ -739,26 +741,24 @@ router.put('/api/settings', async (req, res) => {
         res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
         return;
       }
-      if (normalizedUserProfile && typeof normalizedUserProfile === 'object' && 'id' in normalizedUserProfile) {
+      if (normalizedUserProfile && typeof normalizedUserProfile === 'object') {
         const profileObj = normalizedUserProfile as Record<string, unknown>;
         const profileId = profileObj.id;
         // Issue #612 审计（699）：先校验 id 类型再比较账号——数组等非数字形态
         // 会骗过字符串比较（String([111]) === '111'）并被原样写进 accounts.user_json，
         // 客户端的 accountIdKey 无法接受。仅接受数字或数字字符串；合法数字字符
-        // 串先归一化为数字再核对（'0111' 与 111 同一账号）。profileId 为 null 或
-        // 空字符串时保留现有语义（null 跳过核对；'' 走账号不匹配的 400）。
-        if (isRealAccount && profileId !== undefined && profileId !== null) {
+        // 串先归一化为数字再核对（'0111' 与 111 同一账号）。
+        // Issue #612 R13（审计 64）：真实账号的非空资料必须包含与目标账号匹配的
+        // 数字 id——仅含 login 等字段（或 id 缺失 / null / 非数字）的资料一旦替换
+        // accounts.user_json，恢复流程会因缺数字 id 拒绝该条目且不回查 PAT，
+        // 账号无法进入已保存账号列表（非活跃账号失去一键切换入口）。故在写入前
+        // 拒绝请求，已保存的 PAT 不受影响。显式清空（null / ''）路径保留；
+        // default 分区的全局 user_profile 写入语义不变。
+        if (isRealAccount) {
           const isNumericProfileId = (typeof profileId === 'number' && Number.isInteger(profileId))
             || (typeof profileId === 'string' && /^\d+$/.test(profileId));
-          if (!isNumericProfileId) {
-            res.status(400).json({
-              error: 'user_profile.id does not match target account',
-              code: 'INVALID_USER_PROFILE',
-            });
-            return;
-          }
           const comparableProfileId = typeof profileId === 'string' ? Number(profileId) : profileId;
-          if (String(comparableProfileId) !== accountId) {
+          if (!isNumericProfileId || String(comparableProfileId) !== accountId) {
             res.status(400).json({
               error: 'user_profile.id does not match target account',
               code: 'INVALID_USER_PROFILE',
@@ -796,6 +796,9 @@ router.put('/api/settings', async (req, res) => {
     // 时放弃本次 PAT 写回（绝不把校验时的 PAT 写回两个已变化的位置）。
     let tokenVerificationFailed = false;
     let tokenWriteSuperseded = false;
+    // Issue #612 R13（审计 13）：资料版本与凭据版本分开记录——资料写入不推进
+    // 凭据/活跃账号版本，GitHub 校验等待期间另一设备可以只更新同账号资料。
+    const profileVersionBefore = isRealAccount ? getAccountProfileVersion(db, accountId) : 0;
     const credentialVersionBefore = isRealAccount ? getAccountCredentialVersion(db, accountId) : 0;
     const activeAccountVersionBefore = isRealAccount ? getActiveAccountVersion(db) : 0;
     const rawToken = updates.github_token;
@@ -845,6 +848,9 @@ router.put('/api/settings', async (req, res) => {
     // Issue #612 R12：更晚的账号切换抢先导致本次活跃账号写入被跳过时置位，
     // 供客户端识别冲突 / 重试（不把这次请求报告为对齐成功）。
     let activeWriteSkipped = false;
+    // Issue #612 R13（审计 13）：校验等待期间同账号资料已被并发请求更新
+    // （资料版本已推进）时置位：本次携带的旧资料被跳过并在响应中报告冲突。
+    let profileWriteSuperseded = false;
 
     const upsert = db.transaction(() => {
       // Issue #612 审计（798）：无账号头请求在事务写入任何设置前重新确认写入
@@ -934,10 +940,20 @@ router.put('/api/settings', async (req, res) => {
         && (accountPayload.userProfile !== undefined
           || accountPayload.tokenEncrypted !== null
           || accountPayload.tokenCleared)) {
+        // Issue #612 R13（审计 13）：写回前单独复核资料版本——校验等待期间资料
+        // 已被并发请求更新时，跳过本次携带的旧资料（保留较新的 user_json）并在
+        // 响应中报告冲突；未被替换且已验证的 PAT 照常保存。资料未提交或版本
+        // 未变时行为与原先一致。
+        let effectiveUserProfile = accountPayload.userProfile;
+        if (effectiveUserProfile !== undefined
+          && getAccountProfileVersion(db, accountId) !== profileVersionBefore) {
+          profileWriteSuperseded = true;
+          effectiveUserProfile = undefined;
+        }
         upsertAccountRow(
           db,
           accountId,
-          accountPayload.userProfile,
+          effectiveUserProfile,
           accountPayload.tokenCleared ? null : accountPayload.tokenEncrypted,
           accountPayload.tokenCleared,
         );
@@ -978,6 +994,7 @@ router.put('/api/settings', async (req, res) => {
       updated: true,
       ...(tokenVerificationFailed ? { token_update_skipped: true } : {}),
       ...(tokenWriteSuperseded ? { token_update_superseded: true } : {}),
+      ...(profileWriteSuperseded ? { profile_update_superseded: true } : {}),
       ...(activeWriteSkipped ? { active_account_update_skipped: true } : {}),
     });
   } catch (err) {
@@ -1025,6 +1042,11 @@ function upsertAccountRow(
     userJsonProvided: userProfileRaw !== undefined ? 1 : 0,
     clearToken: clearToken ? 1 : 0,
   });
+  // Issue #612 R13（审计 13）：资料实际写回后递增资料版本，使其他设备等待中的
+  // 迟到资料写回失效（与凭据版本同语义；这是 accounts.user_json 的唯一写路径）。
+  if (userProfileRaw !== undefined) {
+    bumpAccountProfileVersion(db, accountId);
+  }
 }
 
 // ── Embedding Configs ──

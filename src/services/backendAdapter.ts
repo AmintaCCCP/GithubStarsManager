@@ -272,6 +272,14 @@ class BackendAdapter {
 
   private _connectionGeneration = 0;
 
+  /**
+   * 探测代次（第 13 轮审计修复 [23]）：init() 入口记录、断开或启动新探测时
+   * 递增——健康检查完成后只有当前代次的探测允许提交 URL 并发布探测结果，
+   * 避免旧探测（init(X) 等待期间连接被 disconnect() 清空或被新探测取代）
+   * 覆盖断开/回滚状态。
+   */
+  private _probeGeneration = 0;
+
   /** 后端连接代次：每次后端地址变化时递增，用于识别 X→Y→X 切出再切回同 URL 的连接变化。 */
   get connectionGeneration(): number {
     return this._connectionGeneration;
@@ -285,6 +293,8 @@ class BackendAdapter {
   }
 
   async init(preferredUrl?: string): Promise<void> {
+    // 第 13 轮审计修复 [23]：入口记录探测代次（启动新探测即使旧代次失效）。
+    const probeGeneration = ++this._probeGeneration;
     if (this._beforeInitHook) {
       try {
         await this._beforeInitHook();
@@ -325,6 +335,9 @@ class BackendAdapter {
           if (res.ok) {
             const data = await res.json();
             if (data.status === 'ok') {
+              // 第 13 轮审计修复 [23]：等待健康检查期间若发生 disconnect() 或
+              // 新探测（代次已变化），旧探测不得提交候选 URL，也不发布探测结论。
+              if (probeGeneration !== this._probeGeneration) return;
               // In-memory commit only. Persistence is an explicit caller
               // decision (rememberActiveUrl) after its own auth checks, so a
               // candidate that later fails authentication is never remembered.
@@ -340,16 +353,22 @@ class BackendAdapter {
         }
       }
 
+      if (probeGeneration !== this._probeGeneration) return;
       this.commitBackendUrl(null);
       logger.info('backendAdapter', 'Backend not available, using local-only mode');
     } catch {
+      if (probeGeneration !== this._probeGeneration) return;
       this.commitBackendUrl(null);
       logger.info('backendAdapter', 'Backend not available, using local-only mode');
     } finally {
       // 探测结束：标记结论已落定并通知订阅者。即使可用性没有翻转
       // （如纯浏览器模式保持 null），订阅方也需要重新取值。
-      setBackendProbed();
-      for (const listener of this._availabilityListeners) listener();
+      // 第 13 轮审计修复 [23]：失效的旧探测不发布结论（由当前探测或
+      // disconnect 负责通知订阅者）。
+      if (probeGeneration === this._probeGeneration) {
+        setBackendProbed();
+        for (const listener of this._availabilityListeners) listener();
+      }
     }
   }
 
@@ -411,6 +430,9 @@ class BackendAdapter {
    * 候选 URL 并把回滚悄悄连回候选后端。
    */
   disconnect(): void {
+    // 第 13 轮审计修复 [23]：断开使尚未完成的探测失效（旧探测的提交与结论
+    // 发布被代次门控拦下），随后由本次断开统一通知订阅者。
+    this._probeGeneration += 1;
     this.commitBackendUrl(null);
     setBackendProbed();
     for (const listener of this._availabilityListeners) listener();
@@ -1036,8 +1058,25 @@ class BackendAdapter {
   async fetchRepositories(accountId?: string | null): Promise<{ repositories: Repository[]; total: number; revision?: number | null }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
+    // 第 13 轮审计修复 [107]：分页读取必须固定到单一账号分区——账号在读取开始
+    // 时确定一次（显式参数优先，否则读取 Store 当前用户），每页复用同一请求头。
+    // 无法固定账号（无显式参数且 Store 无用户）时直接失败：服务端会逐页回退
+    // 全局 active_account_id，两页之间活跃账号切换且 revision 恰好相同时，
+    // 页间校验不会失败，无头读取可能拼接两个账号的分区。
+    const pinnedAccountId = accountId !== undefined
+      ? accountId
+      : (() => {
+        try {
+          return accountIdKey(useAppStore.getState().user);
+        } catch {
+          return null;
+        }
+      })();
+    if (!pinnedAccountId) {
+      throw new Error('Backend repository pagination requires an account context');
+    }
     const backendUrl = this._backendUrl;
-    const headers = getBackendAuthHeaders(accountId);
+    const headers = getBackendAuthHeaders(pinnedAccountId);
     const collected: Repository[] = [];
     let total = 0;
     let revision: number | null = null;
@@ -1307,10 +1346,8 @@ class BackendAdapter {
       timedOut = true;
       deadlineController.abort();
     }, SYNC_SETTINGS_DEADLINE_MS);
-    let callerAborted = false;
     if (signal) {
       if (signal.aborted) {
-        callerAborted = true;
         deadlineController.abort();
       } else {
         signal.addEventListener('abort', () => deadlineController.abort(), { once: true });
@@ -1328,16 +1365,23 @@ class BackendAdapter {
         signal: deadlineController.signal,
       });
       if (!res.ok) await this.throwTranslatedError(res, 'Sync settings error');
+      // 第 13 轮审计修复 [33]：分离正文读取与 JSON 解析——正文读取失败时超时
+      // 抛超时错误，其他失败（传输中断或调用方取消）原样抛出（凭据对齐结论
+      // 未知，调用方的待对齐状态不得被误清）；正文完整读取后，空正文或非法
+      // JSON 仍按「无标志成功」处理（旧行为）。
+      let text: string;
       try {
-        payload = await res.json();
+        text = await res.text();
       } catch (err) {
         if (timedOut) {
-          // 正文读取超时：凭据对齐结论未知——按失败处理，绝不当作两个标志均
-          // 为 false 的成功响应。
           throw new Error('Sync settings response body timed out');
         }
-        if (callerAborted) throw err;
-        // 响应体缺失/非法时按「无标志」处理（旧行为：写入成功）
+        throw err;
+      }
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        // 已完整收到的空正文或非法正文，保留旧的无标志成功行为。
         payload = null;
       }
     } finally {

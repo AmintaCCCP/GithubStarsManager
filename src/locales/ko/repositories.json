@@ -209,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "AI 분석 중지",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "AI 분석을 중지하시겠습니까? 분석된 결과가 저장됩니다.",
+    "analysis-task-already-running": "AI 분석 작업이 이미 실행 중입니다. 완료될 때까지 기다리거나 현재 작업을 중지한 후 다시 시도하세요.",
     "no-failed-repositories-to-re-analyze": "분석이 실패한 저장소는 없습니다!",
     "all-repositories-have-been-analyzed": "모든 창고가 분석되었습니다!",
     "no-repositories-to-analyze": "분석할 저장소가 없습니다!",

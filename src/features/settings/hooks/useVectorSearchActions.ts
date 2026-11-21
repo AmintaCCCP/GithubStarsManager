@@ -14,6 +14,7 @@ import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { logger } from '../../../services/logger';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
 import {
+  accountIdKey,
   getAccountSessionGeneration,
   isCurrentAccountSession,
   peekCurrentAccountId,
@@ -62,6 +63,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     activeEmbeddingConfig: store.activeEmbeddingConfig,
     vectorSearchConfig: store.vectorSearchConfig,
     repositories: store.repositories,
+    user: store.user,
     githubToken: store.githubToken,
     setVectorSearchStatus: store.setVectorSearchStatus,
     setVectorIndexingState: store.setVectorIndexingState,
@@ -90,6 +92,13 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     // 与 selectIndexableRepos 的顺序一致：先按增量谓词筛选，再按 id 去重，
     // 否则同 id 首条无需重建时会漏计第二条待索引记录。mode=null 表示全量目标，
     // 只做分析状态过滤（对应 formatVersionChanged 时的增量目标）。
+    // 账号范围迁移未完成时，上传路径会忽略增量过滤全量补写（runIndex 中
+    // accountScopeMigrationPending → incremental=false），计数必须复现同一判定，
+    // 否则按钮/徽标会因逐仓计数为 0 而拦住用户完成迁移的唯一增量入口。
+    const jobAccountId = accountIdKey(state.user);
+    const workerId = (state.vectorSearchConfig.workerUrl ?? '').replace(/\/+$/, '');
+    const migrationPending = !!jobAccountId && !isAccountScopeMigrationDone(jobAccountId, workerId);
+    const incrementalModeChanged = formatVersionChanged || migrationPending;
     const countAfter = (mode: boolean | null): number => {
       const seen = new Set<number>();
       let count = 0;
@@ -103,10 +112,10 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       return count;
     };
     return {
-      incrementalTargetCount: formatVersionChanged ? countAfter(null) : countAfter(false),
-      unindexedRepoCount: state.vectorSearchConfig.enabled ? countAfter(formatVersionChanged) : 0,
+      incrementalTargetCount: incrementalModeChanged ? countAfter(null) : countAfter(false),
+      unindexedRepoCount: state.vectorSearchConfig.enabled ? countAfter(incrementalModeChanged) : 0,
     };
-  }, [formatVersionChanged, state.repositories, state.vectorSearchConfig.enabled]);
+  }, [formatVersionChanged, state.repositories, state.user, state.vectorSearchConfig.enabled, state.vectorSearchConfig.workerUrl]);
 
   const testEmbedding = useCallback(async (draft: EmbeddingDraft) => {
     setTestingEmbedding(true);

@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
   storeUser: null as { id: number } | null,
   storeAccountWorkspaces: {} as Record<string, unknown>,
   markPendingAccountSync: vi.fn(),
+  // R13 审计修复（CodeRabbit）：待同步标记的后端归属必须在「发起时后端 X →
+  // 等待期间切到 Y」的场景下验证——只有空 URL 断言无法区分实现读取的是
+  // 发起时地址还是请求完成时地址。
+  backend: { backendUrl: null as string | null },
 }));
 vi.mock('../../../store/useAppStore', () => {
   const store = (selector: (state: unknown) => unknown) => selector({
@@ -48,6 +52,7 @@ vi.mock('../../../services/autoSync', () => ({
   withAccountSwitchGuardSync: (fn: () => void) => fn(),
 }));
 vi.mock('../../../services/translateService', () => ({ translateBatch: mocks.translateBatch }));
+vi.mock('../../../services/backendAdapter', () => ({ backend: mocks.backend }));
 
 const detail = (owner: string, name: string) => ({
   id: 1, name, full_name: `${owner}/${name}`, description: 'A repository',
@@ -64,6 +69,7 @@ describe('useBatchStarImport', () => {
     mocks.language = 'zh';
     mocks.storeUser = null;
     mocks.storeAccountWorkspaces = {};
+    mocks.backend.backendUrl = null;
     mocks.getRepositoryDetails.mockImplementation(async (owner, name) => detail(owner, name));
     mocks.isRepositoryStarred.mockResolvedValue(false);
     mocks.starRepository.mockResolvedValue(undefined);
@@ -264,9 +270,12 @@ describe('useBatchStarImport', () => {
     // 尾部同步（forceSyncToBackend）绝不能在切号后执行。
     mocks.storeUser = { id: 1 };
     mocks.storeAccountWorkspaces = { '1': { repositories: [] } };
+    // 发起星标请求时后端为 X；等待期间切换到 Y（模拟切号流程更换后端连接）
+    mocks.backend.backendUrl = 'https://backend-x.example/api';
     mocks.starRepository.mockImplementation(async () => {
-      // 星标请求期间切换到账号 2
+      // 星标请求期间切换到账号 2，同时后端地址从 X 切到 Y
       mocks.storeUser = { id: 2 };
+      mocks.backend.backendUrl = 'https://backend-y.example/api';
     });
     const { result } = renderHook(() => useBatchStarImport());
     await act(() => result.current.preview('https://github.com/owner/repo'));
@@ -279,6 +288,12 @@ describe('useBatchStarImport', () => {
     const parked = mocks.storeAccountWorkspaces['1'] as { repositories: Array<{ id: number }> };
     expect(parked.repositories).toHaveLength(1);
     expect(parked.repositories[0].id).toBe(1);
-    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', '');
+    // R13 审计修复（CodeRabbit）：待同步标记必须使用请求发起时的后端地址 X，
+    // 绝不能记录请求完成时的后端 Y——若实现改为在星标完成后读取地址，本断言
+    // 会因多出 Y 调用而失败。
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledTimes(1);
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', 'https://backend-x.example/api');
+    expect(mocks.markPendingAccountSync).not.toHaveBeenCalledWith('1', 'https://backend-y.example/api');
+    mocks.backend.backendUrl = null;
   });
 });

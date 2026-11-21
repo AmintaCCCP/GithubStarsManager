@@ -31,6 +31,13 @@ export interface ReadReleasesWriteInfo {
   source: ReadReleasesWriteSource;
   /** 本次写入实际写入 store 的集合引用；用于识别未经登记的原始 setState。 */
   next: ReadonlySet<number>;
+  /**
+   * 第 13 轮审计修复 [106]：single-read 登记本次操作的目标 ID（普通模式为被
+   * 点击的 release，latest 模式连同同仓库全部 release）。乐观「全部已读」的
+   * 失败回滚据此把这些 ID 从「仅由全部已读新增」的撤销集合中排除——等待期间
+   * 用户单条已读的条目不得被回滚撤销。其他来源不携带该字段。
+   */
+  targetIds?: ReadonlySet<number>;
 }
 
 let _readReleasesWriteRevision = 0;
@@ -40,12 +47,14 @@ let _lastReadReleasesWrite: ReadReleasesWriteInfo | null = null;
 export function recordReadReleasesWrite(
   source: ReadReleasesWriteSource,
   next: ReadonlySet<number>,
+  targetIds?: ReadonlySet<number>,
 ): void {
   _readReleasesWriteRevision += 1;
   _lastReadReleasesWrite = {
     revision: _readReleasesWriteRevision,
     source,
     next,
+    ...(targetIds ? { targetIds } : {}),
   };
 }
 

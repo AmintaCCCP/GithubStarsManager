@@ -297,6 +297,11 @@ describe('useReleaseTimelineActions account switch guards', () => {
 
     await act(async () => { await result.current.handleUnsubscribeRelease(1); });
 
+    // 先确认失败路径已执行（推送确实发出并失败），再检查回滚结果
+    expect(mocks.forceSyncToBackend).toHaveBeenCalled();
+    // 回滚效果可观察：被移除的自定义来源已恢复
+    expect((storeState as unknown as { releaseSourceSettings: { customReleaseRepos: unknown[] } })
+      .releaseSourceSettings.customReleaseRepos).toHaveLength(1);
     // 失败回滚只恢复删除前已展开的仓库——原本收起的仓库保持收起
     expect(storeState.releaseExpandedRepositories.size).toBe(0);
   });

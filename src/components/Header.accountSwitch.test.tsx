@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,6 +45,10 @@ const mocks = vi.hoisted(() => ({
   // R12：Header 在渲染期读取当前账号的待对齐标记（单账号重试入口）——
   // 默认无标记，待对齐用例可改写返回值
   hasPendingBackendCredentialAlign: vi.fn((): boolean => false),
+  // R13 finding 84：对齐标记订阅桩——版本计数与监听器由用例直接驱动，
+  // 验证「无其他 Store 订阅字段变化时重试入口仍出现」
+  pendingAlignListeners: [] as (() => void)[],
+  pendingAlignVersion: 0,
 }));
 
 vi.mock('../hooks/useDialog', () => ({
@@ -53,6 +57,16 @@ vi.mock('../hooks/useDialog', () => ({
 
 vi.mock('../features/lifecycle/hooks/useAccountSwitchActions', () => ({
   hasPendingBackendCredentialAlign: mocks.hasPendingBackendCredentialAlign,
+  // R13 finding 84 接缝：Header 以 useSyncExternalStore 订阅对齐标记版本——
+  // mock 工厂必须提供订阅入口与 getSnapshot，否则模块替换后 Header 挂载即挂
+  subscribePendingBackendCredentialAlign: vi.fn((listener: () => void) => {
+    mocks.pendingAlignListeners.push(listener);
+    return () => {
+      const index = mocks.pendingAlignListeners.indexOf(listener);
+      if (index >= 0) mocks.pendingAlignListeners.splice(index, 1);
+    };
+  }),
+  getPendingBackendCredentialAlignVersion: vi.fn(() => mocks.pendingAlignVersion),
   useAccountSwitchActions: () => ({
     isSwitching: false,
     switchToAccount: mocks.switchToAccount,
@@ -76,6 +90,8 @@ const savedAccount = (id: string, user: typeof userA, token: string): SavedAccou
 
 const baseState = {
   user: userA as typeof userA | null,
+  isAuthenticated: false as boolean,
+  githubToken: null as string | null,
   themeMode: 'dark' as const,
   systemTheme: 'dark' as const,
   currentView: 'repositories' as const,
@@ -93,10 +109,14 @@ const baseState = {
 beforeEach(() => {
   vi.clearAllMocks();
   baseState.user = userA;
+  baseState.isAuthenticated = false;
+  baseState.githubToken = null;
   mocks.confirm.mockResolvedValue(true);
   mocks.switchToAccount.mockResolvedValue({ ok: true });
   mocks.logoutCurrentAccount.mockResolvedValue(true);
   mocks.hasPendingBackendCredentialAlign.mockReturnValue(false);
+  mocks.pendingAlignListeners.length = 0;
+  mocks.pendingAlignVersion = 0;
   vi.mocked(useAppStore).mockImplementation(((
     selector?: (state: typeof baseState) => unknown,
   ) => (selector ? selector(baseState) : baseState)) as typeof useAppStore);
@@ -124,6 +144,12 @@ describe('Header account switcher', () => {
   // header.retry-credential-alignment 已在 10 个 locale 落地）。
   it('shows a credential-alignment retry entry for a single account with a pending align marker (R12)', async () => {
     baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    // 审计修复（R13 finding 79）：用例必须进入已认证账号的早退分支——设置
+    // isAuthenticated 与非空顶层 githubToken 后，handleSwitchAccount 的同账号
+    // 早退守卫只剩待对齐标记例外：只有标记确实允许当前账号重试时点击才会
+    // 调用 switchToAccount。
+    baseState.isAuthenticated = true;
+    baseState.githubToken = 'ghp_a';
     mocks.hasPendingBackendCredentialAlign.mockReturnValue(true);
     const { unmount } = render(<Header />);
 
@@ -140,6 +166,35 @@ describe('Header account switcher', () => {
     const { unmount } = render(<Header />);
 
     expect(screen.queryByRole('button', { name: 'header.retry-credential-alignment' })).not.toBeInTheDocument();
+    unmount();
+  });
+
+  // R13 finding 84：快捷登录的对齐失败不经过 Header 的 isSwitchingMenu，也不
+  // 改变任何 Store 订阅字段——重试入口必须由对齐标记的版本订阅触发重算后出现，
+  // 不得依赖拉取结果的副作用或无关重渲染带动。
+  it('shows the credential-alignment retry entry after alignment fails without any store-subscribed field change (R13 finding 84)', async () => {
+    baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    baseState.isAuthenticated = true;
+    baseState.githubToken = 'ghp_a';
+    const { unmount } = render(<Header />);
+
+    // 对齐尚未失败：单账号不显示重试入口（当前账号无待对齐标记）
+    expect(screen.queryByRole('button', { name: 'header.retry-credential-alignment' })).not.toBeInTheDocument();
+
+    // 模拟对齐失败：标记写入抬升版本并通知订阅者；Store 订阅字段（baseState）
+    // 零变化，也没有任何 rerender 触发
+    act(() => {
+      mocks.hasPendingBackendCredentialAlign.mockReturnValue(true);
+      mocks.pendingAlignVersion += 1;
+      for (const listener of [...mocks.pendingAlignListeners]) listener();
+    });
+
+    expect(screen.getByRole('button', { name: 'header.retry-credential-alignment' })).toBeTruthy();
+    // 重试入口仍复用 handleSwitchAccount 重新走后端对齐
+    fireEvent.click(screen.getByRole('button', { name: 'header.retry-credential-alignment' }));
+    await waitFor(() => {
+      expect(mocks.switchToAccount).toHaveBeenCalledWith('1');
+    });
     unmount();
   });
 

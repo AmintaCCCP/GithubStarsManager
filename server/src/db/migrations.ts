@@ -182,11 +182,15 @@ const migrations: Record<number, (db: Database.Database) => void> = {
         -- 备份（基线导入原样写 ''）留下的空 id 分类在 v4 无法被
         -- PUT/DELETE /api/categories/:id 匹配（空路径段），既不能编辑也不能删除。
         -- Issue #612 R12：空白判定与备份导入器的 JavaScript trim() 保持一致——
-        -- SQLite 单参数 TRIM 只删空格（U+0020），制表符等 ASCII 空白要用双参数
-        -- TRIM(X, Y) 显式列出（' ' + char(9,10,11,12,13)），否则仅含制表符的旧 id
-        -- 在迁移中被保留、在备份导入中被判缺失重新生成，同一记录在两条路径下
-        -- 得到不同的 ID。
-        SELECT 'default', CASE WHEN TRIM(COALESCE(id, ''), ' ' || char(9) || char(10) || char(11) || char(12) || char(13)) = '' THEN 'legacy-category-' || rowid || '-' || lower(hex(randomblob(8))) ELSE id END, name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
+        -- SQLite 单参数 TRIM 只删空格（U+0020），其余空白字符要用双参数
+        -- TRIM(X, Y) 显式列出，否则仅含空白的旧 id 在迁移中被保留、在备份导入
+        -- 中被判缺失重新生成，同一记录在两条路径下得到不同的 ID。
+        -- Issue #612 R13（审计 60）：Y 字符集完整覆盖 ECMAScript trim() 的
+        -- WhiteSpace + LineTerminator（U+0009-000D、U+0020、U+00A0、U+1680、
+        -- U+2000-U+200A、U+2028、U+2029、U+202F、U+205F、U+3000、U+FEFF）——
+        -- 旧列表漏掉 U+00A0 等 Space_Separator 类空格：仅含这类空白的旧 id 会被
+        -- TRIM 保留，而导入侧 JS trim() 判其缺失并重新生成，两条路径的 ID 不一致。
+        SELECT 'default', CASE WHEN TRIM(COALESCE(id, ''), ' ' || char(9,10,11,12,13,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288,65279)) = '' THEN 'legacy-category-' || rowid || '-' || lower(hex(randomblob(8))) ELSE id END, name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
         FROM categories;
 
         DROP TABLE categories;

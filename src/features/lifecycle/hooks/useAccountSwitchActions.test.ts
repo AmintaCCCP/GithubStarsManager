@@ -14,6 +14,15 @@ const mocks = vi.hoisted(() => ({
     syncSettings: vi.fn(),
     backendUrl: null as string | null,
     init: vi.fn<(url?: string) => Promise<void>>(async () => undefined),
+    // 推送链各数据分片的写入方法桩（R13 审计修复）：真实 syncToBackend 的
+    // 模块内部调用不经过导出 mock，写入归属必须在 backend 适配器写入边界
+    // 记录 URL 才能验证（见 C65b-1 用例）。
+    syncRepositories: vi.fn(),
+    syncReleases: vi.fn(),
+    syncAIConfigs: vi.fn(),
+    syncWebDAVConfigs: vi.fn(),
+    syncEmbeddingConfigs: vi.fn(),
+    syncVectorSearchConfig: vi.fn(),
   },
   restoreBackendSession: vi.fn(),
   authenticateWithGitHub: vi.fn(),
@@ -61,7 +70,13 @@ vi.mock('./useLoginActions', () => ({
 import { useAppStore } from '../../../store/useAppStore';
 import { hasPendingAccountSync, startAutoSync, stopAutoSync } from '../../../services/autoSync';
 import type { GitHubUser } from '../../../types';
-import { useAccountSwitchActions, hasPendingBackendCredentialAlign, resetPendingBackendCredentialAlignForTest } from './useAccountSwitchActions';
+import {
+  useAccountSwitchActions,
+  hasPendingBackendCredentialAlign,
+  getPendingBackendCredentialAlignVersion,
+  subscribePendingBackendCredentialAlign,
+  resetPendingBackendCredentialAlignForTest,
+} from './useAccountSwitchActions';
 
 // 恢复真实 Store：全局 setup.ts 将 ../store/useAppStore mock 成了选择器桩，
 // 而本测试需要驱动真实的多账号切换编排。
@@ -689,6 +704,29 @@ describe('useAccountSwitchActions audit fixes', () => {
     });
     mocks.backend.isAvailable = true;
     mocks.backend.backendUrl = 'https://origin.example/api';
+    // R13 审计修复（CodeRabbit）：写入归属必须在真实后端写入边界验证——
+    // mocks.syncToBackend 只替换 autoSync 对外导出的函数，模块内部绑定的
+    // 守卫冲刷/重试仍调用真实实现，仅断言导出调用次数发现不了窗口内推送。
+    // 在每个写入分片方法上记录发起时的后端 URL 与载荷键。
+    const backendWrites: Array<{ method: string; url: string | null; payloadKeys: string[] }> = [];
+    for (const method of [
+      'syncRepositories',
+      'syncReleases',
+      'syncAIConfigs',
+      'syncWebDAVConfigs',
+      'syncEmbeddingConfigs',
+      'syncVectorSearchConfig',
+      'syncSettings',
+    ] as const) {
+      (mocks.backend[method] as ReturnType<typeof vi.fn>).mockImplementation(async (payload?: unknown) => {
+        backendWrites.push({
+          method,
+          url: mocks.backend.backendUrl,
+          payloadKeys: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+        });
+        return undefined;
+      });
+    }
     mocks.restoreBackendSession.mockImplementation(async () => {
       // 候选后端 Y 提交 URL 后，恢复等待期间的真实编辑（归属发起账号 A）
       mocks.backend.backendUrl = 'https://candidate.example/api';
@@ -708,6 +746,13 @@ describe('useAccountSwitchActions audit fixes', () => {
       expect(useAppStore.getState().user?.login).toBe('bob');
       // 候选后端零推送：窗口内编辑绝不外发（整个恢复流程 syncToBackend 未被调用）
       expect(mocks.syncToBackend).not.toHaveBeenCalled();
+      // 写入边界复核：数据分片在候选 URL 上零写入；syncSettings 在候选 URL 上
+      // 仅允许恢复提交后的 B 账号凭据对齐载荷（github_token/active_account_id/
+      // user_profile），绝不含窗口内 A 的设置编辑（categoryOrder）。
+      expect(backendWrites.filter((write) => write.method !== 'syncSettings' && write.url === 'https://candidate.example/api')).toEqual([]);
+      for (const write of backendWrites.filter((candidate) => candidate.method === 'syncSettings' && candidate.url === 'https://candidate.example/api')) {
+        expect(write.payloadKeys).not.toContain('categoryOrder');
+      }
       // 待推记录按原后端 X 登记：停留在候选后端 Y 上不可见、未被消费
       expect(hasPendingAccountSync('1')).toBe(false);
       expect(hasPendingAccountSync('2')).toBe(false);
@@ -973,6 +1018,123 @@ describe('useAccountSwitchActions audit fixes', () => {
     });
     expect(outcome).toEqual({ ok: true });
     expect(hasPendingBackendCredentialAlign('2')).toBe(false);
+  });
+
+  it('notifies subscribers when the pending credential align marker changes (R13 finding 84)', async () => {
+    // 待对齐标记是模块级集合而非 React 状态：写入必须触发订阅通知（版本计数
+    // 递增），Header 经 useSyncExternalStore 订阅后才能及时渲染重试入口。
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't0', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't0', lastUsedAt: 't' },
+      },
+      accountWorkspaces: { '2': workspaceOf(2) },
+      repositories: [],
+      searchResults: [],
+    });
+    mocks.backend.isAvailable = true;
+    mocks.backend.syncSettings.mockResolvedValueOnce({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: true,
+    });
+
+    const versionBefore = getPendingBackendCredentialAlignVersion();
+    let notified = 0;
+    const unsubscribe = subscribePendingBackendCredentialAlign(() => {
+      notified += 1;
+    });
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.switchToAccount('2');
+    });
+
+    // 对齐失败写入标记：版本递增且订阅者收到通知
+    expect(outcome).toEqual({ ok: false, error: 'backend-credential-sync-failed' });
+    expect(hasPendingBackendCredentialAlign('2')).toBe(true);
+    expect(notified).toBe(1);
+    expect(getPendingBackendCredentialAlignVersion()).toBe(versionBefore + 1);
+
+    // 幂等重写（标记已存在）不抬版本：对齐再次失败时不再多通知
+    mocks.backend.syncSettings.mockResolvedValueOnce({
+      tokenUpdateSkipped: true,
+      tokenUpdateSuperseded: false,
+    });
+    await act(async () => {
+      outcome = await result.current.switchToAccount('2');
+    });
+    expect(outcome).toEqual({ ok: false, error: 'backend-credential-sync-failed' });
+    expect(notified).toBe(1);
+    expect(getPendingBackendCredentialAlignVersion()).toBe(versionBefore + 1);
+
+    // 重试成功清除标记：版本再递增一次
+    mocks.backend.syncSettings.mockResolvedValueOnce({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: false,
+    });
+    await act(async () => {
+      outcome = await result.current.switchToAccount('2');
+    });
+    expect(outcome).toEqual({ ok: true });
+    expect(hasPendingBackendCredentialAlign('2')).toBe(false);
+    expect(notified).toBe(2);
+    expect(getPendingBackendCredentialAlignVersion()).toBe(versionBefore + 2);
+
+    unsubscribe();
+    // 退订后写入不再通知订阅者。制造一次真实写入：破坏当前令牌使同账号
+    // 早退失效（快速路径要求令牌完好且无待对齐标记），重走完整对齐流程并
+    // 让 syncSettings 的 Once 桩被消费（clearAllMocks 不清队列，未消费的
+    // Once 会泄漏给后续用例）。
+    useAppStore.setState({ githubToken: '' });
+    mocks.backend.syncSettings.mockResolvedValueOnce({
+      tokenUpdateSkipped: false,
+      tokenUpdateSuperseded: false,
+      activeAccountUpdateSkipped: true,
+    });
+    await act(async () => {
+      outcome = await result.current.switchToAccount('2');
+    });
+    expect(hasPendingBackendCredentialAlign('2')).toBe(true);
+    expect(notified).toBe(2);
+  });
+
+  it('directs the restore request at the expected account when re-authorizing (R13 finding 83)', async () => {
+    // 候选后端保存多账号且无唯一活跃账号时，无目标恢复会返回
+    // account-selection-required 而直接失败——补授权点名账号时恢复请求必须
+    // 定向该账号（accountId 选项 → getBackendAuthHeaders(accountId) 显式请求头）。
+    useAppStore.setState({
+      user: null,
+      githubToken: null,
+      isAuthenticated: false,
+      savedAccounts: { '2': { accountId: '2', user: userB, githubToken: '', addedAt: 't0', lastUsedAt: 't' } },
+    });
+    mocks.backend.isAvailable = true;
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_b',
+      user: userB,
+      accounts: [],
+    });
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.addAccountFromBackend('https://backend.example', 'candidate-key', '2');
+    });
+
+    expect(mocks.restoreBackendSession).toHaveBeenCalledWith('https://backend.example', {
+      omitAccountHeader: true,
+      apiSecret: 'candidate-key',
+      accountId: '2',
+    });
+    expect(outcome).toEqual({ ok: true, user: userB });
+    expect(useAppStore.getState().user?.login).toBe('bob');
   });
 
   it('flushes the current account before removing it (even when target === current)', async () => {

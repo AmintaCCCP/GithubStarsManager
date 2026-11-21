@@ -209,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "Stop AI Analysis",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "Are you sure you want to stop AI analysis? Analyzed results will be saved.",
+    "analysis-task-already-running": "An AI analysis task is already running. Please wait for it to finish or stop the current task before trying again.",
     "no-failed-repositories-to-re-analyze": "No failed repositories to re-analyze!",
     "all-repositories-have-been-analyzed": "All repositories have been analyzed!",
     "no-repositories-to-analyze": "No repositories to analyze!",

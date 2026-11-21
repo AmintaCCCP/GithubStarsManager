@@ -208,7 +208,9 @@ export const useRepositoryAnalysisJob = ({
       // 审计修复（C33）：运行锁被占用时给出明确提示而非静默 return false——
       // 典型场景是切号后旧任务尚未结束（清理路径会中止并复位运行状态），
       // 新账号立即重试即可启动。
-      toast(t('app:header.switch-in-progress'), 'error');
+      // R13 finding 69：占用运行锁的也可能是同账号的在途分析任务——提示应
+      // 指向「分析任务正在运行」，让用户等待或停止当前任务，而非误报切号。
+      toast(t('useRepositoryAnalysisJob.analysis-task-already-running'), 'error');
       return false;
     }
 
@@ -344,12 +346,19 @@ export const useRepositoryAnalysisJob = ({
 
       const stats = optimizer.getStats();
       console.log('AI Analysis Stats:', stats);
-      // 账号已切换（含 A→B→A）：本次任务的结果与提示一律作废。
-      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
+      // 任务已被释放（后端恢复、卸载）或账号已切换（含 A→B→A）：不得同步或提示完成。
+      if (optimizerRef.current !== optimizer || !isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
+      // R13 审计修复：推送失败（返回 false，未传 reportFailures 时不抛错）不得
+      // 报告完整成功——分析结果已写入本地，仅单独提示后端同步未完成。
+      let backendSynced = true;
       if (syncOnComplete) {
-        await forceSyncToBackend();
+        backendSynced = await forceSyncToBackend();
       }
       if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
+      if (!backendSynced) {
+        toast(t('app:repositorySlice.push-failed'), 'warning');
+        return false;
+      }
 
       if (scope === 'selected') {
         toast(

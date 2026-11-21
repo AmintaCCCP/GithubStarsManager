@@ -62,6 +62,21 @@ const patchGistStarred = (gists: Gist[], gistId: string, starred: boolean): Gist
 };
 
 /**
+ * R13 审计修复（CodeRabbit）：迟到的编辑响应不得用发起时的旧对象覆盖期间
+ * 完成的较新编辑（如响应等待期间同账号又完成了第二次编辑）。以 GitHub 服务
+ * 端版本戳 updated_at 比较当前条目与迟到响应的版本顺序（PATCH 响应与既有
+ * 条目都携带服务端 updated_at）；不使用响应到达时本地设置的 last_edited——
+ * 那是到达时刻，不代表编辑顺序。任一时间戳无法解析（版本顺序不可判定）或
+ * 当前条目更新时返回 true（跳过补写，等待下次刷新），绝不回退较新内容。
+ */
+const lateEditWriteSuperseded = (current: Gist, incoming: Gist): boolean => {
+  const currentVersion = Date.parse(current.updated_at);
+  const incomingVersion = Date.parse(incoming.updated_at);
+  if (Number.isNaN(currentVersion) || Number.isNaN(incomingVersion)) return true;
+  return currentVersion > incomingVersion;
+};
+
+/**
  * 审计修复：切号期间远端操作已成功的 Gist 变更（删除/取消星标/编辑）必须
  * 反映到发起账号的工作区，否则切回该账号时归档快照会把旧状态换入实时列表，
  * 与 GitHub 不一致。沿用账号工作区生命周期的安全更新路径（与
@@ -103,6 +118,10 @@ const applyRemoteGistChangeToOwnerSession = (
         });
         return;
       }
+      // R13：实时列表已有较新版本（响应等待期间同账号完成了第二次编辑）时
+      // 跳过补写——迟到的编辑响应绝不覆盖较新的 Gist。
+      const liveCurrent = useAppStore.getState().gists.find((gist) => gist.id === change.gist.id);
+      if (liveCurrent && lateEditWriteSuperseded(liveCurrent, change.gist)) return;
       useAppStore.getState().updateGist(change.gist);
     });
     return;
@@ -147,9 +166,12 @@ const applyRemoteGistChangeToOwnerSession = (
       }
       // 编辑：按 ID 原位替换；条目不在快照中时跳过（绝不无中生有，
       // 也绝不把更新条目前置插入——那是「新增」语义，不属于本路径）。
+      // R13：归档条目已是更新的远端版本时跳过补写——迟到的编辑响应
+      // 绝不用旧对象覆盖较新的归档 Gist。
       const replaceById = (gists: Gist[]): Gist[] => {
         const index = gists.findIndex((gist) => gist.id === change.gist.id);
         if (index === -1) return gists;
+        if (lateEditWriteSuperseded(gists[index], change.gist)) return gists;
         const next = [...gists];
         next[index] = change.gist;
         return next;
@@ -178,6 +200,9 @@ export const useGistActions = () => {
   // 不变、下方 effect 不执行，而 finally 的会话检查又会跳过清理——没有请求身份
   // 记录时同步按钮会永久禁用。每次刷新登记唯一身份，仅最新请求可复位状态。
   const refreshRunRef = useRef(0);
+  // AI 搜索忙碌状态按请求归属（R13 审计修复）：与 refreshGists 同一模式——
+  // 仅最新一次搜索可在 finally 中清除 isSearching，旧请求不得覆盖新请求的状态。
+  const searchRunRef = useRef(0);
   // 分析标记归属（R12 审计修复）：同账号换凭据会推进会话代次但账号不变，
   // 旧任务的 finally 若只看代次会跳过清理，Gist 永久显示「分析中」。为每个
   // Gist 记录设置标记的任务身份：只有仍持有该标记的任务才能清除它——新会话
@@ -188,6 +213,9 @@ export const useGistActions = () => {
   // 切换账号时立即清除旧会话残留的刷新状态，避免新账号的刷新按钮被禁用
   useEffect(() => {
     setIsRefreshing(false);
+    // R13 审计修复（CodeRabbit）：AI 搜索忙碌状态同样随切号复位——GistView
+    // 不因切号重新挂载，旧账号未结束的搜索会让新账号的搜索按钮保持禁用。
+    setIsSearching(false);
   }, [currentUserId]);
   // isAnalyzingGist(id) 的渲染值恒等于 store 集合值：原 GistCard 的本地 isAnalyzingLocal
   // 与 setAnalyzingGist 同置同清，渲染上与集合值等价，故本 hook 只操作 store 集合、
@@ -267,6 +295,7 @@ export const useGistActions = () => {
       return;
     }
     setIsSearching(true);
+    const searchRunId = ++searchRunRef.current;
     // 账号代次校验（Issue #611）：AI 搜索等待期间切号后，旧账号的查询与结果
     // 绝不能写入新账号的搜索视图（含失败回退路径），沿用 refreshGists 的模式
     const startedAccountId = peekCurrentAccountId();
@@ -293,7 +322,11 @@ export const useGistActions = () => {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       state.setGistSearchFilters({ query });
     } finally {
-      setIsSearching(false);
+      // 忙碌状态按请求身份清除（R13）：只有仍是最新一次搜索时才复位，
+      // 旧请求不得覆盖新请求设置的忙碌状态。
+      if (searchRunRef.current === searchRunId) {
+        setIsSearching(false);
+      }
     }
   }, [state]);
 

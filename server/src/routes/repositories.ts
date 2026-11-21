@@ -347,12 +347,14 @@ router.put('/api/repositories', (req, res) => {
         END,
         analyzed_at = CASE
           -- Issue #612 R12：analyzed_at 必须与最终采用的 ai_summary 来自同一条
-          -- 记录——本载荷提供总结时时间也只能来自本载荷（缺失则留空）；保留
-          -- 本地总结时不用其他账号的时间补空值；仅当总结来自跨账号回填时，
-          -- 时间从同一来源行复制（与 ai_summary 子查询同 WHERE + 同 ORDER BY，
-          -- 命中同一条记录）。
+          -- 记录——本载荷提供总结时时间也只能来自本载荷（缺失则留空）。
+          -- Issue #612 R13（审计 61）：分支顺序与 ai_summary 的最终来源一致——
+          -- 保留本地总结时保留该总结原有的分析时间，载荷只提交时间不提交总结
+          -- 时不得覆盖（否则旧总结会被显示为在载荷时间 T2 生成）；总结来自跨
+          -- 账号回填时，时间从同一来源行复制（与 ai_summary 子查询同 WHERE +
+          -- 同 ORDER BY，命中同一条记录）；本地与载荷都没有总结时载荷时间照旧
+          -- 优先，其次保留本地值（NULLIF 保持原「非空才采用」的判断）。
           WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.analyzed_at
-          WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at
           WHEN repositories.ai_summary IS NOT NULL AND repositories.ai_summary != '' THEN repositories.analyzed_at
           ELSE COALESCE((
             SELECT other.analyzed_at FROM repositories AS other
@@ -367,7 +369,7 @@ router.put('/api/repositories', (req, res) => {
               )
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             ORDER BY other.rowid LIMIT 1
-          ), repositories.analyzed_at)
+          ), NULLIF(excluded.analyzed_at, ''), repositories.analyzed_at)
         END,
         -- Issue #612 A21：写入 AI 内容的行按当前账号的共享设置置位 ai_shared；
         -- 不携带 AI 内容的载荷保留已存储标记（可能是回填得到的共享成果）。
@@ -508,12 +510,26 @@ router.put('/api/repositories', (req, res) => {
           ELSE ai_platforms END,
         analyzed_at = CASE
           -- Issue #612 R12：批量回填的时间与最终采用的总结来自同一条记录——
-          -- 本地总结保留（旧 ai_summary 非空）时不用其他账号的时间补空值；
-          -- 总结被回填时时间从同一来源行复制（与 ai_summary 子查询同 WHERE +
-          -- 同 ORDER BY，命中同一条记录），来源行缺时间时保持空值。
-          WHEN (analyzed_at IS NULL OR analyzed_at = '')
-            AND (ai_summary IS NULL OR ai_summary = '')
-          THEN COALESCE((
+          -- 本地总结保留（旧 ai_summary 非空）时不用其他账号的时间补空值。
+          -- Issue #612 R13（审计 62）：确实选中共享总结时（EXISTS 与 ai_summary
+          -- 子查询同 WHERE、同 ORDER BY，命中同一条记录），时间同步替换为来源
+          -- 行的 analyzed_at——包括 NULL（目标行原有的孤立时间不得与来源总结
+          -- 配对显示，首次回填也要替换）；未选中共享总结时保留原时间。
+          WHEN (ai_summary IS NULL OR ai_summary = '')
+            AND EXISTS (
+              SELECT 1 FROM repositories AS other
+              WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+                AND other.account_id != 'default'
+                AND other.ai_summary_shared = 1
+                AND EXISTS (
+                  SELECT 1 FROM account_settings AS other_cfg
+                  WHERE other_cfg.account_id = other.account_id
+                    AND other_cfg.key = 'ai_result_sharing_enabled'
+                    AND other_cfg.value IN ('1', 'true')
+                )
+                AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
+            )
+          THEN (
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
@@ -526,7 +542,7 @@ router.put('/api/repositories', (req, res) => {
               )
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             ORDER BY other.rowid LIMIT 1
-          ), analyzed_at)
+          )
           ELSE analyzed_at END,
         -- Issue #612 审计（679）：被回填字段的共享标记清零（UPDATE 的右侧表达式
         -- 看到的是旧行值：字段此前为空即视为「本批次可能被他人成果回填」）——

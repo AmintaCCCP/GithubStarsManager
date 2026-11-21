@@ -103,14 +103,17 @@ describe('githubApiFactory routeMode', () => {
     // 显式账号的 Lists 写入会被错误归属到当前登录账号。
     mocks.backendUrlGet.mockReturnValue('http://backend/api');
     createGitHubListsApiService('token', { accountId: '17' });
-    expect(mocks.setBackendAccountId).toHaveBeenCalledWith('17');
+    // 第 13 轮审计修复 [24]：断言完整调用列表仅含一次 '17'——工厂若先设置
+    // 其他值再覆盖为 '17'，测试应同时检查最终选值与绑定顺序。
+    expect(mocks.setBackendAccountId.mock.calls).toEqual([['17']]);
   });
 
   it('passes an explicit null accountId through for the lists factory', () => {
     // 显式 null（无归属账号）同样按原样传递，不回退到 Store 用户。
     mocks.backendUrlGet.mockReturnValue('http://backend/api');
     createGitHubListsApiService('token', { accountId: null });
-    expect(mocks.setBackendAccountId).toHaveBeenCalledWith(null);
+    // 完整调用列表仅含一次 null（选值 + 绑定顺序，第 13 轮审计修复 [24]）。
+    expect(mocks.setBackendAccountId.mock.calls).toEqual([[null]]);
   });
 
   it('skips backend URL for the lists factory in browser mode', () => {

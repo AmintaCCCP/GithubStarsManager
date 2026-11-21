@@ -292,6 +292,11 @@ describe('LoginScreen 后端登录', () => {
       accounts: [
         { accountId: '2', user: { id: 2, login: 'bob', name: 'Bob', avatar_url: 'https://x/b.png', email: null }, githubToken: 'ghp_b' },
         { accountId: '3', user: null, githubToken: null },
+        // 审计修复（R13 finding 108）：缺少 accountId 但带可识别登录名的条目——
+        // 仅断言「option-1 不存在」拦不住过滤条件被删除的回归（夹具原本没有
+        // accountId 为 '1' 的条目，断言恒真）。该条目若未被过滤会以
+        // restore-account-option-undefined 渲染并显示其登录名。
+        { user: { id: 4, login: 'carol-no-id', name: 'Carol No Id', avatar_url: '', email: null }, githubToken: null },
       ],
     });
     const { urlInput, apiKeyInput } = await enterBackendMode();
@@ -309,6 +314,8 @@ describe('LoginScreen 后端登录', () => {
     expect(screen.getByTestId('restore-account-option-3')).toHaveTextContent('需补充 Token');
     // 无账号 ID 的条目不渲染（账户行以 accountId 为键）
     expect(screen.queryByTestId('restore-account-option-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('restore-account-option-undefined')).not.toBeInTheDocument();
+    expect(screen.queryByText(/carol-no-id/)).not.toBeInTheDocument();
     // 主按钮/令牌输入隐藏：动作在账号行上
     expect(screen.queryByRole('button', { name: '连接并恢复数据' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('GitHub Personal Access Token')).not.toBeInTheDocument();
@@ -688,6 +695,196 @@ describe('LoginScreen 后端登录', () => {
     await waitFor(() => expect(mocks.syncTokenToBackend).toHaveBeenCalledOnce());
   });
 
+  // 审计修复（R13 finding 36）：settings 分片读取失败时（syncFromBackend 只
+  // 记录不抛错），拉取自被清空的顶层保留空默认值——目标账号原归档的分类类
+  // 字段保持原值，绝不被默认值覆盖；releases 分片成功则照常覆盖为拉取值
+  //（后端无发布记录 → 数据为空≠失败 → 清空）。
+  it('settings 分片读取失败时目标账号原归档分类保留 (R13 finding 36)', async () => {
+    useAppStore.setState({
+      user: null,
+      repositories: [],
+      accountWorkspaces: {
+        '3': {
+          repositories: [repoOf(301)],
+          lastSync: '2026-01-01T00:00:00Z',
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [{ id: 'cat-3', name: 'Cat 3', icon: '', isCustom: true, keywords: [] }],
+          hiddenDefaultCategoryIds: ['hidden-3'],
+          categoryOrder: ['cat-3'],
+          defaultCategoryOverrides: { 'cat-3': { name: 'Cat 3 Override' } },
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: true,
+        },
+      },
+    });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_settings_fail',
+      user: { id: 3, login: 'octo-3', name: 'Octo 3', avatar_url: 'https://avatars.example.com/3', email: null },
+    });
+    // settings 分片读取失败（applyBackendSettings 不执行，顶层分类保持清空后
+    // 的默认值）；releases 分片读取成功但后端无发布记录
+    mocks.syncBackendData.mockResolvedValue({
+      shards: { repositories: true, releases: true, aiConfigs: true, webdavConfigs: true, embeddingConfigs: true, vectorSearch: true, settings: false },
+    });
+
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: '使用后端数据' }));
+
+    await waitFor(() => expect(useAppStore.getState().user?.login).toBe('octo-3'));
+    const archive = useAppStore.getState().accountWorkspaces['3'];
+    // settings 分片失败：原归档的分类类字段保持原值
+    expect(archive?.customCategories.map((c) => c.id)).toEqual(['cat-3']);
+    expect(archive?.hiddenDefaultCategoryIds).toEqual(['hidden-3']);
+    expect(archive?.categoryOrder).toEqual(['cat-3']);
+    expect(archive?.defaultCategoryOverrides['cat-3']?.name).toBe('Cat 3 Override');
+    // releases 分片成功：照常覆盖为拉取值（后端无发布记录 → 清空）
+    expect(archive?.releases).toEqual([]);
+    // 保留的归档随后 setUser 落回实时工作区（不会回退为清空后的默认值）
+    expect(useAppStore.getState().customCategories.map((c) => c.id)).toEqual(['cat-3']);
+  });
+
+  // 审计修复（R13 finding 36）：releases 分片读取失败时目标账号原归档的发布
+  // 记录保持原值；settings 分片成功则照常覆盖（成功分片数据为空≠失败）。
+  it('releases 分片读取失败时目标账号原归档发布记录保留 (R13 finding 36)', async () => {
+    useAppStore.setState({
+      user: null,
+      repositories: [],
+      accountWorkspaces: {
+        '3': {
+          repositories: [],
+          lastSync: '2026-01-01T00:00:00Z',
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [{
+            id: 9001,
+            tag_name: 'v1.0',
+            name: null,
+            body: null,
+            published_at: '2026-01-01T00:00:00Z',
+            html_url: 'https://github.com/o/r/releases/v1.0',
+            assets: [],
+            repository: { id: 301, full_name: 'o/r', name: 'r' },
+          }],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
+      },
+    });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_releases_fail',
+      user: { id: 3, login: 'octo-3', name: 'Octo 3', avatar_url: 'https://avatars.example.com/3', email: null },
+    });
+    // releases 分片读取失败（setReleases 不执行）；settings 分片成功但后端无
+    // 自定义分类
+    mocks.syncBackendData.mockResolvedValue({
+      shards: { repositories: true, releases: false, aiConfigs: true, webdavConfigs: true, embeddingConfigs: true, vectorSearch: true, settings: true },
+    });
+
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: '使用后端数据' }));
+
+    await waitFor(() => expect(useAppStore.getState().user?.login).toBe('octo-3'));
+    const archive = useAppStore.getState().accountWorkspaces['3'];
+    // releases 分片失败：原归档的发布记录保持原值
+    expect(archive?.releases.map((r) => r.id)).toEqual([9001]);
+    // settings 分片成功：照常覆盖为拉取值（后端无自定义分类 → 清空）
+    expect(archive?.customCategories).toEqual([]);
+  });
+
+  // 审计修复（R13 finding 36）：分片全部读取成功时归档照常被拉取值覆盖
+  //（含后端返回空快照），成功路径行为不变。
+  it('分片全部成功时目标账号归档照常被拉取值覆盖 (R13 finding 36)', async () => {
+    useAppStore.setState({
+      user: null,
+      repositories: [],
+      accountWorkspaces: {
+        '3': {
+          repositories: [],
+          lastSync: null,
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [{
+            id: 9001,
+            tag_name: 'v1.0',
+            name: null,
+            body: null,
+            published_at: '2026-01-01T00:00:00Z',
+            html_url: 'https://github.com/o/r/releases/v1.0',
+            assets: [],
+            repository: { id: 301, full_name: 'o/r', name: 'r' },
+          }],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [{ id: 'cat-3', name: 'Cat 3', icon: '', isCustom: true, keywords: [] }],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
+      },
+    });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_all_ok',
+      user: { id: 3, login: 'octo-3', name: 'Octo 3', avatar_url: 'https://avatars.example.com/3', email: null },
+    });
+    // 模拟成功拉取写入顶层：分类与发布均为后端值（空快照）
+    mocks.syncBackendData.mockImplementation(async () => {
+      useAppStore.setState({ customCategories: [], releases: [] });
+      return {
+        shards: { repositories: true, releases: true, aiConfigs: true, webdavConfigs: true, embeddingConfigs: true, vectorSearch: true, settings: true },
+      };
+    });
+
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: '使用后端数据' }));
+
+    await waitFor(() => expect(useAppStore.getState().user?.login).toBe('octo-3'));
+    const archive = useAppStore.getState().accountWorkspaces['3'];
+    expect(archive?.customCategories).toEqual([]);
+    expect(archive?.releases).toEqual([]);
+  });
+
   // 审计修复（R2-B6）：缓存只属于其他账号（A）而目标 B 无本地数据时，
   // 先归档 A，再直接拉取 B 远端数据——不弹冲突对话框，也不因「保留本地」
   // 跳过 B 的拉取。
@@ -857,6 +1054,15 @@ describe('LoginScreen 已保存账号快捷登录', () => {
     addedAt: '2026-01-01T00:00:00.000Z',
     lastUsedAt: '2026-01-01T00:00:00.000Z',
   };
+  // 审计修复（R13 finding 80）：常规账号选择卡片仅在保存了多个账号时渲染
+  //（单账号保持原登录界面）——本用例需两个已保存账号才能走到快捷登录路径。
+  const savedAlice: import('../types').SavedAccount = {
+    accountId: '1',
+    user: { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null },
+    githubToken: 'ghp_a',
+    addedAt: '2026-01-01T00:00:00.000Z',
+    lastUsedAt: '2026-01-01T00:00:00.000Z',
+  };
 
   beforeEach(() => {
     switchActionMocks.switchToAccount.mockReset();
@@ -869,7 +1075,7 @@ describe('LoginScreen 已保存账号快捷登录', () => {
       isAuthenticated: false,
       hasHydrated: true,
       backendApiSecret: null,
-      savedAccounts: { '2': savedBob },
+      savedAccounts: { '1': savedAlice, '2': savedBob },
       accountWorkspaces: {},
       repositories: [],
       searchResults: [],
@@ -1083,10 +1289,27 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
       useAppStore.setState({ repositories: [repoOf(601)] });
       throw new Error('restore pull failed');
     });
+    // 审计修复（R13 finding 109）：回滚 mock 返回可手动完成的 Promise——生产
+    // 流程必须等待回滚结束后才显示错误提示与重试入口；回滚立即完成的旧写法
+    // 验证不了这个时序。
+    let resolveRollback: () => void = () => {};
+    mocks.rollbackBackendConnection.mockImplementation(() => new Promise<void>((resolve) => {
+      resolveRollback = resolve;
+    }));
 
     await renderAppOnLoginScreen();
 
-    // 失败提示留在当前登录页（App 未切换到主界面）
+    // 拉取失败已发生（回滚被调用），但回滚挂起期间错误提示尚未出现，
+    // 登录操作仍不可用（连接按钮停留在「连接中…」禁用态）
+    await waitFor(() => expect(mocks.rollbackBackendConnection).toHaveBeenCalledOnce());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    const connectingButton = screen.getByRole('button', { name: '连接中…' });
+    expect(connectingButton).toBeDisabled();
+
+    // 回滚完成：错误提示与重试入口出现
+    await act(async () => {
+      resolveRollback();
+    });
     expect(await screen.findByRole('alert')).toHaveTextContent('restore pull failed');
     expect(useAppStore.getState().user).toBeNull();
     expect(useAppStore.getState().githubToken).toBeNull();
@@ -1094,8 +1317,8 @@ describe('LoginScreen 经 App 渲染的恢复路径', () => {
     // 审计修复（测试覆盖）：失败用例的冻结窗口已释放，且连接回滚在错误提示
     // 出现前已完成——回滚完成后才允许后续操作（如重新发起连接）
     expect(mocks.freezeWindowEvents).toEqual(['frozen-open', 'frozen-close']);
-    expect(mocks.rollbackBackendConnection).toHaveBeenCalledOnce();
     expect(mocks.rememberActiveBackendUrl).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '连接并恢复数据' })).toBeEnabled();
     // 审计修复（B13）：拉取写入顶层的部分同步结果必须一并丢弃（不归档）
     expect(useAppStore.getState().repositories).toEqual([]);
     expect(useAppStore.getState().accountWorkspaces['9']?.repositories ?? []).toEqual([]);

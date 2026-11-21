@@ -6,6 +6,7 @@ import {
   resolveActiveAccountScope,
   getLegacyDefaultClaimedBy,
   getPartitionMeta,
+  getAccountRevision,
   bumpAccountRevision,
 } from '../db/accountScope.js';
 import {
@@ -297,17 +298,29 @@ const VECTOR_PROBE_THRESHOLD = -1e9;
  * 会按元数据过滤；索引建立前写入的存量向量（前端在未登录时上传、metadata
  * 不含 accountId）不会出现在结果里——200 空结果是「未回填」，不是「无数据」。
  * 本地 default 分区仍存在非空 vector_indexed_at 说明客户端确实上传过向量，
- * 此时用独立探测（topK=上限、极低阈值、显式 accountId='default'）区分：
- * - has_scoped_vectors：default 范围确有向量，空用户结果是阈值/相似度导致；
- * - no_scoped_vectors：default 范围查不到任何向量，而本地记录有已索引仓库 →
- *   覆盖未确认（未回填/索引丢失），必须返回迁移状态而不是静默空结果；
- * - probe_failed：无法确认，同样不得静默返回空结果。
+ * 此时用独立探测（topK=上限、极低阈值、显式 accountId='default'）区分。
+ * Issue #612 R13 审计（14）：探测有命中只证明 default 范围「存在向量」，不能
+ * 证明本地全部已索引仓库的向量都已具备元数据——部分回填时（如仓库 1 已回填但
+ * 分数低于阈值、仓库 2 缺元数据本应命中），空用户结果仍会把仓库 2 的漏召回
+ * 误报成正常的「无相似仓库」。判定依据改为逐条核对：本地全部已索引仓库都
+ * 出现在探测结果中才确认覆盖；任一缺失或本地数量超过探测 topK（无法完整
+ * 核对）时一律保留迁移状态：
+ * - has_scoped_vectors：本地全部已索引仓库都带 default 元数据可被范围查询召回，
+ *   空用户结果是阈值/相似度导致；
+ * - no_scoped_vectors：default 范围查不到覆盖本地记录所需的向量 → 覆盖未确认
+ *   （未回填/索引丢失），必须返回迁移状态而不是静默空结果；
+ * - probe_failed：无法确认（探测失败 / 无法完整核对），同样不得静默返回空结果。
  */
 async function probeDefaultPartitionScopedCoverage(
+  db: ReturnType<typeof getDb>,
   workerUrl: string,
   queryHeaders: Record<string, string>,
   queryVector: number[],
 ): Promise<'has_scoped_vectors' | 'no_scoped_vectors' | 'probe_failed'> {
+  // 覆盖核对的基准：本地 default 分区全部已索引仓库。超过探测 topK 时探测结果
+  // 被 Worker 截断（QUERY_TOPK_LIMIT 上限），无法逐条核对，按未确认处理。
+  const expectedRepoIds = loadDefaultPartitionIndexedRepositoryIds(db);
+  if (expectedRepoIds.length > VECTOR_PROBE_TOPK) return 'probe_failed';
   try {
     const probeResult = await fetchWithBodyTimeout(
       `${workerUrl}/query`,
@@ -330,9 +343,36 @@ async function probeDefaultPartitionScopedCoverage(
     if (!probeResult.ok || !probeResult.payload || !Array.isArray(probeResult.payload.matches)) {
       return 'probe_failed';
     }
-    return probeResult.payload.matches.length > 0 ? 'has_scoped_vectors' : 'no_scoped_vectors';
+    // default 范围命中的向量 ID：重新上传带 default 元数据时带 `default:` 前缀
+    // （与客户端 buildAccountScopedVectorId 的 `${accountId}:${repoId}` 形态一致），
+    // 兼容直接以 repoId 落库的无前缀形态。
+    const matchedRepoIds = new Set<string>();
+    for (const match of probeResult.payload.matches) {
+      const id = typeof (match as { id?: unknown })?.id === 'string' ? (match as { id: string }).id : '';
+      if (!id) continue;
+      const separator = id.indexOf(':');
+      const prefix = separator > 0 ? id.slice(0, separator) : '';
+      matchedRepoIds.add(prefix === 'default' ? id.slice(separator + 1) : id);
+    }
+    for (const expected of expectedRepoIds) {
+      if (!matchedRepoIds.has(expected)) return 'no_scoped_vectors';
+    }
+    return 'has_scoped_vectors';
   } catch {
     return 'probe_failed';
+  }
+}
+
+/** 本地 default 分区全部已索引仓库的 ID（覆盖核对的基准清单）。 */
+function loadDefaultPartitionIndexedRepositoryIds(db: ReturnType<typeof getDb>): string[] {
+  try {
+    const rows = db
+      .prepare("SELECT id FROM repositories WHERE account_id = 'default' AND vector_indexed_at IS NOT NULL")
+      .all() as Array<{ id: unknown }>;
+    return rows.map((row) => String(row.id));
+  } catch {
+    // 轻量 stub 缺列/缺表时按「无待核对记录」处理（调用方的存在性检查已先行）。
+    return [];
   }
 }
 
@@ -380,6 +420,13 @@ async function ensureAccountVectorMetadataBackfill(
   if (accountId === 'default') return;
   const workerIdentity = workerUrl.replace(/\/$/, '');
   if (getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) === workerIdentity) return;
+
+  // Issue #612 R13 审计（15）：探测开始时记录账号快照版本。探测（网络）期间
+  // 导入可能清除完成标记并安排重建，客户端重建随后写回新的 vector_indexed_at；
+  // 下方完成标记复核此时看到空标记会放行旧探测，清除重建后的新索引状态。
+  // 写事务内复核版本，已变化时放弃本次决策（不清除任何索引状态、不写标记），
+  // 下次查询重新探测。
+  const revisionAtProbeStart = getAccountRevision(db, accountId);
 
   // ── 探测阶段（网络）：诊断 /query 失败直接返回并允许重试 ──
   try {
@@ -431,6 +478,11 @@ async function ensureAccountVectorMetadataBackfill(
       .prepare('SELECT value FROM partition_meta WHERE account_id = ? AND key = ?')
       .get(accountId, VECTOR_BACKFILL_CHECKED_KEY) as { value: string | null } | undefined;
     if (claimedRow && claimedRow.value === workerIdentity) return false;
+    // Issue #612 R13 审计（15）：复核探测开始时记录的快照版本——探测期间该分区
+    // 发生过任何仓库写入（导入清除完成标记、客户端重建写回新 vector_indexed_at
+    // 等）时，探测结论已过期，不得清除任何索引状态（否则旧探测会抹掉重建后的
+    // 新索引状态，迫使客户端再次全量重建）。
+    if (getAccountRevision(db, accountId) !== revisionAtProbeStart) return false;
     // 归属未确认（无同快照证据）或探测到 legacy 向量：清除索引标记，明确安排
     // 一次全量重建（客户端下次同步携带 accountId 元数据重新上传）。
     const cleared = db.prepare(
@@ -751,16 +803,17 @@ export async function vectorSearch(
   // Issue #612 R12 审计 ISSUE-2：default 分区不得在「元数据索引已启用但未回填/
   // 覆盖未确认」时静默返回空结果。带 accountId='default' 的查询在旧向量缺少
   // accountId 元数据时同样返回 200 空 matches；本地 default 分区存在已索引仓库
-  // 时先做独立探测区分「阈值导致的空结果」与「范围内没有任何向量」——后者
-  // （以及探测失败导致无法确认）按与 account_metadata_not_indexed 一致的迁移
-  // 状态返回，避免把未回填伪装成「没有相似仓库」。default 分区没有本地索引
+  // 时先做独立探测，逐条核对本地全部已索引仓库是否都能被 default 范围召回——
+  // 仅凭「范围内有向量」不能确认覆盖完整（部分回填会把漏召回伪装成正常的
+  // 阈值空结果，R13 审计 14）。未确认（含探测失败 / 无法完整核对）时按与
+  // account_metadata_not_indexed 一致的迁移状态返回。default 分区没有本地索引
   // 标记时是真「无数据」，保持空结果。
   if (
     accountId === 'default'
     && matches.length === 0
     && hasIndexedDefaultPartitionRepositories(db)
   ) {
-    const coverage = await probeDefaultPartitionScopedCoverage(workerUrl, queryHeaders, vector);
+    const coverage = await probeDefaultPartitionScopedCoverage(db, workerUrl, queryHeaders, vector);
     if (coverage !== 'has_scoped_vectors') {
       logger.warn('mcp.vector', 'Default partition account metadata coverage unconfirmed', {
         coverage,

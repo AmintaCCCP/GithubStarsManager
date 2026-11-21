@@ -254,15 +254,16 @@ export interface AccountSwitchActions {
 3. **冲刷并冻结旧账号在途同步（解决 R3 & R4）**：
    - 调用 `autoSync.ts` 新增的 `prepareForAccountSwitch(previousAccountId)`：
      - 若存在未触发的 `_debounceTimer` 或 `_hasPendingLocalChanges`，**立即在旧账号上下文（`X-GitHub-Account-Id: previousAccountId`）下执行 `syncToBackend()`**，确保旧账号最后 2 秒内的本地修改 100% 落入后端旧账号分区。
-     - **冲刷必须排空推送通道**：注意 `waitForInFlightSync()`（`autoSync.ts:51-59`）只等待拉取 `_syncPromise`，**不等待推送 `_pushPromise`**。`prepareForAccountSwitch` 必须循环 `await syncToBackend()` 直至 `_hasPendingLocalChanges === false` 且 `_pushPromise` 为 null（带上限重试，如 3 次；若后端瞬时不可达导致冲刷失败，记录告警但不阻塞切换——推送内容与请求头原子一致，旧账号的未决修改将在下次进入账号 A 会话时补推，绝不能把失败标记带入新账号会话）。
+     - **冲刷必须排空推送通道**：注意 `waitForInFlightSync()`（`autoSync.ts:51-59`）只等待拉取 `_syncPromise`，**不等待推送 `_pushPromise`**。`prepareForAccountSwitch` 必须循环 `await syncToBackend()` 直至 `_hasPendingLocalChanges === false` 且 `_pushPromise` 为 null（带上限重试，如 3 次；若后端瞬时不可达导致冲刷失败，记录告警但不阻塞切换——推送内容与请求头原子一致）。**待推送状态必须按账号持久化**：冲刷失败时把旧账号的未决修改记录到账号级持久化待推状态（`markPendingAccountSync(previousAccountId)`，按 (账号, 后端 URL) 复合键持久化，含脏设置键与值快照），**推送失败时该状态必须保留**，待旧账号下次进入会话时先补推再拉取；会话级失败标记绝不带入新账号会话，账号级待推语义由持久化记录承载。
      - 等待任何在途的 `waitForInFlightSync()` 结束。
      - 开启切换静默锁 `_isSwitchingAccount = true`，阻止 Store 订阅器把接下来的工作区切换误判为本地编辑推送（即 `withAccountSwitchGuard(fn)` 包裹第 4-6 步；该守卫由 `useAccountSwitchActions.switchToAccount` 调用，不是孤立 API）。
-     - 切换完成后（第 6 步）显式清零 `_hasPendingLocalChanges` / `_hasPendingPush` 等模块级标志，避免语义残留。
+     - 切换完成后（第 6 步）显式清零 `_hasPendingLocalChanges` / `_hasPendingPush` 等模块级标志，避免语义残留。**清零会话级标志不等于丢弃旧账号的未决修改**：冲刷失败遗留的待推状态已按账号持久化（见上），**仅在补推确认成功后**才清除对应账号的待推记录，绝不用清零全局标志代替账号级状态管理。
 4. **原子切换客户端 Store 工作区**：
    - 调用 `useAppStore.getState().switchAccount(targetAccountId)`（内部完成旧工作区快照写入 `accountWorkspaces[previousAccountId]`、加载 `accountWorkspaces[targetAccountId]`、更新 `user` 与 `githubToken`、重置 `_lastHash`）。
 5. **对齐后端目标账号分区（若 `backend.isAvailable` 为 `true`）**：
    - 调用 `backend.syncSettings({ github_token: target.githubToken, active_account_id: targetAccountId, user_profile: target.user })`（此时请求头已自动携带新的 `X-GitHub-Account-Id: targetAccountId`）。**必须携带 `user_profile`**：后端 `accounts.user_json` 表唯一的写入路径就是 `PUT /api/settings` 的 `user_profile` 字段（`autoSync.ts:650-661` 现有推送载荷不含 user 字段，若不主动发送则后端恢复的账号列表永远没有头像/昵称，LoginScreen 快捷卡片无法渲染）。登录流程（`useLoginActions` / AddAccountModal）首次上传 Token 时同样附带 `user_profile`。
    - 调用 `syncFromBackend({ force: false })`：
+     - **先消费账号级待推状态，顺序绝不能颠倒**：若目标账号在当前后端存在冲刷失败遗留的持久化待推记录（`hasPendingAccountSync(targetAccountId)`），必须**先执行 `syncToBackend()` 补推该账号本地工作区（含未推修改），再拉取后端**——非强制拉取走合并分支，若先拉取，后端旧快照会在合并中覆盖该账号尚未推送的本地修改且不触发补推；补推失败时保留该账号的待推记录并调度自动重试，**仅在补推确认成功后清除该账号的待推状态**。
      - 若后端该账号分区已有数据，拉取并合并到本地；
      - 若后端该账号分区为空而本地该账号工作区有数据，`autoSync` 的空保护逻辑会自动将本地该账号数据推送到后端 `targetAccountId` 分区。
 6. **释放切换锁并刷新桌面端桥接**：
@@ -478,11 +479,12 @@ export interface AccountSwitchActions {
      2. 若未传该请求头（如旧版客户端、现有后端单元测试、或 MCP 请求），查询 `settings` 表中的 `active_account_id`；若仍不存在则返回 `'default'`；
      3. **首次真实账号认领（Legacy Default Claim）——必须带身份校验，防止误认领**：
         - 若请求携带了真实数字 `accountId`（如 `'123456'`），且 `settings` 表中尚未记录 `legacy_default_claimed_by`：
-          - **身份校验（防误归属）**：读出存量 `settings.github_token`，调用 GitHub `/user` API（结果缓存到 `settings` 表避免重复请求）解析出该 Token 真实归属的 GitHub 账号 id `ownerId`；**仅当 `ownerId === '123456'` 时才执行认领**。若不一致（例如后端存量数据属于账号 A，但第一个用新版客户端连上来的却是账号 B），**绝不认领**：`'default'` 数据原地不动，账号 B 获得干净独立分区，同时在响应中提示存量数据归属待处理（可由账号 A 首次登录时再认领）。
+          - **身份校验（防误归属，验证迁移时固化的凭据）**：归属判定**优先使用已固化的所有者**——首次 GitHub `/user` 校验成功后，把存量数据归属 `ownerId` 与当时绑定的全局 Token 密文一并持久化到 `settings` 表（`legacy_default_owner_id`，后续请求免网络复用）；此后认领判定只认这份已固化所有者，**绝不随全局 Token 换绑/轮换重新判定**。尚无固化所有者时，**优先验证 `legacy_default_github_token`**（无头请求覆写全局 Token 前固化的存量凭据快照，防止新 Token 冒充存量数据所有者），仅当该快照不存在时才回退验证当前 `settings.github_token`。
+          - **认领与凭据复制绑定验证时密文**：校验出的 `ownerId` **仅当等于请求账号（`ownerId === '123456'`）时才执行认领**；若不一致（例如后端存量数据属于账号 A，但第一个用新版客户端连上来的却是账号 B，或全局 Token 已换绑到 B），**绝不认领**：`'default'` 数据原地不动，账号 B 获得干净独立分区，存量数据等待账号 A 首次登录通过校验后再认领（或由管理员显式确认迁移目标）。通过校验后，全局 `github_token` 也**仅当当前密文与验证时绑定的密文一致**才复制进认领账号分区；Token 已换绑其他账号或已轮换时一律跳过（宁可缺失，不可错配），绝不把来源无法证明的凭据迁入认领分区。
           - 通过校验后：检查 `repositories` / `releases` / **`categories`（三表都要查）** 中是否存在 `account_id = 'default'` 的记录，且 `account_id = '123456'` 尚无记录；
           - 在单个 SQLite 事务中，将 `repositories`、`releases`、`categories` 中 `account_id = 'default'` 的行迁移更新为 `account_id = '123456'`，并将 `settings` 中的账号级键复制到 `account_settings ('123456', key, value)`，最后写入 `settings ('legacy_default_claimed_by', '123456')` 和 `settings ('active_account_id', '123456')`！
         - 这样老用户升级后，第一个已登录账号**零感知继承全部历史后端数据**；而第二个添加的账号（如 `'789012'`）进来时，因为 `legacy_default_claimed_by` 已设置，会直接拥有干净独立的 `'789012'` 分区，**彻底杜绝互相覆盖**！
-        - **`/api/sync/auth` 恢复登录流程天然满足身份校验**：客户端恢复的是后端保存的 Token，解出的 `ownerId` 与请求头账号一致，因此主流程不会受校验影响；仅直连 PAT 首登且与存量数据主人不符时才走「不认领」分支。
+        - **`/api/sync/auth` 恢复登录流程不受身份校验阻塞**：认领校验验证的是固化凭据（存量快照 Token / 已固化所有者）而非请求者携带的 Token，校验失败或归属未确立也不阻塞请求，主流程不受影响；仅当直连 PAT 首登账号与已固化归属不符时才走「不认领」分支。
 
 #### 4.3 后端各路由改造清单（`server/src/routes/` & `server/src/mcp/`）
 
@@ -595,7 +597,7 @@ export interface AccountSwitchActions {
 3. **导入逻辑（`importData`）**：
    - **绝不丢失其他账号工作区**：
      - 若导入包中含有 `importedData.accountWorkspaces`：
-       - `replace` 模式下：以 `{ ...store.accountWorkspaces, ...normalizeAccountWorkspaces(importedData.accountWorkspaces) }` 合并（即更新备份中存在的账号工作区，同时**保留本机独有的其他账号工作区**，防止导入单机备份抹掉本机其他账号）。
+       - `replace` 模式下：**在调用 `normalizeAccountWorkspaces` 之前先记录原始备份中每个账号实际包含的字段**（规整化会为缺失字段补默认空值，无法区分「未导出字段」与「导出为空」，违反上文导出逻辑确立的「未导出字段 ≠ 空集合」契约），逐账号**只替换原始备份中实际提供且有效的字段**（原始键存在且为真数组/有效对象才写入，并叠加本次恢复所选的数据类型筛选）；备份中缺失的字段**保留本机该账号工作区原值**，显式提供的空数组（如 `releases: []`）仍是有效的清空指令。即更新备份中存在的账号工作区，同时**保留本机独有的其他账号工作区**，防止导入部分备份抹掉本机其他账号或各账号未随备份导出的数据。
        - `merge` 模式下：对每个 `accountId` 的工作区数组（`repositories`, `releases`, `gists`, `forks`, `customCategories`）按 ID 去重合并。
      - 若导入包中含有 `importedData.savedAccounts`：
        - 遍历每个账号，若 `wasIncluded && isRealSecret(acc.githubToken)` 则采用导入的 Token，否则保留本机 `store.savedAccounts[id]?.githubToken ?? ''`。
@@ -711,8 +713,8 @@ export interface AccountSwitchActions {
 1. 修改 `src/locales/<10个语种>/app.json` 与 `login.json`，补齐全部多语言文案。
 2. 新增 `src/components/AddAccountModal.tsx`：实现在线添加新账号（或为脱敏导入账号补全 Token）弹窗。
 3. 修改 `src/components/Header.tsx`：
-   - 将右上角头像、用户名与退出按钮替换为 `DropdownMenu`（列出已保存账号及头像、当前账号标识、点击切换账号、添加新账号、移除非活跃账号、退出登录）。
-4. 新增 `src/components/Header.accountSwitch.test.tsx`：测试下拉菜单展开、账号列表渲染、点击切换账号、点击添加新账号打开弹窗、点击退出登录二次确认。
+   - **仅当已保存账号数 ≥ 2 时**才将右上角头像、用户名与退出按钮替换为 `DropdownMenu`（列出已保存账号及头像、当前账号标识、点击切换账号、添加新账号、移除非活跃账号、退出登录）；**单账号（仅登录 1 个账号）时保留升级前的独立退出图标按钮（含原有 Tooltip 与二次确认弹窗）与独立「添加新账号」入口**，退出登录不移入菜单（与 2.1 节第 0 条及验收标准 Checklist 一致）。
+4. 新增 `src/components/Header.accountSwitch.test.tsx`：测试下拉菜单展开、账号列表渲染、点击切换账号、点击添加新账号打开弹窗、点击退出登录二次确认；**补充单账号验收用例**——仅 1 个账号时资料区不渲染下拉触发器、退出登录走独立图标按钮且保留二次确认、「添加新账号」仍为独立入口。
 
 ### Step 5：本地 JSON 与 WebDAV 备份恢复多账号改造
 1. 修改 `src/components/settings/DataManagementPanel.tsx`：

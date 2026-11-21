@@ -151,7 +151,7 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     // 数字 ID）也不得返回 coverageConfirmed: true（调用方就不会保存 verified: true）。
     assert.match(
       src,
-      /if \(legacyCount > 0\) \{[\s\S]{0,800}?acct_verify_coverage_sample_legacy[\s\S]{0,400}?reason: 'legacy_present'[\s\S]*?const enumeration = enumerateVectorIds\(indexName\);/,
+      /if \(legacyCount > 0\) \{[\s\S]{0,800}?acct_verify_coverage_sample_legacy[\s\S]{0,400}?reason: 'legacy_present'[\s\S]*?const enumeration = enumerateVectorIds\(indexName, listVectorIdsPage\);/,
       'sample-observed gap must fail verification before enumeration-based coverage confirmation'
     );
     // 采样缺口失败结果绝不携带 coverageConfirmed: true / ok: true。
@@ -167,28 +167,52 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     );
   });
 
-  it('deploy.mjs enumeration fails when the pagination cap is hit before the last page (R12)', () => {
-    const src = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
-    // R12 review：达到分页上限仍有 nextCursor 时枚举不完整，必须按枚举失败处理；
-    // 只有明确读到末页（reachedEnd）才能返回 ok: true，正常读完的短分页不受影响。
-    assert.match(src, /let reachedEnd = false;/, 'enumeration must track whether it reached the last page');
-    assert.match(
-      src,
-      /if \(!next\) \{\s*\n\s*reachedEnd = true;\s*\n\s*break;\s*\n\s*\}/,
-      'loop must record reaching the last page when no cursor follows'
+  it('vectorize ID enumeration handles the pagination cap and end-of-pages by behavior (R12/R13)', async () => {
+    const deploySrc = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
+    // R13 review：分页读取已抽为可注入参数（cloudflare-worker/enumerate-vector-ids.mjs），
+    // 这里用注入的读取器验证实际行为，而不是只断言 deploy.mjs 的源码文本顺序
+    // （旧断言在 if (!reachedEnd) 被反转时仍会通过）。
+    assert.ok(
+      deploySrc.includes("from './enumerate-vector-ids.mjs'"),
+      'deploy.mjs must use the shared injectable enumeration module'
     );
-    const limitFailIdx = src.indexOf("reason: 'page_limit_exceeded'");
-    const okReturnIdx = src.indexOf('return { ok: true, total: ids.size, legacyCount };');
-    assert.ok(limitFailIdx !== -1, 'page-limit exhaustion must map to an enumeration failure');
-    assert.ok(okReturnIdx !== -1, 'enumeration success return must exist');
-    assert.ok(limitFailIdx < okReturnIdx, 'enumeration success must only be reachable after the page-limit check');
+    assert.ok(
+      deploySrc.includes('enumerateVectorIds(indexName, listVectorIdsPage)'),
+      'deploy.mjs must pass its wrangler-backed page reader into the shared enumeration'
+    );
+    const { enumerateVectorIds } = await import(path.resolve(WORKER_DIR, 'enumerate-vector-ids.mjs'));
+
+    // 最后一个允许读取的页面仍返回游标：枚举不完整，必须返回 ok: false +
+    // reason: 'page_limit_exceeded'，且停止在分页上限（不得死循环）。
+    let pages = 0;
+    const endlessReader = () => {
+      pages += 1;
+      return { vectors: [{ id: `7:${pages}` }], nextCursor: `cursor-${pages}` };
+    };
+    const capped = enumerateVectorIds('idx', endlessReader);
+    assert.equal(capped.ok, false);
+    assert.equal(capped.reason, 'page_limit_exceeded');
+    assert.equal(pages, 500, 'enumeration must stop at MAX_ENUM_PAGES');
+
+    // 同一页不返回游标：正常读到末页，返回 ok: true（含 legacy 统计）。
+    const drained = enumerateVectorIds('idx', () => ({ vectors: ['7:42', '101'] }));
+    assert.equal(drained.ok, true);
+    assert.equal(drained.total, 2);
+    assert.equal(drained.legacyCount, 1, 'numeric-only ID must be counted as legacy');
+
+    // 读取失败 / 空快照矛盾 / 缺少索引名仍按失败处理。
+    assert.deepEqual(enumerateVectorIds('idx', () => null), { ok: false, reason: 'list_failed' });
+    assert.deepEqual(enumerateVectorIds('idx', () => ({ vectors: [] })), { ok: false, reason: 'empty_snapshot' });
+    assert.deepEqual(enumerateVectorIds('', endlessReader), { ok: false, reason: 'missing_index_name' });
   });
 
   it('README documents that any numeric-only legacy vector blocks verified enablement (R12 ISSUE-3)', () => {
     const readme = fs.readFileSync(path.resolve(WORKER_DIR, 'README.md'), 'utf-8');
     const deploySrc = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
+    const enumSrc = fs.readFileSync(path.resolve(WORKER_DIR, 'enumerate-vector-ids.mjs'), 'utf-8');
     // 行为（代码）为准：纯数字 ID 一律判定 legacy_present，覆盖验证失败/回滚。
-    assert.match(deploySrc, /function isLegacyVectorId\(id\) \{\s*\n\s*return \/\^\\d\+\$\/\.test\(id\);/, 'deploy must treat numeric-only IDs as legacy');
+    // （R13 review：isLegacyVectorId 已随分页枚举抽至 enumerate-vector-ids.mjs。）
+    assert.match(enumSrc, /function isLegacyVectorId\(id\) \{\s*\n\s*return \/\^\\d\+\$\/\.test\(id\);/, 'enumeration must treat numeric-only IDs as legacy');
     assert.ok(deploySrc.includes("reason: 'legacy_present'"), 'deploy must fail coverage on legacy IDs');
     // README 必须给出与代码一致的、可执行的运维路径，而不是「保留副本无害」。
     assert.ok(readme.includes('legacy_present'), 'README must name the deploy verification failure reason');

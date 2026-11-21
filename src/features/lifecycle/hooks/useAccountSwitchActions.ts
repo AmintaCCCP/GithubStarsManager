@@ -91,15 +91,54 @@ export interface AccountSwitchActions {
 /**
  * 记录后端凭据（PAT / active_account_id）尚未对齐成功的账号集合。
  * 对齐失败时同账号路径与 Header 菜单不得提前短路，允许用户再次点击重试对齐。
+ * R13 finding 84：集合本身不是 React 状态——快捷登录路径不经过组件订阅字段，
+ * 写入不触发重渲染。这里配一套最小外部订阅（版本计数 + subscribe），供
+ * useSyncExternalStore 消费：版本变化触发订阅组件重渲染，重渲染时再用
+ * hasPendingBackendCredentialAlign 读取最新成员。
  */
 const pendingBackendCredentialAlignAccounts = new Set<string>();
+let _pendingBackendCredentialAlignVersion = 0;
+const _pendingBackendCredentialAlignListeners = new Set<() => void>();
+
+const notifyPendingBackendCredentialAlignChange = (): void => {
+  _pendingBackendCredentialAlignVersion += 1;
+  for (const listener of [..._pendingBackendCredentialAlignListeners]) listener();
+};
+
+/** 仅在成员真正增删时通知（幂等写入不抬版本，避免无谓重渲染）。 */
+const markPendingBackendCredentialAlign = (accountId: string): void => {
+  if (pendingBackendCredentialAlignAccounts.has(accountId)) return;
+  pendingBackendCredentialAlignAccounts.add(accountId);
+  notifyPendingBackendCredentialAlignChange();
+};
+
+const clearPendingBackendCredentialAlign = (accountId: string): void => {
+  if (!pendingBackendCredentialAlignAccounts.delete(accountId)) return;
+  notifyPendingBackendCredentialAlignChange();
+};
 
 export function hasPendingBackendCredentialAlign(accountId: string | null | undefined): boolean {
   return Boolean(accountId && pendingBackendCredentialAlignAccounts.has(accountId));
 }
 
+/** useSyncExternalStore 的 subscribe 入口；返回退订函数。 */
+export function subscribePendingBackendCredentialAlign(listener: () => void): () => void {
+  _pendingBackendCredentialAlignListeners.add(listener);
+  return () => {
+    _pendingBackendCredentialAlignListeners.delete(listener);
+  };
+}
+
+/** useSyncExternalStore 的 getSnapshot：单调递增版本计数（原始值，引用稳定）。 */
+export function getPendingBackendCredentialAlignVersion(): number {
+  return _pendingBackendCredentialAlignVersion;
+}
+
 export function resetPendingBackendCredentialAlignForTest(): void {
-  pendingBackendCredentialAlignAccounts.clear();
+  if (pendingBackendCredentialAlignAccounts.size > 0) {
+    pendingBackendCredentialAlignAccounts.clear();
+    notifyPendingBackendCredentialAlignChange();
+  }
 }
 
 /**
@@ -213,13 +252,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         || activeAccountUpdateSkipped
       ) {
         credentialsAligned = false;
-        pendingBackendCredentialAlignAccounts.add(accountId);
+        markPendingBackendCredentialAlign(accountId);
       } else {
-        pendingBackendCredentialAlignAccounts.delete(accountId);
+        clearPendingBackendCredentialAlign(accountId);
       }
     } catch (error) {
       credentialsAligned = false;
-      pendingBackendCredentialAlignAccounts.add(accountId);
+      markPendingBackendCredentialAlign(accountId);
       console.warn('Failed to align account settings on backend:', error);
     }
     if (activeAccountUpdateSkipped) {
@@ -262,6 +301,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
 
   const switchToAccount = useCallback(async (targetAccountId: string): Promise<AccountSwitchResult> => {
     const current = useAppStore.getState();
+    // R13 审计修复（CodeRabbit）：先获取共享锁再判定快速成功——A→B 切换在途
+    // 时当前账号仍是 A，另一实例此时 switchToAccount('A') 会绕过锁返回
+    // { ok: true }，随后第一个流程仍会切到 B。锁空闲时保留对已认证当前账号
+    // 的快速返回（锁是纯布尔标记，获取后立即释放无副作用）。
+    if (!acquireAccountSwitchLock()) {
+      return { ok: false, error: 'switch-in-progress' };
+    }
     // 同账号：仅当当前会话已使用目标凭证且已认证时才提前返回。水化后可能出现
     // user 保留但顶层凭证丢失/未认证的破损会话——此时必须继续走完整流程，
     // 由 store.switchAccount 的同账号分支恢复凭证与登录态（审计修复）。
@@ -271,14 +317,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       && !!current.githubToken?.trim()
       && !pendingBackendCredentialAlignAccounts.has(targetAccountId)
     ) {
+      releaseAccountSwitchLock();
       return { ok: true };
     }
     const target = current.savedAccounts[targetAccountId];
     if (!target || !target.githubToken.trim()) {
+      releaseAccountSwitchLock();
       return { ok: false, needsToken: true };
-    }
-    if (!acquireAccountSwitchLock()) {
-      return { ok: false, error: 'switch-in-progress' };
     }
 
     setIsSwitching(true);
@@ -464,7 +509,18 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         // 账号是 B 时返回 github_token: null，B 的有效凭证被误判为
         // github-token-required。显式省略账号头，让服务端回退到候选后端自己
         // 的 active_account_id 分区。
-        const result = await withAccountSwitchGuard(() => restoreBackendSession(url, { omitAccountHeader: true, apiSecret: secret }));
+        // R13 finding 83：补授权点名账号（expectedAccountId）时恢复请求必须
+        // 定向该账号（restoreBackendSession 的 accountId 选项以
+        // getBackendAuthHeaders(accountId) 显式构造请求头，不读取本地旧账号）
+        // ——候选后端保存多账号且无唯一活跃账号时，无目标恢复会返回
+        // account-selection-required 而直接失败，补授权弹窗永远无法完成；
+        // 定向恢复命中分区后正常返回凭证，命中身份不符仍按
+        // restored-token-invalid 处理（restoreBackendSession 内已有归属校验）。
+        const result = await withAccountSwitchGuard(() => restoreBackendSession(url, {
+          omitAccountHeader: true,
+          apiSecret: secret,
+          ...(expectedAccountId ? { accountId: expectedAccountId } : {}),
+        }));
         if (result.status === 'backend-unavailable') return { ok: false, error: 'backend-unavailable' };
         if (result.status === 'unauthorized') return { ok: false, error: 'unauthorized' };
         if (result.status === 'restore-failed') return { ok: false, error: 'restore-failed' };

@@ -804,6 +804,26 @@ export async function runVectorSearchPipeline(
     return denseScopePromise;
   };
 
+  // 第 13 轮审计修复 [71]：/status 探测通过后 Worker 仍可能在账号范围查询时
+  // 回滚（ACCOUNT_METADATA_NOT_INDEXED）——保留 Worker 错误码，收到该错误时
+  // 每次搜索只通知一次 onDenseSkipped（metadata-index-not-ready），随后继续
+  // 使用本地召回，绝不发无范围查询。
+  const handleDenseQueryFailure = (stage: 'Raw' | 'Ideal', error: unknown): VectorQueryResult[] => {
+    if (isAbortError(error)) throw error;
+    const workerCode = (error as { code?: unknown } | null)?.code;
+    if (workerCode === 'ACCOUNT_METADATA_NOT_INDEXED') {
+      if (!denseSkipNotified) {
+        denseSkipNotified = true;
+        denseSkipReason = 'metadata-index-not-ready';
+        options.onDenseSkipped?.('metadata-index-not-ready');
+      }
+      logger.warn('vector-search', `${stage} dense query rejected: accountId metadata index is not ready`, { error });
+      return [];
+    }
+    logger.warn('vector-search', `${stage} embedding or dense recall failed, continuing without it`, { error });
+    return [];
+  };
+
   let rawDenseStarted = 0;
   const rawDensePromise = rawEmbeddingPromise
     .then((vectors) => {
@@ -830,11 +850,7 @@ export async function runVectorSearchPipeline(
     .finally(() => {
       if (rawDenseStarted) timingsMs.rawDense = Date.now() - rawDenseStarted;
     })
-    .catch(error => {
-      if (isAbortError(error)) throw error;
-      logger.warn('vector-search', 'Raw embedding or dense recall failed, continuing without it', { error });
-      return [];
-    });
+    .catch(error => handleDenseQueryFailure('Raw', error));
   // Analysis may reject first on cancellation; keep the in-flight dense promise handled.
   void rawDensePromise.catch(() => undefined);
 
@@ -881,11 +897,7 @@ export async function runVectorSearchPipeline(
             timingsMs.idealDense = Date.now() - started;
           });
         })
-        .catch(error => {
-          if (isAbortError(error)) throw error;
-          logger.warn('vector-search', 'Ideal embedding or dense recall failed, continuing without it', { error });
-          return [];
-        })
+        .catch(error => handleDenseQueryFailure('Ideal', error))
     : Promise.resolve([]);
 
   const [rawMatchResults, idealMatchResults] = await Promise.all([

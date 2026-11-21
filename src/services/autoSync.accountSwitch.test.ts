@@ -572,9 +572,14 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     });
 
     // 切回原后端重试：补推载荷必须使用持久化的值，而不是被覆盖后的工作区值。
+    // 第 13 轮审计修复 [76]：记录重试前的调用次数——首次失败冲刷已写入
+    // ['flush-failed-edit']，若重试因待推状态丢失而提前返回，最后一次调用仍
+    // 来自失败冲刷，只看载荷会误通过。先断言重试产生了新调用，再检查载荷。
     adapter.backendUrl = 'http://origin';
+    const syncSettingsCallsBeforeRetry = vi.mocked(backend.syncSettings).mock.calls.length;
     await syncToBackend();
     const settingsPayloads = vi.mocked(backend.syncSettings).mock.calls;
+    expect(settingsPayloads.length).toBeGreaterThan(syncSettingsCallsBeforeRetry);
     const lastPayload = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
     expect(lastPayload.categoryOrder).toEqual(['flush-failed-edit']);
     delete adapter.backendUrl;

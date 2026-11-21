@@ -389,7 +389,10 @@ describe('useBulkRepositoryActions account switch guards', () => {
       ...storeState,
       accountWorkspaces: {
         '1': {
-          repositories: [restarred],
+          // R13 审计修复（CodeRabbit）：发起请求时归档仍是 original——重新加星
+          // 发生在请求等待期间（见 unstarRepository mock），对账必须读取响应
+          // 完成时的记录，而不是发起时的快照。
+          repositories: [original],
           releases: [{ id: 101, repository: { id: 1 } } as unknown as import('../../../types').Release],
           releaseSubscriptions: [1],
           readReleases: [101],
@@ -405,6 +408,10 @@ describe('useBulkRepositoryActions account switch guards', () => {
     });
     mocks.unstarRepository.mockImplementation(async () => {
       switchToB();
+      // 等待期间用户对同 ID 仓库重新加星：A 归档更新为 restarred
+      (storeState as unknown as {
+        accountWorkspaces: Record<string, { repositories: Repository[] }>;
+      }).accountWorkspaces['1'].repositories = [restarred];
       return undefined;
     });
     const { result } = renderActions();

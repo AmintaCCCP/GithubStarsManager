@@ -64,6 +64,7 @@
     "click-to-sign-in": "點擊登入",
     "token-required": "需補充 Token",
     "select-account-to-restore": "選擇要還原的帳號",
-    "multiple-accounts-exist-on-this-backend-select-th": "此後端存在多個帳號，請選擇要還原的帳號。"
+    "multiple-accounts-exist-on-this-backend-select-th": "此後端存在多個帳號，請選擇要還原的帳號。",
+    "multiple-accounts-exist-on-this-backend-close-th": "此後端存在多個帳號。請關閉此視窗，然後在登入頁選擇要還原的帳號。"
   }
 }

@@ -64,6 +64,7 @@
     "click-to-sign-in": "Haz clic para iniciar sesión",
     "token-required": "Se requiere token",
     "select-account-to-restore": "Selecciona la cuenta que quieres restaurar",
-    "multiple-accounts-exist-on-this-backend-select-th": "Existen varias cuentas en este backend; selecciona la cuenta que quieres restaurar."
+    "multiple-accounts-exist-on-this-backend-select-th": "Existen varias cuentas en este backend; selecciona la cuenta que quieres restaurar.",
+    "multiple-accounts-exist-on-this-backend-close-th": "Existen varias cuentas en este backend. Cierra este diálogo y selecciona la cuenta que quieres restaurar en la página de inicio de sesión."
   }
 }

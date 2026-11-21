@@ -100,6 +100,12 @@ export default {
         // 账号范围过滤必须在 topK 之前生效（Vectorize 的 filter 语义），
         // 否则其他账号的高分向量会占满候选名额；若 accountId 元数据索引尚未
         // 就绪，直接拒绝按账号过滤的查询，避免静默漏召回或退回无范围查询。
+        // R13 review：accountId 字段已提供但不是非空字符串（如数字 42）时返回
+        // 400——静默当作「未传账号范围」会跳过索引就绪检查并执行无过滤查询；
+        // 仅当字段省略时保留旧客户端的无范围行为。
+        if (accountId !== undefined && (typeof accountId !== 'string' || accountId.length === 0)) {
+          return jsonResponse({ success: false, error: 'accountId must be a non-empty string when provided' }, 400);
+        }
         const requestedAccountId = typeof accountId === 'string' && accountId.length > 0 ? accountId : null;
         if (requestedAccountId && env.ACCOUNT_METADATA_INDEXED !== 'true') {
           return jsonResponse(
@@ -150,6 +156,11 @@ export default {
         if (!Array.isArray(keepIds)) {
           return jsonResponse({ success: false, error: 'keepIds array required' }, 400);
         }
+        // R13 review：keepIds 必须全为字符串——`[42]` 这类数字元素会让
+        // keepSet.has('42') 落空，采样命中 ID "42" 的旧向量时会把它提交删除。
+        if (keepIds.some((id) => typeof id !== 'string')) {
+          return jsonResponse({ success: false, error: 'keepIds must contain only string ids' }, 400);
+        }
         if (body.accountPrefix !== undefined) {
           if (typeof body.accountPrefix !== 'string' || !/^\d+$/.test(body.accountPrefix.trim())) {
             return jsonResponse({ success: false, error: 'accountPrefix must be a numeric account id string' }, 400);
@@ -166,6 +177,13 @@ export default {
         const prefix = accountPrefix !== null ? `${accountPrefix}:` : null;
         const isLegacyId = (id: string): boolean => /^\d+$/.test(id);
         const keepSet = new Set(keepIds);
+        // R13 review：显式范围请求但没有任何可删除范围（accountPrefix 未提供且
+        // includeLegacy=false）时，isDeletableId 对所有 ID 都返回 false——确定性
+        // 空操作直接返回零删除，不执行索引查询，也不把空操作标成「未验证」；
+        // 两个字段都省略时的旧版清理行为保持不变。
+        if (scoped && prefix === null && !includeLegacy) {
+          return jsonResponse({ success: true, deleted: 0 });
+        }
         const info = await env.VECTORIZE.describe();
         if ((info.vectorCount ?? 0) === 0) {
           return jsonResponse({ success: true, deleted: 0 });

@@ -80,6 +80,12 @@ export const GistView: React.FC = () => {
     detailRequestSeqRef.current += 1;
     setDetailGist(null);
     setIsDetailOpen(false);
+    // 审计修复（R13 finding 55）：账号切换时 GistView 保持挂载——编辑器若仍
+    // 打开，会继续显示上一账号的私有 Gist 草稿，且提交会以新会话 Token 调用
+    // updateGist（editingGist.id 无归属校验）。同一 effect 内关闭编辑器并清空
+    // 草稿，阻止切换后的提交与上一账号草稿的残留展示。
+    setEditingGist(null);
+    setIsEditorOpen(false);
   }, [sessionAccountId]);
 
   const categoryItems = useMemo(() => ({

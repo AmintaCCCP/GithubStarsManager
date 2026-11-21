@@ -64,6 +64,7 @@
     "click-to-sign-in": "Нажмите, чтобы войти",
     "token-required": "Требуется токен",
     "select-account-to-restore": "Выберите аккаунт для восстановления",
-    "multiple-accounts-exist-on-this-backend-select-th": "На этом бэкенде есть несколько аккаунтов; выберите аккаунт для восстановления."
+    "multiple-accounts-exist-on-this-backend-select-th": "На этом бэкенде есть несколько аккаунтов; выберите аккаунт для восстановления.",
+    "multiple-accounts-exist-on-this-backend-close-th": "На этом бэкенде есть несколько аккаунтов. Закройте это окно и выберите аккаунт для восстановления на странице входа."
   }
 }

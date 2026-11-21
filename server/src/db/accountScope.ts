@@ -53,12 +53,30 @@ const LEGACY_REPOSITORY_MERGE_COLUMNS: ReadonlyArray<{
     expression: (source) => `CASE WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE(${source}, ai_summary) ELSE ai_summary END`,
   },
   {
+    // Issue #612 审计（R13）：从 default 补入 ai_summary 的同一事务内必须同步
+    // 设置 ai_summary_shared——目标行在空摘要上的授权位本无实际效果（捐赠查询
+    // 要求字段非空），补入他人的总结后该位却会生效，其他账号的回填可能因此
+    // 收到未经授权共享的 default 摘要。与 repositories.ts 回填路径「被回填字段
+    // 的共享标记清零」语义一致：清零而非沿用，绝不继承空字段上的旧授权位；
+    // 目标摘要非空（未补入）时保留现有标记。ai_tags / ai_platforms 同理。
+    column: 'ai_summary_shared',
+    expression: () => `CASE WHEN ai_summary IS NULL OR ai_summary = '' THEN 0 ELSE ai_summary_shared END`,
+  },
+  {
     column: 'ai_tags',
     expression: (source) => `CASE WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE(${source}, ai_tags) ELSE ai_tags END`,
   },
   {
+    column: 'ai_tags_shared',
+    expression: () => `CASE WHEN ai_tags IS NULL OR ai_tags = '[]' THEN 0 ELSE ai_tags_shared END`,
+  },
+  {
     column: 'ai_platforms',
     expression: (source) => `CASE WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE(${source}, ai_platforms) ELSE ai_platforms END`,
+  },
+  {
+    column: 'ai_platforms_shared',
+    expression: () => `CASE WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN 0 ELSE ai_platforms_shared END`,
   },
   {
     column: 'analyzed_at',
@@ -574,6 +592,32 @@ export function bumpAccountCredentialVersion(db: Database.Database, accountId: s
   }
 }
 
+/**
+ * 账号资料版本（Issue #612 R13 审计 13：并发资料变更检测）。资料变更（accounts
+ * .user_json 写入）不推进凭据版本或活跃账号版本：携带资料 + 新 PAT 的请求在
+ * GitHub 校验等待期间，另一设备可更新同账号资料。PUT /api/settings 在等待前
+ * 记录本版本、写入事务内单独复核，已变化时跳过迟到请求携带的旧资料并报告冲突
+ * （已验证且未被替换的 PAT 仍照常保存）。
+ */
+export function getAccountProfileVersion(db: Database.Database, accountId: string): number {
+  const raw = getPartitionMeta(db, accountId, 'profile_revision');
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/** 资料实际变更（accounts.user_json 写入 / 显式清空）后递增资料版本。 */
+export function bumpAccountProfileVersion(db: Database.Database, accountId: string): void {
+  try {
+    db.prepare(`
+      INSERT INTO partition_meta (account_id, key, value) VALUES (?, 'profile_revision', '1')
+      ON CONFLICT(account_id, key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
+    `).run(accountId);
+  } catch (err) {
+    // 与 bumpAccountCredentialVersion 相同的容忍范围：仅轻量 stub 缺表，其余向上抛出。
+    if (!isMissingPartitionMetaTableError(err)) throw err;
+  }
+}
+
 const GLOBAL_META_SCOPE = '__global__';
 
 /** 全局活跃账号切换版本（用于防止异步 PAT 校验完成后覆盖期间发生的较新账号切换）。 */
@@ -1026,8 +1070,12 @@ function runLegacyDefaultClaimTransaction(
         }
         db.prepare("DELETE FROM account_settings WHERE account_id = 'default' AND key = ?").run(row.key);
       }
-    } catch {
-      // 轻量 stub 缺 account_settings 表时跳过
+    } catch (err) {
+      // 仅容忍轻量 stub 缺 account_settings 表的错误（与 partition_meta 写入的
+      // 容忍范围一致）；其余真实数据库错误向上抛出——事务内抛出即整体回滚，
+      // 绝不带着未迁移完的设置写入 legacy_default_claimed_by（认领标记一旦写入，
+      // 自动与手动认领都会跳过，剩余设置将永远失去迁移入口）。
+      if (!(err instanceof Error && /no such table: account_settings/.test(err.message))) throw err;
     }
     // 仅在多账号共存时清除存量仓库的 vector_indexed_at，避免单账号老用户升级后被迫全量重建向量。
     if (collectNonDefaultPartitionIds(db).size > 1) {

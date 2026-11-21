@@ -209,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "Остановить анализ ИИ",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "Вы уверены, что хотите остановить анализ ИИ? Результаты анализа будут сохранены.",
+    "analysis-task-already-running": "Задача ИИ-анализа уже выполняется. Дождитесь её завершения или остановите текущую задачу и повторите попытку.",
     "no-failed-repositories-to-re-analyze": "Нет репозитория с неудачным анализом!",
     "all-repositories-have-been-analyzed": "Все склады проанализированы!",
     "no-repositories-to-analyze": "Нет репозиториев для анализа!",

@@ -209,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "AI解析を停止する",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "AI分析を停止してもよろしいですか?分析結果は保存されます。",
+    "analysis-task-already-running": "AI 分析タスクが実行中です。完了を待つか、現在のタスクを停止してから再試行してください。",
     "no-failed-repositories-to-re-analyze": "分析に失敗したリポジトリはありません。",
     "all-repositories-have-been-analyzed": "すべての倉庫が分析されました!",
     "no-repositories-to-analyze": "分析するリポジトリがありません。",

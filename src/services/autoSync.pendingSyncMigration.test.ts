@@ -16,11 +16,13 @@ const importFresh = async () => {
 
 const PENDING_SYNC_ACCOUNTS_KEY = 'gsm.pendingSyncAccounts';
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
+const LEGACY_PENDING_SYNC_EVALUATED_KEY = 'gsm.pendingSyncLegacyEvaluated';
 
 describe('loadPendingSyncAccounts legacy record migration (audit fix)', () => {
   afterEach(() => {
     window.localStorage.removeItem(PENDING_SYNC_ACCOUNTS_KEY);
     window.localStorage.removeItem(BACKEND_URL_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_PENDING_SYNC_EVALUATED_KEY);
     vi.resetModules();
   });
 
@@ -46,6 +48,37 @@ describe('loadPendingSyncAccounts legacy record migration (audit fix)', () => {
     // 无法确认原后端：记录保留原样，绝不关联到任何新后端。
     expect(autoSync.hasPendingAccountSync('77')).toBe(false);
     expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
+  });
+
+  it('keeps legacy records unbound after connecting another backend and restarting (round-13 audit fix)', async () => {
+    // 第 13 轮审计修复：首次启动无持久化 URL 时遗留记录保持未归属并写入评估
+    // 标记；之后连接后端 B 并重启（persistedUrl 变为 B），记录也绝不能绑定到
+    // B——否则「绝不会自动补推到新后端」的约定在重启后失效，账号 77 的本地
+    // 修改会被当作 B 的待推内容。
+    window.localStorage.removeItem(BACKEND_URL_STORAGE_KEY);
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['77']]));
+
+    // 第一次启动：无可确认的原后端 → 记录保持未归属。
+    const firstStart = await importFresh();
+    firstStart.backend._backendUrl = 'https://unrelated.test/api';
+    expect(firstStart.autoSync.hasPendingAccountSync('77')).toBe(false);
+    expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
+
+    // 用户连接另一后端 B（持久化 URL 被保存），重新导入模块模拟重启。
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://other.test/api');
+    const secondStart = await importFresh();
+    secondStart.backend._backendUrl = 'https://other.test/api';
+    // 重启后记录仍未归属：hasPendingAccountSync('77') 为 false，存储内容不变。
+    expect(secondStart.autoSync.hasPendingAccountSync('77')).toBe(false);
+    expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
+
+    // 评估标记对一切保持未归属的记录生效（含新格式空 URL 记录）：无法确认
+    // 原后端的记录绝不因后续保存的后端 URL 绑定到该后端。
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['88', '']]));
+    const thirdStart = await importFresh();
+    thirdStart.backend._backendUrl = 'https://other.test/api';
+    expect(thirdStart.autoSync.hasPendingAccountSync('88')).toBe(false);
+    expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['88', '']]));
   });
 
   it('merges dirty setting keys when the target composite key already holds a record (auditor fix)', async () => {

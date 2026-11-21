@@ -209,6 +209,7 @@
   "useRepositoryAnalysisJob": {
     "stop-ai-analysis": "Stoppen Sie die KI-Analyse",
     "are-you-sure-you-want-to-stop-ai-analysis-analyz": "Möchten Sie die KI-Analyse wirklich stoppen? Die analysierten Ergebnisse werden gespeichert.",
+    "analysis-task-already-running": "Eine KI-Analyseaufgabe läuft bereits. Bitte warten Sie, bis sie abgeschlossen ist, oder brechen Sie die aktuelle Aufgabe ab, bevor Sie es erneut versuchen.",
     "no-failed-repositories-to-re-analyze": "Kein Repository mit fehlgeschlagener Analyse!",
     "all-repositories-have-been-analyzed": "Alle Lager wurden analysiert!",
     "no-repositories-to-analyze": "Es sind keine Repositories zum Analysieren vorhanden!",

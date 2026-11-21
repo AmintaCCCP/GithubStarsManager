@@ -27,7 +27,8 @@
     "data-restored-from-backup-repositories-v1-releas": "Dados restaurados do backup: Armazém {{v1}}, Versão {{v2}}, Classificação Customizada {{v3}}.",
     "restore-failed": "Falha na recuperação",
     "account-changed-during-restore": "A conta foi trocada durante a restauração. A restauração foi abortada para proteger seus dados.",
-    "gist-data-in-the-backup-contained-invalid-entries-th": "Os dados de Gist do backup continham entradas inválidas; os campos afetados foram ignorados e mantêm seus valores anteriores."
+    "gist-data-in-the-backup-contained-invalid-entries-th": "Os dados de Gist do backup continham entradas inválidas; os campos afetados foram ignorados e mantêm seus valores anteriores.",
+    "fork-data-in-the-backup-contained-invalid-entries-th": "Os dados de Fork do backup continham entradas inválidas; os campos afetados foram ignorados e mantêm seus valores anteriores."
   },
   "useDesktopActions": {
     "load-failed": "Falha no carregamento",

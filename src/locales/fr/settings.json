@@ -27,7 +27,8 @@
     "data-restored-from-backup-repositories-v1-releas": "Données restaurées à partir de la sauvegarde : entrepôt {{v1}}, version {{v2}}, classification personnalisée {{v3}}.",
     "restore-failed": "La récupération a échoué",
     "account-changed-during-restore": "Le compte a changé pendant la restauration. La restauration a été interrompue pour protéger vos données.",
-    "gist-data-in-the-backup-contained-invalid-entries-th": "Les données Gist de la sauvegarde contenaient des entrées invalides ; les champs concernés ont été ignorés et conservent leurs valeurs précédentes."
+    "gist-data-in-the-backup-contained-invalid-entries-th": "Les données Gist de la sauvegarde contenaient des entrées invalides ; les champs concernés ont été ignorés et conservent leurs valeurs précédentes.",
+    "fork-data-in-the-backup-contained-invalid-entries-th": "Les données Fork de la sauvegarde contenaient des entrées invalides ; les champs concernés ont été ignorés et conservent leurs valeurs précédentes."
   },
   "useDesktopActions": {
     "load-failed": "Le chargement a échoué",

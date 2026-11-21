@@ -340,6 +340,14 @@ export const normalizeSavedAccounts = (value: unknown): Record<string, SavedAcco
       changed = true;
       continue;
     }
+    // 第 13 轮审计修复 [112]：user.name 直接被 Header/LoginScreen 渲染
+    //（user.name || user.login）——持久化/导入来源的非字符串值（如对象）会让
+    // React 渲染抛错，无效条目残留存储后会在相同渲染路径上重复触发。规整化
+    // 保证保留条目的 name 为字符串：非字符串值按 backendAdapter 身份规整化的
+    // 方式回退 user.login（转换而非拒绝，账号元数据不丢）。
+    const safeUser = typeof user.name === 'string'
+      ? user
+      : { ...user, name: user.login };
     const accountId = String(userId);
     // 审计修复（B6）：按 user.id 归一的规范键已存在时，非规范别名条目
     // （如 "042" 指向 id 42）一律忽略——别名不得覆盖规范条目的凭证。
@@ -355,7 +363,7 @@ export const normalizeSavedAccounts = (value: unknown): Record<string, SavedAcco
       && record.accountId === accountId
       && addedAt !== ''
       && lastUsedAt !== ''
-      && (record.user as unknown) === (user as unknown)
+      && (record.user as unknown) === (safeUser as unknown)
       && record.githubToken === githubToken;
     if (stable) {
       result[accountId] = entry as SavedAccount;
@@ -365,7 +373,7 @@ export const normalizeSavedAccounts = (value: unknown): Record<string, SavedAcco
     const now = new Date().toISOString();
     result[accountId] = {
       accountId,
-      user,
+      user: safeUser,
       githubToken,
       addedAt: addedAt || now,
       lastUsedAt: lastUsedAt || addedAt || now,

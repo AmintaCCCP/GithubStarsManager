@@ -30,15 +30,23 @@ let _isAccountSwitchBookkeeping = false;
 // 会立即推送），改记入窗口缓冲按归属账号归档。
 let _isAccountSwitchFrozen = false;
 
+// 冻结窗口深度（第 13 轮审计修复）：并发/嵌套窗口用引用计数管理冻结与守卫
+// 标志——布尔保存/还原在窗口退出顺序交错时会把仍活跃窗口的标志复位为 false，
+// 编辑由此泄漏到会话级待推通道；深度归零才复位。
+let _frozenWindowDepth = 0;
+
 // 冻结窗口内的真实编辑缓冲（R4 审计修复）：记录编辑发生时的活跃账号
 // （GitHub 数值 ID 字符串）。窗口退出时按恢复结果分流：恢复失败（回滚原
 // 后端）→ 调用方在复原连接后立即补推；恢复成功（切到新后端）→ 并入
 // _pendingSyncAccounts，下次进入该账号先补推再拉取。窗口内绝不推送。
+// 第 13 轮审计修复：并发/嵌套窗口各自持有独立缓冲（进入时安装、退出时
+// 还原并按各自 origin 分流），不再共享单一缓冲。
 let _frozenWindowEditAccounts = new Set<string>();
 
 // 冻结窗口内的设置脏键缓冲（审计修复 C4）：按编辑发生时的活跃账号记录窗口内
 // 修改过的设置键。窗口退出时随 markPendingAccountSync 的 dirtySettingKeys
 // 一起按 (accountId, backendUrl) 持久化，重启后拉取仍能保留这些本地编辑值。
+// 并发/嵌套窗口各自持有独立缓冲（第 13 轮审计修复）。
 let _frozenWindowDirtySettingKeys = new Map<string, Set<string>>();
 
 // 冻结窗口内的设置待推「值」缓冲（R12 跨域修复，finding 3）：同账号从 X 恢复
@@ -46,6 +54,7 @@ let _frozenWindowDirtySettingKeys = new Map<string, Set<string>>();
 // 本地工作区的 categoryOrder 等字段，切回 X 时脏键仍在但原值已无法恢复。
 // 这里在编辑发生的瞬间按账号保存每个脏键的新值；窗口退出时随 (accountId,
 // backendUrl) 一起持久化，重试该后端时写回工作区并随推送发送。
+// 并发/嵌套窗口各自持有独立缓冲（第 13 轮审计修复）。
 let _frozenWindowDirtySettingValues = new Map<string, Record<string, unknown>>();
 
 /**
@@ -100,45 +109,48 @@ export async function withAccountSwitchFrozen<T>(
 ): Promise<T> {
   const previousSwitching = _isSwitchingAccount;
   const previousBookkeeping = _isAccountSwitchBookkeeping;
-  const previousFrozen = _isAccountSwitchFrozen;
-  const previousBuffer = _frozenWindowEditAccounts;
-  const previousDirtyBuffer = _frozenWindowDirtySettingKeys;
+  const previousEditBuffer = _frozenWindowEditAccounts;
+  const previousDirtyKeyBuffer = _frozenWindowDirtySettingKeys;
   const previousDirtyValueBuffer = _frozenWindowDirtySettingValues;
-  // 嵌套窗口共享最外层缓冲：只有最外层窗口退出时做缓冲分流
-  const isOutermostWindow = !previousFrozen;
+  // 第 13 轮审计修复（并发冻结窗口）：每个窗口持有自己的缓冲并在退出时按
+  // 自己的 origin 分流——并发/嵌套窗口不再共享一个缓冲，非最外层退出也不会
+  // 吞掉缓冲（旧实现只有最外层退出分流，并发窗口退出顺序交错时编辑会被
+  // 归属到错误的 origin 或整体丢失）。订阅器写入的是「当前窗口」的缓冲
+  // （进入时安装、退出时还原），编辑归属窗口的 origin 语义不变。
+  const windowEditAccounts = new Set<string>();
+  const windowDirtySettingKeys = new Map<string, Set<string>>();
+  const windowDirtySettingValues = new Map<string, Record<string, unknown>>();
+  _frozenWindowEditAccounts = windowEditAccounts;
+  _frozenWindowDirtySettingKeys = windowDirtySettingKeys;
+  _frozenWindowDirtySettingValues = windowDirtySettingValues;
+  _frozenWindowDepth += 1;
   _isSwitchingAccount = true;
   _isAccountSwitchFrozen = true;
   // 冻结窗口内不再全程置簿记标记：guardSync 覆盖的簿记写入自带标记并自行
   // 恢复；窗口内其余写入由此被订阅器视为真实编辑进入窗口缓冲
   _isAccountSwitchBookkeeping = false;
-  if (isOutermostWindow) {
-    _frozenWindowEditAccounts = new Set();
-    _frozenWindowDirtySettingKeys = new Map();
-    _frozenWindowDirtySettingValues = new Map();
-  }
   try {
     return await fn();
   } finally {
-    _isSwitchingAccount = previousSwitching;
-    _isAccountSwitchBookkeeping = previousBookkeeping;
-    _isAccountSwitchFrozen = previousFrozen;
-    if (isOutermostWindow) {
-      const bufferedAccounts = _frozenWindowEditAccounts;
-      const bufferedDirtyKeys = _frozenWindowDirtySettingKeys;
-      const bufferedDirtyValues = _frozenWindowDirtySettingValues;
-      _frozenWindowEditAccounts = previousBuffer;
-      _frozenWindowDirtySettingKeys = previousDirtyBuffer;
-      _frozenWindowDirtySettingValues = previousDirtyValueBuffer;
-      for (const accountId of bufferedAccounts) {
-        // 审计修复（C4）：窗口内编辑过的设置脏键随待推标记一起持久化，
-        // 恢复失败/成功分流后拉取合并仍能保留这些本地编辑值。
-        // R12 finding 3：脏键对应的「值」也一起持久化——同账号切到另一后端后
-        // 目标后端的拉取会覆盖本地工作区，只有保存值才能在重试原后端时恢复。
-        markPendingAccountSync(accountId, originBackendUrl, {
-          dirtySettingKeys: [...(bufferedDirtyKeys.get(accountId) ?? [])],
-          dirtySettingValues: bufferedDirtyValues.get(accountId),
-        });
-      }
+    _frozenWindowDepth -= 1;
+    // 引用计数取代布尔保存/还原：并发窗口中先退出的窗口不再把仍活跃窗口的
+    // 冻结/守卫标志复位为 false（旧实现按进入前值还原，标志被并发退出破坏）。
+    const frozenWindowsRemain = _frozenWindowDepth > 0;
+    _isAccountSwitchFrozen = frozenWindowsRemain;
+    _isSwitchingAccount = frozenWindowsRemain ? true : previousSwitching;
+    _isAccountSwitchBookkeeping = frozenWindowsRemain ? false : previousBookkeeping;
+    _frozenWindowEditAccounts = previousEditBuffer;
+    _frozenWindowDirtySettingKeys = previousDirtyKeyBuffer;
+    _frozenWindowDirtySettingValues = previousDirtyValueBuffer;
+    for (const accountId of windowEditAccounts) {
+      // 审计修复（C4）：窗口内编辑过的设置脏键随待推标记一起持久化，
+      // 恢复失败/成功分流后拉取合并仍能保留这些本地编辑值。
+      // R12 finding 3：脏键对应的「值」也一起持久化——同账号切到另一后端后
+      // 目标后端的拉取会覆盖本地工作区，只有保存值才能在重试原后端时恢复。
+      markPendingAccountSync(accountId, originBackendUrl, {
+        dirtySettingKeys: [...(windowDirtySettingKeys.get(accountId) ?? [])],
+        dirtySettingValues: windowDirtySettingValues.get(accountId),
+      });
     }
   }
 }
@@ -437,6 +449,15 @@ function markAIConfigsLoaded(accountId: string | null | undefined, backendUrl: s
   if (!accountId) return;
   _aiConfigsLoadedKeys.add(settingsLoadedKey(accountId, backendUrl));
 }
+// 第 13 轮审计修复 [49]：WebDAV 配置分片与 AI 配置相同的「已对齐」标记——
+// 服务端 PUT /configs/webdav/bulk 对空数组先 DELETE 全表再插入零行，本地
+// webdavConfigs 为空且该 (账号, 后端) 尚未成功读取过配置时，发送空列表会
+// 清空后端的全部 WebDAV 配置。未对齐时空列表必须跳过写入。
+const _webdavConfigsLoadedKeys = new Set<string>();
+function markWebDAVConfigsLoaded(accountId: string | null | undefined, backendUrl: string): void {
+  if (!accountId) return;
+  _webdavConfigsLoadedKeys.add(settingsLoadedKey(accountId, backendUrl));
+}
 const PUSH_RETRY_MAX_DELAY = 60_000;
 
 // 推送分片名（审计修复 C41）：按 Promise.allSettled 的分片顺序命名，失败分片
@@ -517,7 +538,8 @@ const _lastHash = {
 };
 
 // Track the current sync-from-backend promise so force sync can wait
-let _syncPromise: Promise<void> | null = null;
+// （第 13 轮跨域接缝：doSync 返回分片成败探针，等待方只关心完成，类型放宽为 unknown）
+let _syncPromise: Promise<unknown> | null = null;
 
 /**
  * Wait for any current syncFromBackend pull to finish.
@@ -541,6 +563,11 @@ const SWITCH_FLUSH_MAX_ATTEMPTS = 3;
 // 该集合必须跨重启保留（审计修复）：离线编辑后切走、重启再切回时，内存标记
 // 丢失会让普通拉取直接用后端旧快照覆盖未同步修改。
 const PENDING_SYNC_ACCOUNTS_KEY = 'gsm.pendingSyncAccounts';
+// 第 13 轮审计修复 [42]：遗留旧格式（字符串条目）待推记录的「一次性评估」标记。
+// 首次加载时若无法确认原后端（无持久化 URL），遗留记录保持未归属并写入本标记；
+// 之后即使用户连接了其他后端并重启（persistedUrl 变为该后端），这些记录也绝
+// 不绑定到新后端（「绝不会自动补推到新后端」的约定在重启后仍然成立）。
+const LEGACY_PENDING_SYNC_EVALUATED_KEY = 'gsm.pendingSyncLegacyEvaluated';
 
 function pendingSyncCompositeKey(accountId: string, backendUrl: string): string {
   return `${backendUrl}\n${accountId}`;
@@ -655,10 +682,35 @@ const loadPendingSyncAccounts = (): Map<string, PendingSyncAccountRecord> => {
     } catch {
       migrationBackendUrl = null;
     }
+    // 第 13 轮审计修复 [42]：空 URL（未归属）记录只在「能确认原后端」的首次
+    // 加载中绑定持久化 URL（原单一后端迁移语义）。若本次启动已无法确认（无
+    // 持久化 URL），立即写入一次性评估标记——已评估后，任何保持未归属的记录
+    // 都绝不因后续保存的其他后端 URL 绑定到该后端（无论旧格式字符串条目还是
+    // 新格式空 URL 记录，「绝不会自动补推到新后端」在重启后仍然成立；绑定会
+    // 让 hasPendingAccountSync 命中并把本地修改当作新后端的待推内容）。标记
+    // 写入失败（存储不可用）时退化为旧行为：本次启动仍不绑定，只损失跨重启
+    // 保护。
+    let unboundKeepEvaluated = false;
+    try {
+      unboundKeepEvaluated = window.localStorage.getItem(LEGACY_PENDING_SYNC_EVALUATED_KEY) === '1';
+    } catch {
+      unboundKeepEvaluated = false;
+    }
+    const canRebindUnboundRecords = !unboundKeepEvaluated;
+    if (!unboundKeepEvaluated) {
+      try {
+        window.localStorage.setItem(LEGACY_PENDING_SYNC_EVALUATED_KEY, '1');
+      } catch {
+        // 存储不可用：保持旧绑定语义（下次启动重试评估）
+      }
+    }
     let rebound = false;
     if (migrationBackendUrl) {
       for (const [key, entry] of [...entries]) {
         if (entry.backendUrl !== '') continue;
+        // 已评估过且当时无法确认原后端：保持未归属，绝不绑定到之后持久化的
+        // 其他后端 URL。
+        if (!canRebindUnboundRecords) continue;
         entries.delete(key);
         // 审计员补充（Round 11）：目标复合键上可能已有同账号的新格式记录——
         // 旧格式记录尚未迁移的会话里，同一账号在同一后端又产生了失败补推记录。
@@ -1259,6 +1311,12 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
 
   _isRestoringAuth = true;
   try {
+    // 第 13 轮审计修复 [34]：恢复请求前记录连接代次——请求地址在
+    // backend.restoreAuth() 中同步读取，记录必须位于该调用之前。连接切换只
+    // 递增 connectionGeneration（会话代次不变），等待 GitHub 身份校验期间
+    // 后端从 X 切到 Y 后，旧连接 X 的凭据不得提交进当前会话（否则
+    // syncLocalGitHubTokenToBackend 可能把 X 的 Token 发送到 Y）。
+    const expectedConnectionGeneration = backend.connectionGeneration;
     const restored = await backend.restoreAuth();
     if (!restored?.github_token) return false;
 
@@ -1271,9 +1329,12 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
     // 复核自动恢复仍拥有启动时的同一个空会话：账号 ID 为 null（无登录）且
     // 代次等于启动时捕获值。旧实现把复核放在身份校验之前，等待期间用户手动
     // 登录的话，恢复流程会把后端 Token/用户写到新会话上。
+    // 第 13 轮审计修复 [34]：同时复核连接代次——X→Y→X 时代次递增两次，
+    // 比较仍会失败，此时恢复返回 false，不提交凭据。
     const snapshot = useAppStore.getState();
     if (snapshot.user || snapshot.githubToken) return false;
     if (!isCurrentAccountSession(null, expectedGeneration)) return false;
+    if (backend.connectionGeneration !== expectedConnectionGeneration) return false;
 
     // 审计修复（B1）：凭证提交为一次原子更新——同步守卫内连续写入
     // githubToken/user/isAuthenticated 并以已验证身份 upsert savedAccounts
@@ -1290,14 +1351,18 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
     if (Array.isArray(restored.accounts)) {
       // 记录恢复任务发起时的会话代次与重置代次：等待 GitHub 身份查询期间若用户登出、
       // 切号或清空数据，立即中止登记，避免重新保存已删除的账号和 PAT。
+      // 第 13 轮审计修复 [34]：账号登记循环在每次异步 normalize 后写入前比较
+      // 连接代次——连接切换后不得继续登记旧连接的账号。
       const restoreSessionGen = getAccountSessionGeneration();
       const restoreResetGen = _resetGeneration;
+      const restoreConnectionGen = backend.connectionGeneration;
       const { upsertSavedAccount } = useAppStore.getState();
       for (const account of restored.accounts) {
         const normalizedAccount = await normalizeBackendRestoreAccount(account);
         if (
           _resetGeneration !== restoreResetGen
           || getAccountSessionGeneration() !== restoreSessionGen
+          || backend.connectionGeneration !== restoreConnectionGen
           || !useAppStore.getState().isAuthenticated
         ) {
           break;
@@ -1460,19 +1525,38 @@ function applyBackendSettingsMuted(settings: Record<string, unknown>, protectLoc
  * 拉取结果的会话守卫按 (targetAccountId, 拉取开始时捕获的会话代次) 校验，
  * 不一致时丢弃结果，绝不写入无主顶层。
  */
+/**
+ * syncFromBackend 的分片成败探针（第 13 轮跨域接缝，components 域 [36]）：
+ * 登录恢复流程（LoginScreen 经 useLoginActions.syncBackendData 透传）据此在
+ * settings/releases 分片读取失败时回退目标账号的原归档字段。
+ * shards 各键 = 该分片本次 HTTP 读取是否成功（fulfilled）；null = 拉取未执行、
+ * 结果被丢弃（会话/后端在拉取期间变化）或失败，调用方应按「未知」处理并回退。
+ */
+export interface SyncFromBackendPullResult {
+  shards: {
+    repositories: boolean;
+    releases: boolean;
+    aiConfigs: boolean;
+    webdavConfigs: boolean;
+    embeddingConfigs: boolean;
+    vectorSearch: boolean;
+    settings: boolean;
+  };
+}
+
 export async function syncFromBackend(options: {
   force?: boolean;
   throwOnRepoFailure?: boolean;
   targetAccountId?: string;
-} = {}): Promise<void> {
-  if (!backend.isAvailable) return;
+} = {}): Promise<SyncFromBackendPullResult | null> {
+  if (!backend.isAvailable) return null;
   const activeAccountId = accountIdKey(useAppStore.getState().user);
   // 无活跃账号（登录页/归档窗口）时请求头缺失，服务端会回退全局
   // active_account_id——拉回来的可能是任意账号的分区，写入顶层后会被下一次
   // 快捷登录当成目标账号的工作区（串号）。登录流程都是先 setUser 再拉取；
   // 显式账号恢复（targetAccountId）以已验证账号 ID 固定请求头，无需提前
   // 落登录态。强制拉取是调用方显式发起的恢复（调用方负责先落登录态），保持原有契约。
-  if (!activeAccountId && !options.force && !options.targetAccountId) return;
+  if (!activeAccountId && !options.force && !options.targetAccountId) return null;
   if (!options.force && (
     _autoPullsPaused ||
     _isSyncingFromBackendActive ||
@@ -1484,7 +1568,7 @@ export async function syncFromBackend(options: {
     (_hasPendingLocalChanges && !isUnalignedVacuumAccountSession()) ||
     _debounceTimer
   )) {
-    return;
+    return null;
   }
   // 重启后仍带待推标记的账号：走 doSync 的待推合并分支（只并入远端新到
   // 仓库、绝不覆盖本地），随后补推——避免普通拉取用后端旧快照覆盖未同步修改。
@@ -1511,11 +1595,11 @@ export async function syncFromBackend(options: {
     // Reset fingerprints so every shard is applied regardless of prior hash.
     resetSyncHashes();
   }
-  if (_isSyncingFromBackendActive) return;
+  if (_isSyncingFromBackendActive) return null;
 
   _isSyncingFromBackendActive = true;
 
-  const doSync = async () => {
+  const doSync = async (): Promise<SyncFromBackendPullResult | null> => {
   const startTime = Date.now();
   // 审计修复（C8）：发起时捕获会话代次，提交结果前与账号 ID、后端 URL 一并
   // 校验——拉取等待期间切号/切后端后，旧会话的拉取结果绝不写入新会话。
@@ -1539,13 +1623,23 @@ export async function syncFromBackend(options: {
       backend.fetchVectorSearchConfig(explicitAccountId),
       backend.fetchSettings(explicitAccountId),
     ]);
+    // 第 13 轮跨域接缝（components 域 [36]）：分片读取成败随返回值暴露。
+    const shards: SyncFromBackendPullResult['shards'] = {
+      repositories: reposResult.status === 'fulfilled',
+      releases: releasesResult.status === 'fulfilled',
+      aiConfigs: aiResult.status === 'fulfilled',
+      webdavConfigs: webdavResult.status === 'fulfilled',
+      embeddingConfigs: embeddingResult.status === 'fulfilled',
+      vectorSearch: vectorSearchResult.status === 'fulfilled',
+      settings: settingsResult.status === 'fulfilled',
+    };
 
     if ((backend.backendUrl ?? '') !== fetchedBackendUrl) {
       if (options.throwOnRepoFailure) {
         repoFetchFailure = new Error('Backend connection changed during pull');
         throw repoFetchFailure;
       }
-      return;
+      return null;
     }
 
     // 审计修复（C8）：提交结果（更新 Store、同步哈希、待推状态）前同时校验
@@ -1561,7 +1655,7 @@ export async function syncFromBackend(options: {
           repoFetchFailure = new Error('Target-account pull discarded: session changed during fetch');
           throw repoFetchFailure;
         }
-        return;
+        return null;
       }
     } else {
       const currentAccountId = accountIdKey(useAppStore.getState().user);
@@ -1574,7 +1668,7 @@ export async function syncFromBackend(options: {
           repoFetchFailure = new Error('Pull discarded: session changed during fetch');
           throw repoFetchFailure;
         }
-        return;
+        return null;
       }
     }
 
@@ -1656,7 +1750,20 @@ export async function syncFromBackend(options: {
         }
         markAIConfigsLoaded(fetchedAccountId, fetchedBackendUrl);
       }
-      return;
+      // 第 13 轮审计修复 [49]：待推分支同样记录 WebDAV 配置的读取结论（与
+      // AI 配置相同语义）——本地为空而后端返回非空配置时先在静音作用域内
+      // 应用，否则后续待推补推会把未对齐的空列表发给 bulk PUT，清空后端的
+      // WebDAV 配置。
+      if (webdavResult.status === 'fulfilled') {
+        const backendWebdavConfigs = webdavResult.value;
+        if (useAppStore.getState().webdavConfigs.length === 0 && backendWebdavConfigs.length > 0) {
+          muteSubscriberWrites(() => {
+            useAppStore.getState().setWebDAVConfigs(backendWebdavConfigs);
+          });
+        }
+        markWebDAVConfigsLoaded(fetchedAccountId, fetchedBackendUrl);
+      }
+      return { shards };
     }
 
     const changed = {
@@ -1730,11 +1837,15 @@ export async function syncFromBackend(options: {
     if (aiResult.status === 'fulfilled') {
       markAIConfigsLoaded(fetchedAccountId, fetchedBackendUrl);
     }
+    // 第 13 轮审计修复 [49]：WebDAV 配置读取成功同样标记已对齐。
+    if (webdavResult.status === 'fulfilled') {
+      markWebDAVConfigsLoaded(fetchedAccountId, fetchedBackendUrl);
+    }
 
     // Only update store if backend data actually changed
     if (!Object.values(changed).some(Boolean)) {
       _isSyncingFromBackendActive = false;
-      return;
+      return { shards };
     }
 
     _isSyncingFromBackend = true;
@@ -1869,12 +1980,14 @@ export async function syncFromBackend(options: {
     }
 
     logger.info('sync.pullFromBackend', 'Synced from backend (data changed)', { ...changed, durationMs: Date.now() - startTime });
+    return { shards };
   } catch (err) {
     logger.errorFromError('sync.pullFromBackend', 'Failed to sync from backend', err, { durationMs: Date.now() - startTime });
     // 审计修复（C5）：strict 模式（throwOnRepoFailure）下仓库分片错误必须向上
     // 传播（syncFromBackend 的 Promise 拒绝，finally 清理保持不变），调用方才能
     // 感知恢复失败并停留在登录页；非严格模式（后台轮询）仍只记录不抛出。
     if (repoFetchFailure) throw repoFetchFailure;
+    return null;
   } finally {
     setRepositorySyncVisualState(false);
     _isSyncingFromBackend = false;
@@ -1890,7 +2003,7 @@ export async function syncFromBackend(options: {
   const currentPromise = doSync();
   _syncPromise = currentPromise;
   try {
-    await currentPromise;
+    return await currentPromise;
   } finally {
     if (_syncPromise === currentPromise) {
       _syncPromise = null;
@@ -2017,7 +2130,10 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
     // 若 GET 期间连接从 X 切到 Y，PUT 携带固定的 X——syncRepositories 发现
     // 与当前连接不一致会在写入前抛错，绝不让 X 的合并快照覆盖 Y 的分区。
     const targetBackendUrl = backend.backendUrl ?? '';
-    const remote = await backend.fetchRepositories();
+    // 第 13 轮审计修复 [107]：分页读取显式固定目标账号分区（accountId 在作用
+    // 域内）——缺省时请求头缺失会让服务端逐页回退全局 active_account_id，
+    // 两页之间活跃账号切换可能拼接两个分区的结果。
+    const remote = await backend.fetchRepositories(accountId);
     // 分页截断/不完整的响应不是完整快照：据此推送会物理删除未读到的远端仓库。
     if (remote.repositories.length < (remote.total ?? remote.repositories.length)) {
       logger.warn('sync.pushToBackend', 'Deferred full push: backend repository snapshot is incomplete', {
@@ -2220,7 +2336,12 @@ async function pushToBackend(
       activeEmbeddingConfig: state.activeEmbeddingConfig,
       hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
       categoryOrder: state.categoryOrder,
-      customCategories: state.customCategories,
+      // 第 13 轮审计修复 [51]：customCategories 是账号级跨设备键，服务端
+      // PUT /api/settings 对其 INSERT OR REPLACE 且无版本校验——完整载荷会把
+      // 本机此前拉取到的旧值写回后端，覆盖其他设备在拉取之后保存的新值
+      // （待推补推可能比拉取晚得多）。只有本机明确编辑过（脏键命中）时才随
+      // 完整载荷发送；未编辑时省略该键，服务端保留现有值。
+      ...(_dirtySettingKeys.has('customCategories') ? { customCategories: state.customCategories } : {}),
       assetFilters: state.assetFilters,
       defaultCategoryOverrides: state.defaultCategoryOverrides,
       releaseSourceSettings: state.releaseSourceSettings,
@@ -2265,6 +2386,17 @@ async function pushToBackend(
         backendUrl: pushBackendUrl,
       });
     }
+    // 第 13 轮审计修复 [49]：WebDAV 配置与 AI 配置相同的对齐门控——本地为空
+    // 且该 (账号, 后端) 尚未成功读取过配置时跳过推送，防止待推补推以空列表
+    // 覆盖（服务端 bulk PUT 先 DELETE 全表再插入零行）远端已有配置。
+    const webdavConfigsAligned = _webdavConfigsLoadedKeys.has(settingsLoadedKey(pushAccountId, pushBackendUrl));
+    const webdavSkipped = !webdavConfigsAligned && state.webdavConfigs.length === 0;
+    if (webdavSkipped) {
+      logger.warn('sync.pushToBackend', 'Skipped WebDAV configs push: local list is empty and backend configs have not been read yet', {
+        accountId: pushAccountId,
+        backendUrl: pushBackendUrl,
+      });
+    }
 
     // 从这里开始本次推送确实发出了写入尝试（R2-C5）。
     outcome.attempted = true;
@@ -2275,7 +2407,7 @@ async function pushToBackend(
       reposUnchanged ? Promise.resolve(skipped) : syncRepositoriesWithServerMerge(state.repositories, pushAccountId),
       backend.syncReleases(state.releases),
       aiSkipped ? Promise.resolve(skipped) : backend.syncAIConfigs(state.aiConfigs),
-      backend.syncWebDAVConfigs(state.webdavConfigs),
+      webdavSkipped ? Promise.resolve(skipped) : backend.syncWebDAVConfigs(state.webdavConfigs),
       backend.syncEmbeddingConfigs(state.embeddingConfigs),
       backend.syncVectorSearchConfig(state.vectorSearchConfig),
       settingsSkipped
@@ -2308,13 +2440,17 @@ async function pushToBackend(
     } else if (settingsManualUnverified) {
       // 第 12 轮审计修复：所有已发分片成功但设置未对齐——按未完成上报（含
       // 分片名供调用方诊断），保留待推状态等待设置对齐后的完整写入。
+      // 第 13 轮审计修复 [48]：不再置 _hasPendingLocalChanges——该标志表示
+      // 「还有编辑未写入」，会拦截下一次普通拉取；而本次已确认写入的脏键在
+      // 上方被清理，没有编辑却拦截拉取会让设置永远无法自动对齐（死锁）。
+      // 已确认写入的部分安全保留；轮询的下一次普通拉取重新读取设置完成对齐
+      //（markSettingsLoaded），请求在途期间的新编辑仍由脏键保护在读取时保留。
       logger.warn('sync.pushToBackend', 'Manual sync finished with a partial settings write; settings are not yet aligned with the backend', {
         accountId: pushAccountId,
         backendUrl: pushBackendUrl,
         durationMs: Date.now() - pushStartTime,
       });
       outcome.failedShards = [...outcome.failedShards, 'settings'];
-      _hasPendingLocalChanges = true;
     } else {
       logger.info('sync.pushToBackend', 'Synced to backend', { durationMs: Date.now() - pushStartTime });
       _pushRetryDelay = 2000;
@@ -2334,7 +2470,10 @@ async function pushToBackend(
     // 跳过的 AI 分片未发生写入：不得把本地（空）哈希记为已同步基线，否则
     // 下次拉取的对账会误判「后端已与本地一致」。
     if (aiSync.status === 'fulfilled' && aiSync.value !== skipped) _lastHash.ai = quickHash(state.aiConfigs);
-    if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
+    // 第 13 轮审计修复 [49]：跳过的 WebDAV 分片未发生写入，与 AI 分片相同——
+    // 不得把本地（空）哈希记为已同步基线，否则下次拉取的对账会误判「后端已
+    // 与本地一致」。
+    if (webdavSync.status === 'fulfilled' && webdavSync.value !== skipped) _lastHash.webdav = quickHash(state.webdavConfigs);
     if (embeddingSync.status === 'fulfilled') _lastHash.embedding = quickHash(state.embeddingConfigs);
     if (vectorSearchSync.status === 'fulfilled') _lastHash.vectorSearch = vectorSearchFingerprint(state.vectorSearchConfig);
     if (settingsSync.status === 'fulfilled' && settingsSync.value !== skipped) {

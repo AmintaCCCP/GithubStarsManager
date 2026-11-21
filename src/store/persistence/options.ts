@@ -22,6 +22,7 @@ import { normalizePersistedState } from '../normalizers/persistedState';
 import { useAppStore } from '../useAppStore';
 import { readLegacyAuthMirrorForDesktopMigration, writeAuthMirror } from './authStorage';
 import {
+  fillMissingGhAccountTokens,
   getPendingGhAccountSecretRemovalIds,
   hasGhAccountsBridge,
   hasPendingGhAccountSecretRemovals,
@@ -107,6 +108,10 @@ const captureLegacyMirrorForDesktopMigration = (merged: {
   const mirrorUser = legacyMirror?.user ?? null;
   const mirrorAccountId = accountIdKey(mirrorUser);
   if (!legacyMirror?.githubToken || !mirrorUser || !mirrorAccountId) return null;
+  // 第 13 轮审计修复：设备删除失败后重启的账号同时具有待删标记与旧镜像 PAT——
+  // 迁移保存会被 saveGhAccountTokens 视为替换并解除待删标记（旧凭据迁移绝不能
+  // 解除删除意图，只有用户显式重新授权才能解除），此处直接不捕获。
+  if (getPendingGhAccountSecretRemovalIds().includes(mirrorAccountId)) return null;
   const mergedAccountId = accountIdKey(merged.user);
   if (mergedAccountId && mergedAccountId !== mirrorAccountId) return null;
   const mergedHasToken = (typeof merged.githubToken === 'string' && !!merged.githubToken.trim())
@@ -132,8 +137,13 @@ const consumePendingLegacyMirrorMigrationSave = (): Promise<{ ok: boolean; error
   if (!stash || !hasGhAccountsBridge() || v19TokenSaveConfirmed) return null;
   const stashAccountId = accountIdKey(stash.user);
   if (!stashAccountId) return null;
-  return saveGhAccountTokens({ [stashAccountId]: stash.githubToken })
+  // 第 13 轮审计修复：镜像迁移改为补写语义（fillMissingGhAccountTokens）——
+  // 磁盘已有该账号的 PAT（新凭据已确认落盘）时保留磁盘值，绝不用尚未刷新的
+  // 镜像明文回退；补写结果确认后才清除镜像明文。
+  return fillMissingGhAccountTokens({ [stashAccountId]: stash.githubToken })
     .then(() => {
+      // 磁盘已确认存在该账号凭据（新写入或已有值）：让镜像账号退出迁移输入。
+      // 跳过情形（待删标记）已在捕获入口过滤，不会走到这里。
       markV19MigrationTokensSaved({ [stashAccountId]: stash.githubToken });
       // 加密写入确认成功：按 B7 语义覆写镜像，清除遗留明文 PAT。
       const store = useAppStore.getState();
@@ -770,10 +780,16 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
     const legacyTopToken = typeof stateRecord.githubToken === 'string' ? stateRecord.githubToken : '';
     const legacyTopAccountId = accountIdKey(legacyUser);
     const tokens: GhAccountTokenMap = {};
+    // 第 13 轮审计修复：设备删除失败后重启的账号可能同时具有待删标记与旧分片
+    // PAT——迁移保存会被视为替换并解除待删标记（旧凭据迁移绝不能解除删除意图，
+    // 只有用户显式重新授权才能解除），这类账号不进入迁移输入。
+    const pendingRemovalIds = new Set(getPendingGhAccountSecretRemovalIds());
     for (const [accountId, account] of Object.entries(legacySaved)) {
+      if (pendingRemovalIds.has(accountId)) continue;
       if (account?.githubToken?.trim()) tokens[accountId] = account.githubToken;
     }
-    if (legacyTopAccountId && legacyTopToken.trim() && !tokens[legacyTopAccountId]) {
+    if (legacyTopAccountId && legacyTopToken.trim() && !tokens[legacyTopAccountId]
+      && !pendingRemovalIds.has(legacyTopAccountId)) {
       tokens[legacyTopAccountId] = legacyTopToken;
     }
     // 一次性桌面迁移兜底：旧快照缺 Token 时从旧认证镜像核对同账号 PAT 并迁入 safeStorage，
@@ -785,7 +801,8 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
       const mirrorAccountId = accountIdKey(mirrorUser);
       if (legacyMirror?.githubToken && mirrorAccountId && mirrorUser
         && (!legacyTopAccountId || mirrorAccountId === legacyTopAccountId)
-        && !tokens[mirrorAccountId]) {
+        && !tokens[mirrorAccountId]
+        && !pendingRemovalIds.has(mirrorAccountId)) {
         tokens[mirrorAccountId] = legacyMirror.githubToken;
         migratedFromMirror = { user: mirrorUser, backendApiSecret: legacyMirror.backendApiSecret };
         // 审计修复：迁入镜像凭据时同时补录账号记录——旧快照只有 user 而缺
@@ -815,11 +832,15 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
       // ISSUE-1：输入按账号维护，保存成功后逐项失效；全部失效时才允许确认。
       setV19MigrationInputs(tokensSnapshot);
       const mirrorToClear = migratedFromMirror;
-      pendingMigrationTokenSave = saveGhAccountTokens(tokensSnapshot)
-        .then(() => {
-          // 加密保存成功：本次写入的账号退出迁移输入，输入清空后才允许持久化
-          // 分片提交剥除 PAT 的干净快照（其他账号的未落盘输入仍会保留）。
-          markV19MigrationTokensSaved(tokensSnapshot);
+      // 第 13 轮审计修复：迁移改为补写语义（fillMissingGhAccountTokens）——
+      // 磁盘已有该账号 PAT（新凭据已确认落盘、旧分片尚未刷新）时保留磁盘值，
+      // 绝不用迁移输入中的旧 PAT 覆盖；补写确认的账号才退出迁移输入。
+      pendingMigrationTokenSave = fillMissingGhAccountTokens(tokensSnapshot)
+        .then((settledTokens) => {
+          // 加密保存确认（或磁盘已有值）：本次落盘的账号退出迁移输入，输入
+          // 清空后才允许持久化分片提交剥除 PAT 的干净快照（其他账号的未落盘
+          // 输入仍会保留）。
+          markV19MigrationTokensSaved(settledTokens);
           if (mirrorToClear) {
             writeAuthMirror({
               user: mirrorToClear.user,

@@ -15,6 +15,9 @@ import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+// R13 review：向量 ID 全量枚举抽为可注入分页读取的共享模块（行为测试见
+// scripts/deploy-vector.test.mjs）。
+import { enumerateVectorIds } from './enumerate-vector-ids.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -236,7 +239,7 @@ const MESSAGES = {
     acct_verify_no_vectors: '   - 索引暂无向量可采样，无法确认 accountId 元数据索引与回填状态。',
     acct_verify_ownership_failed: '❌ 账号归属校验失败：账号过滤查询返回的结果中混入了其他账号（或缺少 accountId 元数据）的向量，账号过滤未真正生效。',
     acct_verify_negative_control_failed: '❌ 负向对照失败：用确认无数据的账号执行过滤查询仍返回了结果——部署的 Worker 忽略了 accountId 过滤参数（可能仍是旧版实现），验证不通过。',
-    acct_verify_coverage_confirmed: '✅ 回填覆盖已确认：全量枚举 {total} 条向量 ID，未发现未回填的 legacy 向量（纯数字 ID），采样中也未观察到缺少 accountId 元数据的缺口。',
+    acct_verify_coverage_enum_not_proof: '✅ 账号过滤验证通过：全量枚举 {total} 条向量 ID 未发现纯数字 legacy ID（旧向量退役检查通过），采样中也未观察到缺少 accountId 元数据的缺口。但 ID 枚举不能证明回填覆盖——带账号前缀、缺少 accountId 元数据的向量对枚举不可见；正式依赖账号过滤前，请按 README 步骤 4 用「元数据索引创建后逐项成功重写记录」核对各账号的预期向量。',
     acct_verify_coverage_legacy_found: '⚠️ 回填覆盖未完成：全量枚举 {total} 条向量 ID，发现 {count} 条 legacy 向量（纯数字 ID，缺少 accountId 元数据），启用账号过滤后它们将无法召回。任何纯数字 ID 都会使覆盖验证失败：请先核实归属并确认替代向量可召回后手动删除（见 README 步骤 4），否则只能以未验证模式强制启用。',
     acct_verify_coverage_sample_legacy: '⚠️ 回填覆盖未确认：采样已观察到 {count} 条缺少 accountId 元数据的向量，它们无法被账号过滤召回（带账号前缀的 ID 不能证明向量已带 accountId 元数据或已进入元数据索引；元数据索引创建前写入的向量需重写后才会被收录）。完整枚举未发现纯数字 ID 也不能否定该观察，请先补完回填再重新部署验证。',
     acct_verify_coverage_unverified: '⚠️ 回填覆盖未验证：全量枚举不可用（{reason}）。采样查询（≤50 条）只能证明过滤生效，不能证明全量回填完成；请通过回填记录或手动执行 `npx wrangler vectorize list-vectors {index}` 核对所有预期向量后，再依赖账号过滤。',
@@ -246,6 +249,7 @@ const MESSAGES = {
     acct_verify_forced_keep: '⚠️ 已按你的选择保留 ACCOUNT_METADATA_INDEXED=true，但本次验证未通过：本地记录不会标记为已验证，快速部署也不会复用该启用标记；修复回填后请重新部署并再次验证。',
     acct_verify_cannot_verify_disable: '⚠️ 无法验证账号过滤（缺少 AUTH_TOKEN 或 Worker URL）：本次部署保持 ACCOUNT_METADATA_INDEXED=false；如需启用，请在提供验证凭据后重新部署并显式确认。',
     acct_quick_gate_skip: 'ℹ️ 本地记录的 ACCOUNT_METADATA_INDEXED=true 上次验证未通过，快速部署不会自动启用账号过滤；如需启用请使用 --account-metadata-indexed=true 或重新运行完整向导。',
+    acct_explicit_enable_failed: '❌ 显式请求的 ACCOUNT_METADATA_INDEXED=true 未能在本次部署中生效（已回滚或保持为 false，原因见上方日志）；配置已保存，部署向导以非零状态退出。',
   },
   en: {
     banner_title: 'GitHub Stars Manager — Vector Search One-Click Deploy Wizard (TUI)',
@@ -427,7 +431,7 @@ const MESSAGES = {
     acct_verify_no_vectors: '   - No vectors sampled yet; cannot verify accountId metadata index or backfill status.',
     acct_verify_ownership_failed: '❌ Ownership check failed: account-filtered results include vectors from other accounts (or missing accountId metadata); the filter is not actually scoping.',
     acct_verify_negative_control_failed: '❌ Negative control failed: a filtered query with an account confirmed to have no data still returned matches — the deployed Worker ignores the accountId filter (likely a legacy implementation). Verification failed.',
-    acct_verify_coverage_confirmed: '✅ Backfill coverage confirmed: enumerated {total} vector IDs; no legacy (numeric-only ID) vectors remain and no sampled vector was observed missing accountId metadata.',
+    acct_verify_coverage_enum_not_proof: "✅ Account filtering verified: full enumeration of {total} vector IDs found no numeric-only legacy IDs (legacy-retirement check passed) and no sampled vector was observed missing accountId metadata. However, ID enumeration cannot prove backfill coverage — prefixed vectors lacking accountId metadata are invisible to enumeration. Before relying on account filtering, reconcile each account's expected vectors against successful rewrite records per README step 4.",
     acct_verify_coverage_legacy_found: '⚠️ Backfill coverage incomplete: enumerated {total} vector IDs and found {count} legacy vectors (numeric-only IDs, missing accountId metadata); they would be unrecallable under account filtering. Any numeric-only ID fails coverage verification: retire the copies after verifying ownership and that the replacement vectors are recallable (see README step 4), or enable only in the unverified forced-keep mode.',
     acct_verify_coverage_sample_legacy: '⚠️ Backfill coverage NOT confirmed: the sampled query observed {count} vector(s) missing accountId metadata; they are unrecallable under account filtering (an account-prefixed ID does not prove the vector carries accountId metadata or was re-written into the metadata index; vectors written before index creation must be re-upserted to be filterable). Full enumeration finding no numeric-only IDs cannot refute this observation. Finish the backfill, then re-deploy and re-verify.',
     acct_verify_coverage_unverified: '⚠️ Backfill coverage NOT verified: full enumeration unavailable ({reason}). The sampled query (≤50 results) only proves the filter works, not full backfill; reconcile expected vectors via backfill records or `npx wrangler vectorize list-vectors {index}` before relying on account filtering.',
@@ -437,6 +441,7 @@ const MESSAGES = {
     acct_verify_forced_keep: '⚠️ Keeping ACCOUNT_METADATA_INDEXED=true as requested, but this verification failed: the local record is NOT marked verified and quick deploy will not reuse the flag; re-deploy and re-verify after fixing the backfill.',
     acct_verify_cannot_verify_disable: '⚠️ Cannot verify account filtering (missing AUTH_TOKEN or Worker URL): this deploy keeps ACCOUNT_METADATA_INDEXED=false; provide verification credentials and re-deploy to enable it explicitly.',
     acct_quick_gate_skip: 'ℹ️ The locally saved ACCOUNT_METADATA_INDEXED=true failed its last verification; quick deploy will not auto-enable account filtering. Use --account-metadata-indexed=true or re-run the full wizard to enable.',
+    acct_explicit_enable_failed: '❌ The explicitly requested ACCOUNT_METADATA_INDEXED=true did not take effect in this deploy (rolled back or kept as false; see logs above); configuration saved, exiting with a non-zero status.',
   },
 };
 
@@ -1148,22 +1153,35 @@ async function handleAuthTokenConfig(savedConfig, keepRemoteSecret = false) {
 }
 
 // ======================== 部署与验证 ========================
+// R13 review：wrangler.toml 的 index_name 决定部署实际绑定的 Vectorize 索引。
+// 同步失败（文件不可读/不可写、缺少 index_name 条目）时不能再只告警后继续——
+// 否则 Worker 仍绑定旧索引，而后续验证查询与 ID 枚举指向新选索引，两者都通过
+// 也无法证明所选索引已就绪。这里统一抛错，由 main 的统一 catch 中止部署；
+// 快速部署（CLI/交互）与完整向导共用本检查。
 function syncWranglerToml(indexName) {
+  let content;
   try {
-    let content = fs.readFileSync(WRANGLER_TOML, 'utf-8');
-    if (/index_name\s*=\s*["'][^"']+["']/.test(content)) {
-      const updated = content.replace(
-        /index_name\s*=\s*["'][^"']+["']/,
-        `index_name = "${indexName}"`
-      );
-      if (updated !== content) {
-        fs.writeFileSync(WRANGLER_TOML, updated, 'utf-8');
-        console.log(c.gray(`  ✓ Synchronized wrangler.toml index_name = "${indexName}"`));
-      }
-    }
+    content = fs.readFileSync(WRANGLER_TOML, 'utf-8');
   } catch (err) {
-    console.warn(c.yellow(`⚠️ Sync wrangler.toml failed: ${err.message}`));
+    throw new Error(`Sync wrangler.toml failed: ${err.message}`);
   }
+  if (!/index_name\s*=\s*["'][^"']+["']/.test(content)) {
+    throw new Error('Sync wrangler.toml failed: no index_name entry found');
+  }
+  const updated = content.replace(
+    /index_name\s*=\s*["'][^"']+["']/,
+    `index_name = "${indexName}"`
+  );
+  if (updated === content) {
+    // 绑定已指向所选索引，无需写入。
+    return;
+  }
+  try {
+    fs.writeFileSync(WRANGLER_TOML, updated, 'utf-8');
+  } catch (err) {
+    throw new Error(`Sync wrangler.toml failed: ${err.message}`);
+  }
+  console.log(c.gray(`  ✓ Synchronized wrangler.toml index_name = "${indexName}"`));
 }
 
 function putWranglerSecret(authToken) {
@@ -1212,15 +1230,19 @@ function deployWorker(accountMetadataIndexed = false) {
  *      才判定过滤生效（Vectorize 缺少元数据索引时会静默返回空 matches 而非报错）；
  *    - 负向对照：用确认无任何数据的哨兵账号执行同一查询，结果必须为空——忽略
  *      accountId 过滤参数的旧版 Worker 会原样返回未过滤结果，无法通过该检查。
- * 3) 回填覆盖核对（R2 review / R12 review）：查询命中只能证明「过滤生效」，≤50 条
- *    采样不能证明全量回填完成。覆盖判定先处理采样中已观察到的缺口：采样结果缺少
- *    accountId 元数据的向量（无论 ID 是否带账号前缀）都是已知回填缺口——完整枚举
- *    成功也不得据此确认覆盖。再用 `wrangler vectorize list-vectors` 全量枚举向量 ID
- *    并统计纯数字 legacy ID：枚举完整读到末页且为 0 才算覆盖已确认；枚举不可用或
- *    达到分页上限仍未读到末页时明确报告「覆盖未验证」。
+ * 3) 旧向量退役核对（R2 review / R12 review / R13 review）：查询命中只能证明
+ *    「过滤生效」，≤50 条采样不能证明全量回填完成。判定先处理采样中已观察到的
+ *    缺口：采样结果缺少 accountId 元数据的向量（无论 ID 是否带账号前缀）都是已知
+ *    回填缺口。再用 `wrangler vectorize list-vectors` 全量枚举向量 ID 并统计纯数字
+ *    legacy ID：发现纯数字 ID 即验证失败；枚举不可用或达到分页上限仍未读到末页时
+ *    明确报告「未验证」。枚举未发现纯数字 ID 也只是「旧向量已退役 + 过滤生效」的
+ *    证据（R13 review）——带账号前缀、缺少 accountId 元数据的向量对枚举不可见，
+ *    枚举不能证明回填覆盖。
  * 返回 { ok, filterActive, coverageConfirmed, reason? } 供调用方决定是否回滚：
  *   - ok：验证整体通过（过滤生效，且未观察到回填缺口）；
- *   - coverageConfirmed：回填覆盖是否经全量枚举核对确认（采样无法确认覆盖）。
+ *   - coverageConfirmed：回填覆盖是否已确认——采样与 ID 枚举都无法证明覆盖
+ *     （覆盖确认需按 README 步骤 4 用各账号成功重写记录另行核对），自动验证
+ *     恒为 false。
  */
 const VERIFY_QUERY_THRESHOLD = -1e9;
 
@@ -1229,69 +1251,15 @@ const VERIFY_QUERY_THRESHOLD = -1e9;
 // Worker 忽略 accountId 过滤参数（旧版实现），该查询会返回未过滤结果从而暴露问题。
 const NEGATIVE_CONTROL_ACCOUNT_ID = '__gsa_account_metadata_probe_no_match__';
 
-// 多账号向量 ID 规则（与客户端 buildAccountScopedVectorId 对应）：单租户 legacy
-// 向量为纯数字 repoId；完成 accountId 回填（重写）的向量为 `${accountId}:${repoId}`。
-// 据此可用全量枚举向量 ID 核对回填覆盖：只要还存在纯数字 ID，就存在未被账号
-// 过滤收录的存量向量。
-function isLegacyVectorId(id) {
-  return /^\d+$/.test(id);
-}
-
+// 多账号向量 ID 规则与分页枚举逻辑（R13 review）已抽至 ./enumerate-vector-ids.mjs，
+// 分页读取通过参数注入（listVectorIdsPage）以便行为测试；这里只保留基于
+// wrangler CLI 的分页读取实现。
 function listVectorIdsPage(indexName, cursor) {
   const args = ['vectorize', 'list-vectors', indexName, '--count=1000', '--json'];
   if (cursor) args.push(`--cursor=${cursor}`);
   const res = runWrangler(args);
   if (res.status !== 0) return null;
   return extractJson(res.stdout);
-}
-
-/**
- * 全量枚举 Vectorize 索引的向量 ID（wrangler vectorize list-vectors，游标分页），
- * 用于回填覆盖核对（R2 review / R12 review）。返回 { ok, total?, legacyCount?, reason? }；
- * wrangler 不可用 / 命令失败 / 输出异常 / 达到分页上限仍未读到末页时 ok=false——
- * 调用方据此明确报告「覆盖未验证」，绝不把采样或部分枚举结果当作覆盖证明。
- */
-function enumerateVectorIds(indexName) {
-  try {
-    if (!indexName) return { ok: false, reason: 'missing_index_name' };
-    const ids = new Set();
-    let cursor;
-    // 分页安全上限（1000/页 × 500 页）：超出按枚举失败处理，避免游标异常死循环。
-    const MAX_ENUM_PAGES = 500;
-    // R12 review：是否明确读到末页。达到页数上限仍有 nextCursor 时枚举不完整，
-    // 必须按枚举失败处理——否则第 501 页才出现的 legacy 向量会被漏检，覆盖被误判。
-    let reachedEnd = false;
-    for (let page = 0; page < MAX_ENUM_PAGES; page++) {
-      const data = listVectorIdsPage(indexName, cursor);
-      if (!data || !Array.isArray(data.vectors)) return { ok: false, reason: 'list_failed' };
-      for (const entry of data.vectors) {
-        const id = typeof entry === 'string' ? entry : String((entry && entry.id) ?? '');
-        if (id) ids.add(id);
-      }
-      const rawNext = data && data.nextCursor;
-      const next = typeof rawNext === 'string' && rawNext ? rawNext : undefined;
-      if (!next) {
-        reachedEnd = true;
-        break;
-      }
-      cursor = next;
-    }
-    if (!reachedEnd) {
-      // 达到分页上限仍有后续游标：本次枚举不完整，按枚举失败处理（覆盖未验证）。
-      return { ok: false, reason: 'page_limit_exceeded' };
-    }
-    if (ids.size === 0) {
-      // 采样查询能命中向量而枚举结果为空：快照矛盾，按枚举失败处理。
-      return { ok: false, reason: 'empty_snapshot' };
-    }
-    let legacyCount = 0;
-    for (const id of ids) {
-      if (isLegacyVectorId(id)) legacyCount++;
-    }
-    return { ok: true, total: ids.size, legacyCount };
-  } catch (err) {
-    return { ok: false, reason: err && err.message ? err.message : 'list_failed' };
-  }
 }
 
 async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions, indexName) {
@@ -1417,7 +1385,14 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions, inde
         if (negativeController.signal.aborted) throw err;
         return null;
       });
-      negativeMatches = Array.isArray(negativeData?.matches) ? negativeData.matches : [];
+      // R13 review：负向对照必须基于符合契约的响应——正文解析失败或缺少 matches
+      // 数组时不能回退为空数组（那会把无效响应当成「哨兵账号无结果」放行验证并
+      // 保存已验证标记）；matches 允许为空数组（这正是对照期望的结果）。
+      if (!negativeData || !Array.isArray(negativeData.matches)) {
+        console.warn(c.yellow(t('acct_verify_failed', { err: 'negative control response missing matches array' })));
+        return { ok: false, filterActive: false, coverageConfirmed: false, reason: 'invalid_response' };
+      }
+      negativeMatches = negativeData.matches;
     } finally {
       clearTimeout(negativeTimeout);
     }
@@ -1428,27 +1403,31 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions, inde
 
     console.log(c.green(t('acct_verify_index_active')));
 
-    // 4) 回填覆盖核对（R2 review / R12 review）：≤50 条采样不能证明全量回填完成——
-    //    用 wrangler 全量枚举向量 ID 核对 legacy 向量是否清零；枚举不可用时明确
-    //    报告「覆盖未验证」。覆盖判定顺序（R12 review）：先处理采样中已观察到的
-    //    回填缺口——采样结果中缺少 accountId 元数据的向量（无论 ID 是否带账号前缀）
-    //    都不可能被账号过滤召回（带账号前缀的 ID 不能证明向量已带 accountId 元数据
-    //    或已进入元数据索引；元数据索引创建前写入的向量必须重写后才会被过滤收录），
-    //    因此即使完整枚举成功、未发现纯数字 ID，也不得返回 coverageConfirmed: true。
+    // 4) 旧向量退役核对（R2 review / R12 review / R13 review）：≤50 条采样不能证明
+    //    全量回填完成——先处理采样中已观察到的回填缺口：采样结果中缺少 accountId
+    //    元数据的向量（无论 ID 是否带账号前缀）都不可能被账号过滤召回（带账号前缀
+    //    的 ID 不能证明向量已带 accountId 元数据或已进入元数据索引；元数据索引创建
+    //    前写入的向量必须重写后才会被过滤收录）。再用 wrangler 全量枚举向量 ID 统计
+    //    纯数字 legacy ID（R13 review）：枚举只是「旧向量退役检查」——枚举未发现
+    //    纯数字 ID 也只证明过滤生效且无已观察缺口，不能证明回填覆盖（带账号前缀、
+    //    缺少 accountId 元数据的向量对枚举不可见），coverageConfirmed 保持 false。
     if (legacyCount > 0) {
       // 采样已观察到缺少 accountId 元数据的向量 → 已知回填缺口，先于枚举判定：
       // 枚举结果不能否定采样直接观察到的缺口（fail-fast，避免长时间全量枚举）。
       console.warn(c.yellow(t('acct_verify_coverage_sample_legacy', { count: legacyCount })));
       return { ok: false, filterActive: true, coverageConfirmed: false, reason: 'legacy_present' };
     }
-    const enumeration = enumerateVectorIds(indexName);
+    const enumeration = enumerateVectorIds(indexName, listVectorIdsPage);
     if (enumeration.ok) {
       if (enumeration.legacyCount > 0) {
         console.warn(c.yellow(t('acct_verify_coverage_legacy_found', { total: enumeration.total, count: enumeration.legacyCount })));
         return { ok: false, filterActive: true, coverageConfirmed: false, reason: 'legacy_present' };
       }
-      console.log(c.green(t('acct_verify_coverage_confirmed', { total: enumeration.total })));
-      return { ok: true, filterActive: true, coverageConfirmed: true };
+      console.log(c.green(t('acct_verify_coverage_enum_not_proof', { total: enumeration.total })));
+      // R13 review：采样 + 枚举只能证明「过滤生效、旧向量已退役」，不能证明回填
+      // 覆盖——覆盖确认需另行核对各账号预期向量与成功重写记录，这里只记录
+      // 过滤验证通过。
+      return { ok: true, filterActive: true, coverageConfirmed: false };
     }
     console.warn(c.yellow(t('acct_verify_coverage_unverified', { reason: enumeration.reason || 'unknown', index })));
     // 过滤生效且采样未发现 legacy：保留过滤标记（部署方已显式确认回填），
@@ -1674,6 +1653,13 @@ async function main() {
     savedConfig.accountMetadataCoverageConfirmed = accountMetadataCoverageConfirmed;
     savedConfig.lastDeployedAt = new Date().toISOString();
     saveLocalConfig(savedConfig);
+    // R13 review：显式请求 --account-metadata-indexed=true 却未生效（验证失败已
+    // 自动回滚，或缺少验证凭据被禁用）时，不能向自动化报告成功——保留回滚与
+    // 配置保存，但不显示成功卡片，以非零状态退出。
+    if (cliAccountMetadataIndexed === true && accountMetadataIndexed === false) {
+      console.error(c.red(t('acct_explicit_enable_failed')));
+      process.exit(1);
+    }
     showFinalSuccessCard(url, savedConfig.authToken, savedConfig.dimensions);
     return;
   }
@@ -1772,6 +1758,13 @@ async function main() {
       savedConfig.accountMetadataCoverageConfirmed = accountMetadataCoverageConfirmed;
       savedConfig.lastDeployedAt = new Date().toISOString();
       saveLocalConfig(savedConfig);
+
+      // R13 review：显式请求 true 却未生效（验证失败回滚 / 缺少凭据被禁用）时，
+      // 不显示成功卡片，以非零状态退出（配置保存行为保留）。
+      if (cliAccountMetadataIndexed === true && accountMetadataIndexed === false) {
+        console.error(c.red(t('acct_explicit_enable_failed')));
+        process.exit(1);
+      }
 
       showFinalSuccessCard(url, savedConfig.authToken, savedConfig.dimensions);
       return;
@@ -1877,6 +1870,26 @@ async function main() {
               claimedAccountMetadataCoverageConfirmed = verified.accountMetadataCoverageConfirmed;
               workerUrl = verified.workerUrl;
             }
+          } else if (claimedAccountMetadataIndexed) {
+            // R13 review：Worker 已按 true 部署但拿不到 URL（Wrangler 输出无可提取
+            // URL、操作者也未输入）——缺少 URL 必须按验证失败处理：回滚，或按操作者
+            // 选择保留并明确记录未验证状态（verified=false，快速部署不会复用该标记），
+            // 不得静默跳过验证并保存启用标记后报告成功。此处不会出现「无 Token」
+            // 分支：claimedAccountMetadataIndexed 为 true 时 finalAuthToken 必已存在。
+            const shouldRollback = process.stdin.isTTY
+              ? await askConfirm(t('acct_verify_rollback_prompt'), true)
+              : true;
+            if (shouldRollback) {
+              deployWorker(false);
+              console.log(c.yellow(t('acct_verify_rolled_back')));
+              claimedAccountMetadataIndexed = false;
+              claimedAccountMetadataIndexVerified = false;
+              claimedAccountMetadataCoverageConfirmed = false;
+            } else {
+              console.warn(c.yellow(t('acct_verify_forced_keep')));
+              claimedAccountMetadataIndexVerified = false;
+              claimedAccountMetadataCoverageConfirmed = false;
+            }
           }
         }
 
@@ -1899,6 +1912,13 @@ async function main() {
           lastDeployedAt: new Date().toISOString(),
         };
         saveLocalConfig(claimedConfig);
+
+        // R13 review：显式请求 true 却未生效（验证失败回滚 / 缺少凭据被禁用）时，
+        // 不报告成功也不显示成功卡片，以非零状态退出（配置保存行为保留）。
+        if (cliAccountMetadataIndexed === true && claimedAccountMetadataIndexed === false) {
+          console.error(c.red(t('acct_explicit_enable_failed')));
+          process.exit(1);
+        }
 
       console.log(c.green('\n' + t('remote_claimed_saved', { file: 'cloudflare-worker/.deploy-config.json' })));
       showFinalSuccessCard(workerUrl, finalAuthToken, existingDim);
@@ -1964,6 +1984,13 @@ async function main() {
     lastDeployedAt: new Date().toISOString(),
   };
   saveLocalConfig(newConfig);
+
+  // R13 review：显式请求 true 却未生效（验证失败回滚 / 缺少凭据被禁用）时，
+  // 不显示成功卡片，以非零状态退出（配置保存行为保留）。
+  if (cliAccountMetadataIndexed === true && accountMetadataIndexed === false) {
+    console.error(c.red(t('acct_explicit_enable_failed')));
+    process.exit(1);
+  }
 
   showFinalSuccessCard(workerUrl, tokenConfig.token, vecConfig.dimensions);
 }

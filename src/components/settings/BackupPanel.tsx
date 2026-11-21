@@ -83,7 +83,15 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     listedAccountId: null,
     listedGeneration: null,
   });
-  const [listError, setListError] = useState<string | null>(null);
+  // 审计修复（R13 finding 87）：列举错误绑定发生时的配置指纹与会话上下文——
+  // 配置 A 列举失败后切到配置 B（或切换账号/会话代次变化），旧错误不得继续
+  // 显示在面板上；仅当指纹与当前上下文匹配时才渲染。
+  const [listError, setListError] = useState<{
+    message: string;
+    fingerprint: string;
+    accountId: string | null;
+    generation: number;
+  } | null>(null);
 
   // WebDAV 活跃配置切换或 URL/路径/凭据变更时作废旧的备份列表选择，防止下载错位文件
   useEffect(() => {
@@ -109,6 +117,19 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         : current
     ));
   }, [currentAccountId, sessionGithubToken, sessionAuthenticated]);
+
+  // 审计修复（R13 finding 87）：配置或会话变化后清除不匹配的旧列举错误（隐藏
+  // 并清除），同时保留 handleRestoreClick 内对过期异步结果的既有检查。
+  useEffect(() => {
+    setListError((current) => (
+      current
+      && (current.fingerprint !== activeConfigFingerprint
+        || current.accountId !== currentAccountId
+        || getAccountSessionGeneration() !== current.generation)
+        ? null
+        : current
+    ));
+  }, [activeConfigFingerprint, currentAccountId, sessionGithubToken, sessionAuthenticated]);
 
   const handleRestoreClick = async () => {
     const listedConfig = activeConfig ?? null;
@@ -152,7 +173,12 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         || getAccountSessionGeneration() !== listedGeneration) {
         return;
       }
-      setListError(error instanceof Error ? error.message : String(error));
+      setListError({
+        message: error instanceof Error ? error.message : String(error),
+        fingerprint: listedFingerprint,
+        accountId: listedAccountId,
+        generation: listedGeneration,
+      });
     } finally {
       setIsListingBackups(false);
     }
@@ -199,11 +225,16 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         </div>
       )}
 
-      {listError && (
-        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
-          {listError}
-        </div>
-      )}
+      {/* 审计修复（R13 finding 87）：仅显示与当前配置指纹/会话上下文匹配的列举错误 */}
+      {listError
+        && listError.fingerprint === activeConfigFingerprint
+        && listError.accountId === currentAccountId
+        && getAccountSessionGeneration() === listError.generation
+        && (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
+            {listError.message}
+          </div>
+        )}
 
       {lastBackup && (
         <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg">

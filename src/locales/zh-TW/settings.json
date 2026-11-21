@@ -27,7 +27,8 @@
     "data-restored-from-backup-repositories-v1-releas": "已從備份還原資料：倉庫 {{v1}}，發布 {{v2}}，自訂分類 {{v3}}。",
     "restore-failed": "恢復失敗",
     "account-changed-during-restore": "還原期間帳號已切換，已中止本次還原以保護資料安全。",
-    "gist-data-in-the-backup-contained-invalid-entries-th": "備份中的 Gist 資料包含無效條目；相關欄位已跳過，保留還原前的值。"
+    "gist-data-in-the-backup-contained-invalid-entries-th": "備份中的 Gist 資料包含無效條目；相關欄位已跳過，保留還原前的值。",
+    "fork-data-in-the-backup-contained-invalid-entries-th": "備份中的 Fork 資料包含無效條目；相關欄位已跳過，保留還原前的值。"
   },
   "useDesktopActions": {
     "load-failed": "載入失敗",

@@ -44,6 +44,7 @@ vi.mock('../../../services/githubApiFactory', () => ({
 vi.mock('../../../store/persistence/ghAccountSecrets', () => ({
   hasGhAccountsBridge: () => mocks.hasGhAccountsBridge(),
   syncGhAccountTokensFromState: (...args: unknown[]) => mocks.syncGhAccountTokensFromState(...args),
+  getPendingGhAccountSecretRemovalIds: () => [],
 }));
 
 const userA = { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null };
@@ -181,9 +182,32 @@ describe('useBackupActions multi-account (Issue #611)', () => {
       await result.current.backup();
     });
 
+    // R13 finding 53：备份将包含非空 PAT 时先逐次请用户授权（与本地导出同一
+    // 授权文案；测试环境 locale 未含新键时断言键名片段，避免译文落地后失配）
+    // R13 finding 53：备份将包含非空 PAT 时先逐次请用户授权（与本地导出同一
+    // 授权文案；backup() 流程内 confirm 仅用于 PAT 授权，命中即覆盖授权路径）
+    expect(mocks.confirm).toHaveBeenCalledTimes(1);
     const payload = JSON.parse(mocks.uploadFile.mock.calls[0][1] as string);
     expect(payload.savedAccounts['1'].githubToken).toBe('ghp_a');
     expect(payload.savedAccounts['2'].githubToken).toBe('ghp_b');
+  });
+
+  it('masks saved-account tokens when PAT upload authorization is denied (R13 finding 53)', async () => {
+    // includeKeysInBackup=true（含升级保留的旧设置）不等于 PAT 上传授权：
+    // 用户拒绝时 savedAccounts 一律脱敏，备份继续（其余数据照常上传）。
+    // backup() 流程内 confirm 仅用于 PAT 授权，全部拒绝即覆盖拒绝路径。
+    useAppStore.setState({ includeKeysInBackup: true });
+    mocks.confirm.mockResolvedValue(false);
+    const { result } = renderHook(() => useBackupActions());
+
+    await act(async () => {
+      await result.current.backup();
+    });
+
+    const payload = JSON.parse(mocks.uploadFile.mock.calls[0][1] as string);
+    expect(payload.savedAccounts['1'].githubToken).toBe('***');
+    expect(payload.savedAccounts['2'].githubToken).toBe('***');
+    expect(JSON.stringify(payload)).not.toContain('ghp_');
   });
 
   it('restores workspaces and accounts without clobbering local tokens from masked backups', async () => {
@@ -310,6 +334,30 @@ describe('useBackupActions multi-account (Issue #611)', () => {
     expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('Gist'), 'warning');
   });
 
+  it('warns about rejected fork payloads when restoring (R13 finding 52)', async () => {
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: false,
+      activeAccountId: '1',
+      repositories: [],
+      releases: [],
+      customCategories: [],
+      forks: [null],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    // 无效 Fork 字段被拒绝并警示（不写入实时状态，保留恢复前的值）
+    expect(useAppStore.getState().forks).toEqual([]);
+    // locale 键由并行 agent 同步：落地前 toast 携带原始键名（含 fork 片段），
+    // 落地后为含 Fork 字样的译文——两种状态都用大小写不敏感匹配断言。
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringMatching(/[Ff]ork/), 'warning');
+  });
+
   it('warns about rejected gist payloads when restoring another account archive (R12 finding 22)', async () => {
     mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
     mocks.downloadFile.mockResolvedValue(JSON.stringify({
@@ -348,8 +396,14 @@ describe('useBackupActions multi-account (Issue #611)', () => {
       await result.current.restore();
     });
 
+    // 先断言恢复已执行（实时仓库包含载荷数据），再检查分类保持——否则恢复
+    // 在应用载荷前提前返回时分类断言同样通过，无法区分「恢复后保留分类」
+    // 与「没有执行恢复」（R13 审计修复 CodeRabbit）。
+    const state = useAppStore.getState();
+    // 恢复已应用到实时仓库
+    expect(state.repositories[0].ai_summary).toBe('alice-restored');
     // 默认分类 ai 仍然可用（未隐藏）→ 选择保持不变，不重置为 all
-    expect(useAppStore.getState().selectedCategory).toBe('ai');
+    expect(state.selectedCategory).toBe('ai');
   });
 
   it('keeps other parked workspaces intact when restoring a legacy 1.2 backup', async () => {

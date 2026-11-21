@@ -64,6 +64,7 @@
     "click-to-sign-in": "クリックしてサインイン",
     "token-required": "トークンが必要です",
     "select-account-to-restore": "復元するアカウントを選択してください",
-    "multiple-accounts-exist-on-this-backend-select-th": "このバックエンドには複数のアカウントがあります。復元するアカウントを選択してください。"
+    "multiple-accounts-exist-on-this-backend-select-th": "このバックエンドには複数のアカウントがあります。復元するアカウントを選択してください。",
+    "multiple-accounts-exist-on-this-backend-close-th": "このバックエンドには複数のアカウントがあります。ダイアログを閉じて、ログイン画面で復元するアカウントを選択してください。"
   }
 }

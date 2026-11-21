@@ -150,6 +150,13 @@ export const useReleaseTimelineActions = () => {
     const startedGeneration = getAccountSessionGeneration();
     let addedByAction = new Set<number>();
     let optimisticReadReleases = new Set<number>();
+    // R13 审计修复（CodeRabbit）：乐观写入产生的行对象引用（按 release id）。
+    // 字段值相等不足以判断写入归属——请求期间备份恢复可独立把同一条 Release
+    // 写成 is_read: true / updated_asset_ids: []（不替换 readReleases，监听器
+    // 发现不了），失败回滚会误把备份写入当成乐观写入并覆盖。回滚只对「行对象
+    // 引用仍是乐观写入产物」的记录撤销字段；被任何并发写入重写过的行（引用
+    // 已变）跳过，没有后续写入的行仍正常撤销本次乐观更新。
+    let optimisticReleaseRows = new Map<number, unknown>();
     // 跟踪请求期间是否发生过整体替换（如备份恢复/后端同步替换了 readReleases，
     // 即使新集合恰好包含旧 ID 也意味着本次乐观更新已失去所有权）。判定依据是
     // store 侧登记的写入来源/版本，而不是集合差值（R12 finding 2）。
@@ -161,16 +168,37 @@ export const useReleaseTimelineActions = () => {
       for (const id of optimisticReadReleases) {
         if (!currentSet.has(id)) return null;
       }
+      // R13 finding 106：等待期间经 store action 登记的并发单条已读（含 latest
+      // 模式同仓库 release）目标 ID 必须从撤销集合中排除——这些 ID 可能同时在
+      // 本次「全部已读」的新增集合里（addedByAction 在请求发起时计算，早于
+      // 并发已读），按旧逻辑回滚会撤销用户刚刚点下的已读。仅当登记的写入就是
+      // 当前集合（引用一致，未经后续写入/原始 setState 替换）且来源为
+      // single-read 时适用；其他情况保持现行为。
+      const write = getLastReadReleasesWrite();
+      const concurrentTargetIds = write !== null
+        && write.source === 'single-read'
+        && write.next === (current as ReadonlySet<number>)
+        ? write.targetIds
+        : undefined;
       // 回滚保留并发新增的已读记录，并补回乐观更新整体替换时被吞掉的历史已读
-      const next = new Set(Array.from(currentSet).filter(id => !addedByAction.has(id)));
+      const next = new Set(
+        Array.from(currentSet).filter((id) => !addedByAction.has(id) || concurrentTargetIds?.has(id)),
+      );
       for (const id of readReleasesBeforeUpdate) next.add(id);
       return next;
     };
     const rollbackReleases = <T extends { id: number; is_read?: boolean; updated_asset_ids?: number[] }>(
       currentReleases: T[],
+      // R13：同一会话内（含停放归档）行引用已变即被并发写入重写过（备份恢复等），
+      // 其字段归属并发写入，回滚跳过。重新激活分支（A→B→A）不启用该判定——
+      // 工作区换入可能重新实例化行对象（行值仍源自本次乐观写入），保持原值比对语义。
+      options?: { skipRewrittenRows?: boolean },
     ): T[] => currentReleases.map((rel) => {
       const before = releaseFieldsBeforeUpdate.get(rel.id);
       if (!before || !before.mutated) return rel;
+      // 写入归属按行对象身份判定（R13）：值相等不足以区分备份恢复写入的
+      // 相同值——仅当行引用仍是乐观写入产物时才认定字段归本次所有。
+      if (options?.skipRewrittenRows && optimisticReleaseRows.get(rel.id) !== rel) return rel;
       // 按字段检查当前值是否仍归本次乐观写入所有：保留请求期间刷新的并发更新（如新的 updated_asset_ids）
       const restoreIsRead = before.is_read !== true && rel.is_read === true;
       const restoreUpdatedAssets = Boolean(before.updated_asset_ids && before.updated_asset_ids.length > 0)
@@ -194,6 +222,9 @@ export const useReleaseTimelineActions = () => {
         Array.from(useAppStore.getState().readReleases).filter(id => !readReleasesBeforeUpdate.has(id)),
       );
       optimisticReadReleases = new Set(useAppStore.getState().readReleases);
+      optimisticReleaseRows = new Map(
+        useAppStore.getState().releases.map((rel) => [rel.id, rel]),
+      );
       if (typeof useAppStore.subscribe === 'function') {
         unsubscribeReadWatcher = useAppStore.subscribe((nextState, prevState) => {
           // 忽略切号本身引起的工作区替换；但在发起账号活跃（含 A→B→A 切回后）期间，
@@ -227,7 +258,7 @@ export const useReleaseTimelineActions = () => {
         if (rolledBack) {
           useAppStore.setState({
             readReleases: rolledBack,
-            releases: rollbackReleases(current.releases),
+            releases: rollbackReleases(current.releases, { skipRewrittenRows: true }),
           });
         }
       } else if (startedAccountId) {
@@ -259,7 +290,7 @@ export const useReleaseTimelineActions = () => {
                 [startedAccountId]: {
                   ...parked,
                   readReleases: [...rolledBack],
-                  releases: rollbackReleases(parked.releases),
+                  releases: rollbackReleases(parked.releases, { skipRewrittenRows: true }),
                 },
               },
             };
@@ -369,7 +400,10 @@ export const useReleaseTimelineActions = () => {
       ) && (rollbackAll || failedShards.includes('settings'));
       const shouldRollbackRemovedReleases = !stillActive
         && removedReleasesSnapshot.length > 0
-        && (rollbackAll || shouldRollbackStarred || shouldRollbackSettings);
+        // R13 审计修复（CodeRabbit）：releases 分片推送失败时本地删除必然未
+        // 提交到后端（PUT /releases 仅 upsert，不会删除缺失记录），须按分片
+        // 回滚规则一并恢复已删除的历史 Release，使本地与后端保持一致。
+        && (rollbackAll || failedShards.includes('releases') || shouldRollbackStarred || shouldRollbackSettings);
       // 同步等待期间可能已切号（含 A→B→A）：发起账号的回滚绝不写入新账号工作区
       if (!isCurrentAccountSession(accountIdBeforeConfirm, generationBeforeConfirm)) {
         return;
