@@ -100,6 +100,10 @@ const pendingBackendCredentialAlignAccounts = new Set<string>();
 let _pendingBackendCredentialAlignVersion = 0;
 const _pendingBackendCredentialAlignListeners = new Set<() => void>();
 
+const pendingBackendCredentialAlignKey = (accountId: string, backendUrl?: string | null): string => (
+  `${(backendUrl !== undefined ? backendUrl : backend.backendUrl) ?? ''}\0${accountId}`
+);
+
 const notifyPendingBackendCredentialAlignChange = (): void => {
   _pendingBackendCredentialAlignVersion += 1;
   for (const listener of [..._pendingBackendCredentialAlignListeners]) listener();
@@ -108,23 +112,30 @@ const notifyPendingBackendCredentialAlignChange = (): void => {
 /**
  * R15 跨域协调（finding 12 接口侧）：公开登记待对齐标记的入口——普通 PAT
  * 登录（syncTokenToBackend 返回 ok:false）后为当前账号登记标记，使 Header
- * 的重试入口可见。语义与内部封装一致：幂等写入（已存在时不抬订阅版本），
+ * 的重试入口可见。按 (后端地址, 账号) 区分，避免在后端 Y 对齐成功时误清后端 X
+ * 的待对齐重试入口。语义与内部封装一致：幂等写入（已存在时不抬订阅版本），
  * 写入即通知订阅者（配合 subscribePendingBackendCredentialAlign /
  * getPendingBackendCredentialAlignVersion 供 useSyncExternalStore 消费）。
  */
-export function markPendingBackendCredentialAlign(accountId: string): void {
-  if (pendingBackendCredentialAlignAccounts.has(accountId)) return;
-  pendingBackendCredentialAlignAccounts.add(accountId);
+export function markPendingBackendCredentialAlign(accountId: string, backendUrl?: string | null): void {
+  const key = pendingBackendCredentialAlignKey(accountId, backendUrl);
+  if (pendingBackendCredentialAlignAccounts.has(key)) return;
+  pendingBackendCredentialAlignAccounts.add(key);
   notifyPendingBackendCredentialAlignChange();
 }
 
-const clearPendingBackendCredentialAlign = (accountId: string): void => {
-  if (!pendingBackendCredentialAlignAccounts.delete(accountId)) return;
+const clearPendingBackendCredentialAlign = (accountId: string, backendUrl?: string | null): void => {
+  const key = pendingBackendCredentialAlignKey(accountId, backendUrl);
+  if (!pendingBackendCredentialAlignAccounts.delete(key)) return;
   notifyPendingBackendCredentialAlignChange();
 };
 
-export function hasPendingBackendCredentialAlign(accountId: string | null | undefined): boolean {
-  return Boolean(accountId && pendingBackendCredentialAlignAccounts.has(accountId));
+export function hasPendingBackendCredentialAlign(
+  accountId: string | null | undefined,
+  backendUrl?: string | null,
+): boolean {
+  if (!accountId) return false;
+  return pendingBackendCredentialAlignAccounts.has(pendingBackendCredentialAlignKey(accountId, backendUrl));
 }
 
 /** useSyncExternalStore 的 subscribe 入口；返回退订函数。 */
@@ -245,6 +256,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     // 并给出可重试的用户提示。缺省 false 兼容旧响应/测试桩。
     let credentialsAligned = true;
     let activeAccountUpdateSkipped = false;
+    const targetBackendUrl = backend.backendUrl ?? '';
     try {
       const syncResult = await backend.syncSettings({
         github_token: token,
@@ -258,13 +270,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         || activeAccountUpdateSkipped
       ) {
         credentialsAligned = false;
-        markPendingBackendCredentialAlign(accountId);
+        markPendingBackendCredentialAlign(accountId, targetBackendUrl);
       } else {
-        clearPendingBackendCredentialAlign(accountId);
+        clearPendingBackendCredentialAlign(accountId, targetBackendUrl);
       }
     } catch (error) {
       credentialsAligned = false;
-      markPendingBackendCredentialAlign(accountId);
+      markPendingBackendCredentialAlign(accountId, targetBackendUrl);
       console.warn('Failed to align account settings on backend:', error);
     }
     if (activeAccountUpdateSkipped) {
@@ -321,7 +333,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       accountIdKey(current.user) === targetAccountId
       && current.isAuthenticated
       && !!current.githubToken?.trim()
-      && !pendingBackendCredentialAlignAccounts.has(targetAccountId)
+      && !hasPendingBackendCredentialAlign(targetAccountId)
     ) {
       releaseAccountSwitchLock();
       return { ok: true };
@@ -558,7 +570,16 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
           // R2-C12：user:null 条目先用其分区 PAT 核对 GitHub 身份再登记。
           const normalizedAccount = await normalizeBackendRestoreAccount(account);
           if (!normalizedAccount) continue;
-          useAppStore.getState().upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
+          const restoredAccountId = accountIdKey(normalizedAccount.user);
+          const existingLocalToken = restoredAccountId
+            ? useAppStore.getState().savedAccounts?.[restoredAccountId]?.githubToken
+            : undefined;
+          // 完整条目（account.user 非空）未经 GitHub /user 核实，不得用未核实的后端 PAT
+          // 覆盖本机已保存的非空 PAT（显式重新添加账号不走此处）。
+          const tokenToSave = account.user && existingLocalToken
+            ? existingLocalToken
+            : normalizedAccount.githubToken;
+          useAppStore.getState().upsertSavedAccount(normalizedAccount.user, tokenToSave);
         }
         // 审计修复：身份与工作区提交纳入恢复守卫覆盖，并以同步簿记守卫包裹
         // setGitHubToken/setUser——否则订阅器把这两项写入记为待推，守卫释放时

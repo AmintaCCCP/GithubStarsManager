@@ -23,9 +23,10 @@ compatibility_date = "2024-01-01"
 #      `npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:true`
 #      随后执行冒烟检查：用账号过滤查询确认能命中该账号的向量（见 README）。
 #      注意：单账号查询命中只能证明「过滤生效」，不能证明全量回填完成。
-#   4. 确认回填覆盖后再正式启用：正式启用前需另行核对回填覆盖——逐一确认所有
-#      预期向量都带 accountId 元数据，或凭「元数据索引创建后逐项成功重写」的回填
-#      记录核对（见 README 多账号一节）。`npx wrangler vectorize list-vectors
+#   4. 确认回填覆盖后再正式启用：正式启用前需另行核对回填覆盖——核对「元数据索引
+#      创建后逐项成功重写」的回填记录，或逐项确认带 accountId 过滤的查询能够返回
+#      目标向量（见 README 多账号一节；仅检查原始 metadata.accountId 不能证明向量
+#      在索引创建后重写并进入过滤索引）。`npx wrangler vectorize list-vectors
 #      <index-name>` 全量枚举向量 ID 只是旧向量退役检查（不应再存在纯数字 legacy
 #      ID）——ID 清单无法区分「仅带账号前缀」与「同时带 metadata.accountId」的
 #      向量，不能作为回填完成的证明。核对完成后用部署向导

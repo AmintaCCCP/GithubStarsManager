@@ -492,3 +492,60 @@ describe('backendAdapter 探测源协议（file:// 桌面端不探测同源 /api
     expect(backend.isAvailable).toBe(true);
   });
 });
+
+describe('backendAdapter.fetchRepositories multi-page revision guard (finding 50)', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+  });
+
+  it('throws when multi-page response lacks numeric revision on page 1 or page 2', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    vi.mocked(window.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ repositories: [{ id: 1 }], total: 2 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await expect(backend.fetchRepositories('42')).rejects.toThrow(
+      'Backend repository pages lack revision',
+    );
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+
+    vi.mocked(window.fetch).mockReset();
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ repositories: [{ id: 1 }], total: 2, revision: 5 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ repositories: [{ id: 2 }], total: 2 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+    await expect(backend.fetchRepositories('42')).rejects.toThrow(
+      'Backend repository pages lack revision',
+    );
+  });
+
+  it('allows single-page response without revision', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    vi.mocked(window.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ repositories: [{ id: 1 }], total: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const result = await backend.fetchRepositories('42');
+    expect(result.repositories).toHaveLength(1);
+    expect(result.revision).toBeNull();
+  });
+});

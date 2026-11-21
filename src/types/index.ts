@@ -514,7 +514,7 @@ export interface SavedAccount {
   /** GitHub 数值 ID 字符串，与 accountIdKey(user) 一致 */
   accountId: string;
   user: GitHubUser;
-  /** 该账号的 GitHub PAT；仅当用户主动移除账号或未包含密钥导入时为空字符串 */
+  /** 该账号的 GitHub PAT；空字符串表示当前没有可用 PAT，需要从桌面安全存储回填或重新授权 */
   githubToken: string;
   addedAt: string;
   lastUsedAt: string;

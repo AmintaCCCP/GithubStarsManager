@@ -256,9 +256,14 @@ class BackendAdapter {
   private _backendUrl: string | null = null;
   private _availabilityListeners = new Set<() => void>();
   private _beforeInitHook: (() => Promise<void>) | null = null;
+  private _beforePersistUrlHook: ((nextUrl: string | null, previousUrl: string | null) => boolean) | null = null;
 
   registerBeforeInitHook(fn: () => Promise<void>): void {
     this._beforeInitHook = fn;
+  }
+
+  registerBeforePersistUrlHook(fn: (nextUrl: string | null, previousUrl: string | null) => boolean): void {
+    this._beforePersistUrlHook = fn;
   }
 
   /**
@@ -283,6 +288,11 @@ class BackendAdapter {
   /** 后端连接代次：每次后端地址变化时递增，用于识别 X→Y→X 切出再切回同 URL 的连接变化。 */
   get connectionGeneration(): number {
     return this._connectionGeneration;
+  }
+
+  /** 探测代次：每次 init() 或 disconnect() 时递增，用于识别并发断开或新探测是否接管了落点。 */
+  get probeGeneration(): number {
+    return this._probeGeneration;
   }
 
   private commitBackendUrl(url: string | null): void {
@@ -396,6 +406,10 @@ class BackendAdapter {
    */
   rememberActiveUrl(): void {
     if (!this._backendUrl) return;
+    const previousUrl = readStoredBackendUrl();
+    if (this._backendUrl !== previousUrl && this._beforePersistUrlHook) {
+      if (!this._beforePersistUrlHook(this._backendUrl, previousUrl)) return;
+    }
     try {
       localStorage.setItem(BACKEND_URL_STORAGE_KEY, this._backendUrl);
     } catch {
@@ -413,6 +427,10 @@ class BackendAdapter {
    * 把 rememberActiveUrl 保存的候选 URL 还原为恢复前的值，null 表示移除）。
    */
   persistUrl(url: string | null): void {
+    const previousUrl = readStoredBackendUrl();
+    if (url && url !== previousUrl && this._beforePersistUrlHook) {
+      if (!this._beforePersistUrlHook(url, previousUrl)) return;
+    }
     try {
       if (url) {
         localStorage.setItem(BACKEND_URL_STORAGE_KEY, url);
@@ -1112,6 +1130,9 @@ class BackendAdapter {
         // 分页期间分区被其他设备写入：合并结果既非完整也非一致快照
         throw new Error('Repository snapshot changed while paging (revision mismatch)');
       }
+      if (pageRevision === null && (page > 1 || pageTotal > pageRepos.length)) {
+        throw new Error('Backend repository pages lack revision; cannot verify a consistent snapshot');
+      }
       collected.push(...pageRepos);
       const morePages = collected.length < pageTotal;
       if (!morePages) break;
@@ -1441,12 +1462,16 @@ class BackendAdapter {
   // === Health ===
 
   async checkHealth(): Promise<{ status: string; version: string; timestamp: string } | null> {
-    if (!this._backendUrl) return null;
+    const url = this._backendUrl;
+    if (!url) return null;
+    const connectionGeneration = this._connectionGeneration;
 
     try {
-      const res = await this.fetchWithTimeout(`${this._backendUrl}/health`, undefined, 5000);
-      if (res.ok) return res.json() as Promise<{ status: string; version: string; timestamp: string }>;
-      return null;
+      const res = await this.fetchWithTimeout(`${url}/health`, undefined, 5000);
+      if (!res.ok) return null;
+      const data = await res.json() as { status: string; version: string; timestamp: string };
+      if (this._backendUrl !== url || this._connectionGeneration !== connectionGeneration) return null;
+      return data;
     } catch {
       return null;
     }

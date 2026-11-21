@@ -20,9 +20,13 @@ vi.mock('../../../hooks/useDialog', () => ({
   useDialog: () => ({ toast: mocks.toast, confirm: mocks.confirm }),
 }));
 
-vi.mock('../../../services/autoSync', () => ({
-  forceSyncToBackend: mocks.forceSyncToBackend,
-}));
+vi.mock('../../../services/autoSync', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../services/autoSync')>();
+  return {
+    ...actual,
+    forceSyncToBackend: mocks.forceSyncToBackend,
+  };
+});
 
 vi.mock('../../../services/backendAdapter', () => ({
   backend: {
@@ -143,5 +147,88 @@ describe('useReleaseTimelineActions optimistic read rollback ownership (R12 find
     expect(read.has(10)).toBe(false);
     expect(read.has(30)).toBe(false);
     expect(read.has(5)).toBe(true);
+  });
+
+  it('accumulates multiple concurrent single-read targets on the live rollback path', async () => {
+    const { rejectBackend, settle } = await startMarkAllRead();
+
+    act(() => {
+      useAppStore.getState().markReleaseAsRead(20);
+      useAppStore.getState().markReleaseAsRead(30);
+    });
+
+    rejectBackend(new Error('backend down'));
+    await settle();
+
+    const read = useAppStore.getState().readReleases;
+    expect(read.has(5)).toBe(true);
+    expect(read.has(20)).toBe(true);
+    expect(read.has(30)).toBe(true);
+    expect(read.has(10)).toBe(false);
+  });
+
+  it('preserves single-read targets performed before switching away on archived rollback', async () => {
+    const { rejectBackend, settle } = await startMarkAllRead();
+
+    // 在账号 A 中单独标记 10，再切换到账号 B 使批量请求失败，最后切回 A
+    act(() => {
+      useAppStore.getState().upsertSavedAccount(
+        { id: 1, login: 'me', name: 'Me', avatar_url: '', email: null },
+        'token-a',
+      );
+      useAppStore.getState().upsertSavedAccount(
+        { id: 2, login: 'other', name: 'Other', avatar_url: '', email: null },
+        'token-b',
+      );
+      useAppStore.getState().markReleaseAsRead(10);
+      useAppStore.getState().switchAccount('2');
+    });
+
+    rejectBackend(new Error('backend down'));
+    await settle();
+
+    act(() => {
+      useAppStore.getState().switchAccount('1');
+    });
+
+    const read = useAppStore.getState().readReleases;
+    expect(read.has(5)).toBe(true);
+    expect(read.has(10)).toBe(true);
+    expect(read.has(20)).toBe(false);
+    expect(read.has(30)).toBe(false);
+  });
+
+  it('skips rows rewritten after A→B→A reactivation while rolling back untouched rows', async () => {
+    const { rejectBackend, settle } = await startMarkAllRead();
+
+    act(() => {
+      useAppStore.getState().upsertSavedAccount(
+        { id: 1, login: 'me', name: 'Me', avatar_url: '', email: null },
+        'token-a',
+      );
+      useAppStore.getState().upsertSavedAccount(
+        { id: 2, login: 'other', name: 'Other', avatar_url: '', email: null },
+        'token-b',
+      );
+      useAppStore.getState().switchAccount('2');
+      useAppStore.getState().switchAccount('1');
+      // 仅恢复/改写 release 10（不替换 readReleases），保留 release 20 为原乐观行引用
+      const currentReleases = useAppStore.getState().releases;
+      useAppStore.setState({
+        releases: currentReleases.map((rel) => (
+          rel.id === 10
+            ? { ...rel, is_read: true, updated_asset_ids: [] }
+            : rel
+        )),
+      });
+    });
+
+    rejectBackend(new Error('backend down'));
+    await settle();
+
+    const rel10 = useAppStore.getState().releases.find((r) => r.id === 10);
+    const rel20 = useAppStore.getState().releases.find((r) => r.id === 20);
+    expect(rel10?.is_read).toBe(true);
+    expect(rel20?.is_read).toBe(false);
   });
 });

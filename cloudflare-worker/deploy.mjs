@@ -242,10 +242,13 @@ const MESSAGES = {
     acct_verify_coverage_enum_not_proof: '✅ 账号过滤验证通过：全量枚举 {total} 条向量 ID 未发现纯数字 legacy ID（旧向量退役检查通过），采样中也未观察到缺少 accountId 元数据的缺口。但 ID 枚举不能证明回填覆盖——带账号前缀、缺少 accountId 元数据的向量对枚举不可见；正式依赖账号过滤前，请按 README 步骤 4 用「元数据索引创建后逐项成功重写记录」核对各账号的预期向量。',
     acct_verify_coverage_legacy_found: '⚠️ 回填覆盖未完成：全量枚举 {total} 条向量 ID，发现 {count} 条 legacy 向量（纯数字 ID，缺少 accountId 元数据），启用账号过滤后它们将无法召回。任何纯数字 ID 都会使覆盖验证失败：请先核实归属并确认替代向量可召回后手动删除（见 README 步骤 4），否则只能以未验证模式强制启用。',
     acct_verify_coverage_sample_legacy: '⚠️ 回填覆盖未确认：采样已观察到 {count} 条缺少 accountId 元数据的向量，它们无法被账号过滤召回（带账号前缀的 ID 不能证明向量已带 accountId 元数据或已进入元数据索引；元数据索引创建前写入的向量需重写后才会被收录）。完整枚举未发现纯数字 ID 也不能否定该观察，请先补完回填再重新部署验证。',
-    acct_verify_coverage_unverified: '⚠️ 回填覆盖未验证：全量枚举不可用（{reason}）。采样查询（≤50 条）只能证明过滤生效，不能证明全量回填完成；请通过回填记录或手动执行 `npx wrangler vectorize list-vectors {index}` 核对所有预期向量后，再依赖账号过滤。',
+    acct_verify_coverage_unverified: '⚠️ 回填覆盖未验证：全量枚举不可用（{reason}）。采样查询（≤50 条）只能证明过滤生效，不能证明全量回填完成；正式依赖账号过滤前，请务必凭「元数据索引创建后逐项成功重写记录」核对所有预期向量（手动执行 `npx wrangler vectorize list-vectors {index}` 仅作为排查纯数字 legacy ID 的补充步骤）。',
     acct_verify_failed: '⚠️ 回填验证请求失败: {err}',
     acct_verify_rollback_prompt: '验证未通过，是否立即回滚 ACCOUNT_METADATA_INDEXED 为 false（避免向量检索静默为空）？',
     acct_verify_rolled_back: '↩️ 已将 Worker 与本地配置回滚为 ACCOUNT_METADATA_INDEXED=false。',
+    acct_verify_rollback_failed: '❌ 自动回滚部署（ACCOUNT_METADATA_INDEXED=false）失败：{err}。远端 Worker 可能仍处于 ACCOUNT_METADATA_INDEXED=true 状态，本地配置已保留待验证状态（accountMetadataIndexed=true, accountMetadataIndexVerified=false）。请重试回滚：`node deploy.mjs --quick --account-metadata-indexed=false` 或 `npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:false`。',
+    acct_verify_url_unconfirmed: '⚠️ 本次 Wrangler 部署输出未包含可确认的 Worker URL（如自定义域名未出现在输出中），已使用本地记录地址执行验证，但不会写入已验证标记（accountMetadataIndexVerified=false）；请确认目标地址与本次部署的 Worker 一致。',
+    acct_claim_only_flag_rejected: '❌ 「仅认领（不执行部署）」模式不能与 --account-metadata-indexed 参数同时使用：未执行部署和远端验证前，不会将 CLI 请求值保存为远端状态。请选择「认领并一键快速更新部署」或移除该参数后重试。',
     acct_verify_forced_keep: '⚠️ 已按你的选择保留 ACCOUNT_METADATA_INDEXED=true，但本次验证未通过：本地记录不会标记为已验证，快速部署也不会复用该启用标记；修复回填后请重新部署并再次验证。',
     acct_verify_cannot_verify_disable: '⚠️ 无法验证账号过滤（缺少 AUTH_TOKEN 或 Worker URL）：本次部署保持 ACCOUNT_METADATA_INDEXED=false；如需启用，请在提供验证凭据后重新部署并显式确认。',
     acct_quick_gate_skip: 'ℹ️ 本地记录的 ACCOUNT_METADATA_INDEXED=true 上次验证未通过，快速部署不会自动启用账号过滤；如需启用请使用 --account-metadata-indexed=true 或重新运行完整向导。',
@@ -434,10 +437,13 @@ const MESSAGES = {
     acct_verify_coverage_enum_not_proof: "✅ Account filtering verified: full enumeration of {total} vector IDs found no numeric-only legacy IDs (legacy-retirement check passed) and no sampled vector was observed missing accountId metadata. However, ID enumeration cannot prove backfill coverage — prefixed vectors lacking accountId metadata are invisible to enumeration. Before relying on account filtering, reconcile each account's expected vectors against successful rewrite records per README step 4.",
     acct_verify_coverage_legacy_found: '⚠️ Backfill coverage incomplete: enumerated {total} vector IDs and found {count} legacy vectors (numeric-only IDs, missing accountId metadata); they would be unrecallable under account filtering. Any numeric-only ID fails coverage verification: retire the copies after verifying ownership and that the replacement vectors are recallable (see README step 4), or enable only in the unverified forced-keep mode.',
     acct_verify_coverage_sample_legacy: '⚠️ Backfill coverage NOT confirmed: the sampled query observed {count} vector(s) missing accountId metadata; they are unrecallable under account filtering (an account-prefixed ID does not prove the vector carries accountId metadata or was re-written into the metadata index; vectors written before index creation must be re-upserted to be filterable). Full enumeration finding no numeric-only IDs cannot refute this observation. Finish the backfill, then re-deploy and re-verify.',
-    acct_verify_coverage_unverified: '⚠️ Backfill coverage NOT verified: full enumeration unavailable ({reason}). The sampled query (≤50 results) only proves the filter works, not full backfill; reconcile expected vectors via backfill records or `npx wrangler vectorize list-vectors {index}` before relying on account filtering.',
+    acct_verify_coverage_unverified: '⚠️ Backfill coverage NOT verified: full enumeration unavailable ({reason}). The sampled query (≤50 results) only proves the filter works, not full backfill; reconcile all expected vectors against per-vector successful rewrite records (after metadata index creation) before relying on account filtering (manual `npx wrangler vectorize list-vectors {index}` is only a supplementary check for numeric-only legacy IDs).',
     acct_verify_failed: '⚠️ Backfill verification request failed: {err}',
     acct_verify_rollback_prompt: 'Verification did not pass. Roll back ACCOUNT_METADATA_INDEXED to false now (to avoid silent empty recall)?',
     acct_verify_rolled_back: '↩️ Rolled back Worker and local config to ACCOUNT_METADATA_INDEXED=false.',
+    acct_verify_rollback_failed: '❌ Rollback deploy (ACCOUNT_METADATA_INDEXED=false) failed: {err}. The remote Worker may STILL have ACCOUNT_METADATA_INDEXED=true; local config has preserved the pending unverified state (accountMetadataIndexed=true, accountMetadataIndexVerified=false). Retry rollback with `node deploy.mjs --quick --account-metadata-indexed=false` or `npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:false`.',
+    acct_verify_url_unconfirmed: '⚠️ Wrangler deploy output did not include a verifiable Worker URL (e.g. custom domain not printed); verification ran against the saved URL, so accountMetadataIndexVerified stays false. Verify the target URL matches the deployed Worker.',
+    acct_claim_only_flag_rejected: '❌ "Claim only (no deploy)" cannot be combined with --account-metadata-indexed: without deploying and verifying, the CLI value will not be saved as remote state. Choose "Claim & Quick Redeploy" or omit the flag.',
     acct_verify_forced_keep: '⚠️ Keeping ACCOUNT_METADATA_INDEXED=true as requested, but this verification failed: the local record is NOT marked verified and quick deploy will not reuse the flag; re-deploy and re-verify after fixing the backfill.',
     acct_verify_cannot_verify_disable: '⚠️ Cannot verify account filtering (missing AUTH_TOKEN or Worker URL): this deploy keeps ACCOUNT_METADATA_INDEXED=false; provide verification credentials and re-deploy to enable it explicitly.',
     acct_quick_gate_skip: 'ℹ️ The locally saved ACCOUNT_METADATA_INDEXED=true failed its last verification; quick deploy will not auto-enable account filtering. Use --account-metadata-indexed=true or re-run the full wizard to enable.',
@@ -661,6 +667,14 @@ function saveLocalConfig(config) {
 
 // ======================== Wrangler 执行引擎自适应 ========================
 function getLocalWranglerBin() {
+  const envBin = process.env.DEPLOY_WRANGLER_BIN;
+  if (envBin) {
+    const resolvedEnvBin = path.resolve(envBin);
+    if (fs.existsSync(resolvedEnvBin)) {
+      return { cmd: process.execPath, argsPrefix: [resolvedEnvBin], needsShell: false };
+    }
+  }
+
   const candidatePaths = [
     path.resolve(WORKER_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js'),
     path.resolve(ROOT_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js'),
@@ -749,6 +763,9 @@ function checkNodeEnvironment() {
 }
 
 async function ensureDependencies() {
+  if (process.env.DEPLOY_WRANGLER_BIN && fs.existsSync(path.resolve(process.env.DEPLOY_WRANGLER_BIN))) {
+    return;
+  }
   const wranglerJs = path.resolve(WORKER_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
   if (fs.existsSync(wranglerJs)) {
     return;
@@ -1158,6 +1175,32 @@ async function handleAuthTokenConfig(savedConfig, keepRemoteSecret = false) {
 // 否则 Worker 仍绑定旧索引，而后续验证查询与 ID 枚举指向新选索引，两者都通过
 // 也无法证明所选索引已就绪。这里统一抛错，由 main 的统一 catch 中止部署；
 // 快速部署（CLI/交互）与完整向导共用本检查。
+function stripTomlInlineComment(line) {
+  let quote = null;
+  let escaped = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quote === '"') {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        quote = null;
+      }
+    } else if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else {
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+      } else if (ch === '#') {
+        return line.slice(0, i);
+      }
+    }
+  }
+  return line;
+}
+
 function syncWranglerToml(indexName) {
   let content;
   try {
@@ -1165,13 +1208,62 @@ function syncWranglerToml(indexName) {
   } catch (err) {
     throw new Error(`Sync wrangler.toml failed: ${err.message}`);
   }
-  if (!/index_name\s*=\s*["'][^"']+["']/.test(content)) {
-    throw new Error('Sync wrangler.toml failed: no index_name entry found');
+
+  const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+  const lines = content.split(/\r?\n/);
+
+  // 按 TOML 表结构定位 [[vectorize]] 块，避免误改注释行或其他绑定块。
+  const vectorizeBlocks = [];
+  let currentBlock = null;
+  for (let i = 0; i < lines.length; i++) {
+    const code = stripTomlInlineComment(lines[i]).trim();
+    if (!code) continue;
+    const headerMatch = code.match(/^(\[\[?)\s*([^\]]+?)\s*(\]\]?)$/);
+    if (headerMatch) {
+      const isArrayTable = headerMatch[1] === '[[' && headerMatch[3] === ']]';
+      const tableName = headerMatch[2].trim();
+      if (isArrayTable && tableName === 'vectorize') {
+        currentBlock = { binding: null, indexNameLines: [] };
+        vectorizeBlocks.push(currentBlock);
+      } else {
+        currentBlock = null;
+      }
+      continue;
+    }
+    if (!currentBlock) continue;
+    const bindingMatch = code.match(/^binding\s*=\s*(?:"([^"]*)"|'([^']*)')$/);
+    if (bindingMatch) {
+      currentBlock.binding = bindingMatch[1] ?? bindingMatch[2] ?? '';
+      continue;
+    }
+    if (/^index_name\s*=\s*(?:"[^"]*"|'[^']*')$/.test(code)) {
+      currentBlock.indexNameLines.push(i);
+    }
   }
-  const updated = content.replace(
-    /index_name\s*=\s*["'][^"']+["']/,
-    `index_name = "${indexName}"`
+
+  const matchingBlocks = vectorizeBlocks.filter((b) => b.binding === 'VECTORIZE');
+  if (matchingBlocks.length !== 1) {
+    throw new Error(
+      `Sync wrangler.toml failed: expected exactly one [[vectorize]] block with binding = "VECTORIZE", found ${matchingBlocks.length}`
+    );
+  }
+  const targetBlock = matchingBlocks[0];
+  if (targetBlock.indexNameLines.length !== 1) {
+    throw new Error(
+      `Sync wrangler.toml failed: expected exactly one index_name entry in VECTORIZE binding, found ${targetBlock.indexNameLines.length}`
+    );
+  }
+
+  const lineIdx = targetBlock.indexNameLines[0];
+  const originalLine = lines[lineIdx];
+  const codePart = stripTomlInlineComment(originalLine);
+  const commentPart = originalLine.slice(codePart.length);
+  const replacedCode = codePart.replace(
+    /^(\s*index_name\s*=\s*)(?:"[^"]*"|'[^']*')(\s*)$/,
+    `$1"${indexName}"$2`
   );
+  lines[lineIdx] = replacedCode + commentPart;
+  const updated = lines.join(lineEnding);
   if (updated === content) {
     // 绑定已指向所选索引，无需写入。
     return;
@@ -1217,6 +1309,12 @@ function deployWorker(accountMetadataIndexed = false) {
   const urlMatch = cleanOutput.match(/https:\/\/[a-zA-Z0-9_\-.]+\.workers\.dev/i);
   if (urlMatch) {
     return urlMatch[0].trim();
+  }
+  const customDomainMatch = cleanOutput.match(
+    /^\s*(?:https?:\/\/)?([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+)\s*\(custom domain\)/im
+  );
+  if (customDomainMatch) {
+    return `https://${customDomainMatch[1].trim()}`;
   }
   return null;
 }
@@ -1421,18 +1519,22 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions, inde
     if (enumeration.ok) {
       if (enumeration.legacyCount > 0) {
         console.warn(c.yellow(t('acct_verify_coverage_legacy_found', { total: enumeration.total, count: enumeration.legacyCount })));
-        return { ok: false, filterActive: true, coverageConfirmed: false, reason: 'legacy_present' };
+        return { ok: false, filterActive: true, enumerationCompleted: true, coverageConfirmed: false, reason: 'legacy_present' };
       }
       console.log(c.green(t('acct_verify_coverage_enum_not_proof', { total: enumeration.total })));
       // R13 review：采样 + 枚举只能证明「过滤生效、旧向量已退役」，不能证明回填
       // 覆盖——覆盖确认需另行核对各账号预期向量与成功重写记录，这里只记录
       // 过滤验证通过。
-      return { ok: true, filterActive: true, coverageConfirmed: false };
+      return { ok: true, filterActive: true, enumerationCompleted: true, coverageConfirmed: false };
+    }
+    if ((enumeration.legacyCount ?? 0) > 0) {
+      console.warn(c.yellow(t('acct_verify_coverage_legacy_found', { total: enumeration.total, count: enumeration.legacyCount })));
+      return { ok: false, filterActive: true, enumerationCompleted: false, coverageConfirmed: false, reason: 'legacy_present' };
     }
     console.warn(c.yellow(t('acct_verify_coverage_unverified', { reason: enumeration.reason || 'unknown', index })));
-    // 过滤生效且采样未发现 legacy：保留过滤标记（部署方已显式确认回填），
-    // 但必须明确报告覆盖未验证——采样不能证明全量回填完成。
-    return { ok: true, filterActive: true, coverageConfirmed: false };
+    // 过滤生效且未观察到 legacy，但枚举未完成：不触发自动回滚，也不标记为已验证，
+    // 防止 --quick 复用未完成枚举的标记。
+    return { ok: true, filterActive: true, enumerationCompleted: false, coverageConfirmed: false, reason: enumeration.reason || 'enumeration_incomplete' };
   } catch (err) {
     console.warn(c.yellow(t('acct_verify_failed', { err: err.message })));
     return { ok: false, filterActive: false, coverageConfirmed: false, reason: 'request_failed' };
@@ -1448,12 +1550,17 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions, inde
  *   部署不会复用未验证的启用标记）。
  */
 async function verifyOrRollbackAccountMetadataIndex(workerUrl, authToken, dimensions, indexName, options = {}) {
-  const { interactive = true } = options;
+  const { interactive = true, urlConfirmed = true } = options;
   const result = await verifyAccountMetadataIndex(workerUrl, authToken, dimensions, indexName);
   if (result.ok) {
+    let verified = result.enumerationCompleted === true;
+    if (verified && !urlConfirmed) {
+      console.warn(c.yellow(t('acct_verify_url_unconfirmed')));
+      verified = false;
+    }
     return {
       accountMetadataIndexed: true,
-      accountMetadataIndexVerified: true,
+      accountMetadataIndexVerified: verified,
       accountMetadataCoverageConfirmed: result.coverageConfirmed === true,
       workerUrl,
     };
@@ -1462,7 +1569,13 @@ async function verifyOrRollbackAccountMetadataIndex(workerUrl, authToken, dimens
     ? await askConfirm(t('acct_verify_rollback_prompt'), true)
     : true;
   if (shouldRollback) {
-    const rolledBackUrl = deployWorker(false) || workerUrl;
+    let rolledBackUrl;
+    try {
+      rolledBackUrl = deployWorker(false) || workerUrl;
+    } catch (rollbackErr) {
+      console.error(c.red(t('acct_verify_rollback_failed', { err: rollbackErr.message })));
+      throw rollbackErr;
+    }
     console.log(c.yellow(t('acct_verify_rolled_back')));
     return {
       accountMetadataIndexed: false,
@@ -1515,11 +1628,10 @@ async function testWorkerConnectivity(workerUrl, authToken) {
   if (!workerUrl || !authToken) return false;
   const normalized = normalizeUrl(workerUrl);
   console.log(c.cyan(t('testing_worker', { url: normalized })));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const targetUrl = normalized.replace(/\/+$/, '') + '/status';
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
     const resp = await fetch(targetUrl, {
       method: 'GET',
       headers: {
@@ -1527,7 +1639,6 @@ async function testWorkerConnectivity(workerUrl, authToken) {
       },
       signal: controller.signal,
     });
-    clearTimeout(timeout);
 
     if (resp.ok) {
       const data = await resp.json();
@@ -1544,6 +1655,8 @@ async function testWorkerConnectivity(workerUrl, authToken) {
     console.warn(c.yellow(t('test_warn_err', { err: err.message })));
     console.warn(c.gray(t('test_warn_dns')));
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -1635,12 +1748,23 @@ async function main() {
       console.warn(c.yellow(t('acct_verify_cannot_verify_disable')));
       accountMetadataIndexed = false;
     }
-    let url = deployWorker(accountMetadataIndexed) || savedConfig.workerUrl;
+    const deployedUrl = deployWorker(accountMetadataIndexed);
+    let url = deployedUrl || savedConfig.workerUrl;
+    if (accountMetadataIndexed) {
+      // 在验证前先落盘待验证状态：若后续验证失败且回滚部署也失败，本地仍保留可恢复状态，
+      // 不会误留上一次配置而掩盖远端可能仍为 true 的事实。
+      savedConfig.workerUrl = url;
+      savedConfig.accountMetadataIndexed = true;
+      savedConfig.accountMetadataIndexVerified = false;
+      savedConfig.accountMetadataCoverageConfirmed = false;
+      savedConfig.lastDeployedAt = new Date().toISOString();
+      saveLocalConfig(savedConfig);
+    }
     if (savedConfig.authToken) {
       await testWorkerConnectivity(url, savedConfig.authToken);
       if (accountMetadataIndexed) {
         // --quick 是非交互操作：验证失败时自动回滚，绝不等待输入（R2 review）。
-        const verified = await verifyOrRollbackAccountMetadataIndex(url, savedConfig.authToken, savedConfig.dimensions, savedConfig.indexName, { interactive: false });
+        const verified = await verifyOrRollbackAccountMetadataIndex(url, savedConfig.authToken, savedConfig.dimensions, savedConfig.indexName, { interactive: false, urlConfirmed: Boolean(deployedUrl) });
         accountMetadataIndexed = verified.accountMetadataIndexed;
         accountMetadataIndexVerified = verified.accountMetadataIndexVerified;
         accountMetadataCoverageConfirmed = verified.accountMetadataCoverageConfirmed;
@@ -1740,11 +1864,24 @@ async function main() {
         console.warn(c.yellow(t('acct_verify_cannot_verify_disable')));
         accountMetadataIndexed = false;
       }
-      let url = deployWorker(accountMetadataIndexed) || savedConfig.workerUrl;
+      const deployedUrl = deployWorker(accountMetadataIndexed);
+      let url = deployedUrl;
+      if (!url) {
+        console.log(c.yellow(t('worker_url_missing')));
+        url = normalizeUrl(await askQuestion(t('worker_url_prompt'), savedConfig.workerUrl || ''));
+      }
+      if (accountMetadataIndexed) {
+        savedConfig.workerUrl = url;
+        savedConfig.accountMetadataIndexed = true;
+        savedConfig.accountMetadataIndexVerified = false;
+        savedConfig.accountMetadataCoverageConfirmed = false;
+        savedConfig.lastDeployedAt = new Date().toISOString();
+        saveLocalConfig(savedConfig);
+      }
       if (savedConfig.authToken) {
         await testWorkerConnectivity(url, savedConfig.authToken);
         if (accountMetadataIndexed) {
-          const verified = await verifyOrRollbackAccountMetadataIndex(url, savedConfig.authToken, savedConfig.dimensions, savedConfig.indexName, { interactive: true });
+          const verified = await verifyOrRollbackAccountMetadataIndex(url, savedConfig.authToken, savedConfig.dimensions, savedConfig.indexName, { interactive: true, urlConfirmed: Boolean(deployedUrl) });
           accountMetadataIndexed = verified.accountMetadataIndexed;
           accountMetadataIndexVerified = verified.accountMetadataIndexVerified;
           accountMetadataCoverageConfirmed = verified.accountMetadataCoverageConfirmed;
@@ -1827,6 +1964,10 @@ async function main() {
     }
 
       if (claimAction.value === 'claim_deploy' || claimAction.value === 'claim_only') {
+        if (claimAction.value === 'claim_only' && cliAccountMetadataIndexed !== undefined) {
+          console.error(c.red(t('acct_claim_only_flag_rejected')));
+          process.exit(1);
+        }
         console.log('');
         console.log(c.cyan('📌 ' + t('remote_token_claim_prompt')));
         const tokenInput = await askQuestion(t('step_3_title'), savedConfig?.authToken || '');
@@ -1834,7 +1975,9 @@ async function main() {
         let finalAuthToken = (tokenInput || '').trim() || savedConfig?.authToken || '';
         let workerUrl = '';
 
-        let claimedAccountMetadataIndexed = cliAccountMetadataIndexed ?? savedConfig?.accountMetadataIndexed === true;
+        let claimedAccountMetadataIndexed = claimAction.value === 'claim_deploy'
+          ? (cliAccountMetadataIndexed ?? savedConfig?.accountMetadataIndexed === true)
+          : savedConfig?.accountMetadataIndexed === true;
         let claimedAccountMetadataIndexVerified = savedConfig?.accountMetadataIndexVerified === true;
         let claimedAccountMetadataCoverageConfirmed = savedConfig?.accountMetadataCoverageConfirmed === true;
         if (claimAction.value === 'claim_deploy') {
@@ -1855,16 +1998,32 @@ async function main() {
             console.warn(c.yellow(t('acct_verify_cannot_verify_disable')));
             claimedAccountMetadataIndexed = false;
           }
-          workerUrl = deployWorker(claimedAccountMetadataIndexed) || '';
+          const deployedClaimUrl = deployWorker(claimedAccountMetadataIndexed);
+          workerUrl = deployedClaimUrl || '';
           // R2 review：未能从 Wrangler 输出提取 URL 时，先询问并解析实际部署地址，
           // 再决定是否执行验证（验证不能在跳过 URL 解析之后才补问）。
           if (!workerUrl) {
             workerUrl = normalizeUrl(await askQuestion(t('worker_url_prompt')));
           }
+          if (claimedAccountMetadataIndexed) {
+            saveLocalConfig({
+              workerName: remoteProbe.defaultWorkerName,
+              indexName: remoteProbe.defaultIndexName,
+              dimensions: existingDim,
+              metric: existingMetric,
+              authToken: finalAuthToken,
+              workerUrl,
+              accountMetadataIndexed: true,
+              accountMetadataIndexVerified: false,
+              accountMetadataCoverageConfirmed: false,
+              claimedFromRemote: true,
+              lastDeployedAt: new Date().toISOString(),
+            });
+          }
           if (finalAuthToken && workerUrl) {
             await testWorkerConnectivity(workerUrl, finalAuthToken);
             if (claimedAccountMetadataIndexed) {
-              const verified = await verifyOrRollbackAccountMetadataIndex(workerUrl, finalAuthToken, existingDim, remoteProbe.defaultIndexName, { interactive: true });
+              const verified = await verifyOrRollbackAccountMetadataIndex(workerUrl, finalAuthToken, existingDim, remoteProbe.defaultIndexName, { interactive: true, urlConfirmed: Boolean(deployedClaimUrl) });
               claimedAccountMetadataIndexed = verified.accountMetadataIndexed;
               claimedAccountMetadataIndexVerified = verified.accountMetadataIndexVerified;
               claimedAccountMetadataCoverageConfirmed = verified.accountMetadataCoverageConfirmed;
@@ -1880,7 +2039,12 @@ async function main() {
               ? await askConfirm(t('acct_verify_rollback_prompt'), true)
               : true;
             if (shouldRollback) {
-              deployWorker(false);
+              try {
+                deployWorker(false);
+              } catch (rollbackErr) {
+                console.error(c.red(t('acct_verify_rollback_failed', { err: rollbackErr.message })));
+                throw rollbackErr;
+              }
               console.log(c.yellow(t('acct_verify_rolled_back')));
               claimedAccountMetadataIndexed = false;
               claimedAccountMetadataIndexVerified = false;
@@ -1947,22 +2111,35 @@ async function main() {
     putWranglerSecret(tokenConfig.token);
   }
 
-  let workerUrl = deployWorker(accountMetadataIndexed);
+  const deployedFullUrl = deployWorker(accountMetadataIndexed);
+  let workerUrl = deployedFullUrl;
   if (!workerUrl) {
-    if (savedConfig?.workerUrl) {
-      workerUrl = savedConfig.workerUrl;
-    } else {
-      console.log(c.yellow(t('worker_url_missing')));
-      const inputUrl = await askQuestion(t('worker_url_prompt'));
-      workerUrl = normalizeUrl(inputUrl);
-    }
+    console.log(c.yellow(t('worker_url_missing')));
+    const inputUrl = await askQuestion(t('worker_url_prompt'), savedConfig?.workerUrl || '');
+    workerUrl = normalizeUrl(inputUrl);
+  }
+
+  if (accountMetadataIndexed) {
+    saveLocalConfig({
+      workerName: 'github-stars-vectorize',
+      indexName: vecConfig.indexName,
+      dimensions: vecConfig.dimensions,
+      metric: vecConfig.metric,
+      authToken: tokenConfig.token,
+      workerUrl,
+      accountMetadataIndexed: true,
+      accountMetadataIndexVerified: false,
+      accountMetadataCoverageConfirmed: false,
+      modelName: vecConfig.modelName || savedConfig?.modelName || 'Custom',
+      lastDeployedAt: new Date().toISOString(),
+    });
   }
 
   if (tokenConfig.token) {
     await testWorkerConnectivity(workerUrl, tokenConfig.token);
     // Issue #612 A28/A31：启用账号过滤时，用账号过滤查询验证索引与回填状态。
     if (accountMetadataIndexed) {
-      const verified = await verifyOrRollbackAccountMetadataIndex(workerUrl, tokenConfig.token, vecConfig.dimensions, vecConfig.indexName, { interactive: true });
+      const verified = await verifyOrRollbackAccountMetadataIndex(workerUrl, tokenConfig.token, vecConfig.dimensions, vecConfig.indexName, { interactive: true, urlConfirmed: Boolean(deployedFullUrl) });
       accountMetadataIndexed = verified.accountMetadataIndexed;
       accountMetadataIndexVerified = verified.accountMetadataIndexVerified;
       accountMetadataCoverageConfirmed = verified.accountMetadataCoverageConfirmed;

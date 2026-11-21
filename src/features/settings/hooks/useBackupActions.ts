@@ -16,6 +16,8 @@ import {
 } from '../../../store/helpers/accountWorkspace';
 import {
   isRealBackupSecret,
+  isValidBackupForkEntry,
+  isValidBackupGistEntry,
   maskSavedAccountsForBackup,
   mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
   replaceWorkspacesForSelectedTypes,
@@ -32,36 +34,44 @@ import {
 
 /**
  * 审计修复（CodeRabbit）：恢复写入实时状态前校验 Gist 数组的每个条目——
- * null/非对象条目会在渲染 Gist 视图时抛 TypeError（gistUtils 直接读取条目
- * 属性），且持久化读取同样不过滤空条目，重启后问题仍会出现。gists 与
- * starredGists 共用同一结构校验。
- * 返回值：true = 全部条目均为非空对象；false = 含 null/非对象条目（调用方
- * 拒绝该字段，绝不写入实时状态）。
+ * 与 backupWorkspace.isValidBackupGistEntry 共用同一规则：要求条目为普通对象、
+ * 包含非空字符串 id 与普通对象 files（且每个文件值均为普通对象；允许 files: {}）。
  */
-const backupGistEntriesAreValid = (value: unknown): boolean => {
-  if (!Array.isArray(value)) return false;
-  // R12（finding 25）：文件值也必须是非空对象——`{ files: { 'README.md': null } }`
-  // 会通过旧校验并写入实时状态；5xx 降级路径复用 existing.files 时
-  // githubApi 的 file.content 会对 null 取值抛 TypeError。
-  return value.every((entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-    const files = (entry as { files?: unknown }).files;
-    if (files === undefined) return true;
-    if (typeof files !== 'object' || files === null || Array.isArray(files)) return false;
-    return Object.values(files).every((file) => Boolean(file) && typeof file === 'object' && !Array.isArray(file));
-  });
-};
+const backupGistEntriesAreValid = (value: unknown): boolean => (
+  Array.isArray(value) && value.every(isValidBackupGistEntry)
+);
 
 /**
  * R13 审计修复（CodeRabbit）：恢复写入实时状态/归档前校验 Fork 数组的每个
- * 条目——null/非对象条目会让 Fork 视图与 useForkTimelineActions 对
- * entry.fork / entry.owner 的直接取值抛 TypeError（受影响账号无法打开 Fork
- * 页），且持久化读取同样不过滤空条目，重启后问题仍会出现。与 gists 路径
- * 同一规则：含任一无效条目即拒绝整个字段（保留本机现有值）。
+ * 条目——与 backupWorkspace.isValidBackupForkEntry 共用同一规则：要求条目为
+ * 普通对象，且当 fork 为真值时 owner.login 为非空字符串。
  */
-const backupForkEntriesAreValid = (value: unknown): boolean => {
+const backupForkEntriesAreValid = (value: unknown): boolean => (
+  Array.isArray(value) && value.every(isValidBackupForkEntry)
+);
+
+/**
+ * 归档/恢复前校验发布记录数组的每个条目：拒绝 null/非对象及缺少必需字段
+ * （有限数字 id、非空字符串 tag_name、含有限数字 id 的 repository 对象）的条目；
+ * 显式 [] 仍有效（表示清空）。
+ */
+const backupReleaseEntriesAreValid = (value: unknown): boolean => {
   if (!Array.isArray(value)) return false;
-  return value.every((entry) => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry));
+  return value.every((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const rel = entry as { id?: unknown; tag_name?: unknown; repository?: unknown };
+    return (
+      typeof rel.id === 'number'
+      && Number.isFinite(rel.id)
+      && typeof rel.tag_name === 'string'
+      && rel.tag_name.length > 0
+      && Boolean(rel.repository)
+      && typeof rel.repository === 'object'
+      && !Array.isArray(rel.repository)
+      && typeof (rel.repository as { id?: unknown }).id === 'number'
+      && Number.isFinite((rel.repository as { id?: unknown }).id)
+    );
+  });
 };
 
 /**
@@ -188,14 +198,23 @@ export const useBackupActions = (): BackupActions => {
     }
     setIsBackingUp(true);
     try {
-      // 审计修复（R13 finding 53）：includeKeysInBackup（含升级保留的旧设置）
-      // 不等于授权上传 GitHub PAT——WebDAV 备份将包含非空 PAT 时逐次请用户
-      // 明确授权（默认拒绝），与本地导出路径（DataManagementPanel）同一授权
-      // 语义与文案；未授权时 savedAccounts 的 Token 一律脱敏，绝不默认明文上传。
-      const savedAccountsForBackup = useAppStore.getState().savedAccounts;
+      // 审计修复（R13 finding 53 & R16 finding 37）：在等待 PAT 授权确认之前捕获
+      // 单一账号快照（账号 ID、顶层数据、工作区、已保存账号与全局配置），并全程用
+      // 同一快照构造载荷与文件名——避免等待期间切号导致顶层仓库来自 A 而 activeAccountId
+      // 与工作区来自 B 的跨账号混写。
+      const snapshot = useAppStore.getState();
+      const snapshotAccountId = accountIdKey(snapshot.user);
+      const snapshotWorkspaces = mergeAccountWorkspacesForBackup(
+        snapshot.accountWorkspaces,
+        snapshot.accountWorkspaces,
+        snapshotAccountId,
+        captureAccountWorkspace(snapshot),
+        true,
+      );
+      const savedAccountsForBackup = snapshot.savedAccounts;
       let patAuthorized = false;
       if (
-        state.includeKeysInBackup
+        snapshot.includeKeysInBackup
         && Object.values(savedAccountsForBackup ?? {}).some((account) => !!account?.githubToken?.trim())
       ) {
         patAuthorized = await confirm(
@@ -205,57 +224,51 @@ export const useBackupActions = (): BackupActions => {
         );
       }
       const backupData = {
-        repositories: state.repositories,
-        releases: state.releases,
-        gists: useAppStore.getState().gists,
-        starredGists: useAppStore.getState().starredGists,
-        forks: useAppStore.getState().forks,
-        readForks: Array.from(useAppStore.getState().readForks),
-        categoryOrder: useAppStore.getState().categoryOrder,
-        defaultCategoryOverrides: useAppStore.getState().defaultCategoryOverrides,
-        categoryListIdMap: useAppStore.getState().categoryListIdMap,
-        syncMode: useAppStore.getState().syncMode,
-        syncModeConfigured: useAppStore.getState().syncModeConfigured,
-        customCategories: state.customCategories,
-        hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
-        aiConfigs: state.aiConfigs.map((config) => ({
+        repositories: snapshot.repositories,
+        releases: snapshot.releases,
+        gists: snapshot.gists,
+        starredGists: snapshot.starredGists,
+        forks: snapshot.forks,
+        readForks: Array.from(snapshot.readForks),
+        categoryOrder: snapshot.categoryOrder,
+        defaultCategoryOverrides: snapshot.defaultCategoryOverrides,
+        categoryListIdMap: snapshot.categoryListIdMap,
+        syncMode: snapshot.syncMode,
+        syncModeConfigured: snapshot.syncModeConfigured,
+        customCategories: snapshot.customCategories,
+        hiddenDefaultCategoryIds: snapshot.hiddenDefaultCategoryIds,
+        aiConfigs: snapshot.aiConfigs.map((config) => ({
           ...config,
-          apiKey: state.includeKeysInBackup ? config.apiKey : (config.apiKey ? '***' : ''),
+          apiKey: snapshot.includeKeysInBackup ? config.apiKey : (config.apiKey ? '***' : ''),
         })),
-        webdavConfigs: state.webdavConfigs.map((config) => ({
+        webdavConfigs: snapshot.webdavConfigs.map((config) => ({
           ...config,
-          password: state.includeKeysInBackup ? config.password : (config.password ? '***' : ''),
+          password: snapshot.includeKeysInBackup ? config.password : (config.password ? '***' : ''),
         })),
         proxyConfig: {
-          ...state.proxyConfig,
-          password: state.includeKeysInBackup ? state.proxyConfig.password : (state.proxyConfig.password ? '***' : ''),
+          ...snapshot.proxyConfig,
+          password: snapshot.includeKeysInBackup ? snapshot.proxyConfig.password : (snapshot.proxyConfig.password ? '***' : ''),
         },
         rpcDownloadConfig: {
-          ...state.rpcDownloadConfig,
-          secret: state.includeKeysInBackup ? state.rpcDownloadConfig.secret : (state.rpcDownloadConfig.secret ? '***' : ''),
+          ...snapshot.rpcDownloadConfig,
+          secret: snapshot.includeKeysInBackup ? snapshot.rpcDownloadConfig.secret : (snapshot.rpcDownloadConfig.secret ? '***' : ''),
         },
-        routeMode: state.routeMode,
-        backendApiSecret: state.includeKeysInBackup ? state.backendApiSecret : (state.backendApiSecret ? '***' : null),
-        releaseSubscriptions: Array.from(useAppStore.getState().releaseSubscriptions),
-        releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
-        readReleases: Array.from(useAppStore.getState().readReleases),
-        includeKeysInBackup: state.includeKeysInBackup,
+        routeMode: snapshot.routeMode,
+        backendApiSecret: snapshot.includeKeysInBackup ? snapshot.backendApiSecret : (snapshot.backendApiSecret ? '***' : null),
+        releaseSubscriptions: Array.from(snapshot.releaseSubscriptions),
+        releaseSourceSettings: snapshot.releaseSourceSettings,
+        readReleases: Array.from(snapshot.readReleases),
+        includeKeysInBackup: snapshot.includeKeysInBackup,
         // 多账号备份（Issue #611）：活跃账号 ID + 全账号工作区 + 已保存账号列表
-        activeAccountId: accountIdKey(useAppStore.getState().user),
-        accountWorkspaces: mergeAccountWorkspacesForBackup(
-          useAppStore.getState().accountWorkspaces,
-          useAppStore.getState().accountWorkspaces,
-          accountIdKey(useAppStore.getState().user),
-          captureAccountWorkspace(useAppStore.getState()),
-          true,
-        ),
+        activeAccountId: snapshotAccountId,
+        accountWorkspaces: snapshotWorkspaces,
         // Token 明文上传需要 includeKeysInBackup 与本次 PAT 授权同时成立；
         // 任一不满足时一律脱敏（掩码值在恢复端按非真实密钥跳过，不回填会话）。
-        savedAccounts: maskSavedAccountsForBackup(savedAccountsForBackup, state.includeKeysInBackup && patAuthorized),
+        savedAccounts: maskSavedAccountsForBackup(savedAccountsForBackup, snapshot.includeKeysInBackup && patAuthorized),
         exportedAt: new Date().toISOString(),
         version: '1.3',
       };
-      const accountTag = accountIdKey(useAppStore.getState().user) ?? 'local';
+      const accountTag = snapshotAccountId ?? 'local';
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `github-stars-backup-${timestamp}-${accountTag}.json`;
       const success = await new WebDAVService(activeConfig).uploadFile(filename, JSON.stringify(backupData, null, 2));
@@ -426,6 +439,13 @@ export const useBackupActions = (): BackupActions => {
       if (backupData.forks !== undefined && !backupForkEntriesAreValid(backupData.forks)) {
         forkPayloadRejected = true;
       }
+      let releasePayloadRejected = false;
+      const validTopLevelReleases = backupData.releases !== undefined && backupReleaseEntriesAreValid(backupData.releases)
+        ? (backupData.releases as import('../../../types').Release[])
+        : undefined;
+      if (backupData.releases !== undefined && !validTopLevelReleases) {
+        releasePayloadRejected = true;
+      }
       // R2-C8：登记账号/写入工作区前逐份校验各账号工作区的仓库数据（与顶层
       // 恢复和本地 JSON 导入共用 validateBackupRepositories）。非数组或含无效
       // 条目时整体拒绝恢复，绝不用损坏/部分数据覆盖本机工作区；显式 [] 的
@@ -556,8 +576,8 @@ export const useBackupActions = (): BackupActions => {
           repositories: backupRepositories !== undefined
             ? backupRepositories
             : (previous?.repositories ?? []),
-          releases: Array.isArray(backupData.releases)
-            ? (backupData.releases as import('../../../types').Release[])
+          releases: validTopLevelReleases !== undefined
+            ? validTopLevelReleases
             : (previous?.releases ?? []),
           customCategories: Array.isArray(backupData.customCategories)
             ? (backupData.customCategories as import('../../../types').Category[])
@@ -627,7 +647,7 @@ export const useBackupActions = (): BackupActions => {
 
       if (!restoreTargetsOtherAccount && !skipUnboundTopLevelApply) {
         if (backupRepositories !== undefined) state.setRepositories(backupRepositories, { allowEmpty: true });
-        if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases, { allowEmpty: true });
+        if (validTopLevelReleases !== undefined) state.setReleases(validTopLevelReleases, { allowEmpty: true });
         // 工作区级数据（Gist / Fork / 同步范围）随 1.3 备份恢复
         // 审计修复（CodeRabbit）：写入实时状态前逐条校验 Gist 条目——含
         // null/非对象条目时拒绝该字段（保留本机现有值），绝不让无效条目
@@ -867,30 +887,49 @@ export const useBackupActions = (): BackupActions => {
       //（同账号同时携带工作区与顶层字段时顶层覆盖工作区，不重复计数）；
       // 仅工作区应用（跨账号归档 / 未绑定顶层跳过）时按发起账号的工作区计数。
       const topLevelApplied = !restoreTargetsOtherAccount && !skipUnboundTopLevelApply;
-      const appliedLiveWorkspace = liveAccountId
-        && backupData.accountWorkspaces
-        && normalizedBackupWorkspaces[liveAccountId]
-        ? normalizedBackupWorkspaces[liveAccountId]
+      const topLevelTargetAccountId = topLevelApplied
+        ? liveAccountId
+        : (restoreTargetsOtherAccount ? backupAccountId : null);
+      const validTopLevelCategories = Array.isArray(backupData.customCategories)
+        ? backupData.customCategories
         : undefined;
-      // R13 审计修复（CodeRabbit）：跨账号恢复时归档进 backupAccountId 工作区
-      // 的数据同样计入摘要——A 恢复仅含 B 的备份此前只查 A 的工作区显示 0。
-      // 只计备份实际提供的字段（缺失字段沿用该账号原快照，不属于本次恢复）。
-      const archivedRepoCount = restoreTargetsOtherAccount ? (backupRepositories?.length ?? 0) : 0;
-      const archivedReleaseCount = restoreTargetsOtherAccount
-        ? ((backupData.releases as unknown[] | undefined)?.length ?? 0)
+      let restoredRepoCount = (topLevelApplied || restoreTargetsOtherAccount)
+        ? (backupRepositories?.length ?? 0)
         : 0;
-      const archivedCategoryCount = restoreTargetsOtherAccount
-        ? ((backupData.customCategories as unknown[] | undefined)?.length ?? 0)
+      let restoredReleaseCount = (topLevelApplied || restoreTargetsOtherAccount)
+        ? (validTopLevelReleases?.length ?? 0)
         : 0;
-      const restoredRepoCount = (topLevelApplied
-        ? (backupRepositories?.length ?? appliedLiveWorkspace?.repositories.length ?? 0)
-        : (appliedLiveWorkspace?.repositories.length ?? 0)) + archivedRepoCount;
-      const restoredReleaseCount = (topLevelApplied
-        ? ((backupData.releases as unknown[] | undefined)?.length ?? appliedLiveWorkspace?.releases.length ?? 0)
-        : (appliedLiveWorkspace?.releases.length ?? 0)) + archivedReleaseCount;
-      const restoredCategoryCount = (topLevelApplied
-        ? ((backupData.customCategories as unknown[] | undefined)?.length ?? appliedLiveWorkspace?.customCategories.length ?? 0)
-        : (appliedLiveWorkspace?.customCategories.length ?? 0)) + archivedCategoryCount;
+      let restoredCategoryCount = (topLevelApplied || restoreTargetsOtherAccount)
+        ? (validTopLevelCategories?.length ?? 0)
+        : 0;
+      for (const [workspaceAccountId, rawWorkspace] of Object.entries(rawBackupWorkspaces)) {
+        if (!rawWorkspace || typeof rawWorkspace !== 'object' || Array.isArray(rawWorkspace)) continue;
+        const rawRecord = rawWorkspace as Record<string, unknown>;
+        const normalizedWorkspace = normalizedBackupWorkspaces[workspaceAccountId];
+        if (!normalizedWorkspace) continue;
+        const isTopLevelTarget = workspaceAccountId === topLevelTargetAccountId;
+        if (
+          Object.prototype.hasOwnProperty.call(rawRecord, 'repositories')
+          && Array.isArray(rawRecord.repositories)
+          && !(isTopLevelTarget && backupRepositories !== undefined)
+        ) {
+          restoredRepoCount += normalizedWorkspace.repositories.length;
+        }
+        if (
+          Object.prototype.hasOwnProperty.call(rawRecord, 'releases')
+          && Array.isArray(rawRecord.releases)
+          && !(isTopLevelTarget && validTopLevelReleases !== undefined)
+        ) {
+          restoredReleaseCount += normalizedWorkspace.releases.length;
+        }
+        if (
+          Object.prototype.hasOwnProperty.call(rawRecord, 'customCategories')
+          && Array.isArray(rawRecord.customCategories)
+          && !(isTopLevelTarget && validTopLevelCategories !== undefined)
+        ) {
+          restoredCategoryCount += normalizedWorkspace.customCategories.length;
+        }
+      }
       const hasNonEmptyArray = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
       const hasNonEmptyObject = (value: unknown): boolean => (
         Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0
@@ -947,7 +986,10 @@ export const useBackupActions = (): BackupActions => {
       if (forkPayloadRejected) {
         warnings.push(t('useBackupActions.fork-data-in-the-backup-contained-invalid-entries-th'));
       }
-      if (ghTokenPersistFailed || rejectedBackupTokenCount > 0 || gistPayloadRejected || forkPayloadRejected) {
+      if (releasePayloadRejected) {
+        warnings.push('Release data in the backup contained invalid entries; the affected fields were skipped and keep their previous values');
+      }
+      if (ghTokenPersistFailed || rejectedBackupTokenCount > 0 || gistPayloadRejected || forkPayloadRejected || releasePayloadRejected) {
         toast(`${summaryMessage} (${warnings.join('; ')})`, 'warning');
       } else if (hasSkippedUnboundTopLevelData) {
         toast(`${summaryMessage} (${warnings.join('; ')})`, 'info');

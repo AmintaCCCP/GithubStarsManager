@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import {
-  resolveAccountScope,
+  resolveReadableAccountScope,
   resolveWritableAccountScope,
-  hasInvalidAccountHeader,
   getAccountRevision,
   bumpAccountRevision,
 } from '../db/accountScope.js';
@@ -130,16 +129,17 @@ function transformRepo(row: Record<string, unknown>) {
 router.get('/api/repositories', (req, res) => {
   try {
     const db = getDb();
-    // Issue #612 审计（143）：显式携带但格式无效的账号头（空白 / 非数字）按无效
-    // 请求处理，绝不当作缺失回退到活跃账号 / default 分区读取他人数据。
-    if (hasInvalidAccountHeader(req)) {
+    // Issue #612 审计（143 / 多账号读取隔离）：无效账号头或存在多个真实账号分区
+    // 且未携带账号头时直接返回 409，绝不回退到可变的活跃账号读取他人数据。
+    const scope = resolveReadableAccountScope(req, db);
+    if (!scope.ok) {
       res.status(409).json({
-        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        error: scope.error,
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;
     }
-    const accountId = resolveAccountScope(req, db);
+    const accountId = scope.accountId;
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 100));
     const search = req.query.search as string | undefined;
@@ -356,7 +356,19 @@ router.put('/api/repositories', (req, res) => {
           -- 优先，其次保留本地值（NULLIF 保持原「非空才采用」的判断）。
           WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.analyzed_at
           WHEN repositories.ai_summary IS NOT NULL AND repositories.ai_summary != '' THEN repositories.analyzed_at
-          ELSE COALESCE((
+          WHEN EXISTS (
+            SELECT 1 FROM repositories AS other
+            WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default' AND repositories.account_id != 'default'
+              AND other.ai_summary_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
+              AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
+          ) THEN (
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
@@ -369,7 +381,8 @@ router.put('/api/repositories', (req, res) => {
               )
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             ORDER BY other.rowid LIMIT 1
-          ), NULLIF(excluded.analyzed_at, ''), repositories.analyzed_at)
+          )
+          ELSE COALESCE(NULLIF(excluded.analyzed_at, ''), repositories.analyzed_at)
         END,
         -- Issue #612 A21：写入 AI 内容的行按当前账号的共享设置置位 ai_shared；
         -- 不携带 AI 内容的载荷保留已存储标记（可能是回填得到的共享成果）。

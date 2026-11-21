@@ -54,11 +54,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setVectorSearchConfig: state.setVectorSearchConfig,
   })));
   const { toast } = useDialog();
+  const [formWorkerUrl, setFormWorkerUrl] = useState(vectorSearchConfig.workerUrl || '');
   const {
     testingEmbedding, embeddingTestResult, testingWorker, workerTestResult,
     incrementalTargetCount, testEmbedding, testWorker, rebuildIndex,
     incrementalIndex, abortIndexing,
-  } = useVectorSearchActions();
+  } = useVectorSearchActions({ workerUrl: formWorkerUrl });
 
   const activeConfig = embeddingConfigs.find((config) => config.id === activeEmbeddingConfig);
   const [formApiType, setFormApiType] = useState<EmbeddingApiType>(activeConfig?.apiType || 'openai');
@@ -73,7 +74,6 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   );
   const dimensionsInputRef = React.useRef<HTMLInputElement>(null);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [formWorkerUrl, setFormWorkerUrl] = useState(vectorSearchConfig.workerUrl || '');
   const [formAuthToken, setFormAuthToken] = useState(vectorSearchConfig.authToken || '');
   const [showAuthToken, setShowAuthToken] = useState(false);
   const [formIndexMode, setFormIndexMode] = useState<'description' | 'readme'>(vectorSearchConfig.indexMode || 'readme');

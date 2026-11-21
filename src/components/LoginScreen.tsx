@@ -12,12 +12,17 @@ import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
 import {
   accountIdKey,
+  applyAccountWorkspace,
   captureAccountWorkspace,
   getAccountSessionGeneration,
   isSavedAccountRemovedInSession,
   workspaceHasRetainableData,
   type AccountWorkspace,
 } from '../store/helpers/accountWorkspace';
+import {
+  mergeWorkspaceCategorySettings,
+  mergeWorkspacesById,
+} from '../utils/backupWorkspace';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { ConfirmDialog } from './ui/ConfirmDialog';
@@ -120,12 +125,21 @@ const overlayUnfetchedShardsFromPreviousArchive = (
   pulledWorkspace: AccountWorkspace,
   previousArchive: AccountWorkspace | undefined,
 ): AccountWorkspace => {
-  if (!pullResult || !previousArchive) return pulledWorkspace;
-  const overlaySettings = !pullResult.shards.settings;
-  const overlayReleases = !pullResult.shards.releases;
-  if (!overlaySettings && !overlayReleases) return pulledWorkspace;
+  if (!previousArchive) return pulledWorkspace;
+  const overlaySettings = Boolean(pullResult && !pullResult.shards.settings);
+  const overlayReleases = Boolean(pullResult && !pullResult.shards.releases);
   return {
     ...pulledWorkspace,
+    // 审计修复（finding 27）：后端拉取不包含 Gist、Fork、已读状态与发布订阅
+    // （syncFromBackend 只拉取 repositories/releases/settings 与全局配置），
+    // 无论分片是否成功都必须保留目标账号原归档中的这些本地字段。
+    gists: previousArchive.gists,
+    starredGists: previousArchive.starredGists,
+    selectedGistCategory: previousArchive.selectedGistCategory,
+    forks: previousArchive.forks,
+    readForks: previousArchive.readForks,
+    readReleases: previousArchive.readReleases,
+    releaseSubscriptions: previousArchive.releaseSubscriptions,
     ...(overlaySettings ? {
       customCategories: previousArchive.customCategories,
       hiddenDefaultCategoryIds: previousArchive.hiddenDefaultCategoryIds,
@@ -584,6 +598,7 @@ export const LoginScreen: React.FC = () => {
             useAppStore.getState().accountWorkspaces[nextAccountId],
           );
           useAppStore.setState((state) => ({
+            ...applyAccountWorkspace(archivedWorkspace),
             accountWorkspaces: {
               ...state.accountWorkspaces,
               [nextAccountId]: archivedWorkspace,
@@ -624,8 +639,30 @@ export const LoginScreen: React.FC = () => {
           // 现状），绝不自动并入目标账号，目标账号归档原样留在
           // accountWorkspaces 供后续切换恢复；顶层无可保留数据时才清空并恢复
           // 目标归档。
-          if (targetHasParkedData && !workspaceHasRetainableData(useAppStore.getState())) {
+          // 审计修复（finding 26）：当目标账号 B 已有归档且顶层仍存在无主旧版缓存时，
+          // 仅把无主缓存留在顶层并调用 setUser(B) 会在下次从 B 切走时用顶层覆盖 B 原归档。
+          // 按 ID 将无主缓存安全合并进 B 既有归档（B 原归档优先）并同步到顶层与归档，
+          // 既保留无主缓存又绝不覆盖丢失 B 的既有数据。
+          const currentState = useAppStore.getState();
+          const liveHasRetainableData = workspaceHasRetainableData(currentState);
+          if (targetHasParkedData && !liveHasRetainableData) {
             discardPartialLoginWorkspace();
+          } else if (targetHasParkedData && liveHasRetainableData && nextAccountId) {
+            const existingTargetArchive = currentState.accountWorkspaces[nextAccountId];
+            if (existingTargetArchive) {
+              const liveUnowned = captureAccountWorkspace(currentState);
+              const mergedWorkspace: AccountWorkspace = {
+                ...mergeWorkspacesById(existingTargetArchive, liveUnowned),
+                ...mergeWorkspaceCategorySettings(liveUnowned, existingTargetArchive),
+              };
+              useAppStore.setState((state) => ({
+                ...applyAccountWorkspace(mergedWorkspace),
+                accountWorkspaces: {
+                  ...state.accountWorkspaces,
+                  [nextAccountId]: mergedWorkspace,
+                },
+              }));
+            }
           }
           setGitHubToken(result.githubToken);
           setUser(result.user);
@@ -820,6 +857,7 @@ export const LoginScreen: React.FC = () => {
             useAppStore.getState().accountWorkspaces[nextAccountId],
           );
           useAppStore.setState((state) => ({
+            ...applyAccountWorkspace(archivedWorkspace),
             accountWorkspaces: {
               ...state.accountWorkspaces,
               [nextAccountId]: archivedWorkspace,
@@ -833,8 +871,26 @@ export const LoginScreen: React.FC = () => {
         // 同一语义——顶层仍是用户显式要求保留的无主旧版缓存时绝不清空（无
         // 单独的丢弃确认，也不自动并入目标账号），无主缓存独立保留，目标归档
         // 留在 accountWorkspaces；顶层无可保留数据时才清理并恢复目标归档。
-        if (!workspaceHasRetainableData(useAppStore.getState())) {
+        const currentState = useAppStore.getState();
+        const liveHasRetainableData = workspaceHasRetainableData(currentState);
+        if (!liveHasRetainableData) {
           discardPartialLoginWorkspace();
+        } else if (nextAccountId) {
+          const existingTargetArchive = currentState.accountWorkspaces[nextAccountId];
+          if (existingTargetArchive) {
+            const liveUnowned = captureAccountWorkspace(currentState);
+            const mergedWorkspace: AccountWorkspace = {
+              ...mergeWorkspacesById(existingTargetArchive, liveUnowned),
+              ...mergeWorkspaceCategorySettings(liveUnowned, existingTargetArchive),
+            };
+            useAppStore.setState((state) => ({
+              ...applyAccountWorkspace(mergedWorkspace),
+              accountWorkspaces: {
+                ...state.accountWorkspaces,
+                [nextAccountId]: mergedWorkspace,
+              },
+            }));
+          }
         }
       }
       setGitHubToken(githubToken);

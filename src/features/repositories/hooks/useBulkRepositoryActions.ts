@@ -176,6 +176,12 @@ export const useBulkRepositoryActions = ({
               return {
                 repositories: state.repositories.filter((r) => !deletableIds.has(r.id)),
                 searchResults: (state.searchResults ?? []).filter((r) => !deletableIds.has(r.id)),
+                similarView: state.similarView
+                  ? {
+                      ...state.similarView,
+                      similarResults: state.similarView.similarResults.filter((r) => !deletableIds.has(r.id)),
+                    }
+                  : state.similarView,
                 releases: state.releases.filter((rel) => !deletableIds.has(rel.repository.id)),
                 releaseSubscriptions: nextSubscriptions,
                 readReleases: new Set(

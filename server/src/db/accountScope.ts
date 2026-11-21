@@ -32,7 +32,7 @@ export const ACCOUNT_SCOPED_SETTING_KEYS: ReadonlySet<string> = new Set([
   'ai_result_sharing_enabled',
 ]);
 
-const ACCOUNT_ID_PATTERN = /^\d+$/;
+export const ACCOUNT_ID_PATTERN = /^[1-9]\d*$/;
 const GITHUB_USER_API = 'https://api.github.com/user';
 const CLAIMED_BY_KEY = 'legacy_default_claimed_by';
 const LEGACY_OWNER_CACHE_KEY = 'legacy_default_owner_id';
@@ -226,6 +226,37 @@ export function resolveAccountScope(req: Request, db: Database.Database): string
 /** 无请求上下文入口（MCP / 后台任务）：全局 active_account_id → 'default'。 */
 export function resolveActiveAccountScope(db: Database.Database): string {
   return computeAccountScope(db);
+}
+
+/**
+ * 读取路径的账号分区解析（Issue #612）：
+ * - 显式携带合法账号头直接放行；
+ * - 显式携带非法账号头（空白 / 非规范数字，如 `abc` / `042`）拒绝；
+ * - 未携带账号头但存在多个真实账号分区时拒绝（409 ACCOUNT_SCOPE_REQUIRED），
+ *   避免旧客户端无头读取回退到可变的 active_account_id 误拿其他账号数据；
+ * - 仅 0 或 1 个真实分区时保持旧版兼容回退（可选在 default 有待认领数据时优先读 default）。
+ */
+export function resolveReadableAccountScope(
+  req: Request,
+  db: Database.Database,
+  options?: { preferPendingDefault?: boolean },
+): { ok: true; accountId: string } | { ok: false; error: string } {
+  const headerId = extractRequestedAccountId(req);
+  if (headerId) return { ok: true, accountId: headerId };
+  if (hasInvalidAccountHeader(req)) {
+    return { ok: false, error: 'X-GitHub-Account-Id must be a numeric account ID' };
+  }
+  const partitionIds = collectNonDefaultPartitionIds(db);
+  if (partitionIds.size > 1) {
+    return {
+      ok: false,
+      error: 'Multiple GitHub accounts exist on this server; X-GitHub-Account-Id header is required.',
+    };
+  }
+  if (options?.preferPendingDefault && hasPendingDefaultPartitionData(db)) {
+    return { ok: true, accountId: DEFAULT_SCOPE };
+  }
+  return { ok: true, accountId: computeAccountScope(db) };
 }
 
 /**

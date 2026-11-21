@@ -57,7 +57,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   //（旧账号 A 的 finally 在 B 已重新发起刷新后到达时，身份不匹配被忽略）；
   // 未传身份时退回「归属会话与当前会话一致才清除」的判定；两者皆无时保持
   // 无条件布尔语义，兼容既有调用点。
-  let releaseRefreshOwner: { accountId: string | null; generation: number } | null = null;
+  let releaseRefreshOwner: { accountId: string | null; generation: number; count: number } | null = null;
 
   return ({
       // UI actions
@@ -141,16 +141,32 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
       setReleaseExpandedRepositories: (releaseExpandedRepositories) => set({ releaseExpandedRepositories }),
       setReleaseIsRefreshing: (releaseIsRefreshing, owner) => set((state) => {
         if (releaseIsRefreshing) {
-          releaseRefreshOwner = owner ?? null;
+          if (owner) {
+            if (state.releaseIsRefreshing
+              && releaseRefreshOwner
+              && releaseRefreshOwner.accountId === owner.accountId
+              && releaseRefreshOwner.generation === owner.generation) {
+              releaseRefreshOwner = { ...releaseRefreshOwner, count: releaseRefreshOwner.count + 1 };
+            } else {
+              releaseRefreshOwner = { ...owner, count: 1 };
+            }
+          } else {
+            releaseRefreshOwner = null;
+          }
           return { releaseIsRefreshing: true };
         }
         if (owner) {
           // B4：finally 清理携带发起刷新时的身份——仅当该身份仍是标志的当前
           // 持有者才清除；期间切号后 B 已重新发起刷新时，A 的过期 finally
-          // 身份不匹配，被忽略。
+          // 身份不匹配，被忽略。同账号同代次并发刷新按引用计数递减，避免首次
+          // finally 提前复位仍在进行中的第二次刷新状态。
           if (releaseRefreshOwner
             && releaseRefreshOwner.accountId === owner.accountId
             && releaseRefreshOwner.generation === owner.generation) {
+            if (releaseRefreshOwner.count > 1) {
+              releaseRefreshOwner = { ...releaseRefreshOwner, count: releaseRefreshOwner.count - 1 };
+              return {};
+            }
             releaseRefreshOwner = null;
             return { releaseIsRefreshing: false };
           }

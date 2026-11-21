@@ -89,7 +89,11 @@ function makeMockDb(options: MockDbOptions = {}) {
         };
       }
       return {
-        get: (key: string) => (key === 'github_token' ? options.globalTokenRow : undefined),
+        get: (key?: string) => (
+          key === 'github_token' || (key === undefined && sql.includes("key = 'github_token'"))
+            ? options.globalTokenRow
+            : undefined
+        ),
         all: () => [],
       };
     },
@@ -105,6 +109,7 @@ describe('authRestore route (POST /api/sync/auth)', () => {
     expect(res.body).toMatchObject({ github_token: 'github-token' });
     expect(res.body.active_account_id).toBe('default');
     expect(res.body.accounts).toEqual([]);
+    expect(res.body.account_selection_required).toBeUndefined();
   });
 
   it('returns null github_token when none is stored', async () => {
@@ -343,5 +348,19 @@ describe('authRestore route (POST /api/sync/auth)', () => {
     const listed = fallback.body.accounts as Array<{ accountId: string; githubToken: string | null }>;
     expect(listed.find((a) => a.accountId === '1001')?.githubToken).toBeNull();
     expect(listed.find((a) => a.accountId === '1002')?.githubToken).toBe('plain-account-1002');
+  });
+
+  it('rejects non-string body account_id instead of falling back to headerless restore', async () => {
+    getDbMock.mockReturnValue(makeMockDb({
+      partitionAccountIds: ['111'],
+      accountRows: { '111': { github_token_encrypted: 'encrypted-account-111' } },
+      scopedTokenRows: { '111': { value: 'encrypted-account-111' } },
+    }));
+
+    const res = await request(createTestApp())
+      .post('/api/sync/auth')
+      .send({ account_id: 222 })
+      .expect(409);
+    expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED');
   });
 });

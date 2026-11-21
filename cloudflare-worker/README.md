@@ -89,7 +89,10 @@ npm run deploy
 >    npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:true
 >    # 2) 准备探测输入：数字账号 ID + 随机向量（1536 换成你的索引维度；
 >    #    随机向量即可——探测的是过滤行为，不是召回质量）
->    export ACCOUNT_ID=$(curl -s https://api.github.com/users/<your-github-login> | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).id))')
+>    GITHUB_LOGIN="your-github-login"
+>    export ACCOUNT_ID=$(curl -fsS "https://api.github.com/users/${GITHUB_LOGIN}" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const id=JSON.parse(d).id;if(!Number.isInteger(id))process.exit(1);console.log(id);})')
+>    #    确认 $ACCOUNT_ID 为有效数字 ID（非空且为整数）后再继续冒烟检查
+>    test -n "$ACCOUNT_ID" && echo "ACCOUNT_ID=$ACCOUNT_ID"
 >    export VECTOR=$(node -e 'console.log(JSON.stringify(Array.from({length:1536},()=>Math.random()*2-1)))')
 >    # 3) 正向探测：账号过滤查询
 >    curl -s -X POST "$WORKER_URL/query" -H "Authorization: Bearer $AUTH_TOKEN" \
@@ -141,8 +144,13 @@ npm run deploy
 >      可选择强制保留，但只会记录为 `accountMetadataIndexVerified:false`
 >      （「覆盖未确认」模式），后续快速部署不会复用该启用标记。
 >    - 因此以 verified 状态启用账号过滤的唯一可执行路径是**先退役 legacy 副本**：
->      1. 逐个核实副本归属（属于哪个账号），确认替代向量 `<accountId>:<repoId>`
->         已成功写入、且带账号过滤的查询能召回该仓库；
+>      1. 逐个核实副本归属（属于哪个账号），并按目标替代向量 ID 执行带账号过滤的查询
+>         （随机向量的 `topK: 5` 仅能做冒烟检查，不保证返回指定向量）：
+>         ```bash
+>         # 以账号 42、仓库 7 为例：按替代向量 ID 查询并叠加相同的 accountId 过滤条件
+>         npx wrangler vectorize query github-stars --vector-id="42:7" --top-k=5 --filter='{"accountId":"42"}' --return-metadata=indexed
+>         ```
+>         确认查询结果包含确切的替代 ID（如 `42:7`）后，再删除旧副本；
 >      2. 手动删除旧 ID，例如
 >         `npx wrangler vectorize delete-vectors github-stars --ids 7`
 >         （可一次传入多个 ID）；
@@ -151,17 +159,20 @@ npm run deploy
 >      **注意**：向导的枚举核对只是 verified 标记的必要条件（证明没有遗留
 >      legacy 副本），**不能替代**步骤 4 要求的「每个预期向量都有一次成功重写
 >      记录」的数据级验收。
->    - 确实无法核实归属的副本可以保留——它们不会被账号过滤查询召回，不影响
->      查询正确性，也不会被重复清理——**但保留期间只能以「覆盖未确认」模式
->      强制启用**：覆盖验证必然失败，部署状态不会被视为 verified。若选择该模式，
->      请保持 `wrangler.toml` 中 `ACCOUNT_METADATA_INDEXED` 默认值为 `"false"`，
->      并明确记录本次启用未通过覆盖验证；补齐回填/退役副本后再重新验证。
+>    - **注意区分纯数字 ID 与元数据缺失**：客户端在无账号路径下也会保留纯数字 ID，
+>      并写入 `metadata.accountId: "default"`；若该向量在元数据索引创建后写入，
+>      针对 `"default"` 的过滤查询仍可召回它。因此**纯数字 ID 本身不能证明元数据缺失，
+>      也不能单独作为删除依据**（必须先核实归属与替代向量）。对于确实无法核实归属的
+>      副本，保留期间向导的保守退役校验必然失败，只能以「覆盖未确认」模式强制启用，
+>      部署状态不会被视为 verified。若选择该模式，请保持 `wrangler.toml` 中
+>      `ACCOUNT_METADATA_INDEXED` 默认值为 `"false"`，并明确记录本次启用未通过覆盖验证；
+>      补齐回填/退役副本后再重新验证。
 >    确认覆盖后，不要直接把 `wrangler.toml` 中的 `ACCOUNT_METADATA_INDEXED`
 >    默认值改成 `"true"`（默认值保持 `"false"`：默认 false 时 /status 返回
 >    accountScopedCleanup:false，客户端的严格账号范围检索会跳过稠密召回并降级
 >    为本地关键词/词法检索，不会发出无过滤的向量查询；未回填存量向量就设 true
 >    会启用过滤，但旧向量仍可能无法命中）。使用部署向导在
->    **部署时写入显式标记**：
+>    **部署时写入显式标记**（后续代码更新也请使用部署向导而非直接运行 `npm run deploy`，见下方「更新部署」）：
 >    ```bash
 >    # 或使用交互向导（cloudflare-worker/deploy.mjs）：向导会自动执行账号过滤
 >    # 冒烟检查（含归属与负向对照校验），并尝试用 wrangler vectorize list-vectors
@@ -200,10 +211,22 @@ cd cloudflare-worker
 
 # 如果依赖有变更（package.json 更新了）
 npm install
-
-# 重新部署
-npm run deploy
 ```
+
+请按是否已启用账号过滤选择对应的更新命令：
+
+- **未启用账号过滤（默认部署）**：
+  ```bash
+  npm run deploy
+  ```
+- **已启用账号过滤（多账号部署）**：**不要直接运行 `npm run deploy`**——该命令会直接调用 `wrangler deploy` 并回退到 `wrangler.toml` 中的 `ACCOUNT_METADATA_INDEXED = "false"`，导致严格账号范围的客户端停止向量召回。请使用部署向导保留显式标记并重新验证：
+  ```bash
+  # 使用已验证的本地配置快速更新并重新验证
+  node deploy.mjs --quick
+
+  # 或显式指定标记更新（亦可在交互向导 npm run deploy:vector 中选择「快速重新部署」）
+  node deploy.mjs --quick --account-metadata-indexed=true
+  ```
 
 > **注意**：更新部署**不需要**重新创建 Vectorize 索引，已有向量数据不受影响。
 

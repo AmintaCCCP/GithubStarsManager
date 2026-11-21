@@ -3,11 +3,12 @@ import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import {
-  resolveAccountScope,
+  ACCOUNT_ID_PATTERN,
+  resolveReadableAccountScope,
   resolveWritableAccountScope,
-  hasInvalidAccountHeader,
   hasPendingDefaultPartitionData,
   bumpAccountRevision,
+  bumpAccountProfileVersion,
   getAccountCredentialVersion,
   bumpAccountCredentialVersion,
   claimLegacyDefaultWithAdminConfirmation,
@@ -19,9 +20,9 @@ import { toDisplayPref, DESCRIPTION_DISPLAY_VALUES, TAGS_DISPLAY_VALUES } from '
 
 const router = Router();
 
-/** 顶层备份声明的账号是否为合法形态（数字 id 或 'default'）。 */
+/** 顶层备份声明的账号是否为合法形态（规范数字 id 或 'default'）。 */
 function isDeclaredAccountId(value: unknown): value is string {
-  return typeof value === 'string' && (/^\d+$/.test(value) || value === 'default');
+  return typeof value === 'string' && (ACCOUNT_ID_PATTERN.test(value) || value === 'default');
 }
 
 /**
@@ -234,18 +235,18 @@ function exportAccountWorkspace(db: ReturnType<typeof getDb>, accountId: string)
 router.post('/api/sync/export', (req, res) => {
   try {
     const db = getDb();
-    // Issue #612 R12：显式携带但格式无效的账号头（如 `abc`）必须像仓库/发行版
-    // 列表接口一样在解析范围前拒绝——resolveAccountScope 会把无效头当作未指定
-    // 账号回退到活跃账号，导出会错误地把活跃账号数据标记为该账号。真正未携带
-    // 账号头的旧版请求保留原行为。
-    if (hasInvalidAccountHeader(req)) {
+    // Issue #612 R12 / 多账号读取隔离：无效账号头或存在多个真实账号分区且未携带
+    // 账号头时直接拒绝（409 ACCOUNT_SCOPE_REQUIRED），避免导出活跃账号数据时被旧
+    // 客户端误以为是当前账号的数据。单分区/纯 default 库保留无头兼容行为。
+    const scope = resolveReadableAccountScope(req, db);
+    if (!scope.ok) {
       res.status(409).json({
-        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        error: scope.error,
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;
     }
-    const accountId = resolveAccountScope(req, db);
+    const accountId = scope.accountId;
 
     const repositories = db.prepare('SELECT * FROM repositories WHERE account_id = ?').all(accountId) as Record<string, unknown>[];
     const releases = db.prepare('SELECT * FROM releases WHERE account_id = ?').all(accountId) as Record<string, unknown>[];
@@ -462,11 +463,11 @@ router.post('/api/sync/import', async (req, res) => {
           });
           return;
         }
-        // Issue #612 A8：releases.tag_name 为 NOT NULL，缺失/无效时提前给出
-        // 可定位的 400，避免 NULL 写入后整体回滚返回 500。
-        if (typeof tagName !== 'string' || !tagName.trim()) {
+        // Issue #612 A8：releases.tag_name 为 NOT NULL，缺失或类型无效时提前给出
+        // 可定位的 400；允许合法字符串（含已存储的空/空白 tag_name）原样恢复。
+        if (typeof tagName !== 'string') {
           res.status(400).json({
-            error: `Each release must have a non-empty tag_name (release id: ${id})`,
+            error: `Each release must have a string tag_name (release id: ${id})`,
             code: 'RELEASE_TAG_NAME_REQUIRED',
           });
           return;
@@ -515,7 +516,7 @@ router.post('/api/sync/import', async (req, res) => {
         }
         const wsObj = ws as Record<string, unknown>;
         const id = typeof wsObj.account_id === 'string' ? wsObj.account_id : '';
-        if (!id || !/^\d+$|^(default)$/.test(id)) {
+        if (!id || (!ACCOUNT_ID_PATTERN.test(id) && id !== 'default')) {
           res.status(400).json({
             error: `Account workspace entry at index ${i} has an invalid account_id (${String(wsObj.account_id)}): expected a numeric string or 'default'`,
             code: 'INVALID_ACCOUNT_WORKSPACE',
@@ -539,7 +540,7 @@ router.post('/api/sync/import', async (req, res) => {
           res.status(400).json({ error: `Invalid account workspace entry at key (${id})`, code: 'INVALID_ACCOUNT_WORKSPACE' });
           return;
         }
-        if (!/^\d+$|^(default)$/.test(id)) {
+        if (!ACCOUNT_ID_PATTERN.test(id) && id !== 'default') {
           res.status(400).json({
             error: `Account workspace key (${id}) is not a valid account ID: expected a numeric string or 'default'`,
             code: 'INVALID_ACCOUNT_WORKSPACE',
@@ -563,6 +564,12 @@ router.post('/api/sync/import', async (req, res) => {
           unverifiedOwner: unverifiedDefault,
         });
       }
+    } else if (accountWorkspacesRaw !== undefined) {
+      res.status(400).json({
+        error: 'account_workspaces must be an array or an object map when provided',
+        code: 'INVALID_ACCOUNT_WORKSPACE',
+      });
+      return;
     }
     for (const { workspace, unverifiedOwner } of workspaceEntries) {
       if (unverifiedOwner) continue;
@@ -585,13 +592,13 @@ router.post('/api/sync/import', async (req, res) => {
         // 顶层的 trim() 检查拒绝整个备份。
         if (typeof r.id !== 'number' || !Number.isInteger(r.id) || r.id <= 0
           || typeof repoId !== 'number' || !Number.isInteger(repoId) || repoId <= 0
-          || typeof (r.tag_name as unknown) !== 'string' || !(r.tag_name as string).trim()
+          || typeof (r.tag_name as unknown) !== 'string'
           || typeof (r.repo_full_name ?? repository?.full_name) !== 'string'
           || !((r.repo_full_name ?? repository?.full_name) as string).trim()
           || typeof (r.repo_name ?? repository?.name) !== 'string'
           || !((r.repo_name ?? repository?.name) as string).trim()) {
           res.status(400).json({
-            error: 'Each release must have a valid positive integer id / repo_id / non-empty tag_name / repo_full_name / repo_name',
+            error: 'Each release must have a valid positive integer id / repo_id / string tag_name / non-empty repo_full_name / repo_name',
             code: 'RELEASE_ID_REQUIRED',
           });
           return;
@@ -742,7 +749,7 @@ router.post('/api/sync/import', async (req, res) => {
       const workspaceOverlapIds: {
         repositories: Set<number>;
         releases: Set<number>;
-        categories: Set<string | number>;
+        categories: Set<string>;
       } | null = isMigrationImport
         ? { repositories: new Set(), releases: new Set(), categories: new Set() }
         : null;
@@ -770,7 +777,7 @@ router.post('/api/sync/import', async (req, res) => {
               const repoId = r.repo_id ?? repository?.id;
               if (typeof r.id !== 'number' || !Number.isInteger(r.id) || r.id <= 0
                 || typeof repoId !== 'number' || !Number.isInteger(repoId) || repoId <= 0
-                || typeof r.tag_name !== 'string' || !r.tag_name.trim()) continue;
+                || typeof r.tag_name !== 'string') continue;
               workspaceOverlapIds.releases.add(r.id);
             }
           }
@@ -778,7 +785,7 @@ router.post('/api/sync/import', async (req, res) => {
           if (Array.isArray(wsCats) && wsCats.length > 0) {
             const { ids: wsOverlapCatIds } = buildImportedCategoryIds(db, wsAccountId, wsCats as Record<string, unknown>[]);
             for (const catId of wsOverlapCatIds) {
-              if (catId !== null) workspaceOverlapIds.categories.add(catId);
+              if (catId !== null) workspaceOverlapIds.categories.add(String(catId));
             }
           }
         }
@@ -881,10 +888,11 @@ router.post('/api/sync/import', async (req, res) => {
             vectorIndexedLicense
             , toDisplayPref(r.description_display, DESCRIPTION_DISPLAY_VALUES)
             , toDisplayPref(r.tags_display, TAGS_DISPLAY_VALUES)
-            , toSharedBit(r.ai_shared)
-            , toSharedBit(r.ai_summary_shared)
-            , toSharedBit(r.ai_tags_shared)
-            , toSharedBit(r.ai_platforms_shared)
+            // 跨账号迁移不复制原账号的共享授权位（同账号恢复仍原样保留）
+            , isMigrationImport ? 0 : toSharedBit(r.ai_shared)
+            , isMigrationImport ? 0 : toSharedBit(r.ai_summary_shared)
+            , isMigrationImport ? 0 : toSharedBit(r.ai_tags_shared)
+            , isMigrationImport ? 0 : toSharedBit(r.ai_platforms_shared)
             , accountId
           );
           importedRepos += 1;
@@ -996,7 +1004,8 @@ router.post('/api/sync/import', async (req, res) => {
           // 回滚整个导入。
           if (!c || typeof c !== 'object' || Array.isArray(c) || catId === null) continue;
           // Issue #612 R12：与目标分区工作区重叠的分类让位（仅显式迁移场景）。
-          if (workspaceOverlapIds?.categories.has(catId)) {
+          // 按 SQLite TEXT 主键表示统一转成字符串比较（避免数字 7 与字符串 "7" 漏判重叠）。
+          if (workspaceOverlapIds?.categories.has(String(catId))) {
             migrationOverlapSkipped.categories += 1;
             continue;
           }
@@ -1539,7 +1548,7 @@ router.post('/api/sync/import', async (req, res) => {
           // 避免 [null] 抛错导致已导入数据整体回滚。
           if (!a || typeof a !== 'object' || Array.isArray(a)) continue;
           const accountIdValue = typeof a.account_id === 'string' ? a.account_id : '';
-          if (!accountIdValue || !/^\d+$|^(default)$/.test(accountIdValue)) continue;
+          if (!accountIdValue || (!ACCOUNT_ID_PATTERN.test(accountIdValue) && accountIdValue !== 'default')) continue;
           let userJson: string | null = null;
           if (typeof a.user_json === 'string') {
             userJson = a.user_json;
@@ -1553,12 +1562,12 @@ router.post('/api/sync/import', async (req, res) => {
           if (userJson === null) continue;
           // account_id 就是 GitHub user id：资料 id 与之不一致说明备份把两个
           // 账号错配在一起，导入会把 A 的 PAT 登记到 B 名下。
-          if (/^\d+$/.test(accountIdValue)) {
+          if (ACCOUNT_ID_PATTERN.test(accountIdValue)) {
             try {
               const parsedProfile = JSON.parse(userJson) as Record<string, unknown> | null;
               const profileId = parsedProfile && typeof parsedProfile === 'object' ? parsedProfile.id : undefined;
-              const isValidNumericId = (typeof profileId === 'number' && Number.isInteger(profileId))
-                || (typeof profileId === 'string' && /^\d+$/.test(profileId));
+              const isValidNumericId = (typeof profileId === 'number' && Number.isInteger(profileId) && profileId > 0)
+                || (typeof profileId === 'string' && ACCOUNT_ID_PATTERN.test(profileId));
               if (!isValidNumericId || String(profileId) !== accountIdValue) continue;
               if (typeof profileId === 'string') {
                 const numericId = Number(profileId);
@@ -1571,6 +1580,7 @@ router.post('/api/sync/import', async (req, res) => {
             }
           }
           accountStmt.run(accountIdValue, userJson);
+          bumpAccountProfileVersion(db, accountIdValue);
           accountCount++;
         }
         counts.accounts = accountCount;
@@ -1578,11 +1588,11 @@ router.post('/api/sync/import', async (req, res) => {
 
       // Issue #612 A20x：导入写入的每个分区推进仓库快照版本（仅当发生了
       // 仓库/发行版写入；分区归属与 A1 的目标范围校验一致）。
-      // 仓库导入会重置 vector_indexed_at，同步清除回填检查标记以便后续重新核验。
+      // 仓库导入会重置 vector_indexed_at，同步清除回填检查与待重建标记以便后续重新核验。
       const clearBackfillChecked = (targetAccountId: string) => {
         try {
           db.prepare(
-            "DELETE FROM partition_meta WHERE account_id = ? AND key = 'vector_account_backfill_checked'"
+            "DELETE FROM partition_meta WHERE account_id = ? AND key IN ('vector_account_backfill_checked', 'vector_account_rebuild_pending')"
           ).run(targetAccountId);
         } catch {
           // 轻量 stub 缺表时忽略

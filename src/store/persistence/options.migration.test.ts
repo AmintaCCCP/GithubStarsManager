@@ -120,10 +120,25 @@ describe('v19 token migration persistence contract', () => {
     // 使断言可区分「确认后剥除」与「未确认时回填迁移输入」（第 14 轮 [28]）。
     expect(persistSavedAccounts('')['42']?.githubToken).toBe('');
 
-    // 阶段三：确认态下的后续迁移（新启动）——分片照常剥除，不回退确认门控。
-    vi.mocked(saveGhAccountTokens).mockResolvedValueOnce(undefined);
+    // 阶段三：重置迁移状态与 Store 模拟全新启动——补写未确认前分片保留旧 PAT
+    // 供跨重启重试，补写确认后才从分片剥除。
+    __resetV19TokenSaveStateForTest();
+    useAppStore.setState({
+      user: null,
+      githubToken: null,
+      isAuthenticated: false,
+      savedAccounts: {},
+    } as never);
+    let resolvePhase3!: (value: Record<string, string>) => void;
+    vi.mocked(fillMissingGhAccountTokens).mockImplementationOnce(
+      () => new Promise<Record<string, string>>((resolve) => { resolvePhase3 = resolve; }),
+    );
     appPersistenceOptions.migrate!(v18Snapshot(), 18);
+    // 补写尚未完成：旧 PAT 在等待期间仍保留在分片中可重试。
+    expect(persistSavedAccounts('')['42']?.githubToken).toBe('ghp_legacy_token');
+    resolvePhase3({ '42': 'ghp_legacy_token' });
     await flushMigrationSave();
+    // 补写确认后：旧 PAT 从分片移除。
     expect(persistSavedAccounts('')['42']?.githubToken).toBe('');
   });
 
@@ -404,5 +419,104 @@ describe('v19 migration cross-restart lifecycle (ISSUE-1)', () => {
     const shard = persistCurrentState();
     expect(shard['42']?.githubToken ?? '').toBe('');
     expect(shard['44']?.githubToken ?? '').toBe('');
+  });
+
+  it('restores other accounts from readable encrypted storage even when migration write fails', async () => {
+    const secondUser: GitHubUser = {
+      id: 43,
+      login: 'second-user',
+      name: 'Second',
+      avatar_url: 'https://example.com/b.png',
+      email: null,
+    };
+    // 加密存储可读（已有账号 43 的 PAT）但暂时不可写（账号 42 迁移写入与重试均失败）。
+    vi.mocked(fillMissingGhAccountTokens).mockRejectedValue(new Error('read-only disk'));
+    vi.mocked(loadGhAccountTokens).mockResolvedValue({
+      status: 'loaded',
+      tokens: { '43': 'ghp_disk_43' },
+    });
+
+    const migrated = appPersistenceOptions.migrate!({
+      savedAccounts: {
+        '42': {
+          accountId: '42',
+          user: mirrorUser,
+          githubToken: 'ghp_legacy_42',
+          addedAt: '2026-01-01T00:00:00.000Z',
+          lastUsedAt: '2026-01-01T00:00:00.000Z',
+        },
+        '43': {
+          accountId: '43',
+          user: secondUser,
+          githubToken: '',
+          addedAt: '2026-01-01T00:00:00.000Z',
+          lastUsedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    } as never, 18);
+    await flushMigrationSave();
+
+    useAppStore.setState({ user: secondUser, githubToken: null, isAuthenticated: false, savedAccounts: {} } as never);
+    mergePersisted(migrated as PersistedShard);
+    hydrate();
+    await flushMigrationSave();
+
+    // 账号 43 仍从可读的加密存储恢复，不被 42 的写失败阻断；42 保留旧迁移输入供重试。
+    expect(useAppStore.getState().savedAccounts['43']?.githubToken).toBe('ghp_disk_43');
+    expect(useAppStore.getState().savedAccounts['42']?.githubToken).toBe('ghp_legacy_42');
+    expect(vi.mocked(saveGhAccountTokens)).not.toHaveBeenCalled();
+  });
+
+  it('uses disk PAT returned by mirror fill instead of treating stale snapshot PAT as re-auth', async () => {
+    const secondUser: GitHubUser = {
+      id: 43,
+      login: 'second-user',
+      name: 'Second',
+      avatar_url: 'https://example.com/b.png',
+      email: null,
+    };
+    // 批量迁移因 42 写入失败；43 的单独镜像补写返回磁盘上已有的新 PAT；读盘失败。
+    vi.mocked(fillMissingGhAccountTokens)
+      .mockRejectedValueOnce(new Error('batch write failed'))
+      .mockResolvedValueOnce({ '43': 'ghp_disk_new_43' })
+      .mockResolvedValueOnce({ '42': 'ghp_legacy_42' });
+    vi.mocked(loadGhAccountTokens).mockResolvedValue({ status: 'error', error: 'transient read error' });
+
+    const migrated = appPersistenceOptions.migrate!({
+      savedAccounts: {
+        '42': {
+          accountId: '42',
+          user: mirrorUser,
+          githubToken: 'ghp_legacy_42',
+          addedAt: '2026-01-01T00:00:00.000Z',
+          lastUsedAt: '2026-01-01T00:00:00.000Z',
+        },
+        '43': {
+          accountId: '43',
+          user: secondUser,
+          githubToken: 'ghp_legacy_43',
+          addedAt: '2026-01-01T00:00:00.000Z',
+          lastUsedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    } as never, 18);
+    await flushMigrationSave();
+
+    window.localStorage.setItem(
+      'github-stars-manager-auth',
+      JSON.stringify({ user: secondUser, githubToken: 'ghp_legacy_43', backendApiSecret: null }),
+    );
+    try {
+      useAppStore.setState({ user: secondUser, githubToken: null, isAuthenticated: false, savedAccounts: {} } as never);
+      mergePersisted(migrated as PersistedShard);
+      hydrate();
+      await flushMigrationSave();
+
+      // 43 消费镜像补写返回的磁盘新 PAT，且不会被当作重新授权用旧 PAT 覆写磁盘。
+      expect(useAppStore.getState().savedAccounts['43']?.githubToken).toBe('ghp_disk_new_43');
+      expect(vi.mocked(saveGhAccountTokens)).not.toHaveBeenCalled();
+    } finally {
+      window.localStorage.removeItem('github-stars-manager-auth');
+    }
   });
 });

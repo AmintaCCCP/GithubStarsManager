@@ -778,9 +778,11 @@ describe('backend pushes requested during another sync', () => {
     await strictOutcome;
 
     // 编辑可重试：恢复写入后再次严格同步成功，且载荷包含此前丢失的新仓库
+    const callsBeforeRetry = vi.mocked(backend.syncRepositories).mock.calls.length;
     vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);
-    await expect(forceSyncToBackend()).resolves.toBe(true);
+    await expect(forceSyncToBackend({ reportFailures: true })).resolves.toBe(true);
     const payloads = vi.mocked(backend.syncRepositories).mock.calls.map(call => call[0] as Repository[]);
+    expect(payloads).toHaveLength(callsBeforeRetry + 1);
     expect(payloads.at(-1)!.map(repo => repo.full_name)).toEqual(['owner/repo-1', 'owner/repo-2']);
   });
 

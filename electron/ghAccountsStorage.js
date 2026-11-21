@@ -25,6 +25,7 @@ function getGhAccountsPath(userDataPath, pathModule) {
 
 const GH_ACCOUNT_ID_PATTERN = /^\d{1,20}$/;
 const GH_TOKEN_PATTERN = /^[\x21-\x7E]{1,512}$/;
+const GH_REMOVAL_NONCE_PATTERN = /^[A-Za-z0-9:_-]{1,64}$/;
 
 /**
  * 只接受普通键值对象（Object.prototype 或 null 原型）。渲染进程参数不可信：
@@ -49,6 +50,27 @@ function normalizeGhAccounts(value) {
     tokens[accountId] = token;
   }
   return tokens;
+}
+
+/**
+ * Normalize optional clearedRemovalMarkers metadata (`{ [accountId]: nonce }`)
+ * written atomically alongside re-authorized credentials so a stale renderer
+ * localStorage removal marker cannot mask or delete a newly saved PAT after
+ * restart when localStorage update failed.
+ */
+function normalizeClearedRemovalMarkers(meta) {
+  if (meta === undefined || meta === null) return null;
+  if (typeof meta !== 'object' || Array.isArray(meta) || !isPlainObject(meta)) return null;
+  const raw = meta.clearedRemovalMarkers;
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw) || !isPlainObject(raw)) return null;
+  const result = {};
+  for (const [accountId, nonce] of Object.entries(raw)) {
+    if (!GH_ACCOUNT_ID_PATTERN.test(accountId)) continue;
+    if (typeof nonce !== 'string' || !GH_REMOVAL_NONCE_PATTERN.test(nonce)) continue;
+    result[accountId] = nonce;
+  }
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 /**
@@ -79,7 +101,7 @@ function removeGhAccountsFiles({ fs, pathModule, userDataPath }) {
   return { success: true };
 }
 
-function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage, platform = process.platform }, tokens) {
+function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage, platform = process.platform }, tokens, meta) {
   const filePath = getGhAccountsPath(userDataPath, pathModule);
   const normalized = normalizeGhAccounts(tokens);
   if (normalized === null) {
@@ -116,9 +138,13 @@ function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage, pl
   // Audit R2-B4: atomic write — full payload goes to a temp file in the same
   // directory, then rename replaces the target. On any failure the previous
   // map stays intact and the temp file is cleaned up.
+  const clearedRemovalMarkers = normalizeClearedRemovalMarkers(meta);
+  const diskPayload = clearedRemovalMarkers
+    ? { __v: 2, tokens: normalized, clearedRemovalMarkers }
+    : normalized;
   const tempPath = `${filePath}.tmp`;
   try {
-    const encrypted = safeStorage.encryptString(JSON.stringify(normalized));
+    const encrypted = safeStorage.encryptString(JSON.stringify(diskPayload));
     fs.writeFileSync(tempPath, encrypted);
     fs.renameSync(tempPath, filePath);
     return { success: true };
@@ -171,6 +197,23 @@ function loadEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }) 
       // 解密成功但不是 Token 映射：内容未知，不能当作「磁盘为空」——
       // 否则下次保存会整表覆写丢掉未知内容。
       return { status: 'error', error: 'gh-accounts.enc does not contain a token map' };
+    }
+    if (data.__v === 2 && isPlainObject(data)) {
+      const rawTokens = data.tokens;
+      if (!rawTokens || typeof rawTokens !== 'object' || Array.isArray(rawTokens) || !isPlainObject(rawTokens)) {
+        return { status: 'error', error: 'gh-accounts.enc does not contain a token map' };
+      }
+      const normalized = normalizeGhAccounts(rawTokens);
+      if (normalized && Object.keys(normalized).length > 0) {
+        const clearedRemovalMarkers = normalizeClearedRemovalMarkers(data);
+        return clearedRemovalMarkers
+          ? { status: 'loaded', tokens: normalized, clearedRemovalMarkers }
+          : { status: 'loaded', tokens: normalized };
+      }
+      if (Object.keys(rawTokens).length === 0) {
+        return { status: 'missing' };
+      }
+      return { status: 'error', error: 'gh-accounts.enc contains no valid token entries' };
     }
     const normalized = normalizeGhAccounts(data);
     if (normalized && Object.keys(normalized).length > 0) {

@@ -131,7 +131,7 @@ const captureLegacyMirrorForDesktopMigration = (merged: {
  * 镜像清除明文；失败时镜像明文保留，下次启动重新捕获重试。
  * 返回 null 表示本轮无待迁移镜像凭据。
  */
-const consumePendingLegacyMirrorMigrationSave = (): Promise<{ ok: boolean; error?: unknown }> | null => {
+const consumePendingLegacyMirrorMigrationSave = (): Promise<{ ok: boolean; settled?: GhAccountTokenMap; error?: unknown }> | null => {
   const stash = pendingLegacyMirrorMigration;
   pendingLegacyMirrorMigration = null;
   if (!stash || !hasGhAccountsBridge() || v19TokenSaveConfirmed) return null;
@@ -139,12 +139,12 @@ const consumePendingLegacyMirrorMigrationSave = (): Promise<{ ok: boolean; error
   if (!stashAccountId) return null;
   // 第 13 轮审计修复：镜像迁移改为补写语义（fillMissingGhAccountTokens）——
   // 磁盘已有该账号的 PAT（新凭据已确认落盘）时保留磁盘值，绝不用尚未刷新的
-  // 镜像明文回退；补写结果确认后才清除镜像明文。
+  // 镜像明文回退；补写结果确认后才清除镜像明文，并返回磁盘确认值供水化消费。
   return fillMissingGhAccountTokens({ [stashAccountId]: stash.githubToken })
-    .then(() => {
+    .then((settled) => {
       // 磁盘已确认存在该账号凭据（新写入或已有值）：让镜像账号退出迁移输入。
       // 跳过情形（待删标记）已在捕获入口过滤，不会走到这里。
-      markV19MigrationTokensSaved({ [stashAccountId]: stash.githubToken });
+      markV19MigrationTokensSaved(settled);
       // 加密写入确认成功：按 B7 语义覆写镜像，清除遗留明文 PAT。
       const store = useAppStore.getState();
       writeAuthMirror({
@@ -152,7 +152,7 @@ const consumePendingLegacyMirrorMigrationSave = (): Promise<{ ok: boolean; error
         githubToken: typeof store.githubToken === 'string' ? store.githubToken : null,
         backendApiSecret: typeof store.backendApiSecret === 'string' ? store.backendApiSecret : null,
       });
-      return { ok: true as const };
+      return { ok: true as const, settled };
     })
     .catch((err) => ({ ok: false as const, error: err }));
 };
@@ -230,7 +230,7 @@ const savedAccountsForShard = (
  * 同时清理已不存在于 savedAccounts 的孤儿迁移输入：账号记录已被移除时，
  * 其旧 PAT 既无法回填也无法用于弹窗恢复，不应无限期阻止确认。
  */
-const retryUnconfirmedV19TokenSave = async (): Promise<void> => {
+const retryUnconfirmedV19TokenSave = async (diskConfirmedTokens?: GhAccountTokenMap): Promise<void> => {
   if (v19TokenSaveConfirmed || !hasGhAccountsBridge()) return;
   const store = useAppStore.getState();
   // 已请求删除（登出/移除）的账号不得被重试写回：失败删除留下的旧分片值/
@@ -240,11 +240,20 @@ const retryUnconfirmedV19TokenSave = async (): Promise<void> => {
   const tokens: GhAccountTokenMap = {};
   for (const [accountId, account] of Object.entries(store.savedAccounts ?? {})) {
     if (pendingRemovalIds.has(accountId)) continue;
-    if (account?.githubToken?.trim()) tokens[accountId] = account.githubToken;
+    const token = account?.githubToken;
+    if (token?.trim() && diskConfirmedTokens?.[accountId] !== token) {
+      tokens[accountId] = token;
+    }
   }
   const currentAccountId = accountIdKey(store.user);
   const currentToken = typeof store.githubToken === 'string' ? store.githubToken.trim() : '';
-  if (currentAccountId && currentToken && !tokens[currentAccountId] && !pendingRemovalIds.has(currentAccountId)) {
+  if (
+    currentAccountId
+    && currentToken
+    && !tokens[currentAccountId]
+    && !pendingRemovalIds.has(currentAccountId)
+    && diskConfirmedTokens?.[currentAccountId] !== currentToken
+  ) {
     tokens[currentAccountId] = currentToken;
   }
   if (hasV19MigrationInputs()) {
@@ -1006,14 +1015,16 @@ pendingMigrationTokenSave = null;
 // 写入），确认成功后（已置确认标记并清除镜像明文）再读盘回填会话；失败时
 // 镜像明文保留，下次启动 merge 重新捕获重试，其余账号的回填不受影响。
 const mirrorMigrationSave = consumePendingLegacyMirrorMigrationSave();
-const settleMirrorMigration = async (): Promise<void> => {
-  if (!mirrorMigrationSave) return;
+const settleMirrorMigration = async (): Promise<GhAccountTokenMap> => {
+  if (!mirrorMigrationSave) return {};
   const mirrorResult = await mirrorMigrationSave;
   if (!mirrorResult.ok) {
     logger.warn('store.hydrate', 'Legacy auth-mirror token migration into gh-accounts failed; mirror plaintext kept for next-start retry', {
       error: mirrorResult.error instanceof Error ? mirrorResult.error.message : String(mirrorResult.error),
     });
+    return {};
   }
+  return mirrorResult.settled ?? {};
 };
 (migrationSave ?? Promise.resolve(null))
   .then(async (migrationResult) => {
@@ -1021,19 +1032,45 @@ const settleMirrorMigration = async (): Promise<void> => {
       logger.warn('store.hydrate', 'v19 gh-accounts migration save failed; restoring migrated tokens in memory', {
         error: migrationResult.error instanceof Error ? migrationResult.error.message : String(migrationResult.error),
       });
-      // 显式恢复分支：迁移落盘失败时不按成功路径读盘，先把迁移出的 Token 回填到内存保持本次会话可用
-      if (Object.keys(migrationResult.tokens).length > 0) {
-        const { restorePersistedAccountTokens } = useAppStore.getState();
-        restorePersistedAccountTokens(migrationResult.tokens);
+      // 先结算独立的镜像补写，拿到磁盘确认值；再尝试读盘恢复其他已在加密存储的账号
+      //（加密存储可读但暂时不可写时，不阻塞其他账号恢复）。
+      const mirrorSettled = await settleMirrorMigration();
+      const confirmedTokens: GhAccountTokenMap = { ...mirrorSettled };
+      const diskResult = await loadGhAccountTokens();
+      if (diskResult.status === 'loaded' && Object.keys(diskResult.tokens).length > 0) {
+        reconcileLoadedDiskTokensWithMigrationInputs(diskResult.tokens);
+        Object.assign(confirmedTokens, diskResult.tokens);
+      } else if (diskResult.status === 'error') {
+        logger.warn('store.hydrate', 'gh-accounts secure storage read failed during migration fallback; using legacy migration tokens in memory', {
+          error: diskResult.error,
+        });
       }
-      // 第 12 轮：镜像迁移独立于快照迁移——失败路径同样尝试迁入。
-      await settleMirrorMigration();
+      if (Object.keys(confirmedTokens).length > 0) {
+        restoreSessionWithDiskConfirmedTokens(confirmedTokens);
+      }
+      // 只对磁盘缺失（且未由镜像补写确认、仍留在迁移输入中）的账号回填本次失败的旧迁移输入，
+      // 绝不用失败快照中的旧 PAT 覆盖已确认的磁盘值。
+      const remainingInputs = getV19MigrationInputs() ?? {};
+      const fallbackTokens: GhAccountTokenMap = {};
+      for (const [accountId, token] of Object.entries(migrationResult.tokens)) {
+        if (confirmedTokens[accountId]) continue;
+        if (remainingInputs[accountId] !== token) continue;
+        fallbackTokens[accountId] = token;
+      }
+      if (Object.keys(fallbackTokens).length > 0) {
+        const { restorePersistedAccountTokens } = useAppStore.getState();
+        restorePersistedAccountTokens(fallbackTokens);
+      }
       // 迁移保存失败后立即重试一次：瞬时故障可自愈；仍失败则保留可重试状态
       //（持久化分片由 savedAccountsForShard 保留迁移输入，下次启动再次重试）。
-      await retryUnconfirmedV19TokenSave();
+      await retryUnconfirmedV19TokenSave(confirmedTokens);
       return;
     }
-    await settleMirrorMigration();
+    const mirrorSettled = await settleMirrorMigration();
+    const confirmedTokens: GhAccountTokenMap = { ...mirrorSettled };
+    if (Object.keys(mirrorSettled).length > 0) {
+      restoreSessionWithDiskConfirmedTokens(mirrorSettled);
+    }
     const result = await loadGhAccountTokens();
     if (result.status === 'error') {
       logger.warn('store.hydrate', 'gh-accounts secure storage read failed; tokens not restored', {
@@ -1041,19 +1078,18 @@ const settleMirrorMigration = async (): Promise<void> => {
       });
       // ISSUE-1(A)：读取失败不能跳过重试——分片重建的迁移输入必须仍有重试机会
       //（写入内部会先读后写，读取仍失败则保留输入，绝不剥除分片中的旧 PAT）。
-      await retryUnconfirmedV19TokenSave();
+      await retryUnconfirmedV19TokenSave(confirmedTokens);
       return;
     }
     if (result.status === 'loaded' && Object.keys(result.tokens).length > 0) {
       // 磁盘已有确认写入的账号：先让位于磁盘值，再回填/重试（ISSUE-1(B)）。
       reconcileLoadedDiskTokensWithMigrationInputs(result.tokens);
-      // 惰性访问 store（模块初始化环规避，同 accountWorkspace 的做法）
-      const { restorePersistedAccountTokens } = useAppStore.getState();
-      restorePersistedAccountTokens(result.tokens);
+      Object.assign(confirmedTokens, result.tokens);
+      restoreSessionWithDiskConfirmedTokens(result.tokens);
     }
     // 迁移成功路径的确认标记已在保存成功的 then 中置位；本次启动无需迁移时
     // 由 retry 检查收敛（快照无 Token 即确认，仍有残留 Token 则重试迁入）。
-    await retryUnconfirmedV19TokenSave();
+    await retryUnconfirmedV19TokenSave(confirmedTokens);
   })
   .catch(() => undefined)
   .finally(() => finishHydration());

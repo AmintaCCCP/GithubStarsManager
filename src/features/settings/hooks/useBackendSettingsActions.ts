@@ -22,9 +22,15 @@ import {
 
 type BackendStatus = 'connected' | 'disconnected' | 'checking';
 
+type ConnectionProbeOutcome = {
+  status: 'connected' | 'disconnected';
+  health: { version: string; timestamp: string } | null;
+};
+
 // R13 审计修复：完整连接探测的共享互斥——探测窗口（健康检查 + verifyAuth +
 // 认证失败回滚）内不得启动第二次探测。模块级标记在多个 hook 实例之间共享。
 let _connectionProbeInFlight = false;
+let _connectionProbePromise: Promise<ConnectionProbeOutcome> | null = null;
 
 export interface BackendSettingsActions {
   status: BackendStatus;
@@ -88,8 +94,14 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     setStatus('checking');
     try {
       await backend.init(preferredUrl);
+      const urlBeforeHealth = backend.backendUrl;
+      const generationBeforeHealth = backend.connectionGeneration;
       const healthData = await backend.checkHealth();
-      if (healthData) {
+      if (
+        healthData
+        && backend.backendUrl === urlBeforeHealth
+        && backend.connectionGeneration === generationBeforeHealth
+      ) {
         if (options?.deferConnectedStatus !== true) {
           setStatus('connected');
           setHealth({ version: healthData.version, timestamp: healthData.timestamp });
@@ -106,12 +118,58 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     // R14 finding 26：挂载探测不得在手动探测进行中改变后端目标——手动探测已
     // 固定目标并独占探测代次，挂载 init(undefined) 会取代其 init（探测代次
-    // 失效）或提交另一地址，导致界面显示与实际后端错位。手动探测自身会写入
-    // status/health，本次挂载探测直接跳过（不引入新的恢复行为）。
-    if (_connectionProbeInFlight) return;
+    // 失效）或提交另一地址，导致界面显示与实际后端错位。若设置面板在手动探测
+    // 期间重新打开，等待在途探测结束并同步已确定的连接状态（不启动另一次 init）。
+    if (_connectionProbeInFlight) {
+      const pendingProbe = _connectionProbePromise;
+      setStatus('checking');
+      if (pendingProbe) {
+        void pendingProbe.then(async (outcome) => {
+          if (cancelled) return;
+          if (outcome.status === 'connected') {
+            setStatus('connected');
+            setHealth(outcome.health);
+            return;
+          }
+          if (!backend.isAvailable && !backend.backendUrl) {
+            setStatus('disconnected');
+            setHealth(null);
+            return;
+          }
+          try {
+            const urlBeforeHealth = backend.backendUrl;
+            const generationBeforeHealth = backend.connectionGeneration;
+            const healthData = await backend.checkHealth();
+            if (cancelled) return;
+            if (
+              healthData
+              && backend.backendUrl === urlBeforeHealth
+              && backend.connectionGeneration === generationBeforeHealth
+            ) {
+              setStatus('connected');
+              setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+              return;
+            }
+          } catch {
+            // Keep disconnected fallback below
+          }
+          if (!cancelled) {
+            setStatus('disconnected');
+            setHealth(null);
+          }
+        });
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
     void checkConnection(true);
+    return () => {
+      cancelled = true;
+    };
   }, [checkConnection]);
 
   const testConnection = useCallback(async () => {
@@ -130,6 +188,7 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     // R15 finding 13（CodeRabbit）：探测失败回滚（init(previousUrl)）必须先校验
     // 连接所有权——连接代次在探测窗口内被其他流程推进（含 X→Z→X）时不得覆盖。
     const previousConnectionGeneration = backend.connectionGeneration;
+    const previousProbeGeneration = backend.probeGeneration;
     // R14 finding 25：探测会把输入框密钥写入全局 store——失败的探测必须先恢复
     // 原密钥再回滚连接，否则之后发往原后端的请求会携带错误密钥（401）。
     const previousSecret = typeof useAppStore.getState === 'function'
@@ -141,6 +200,11 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     const expectedUrl = trimmedUrl ? normalizeBackendUrl(trimmedUrl) : null;
     state.setBackendApiSecret(stagedSecret);
     _connectionProbeInFlight = true;
+    let resolveProbe!: (outcome: ConnectionProbeOutcome) => void;
+    _connectionProbePromise = new Promise<ConnectionProbeOutcome>((resolve) => {
+      resolveProbe = resolve;
+    });
+    let settledOutcome: ConnectionProbeOutcome = { status: 'disconnected', health: null };
     // 探测失败/被丢弃时恢复原密钥；仅当全局密钥仍是本次暂存值（无并发流程
     // 改写）时才回写，避免覆盖并发流程已写入的密钥。
     const restoreStagedSecret = () => {
@@ -167,7 +231,10 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
           const rollbackCandidates: Array<string | null> = expectedUrl !== null
             ? [expectedUrl, null]
             : [previousUrl, null, backend.persistedUrl];
-          const probeOwnsConnection = rollbackCandidates.some((candidateUrl) => (
+          const probeGenerationOwned = typeof previousProbeGeneration !== 'number'
+            || typeof backend.probeGeneration !== 'number'
+            || backend.probeGeneration === previousProbeGeneration + 1;
+          const probeOwnsConnection = probeGenerationOwned && rollbackCandidates.some((candidateUrl) => (
             landedUrl === candidateUrl
             && landedGeneration === previousConnectionGeneration + (candidateUrl === previousUrl ? 0 : 1)
           ));
@@ -215,8 +282,10 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
           // Health and auth both passed — remember the address (shared with the
           // login screen prefill).
           backend.rememberActiveUrl();
+          const connectedHealth = { version: healthData.version, timestamp: healthData.timestamp };
+          settledOutcome = { status: 'connected', health: connectedHealth };
           setStatus('connected');
-          setHealth({ version: healthData.version, timestamp: healthData.timestamp });
+          setHealth(connectedHealth);
           toast(t('useBackendSettingsActions.backend-connection-successful'), 'success');
           return true;
         } catch {
@@ -250,6 +319,8 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       }
     } finally {
       _connectionProbeInFlight = false;
+      _connectionProbePromise = null;
+      resolveProbe(settledOutcome);
     }
   }, [checkConnection, secretInput, state, t, toast, urlInput]);
 

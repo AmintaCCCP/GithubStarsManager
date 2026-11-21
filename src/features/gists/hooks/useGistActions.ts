@@ -77,6 +77,23 @@ const lateEditWriteSuperseded = (current: Gist, incoming: Gist): boolean => {
 };
 
 /**
+ * 合并迟到的 Gist PATCH 编辑响应：只覆写 PATCH 拥有的远端字段与 last_edited，
+ * 保留归档/实时条目上独立产生的本地字段（如 ai_summary、analyzed_at、starred）。
+ */
+const mergeLateGistEdit = (current: Gist, incoming: Gist): Gist => ({
+  ...current,
+  description: incoming.description,
+  public: incoming.public,
+  html_url: incoming.html_url,
+  created_at: incoming.created_at,
+  updated_at: incoming.updated_at,
+  comments: incoming.comments,
+  owner: incoming.owner,
+  files: incoming.files,
+  last_edited: incoming.last_edited,
+});
+
+/**
  * 审计修复：切号期间远端操作已成功的 Gist 变更（删除/取消星标/编辑）必须
  * 反映到发起账号的工作区，否则切回该账号时归档快照会把旧状态换入实时列表，
  * 与 GitHub 不一致。沿用账号工作区生命周期的安全更新路径（与
@@ -122,7 +139,7 @@ const applyRemoteGistChangeToOwnerSession = (
       // 跳过补写——迟到的编辑响应绝不覆盖较新的 Gist。
       const liveCurrent = useAppStore.getState().gists.find((gist) => gist.id === change.gist.id);
       if (liveCurrent && lateEditWriteSuperseded(liveCurrent, change.gist)) return;
-      useAppStore.getState().updateGist(change.gist);
+      useAppStore.getState().updateGist(liveCurrent ? mergeLateGistEdit(liveCurrent, change.gist) : change.gist);
     });
     return;
   }
@@ -173,7 +190,7 @@ const applyRemoteGistChangeToOwnerSession = (
         if (index === -1) return gists;
         if (lateEditWriteSuperseded(gists[index], change.gist)) return gists;
         const next = [...gists];
-        next[index] = change.gist;
+        next[index] = mergeLateGistEdit(gists[index], change.gist);
         return next;
       };
       const gists = replaceById(parked.gists);
@@ -209,14 +226,28 @@ export const useGistActions = () => {
   // 刚为同一 Gist 设置的标记不会被旧任务误清。
   const analysisRunRef = useRef(0);
   const analysisMarkerOwnersRef = useRef(new Map<string, number>());
+  const analyzeAllRunRef = useRef(0);
+  const mutationRunRef = useRef(0);
+  const activeMutationsRef = useRef(new Map<number, string | null>());
   const currentUserId = useAppStore((s) => s.user?.id ?? null);
-  // 切换账号时立即清除旧会话残留的刷新状态，避免新账号的刷新按钮被禁用
+  const syncMutatingStateForAccount = useCallback((accountId: string | null) => {
+    for (const owner of activeMutationsRef.current.values()) {
+      if (owner === accountId) {
+        setIsMutating(true);
+        return;
+      }
+    }
+    setIsMutating(false);
+  }, []);
+  // 切换账号时立即清除旧会话残留的刷新/搜索/批量分析/变更忙碌状态，避免新账号按钮被禁用
   useEffect(() => {
     setIsRefreshing(false);
     // R13 审计修复（CodeRabbit）：AI 搜索忙碌状态同样随切号复位——GistView
     // 不因切号重新挂载，旧账号未结束的搜索会让新账号的搜索按钮保持禁用。
     setIsSearching(false);
-  }, [currentUserId]);
+    setIsAnalyzingAll(false);
+    syncMutatingStateForAccount(currentUserId !== null ? String(currentUserId) : null);
+  }, [currentUserId, syncMutatingStateForAccount]);
   // isAnalyzingGist(id) 的渲染值恒等于 store 集合值：原 GistCard 的本地 isAnalyzingLocal
   // 与 setAnalyzingGist 同置同清，渲染上与集合值等价，故本 hook 只操作 store 集合、
   // 不再设本地 flag（勿"修复"回双 flag 写法）。
@@ -359,6 +390,7 @@ export const useGistActions = () => {
     if (!confirmed) return;
     if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
 
+    const analyzeAllRunId = ++analyzeAllRunRef.current;
     setIsAnalyzingAll(true);
     const api = createGitHubApiService(state.githubToken);
     const aiService = new AIService(activeConfig, state.language);
@@ -398,7 +430,9 @@ export const useGistActions = () => {
         toast(t('useGistActions.ai-analysis-done-success-succeeded-failed-failed', { success: success, failed: failed }), failed > 0 ? 'error' : 'success');
       }
     } finally {
-      setIsAnalyzingAll(false);
+      if (analyzeAllRunRef.current === analyzeAllRunId && isCurrentAccount(jobAccountId)) {
+        setIsAnalyzingAll(false);
+      }
     }
   }, [beginAnalysisMarker, endAnalysisMarker, state, t, toast, confirm]);
 
@@ -561,6 +595,8 @@ export const useGistActions = () => {
     // 客户端必须在复核之后同步创建：工厂从实时 Store 读取账号头，
     // 任何 await 之后创建都可能把请求发到切号后的账号。
     const api = createGitHubApiService(state.githubToken);
+    const mutationToken = ++mutationRunRef.current;
+    activeMutationsRef.current.set(mutationToken, startedAccountId);
     setIsMutating(true);
     try {
       await api.unstarGist(gist.id);
@@ -578,9 +614,12 @@ export const useGistActions = () => {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       toast(t('useGistActions.failed-to-unstar'), 'error');
     } finally {
-      setIsMutating(false);
+      activeMutationsRef.current.delete(mutationToken);
+      if (isCurrentAccount(startedAccountId)) {
+        syncMutatingStateForAccount(startedAccountId);
+      }
     }
-  }, [state, t, toast, confirm]);
+  }, [state, t, toast, confirm, syncMutatingStateForAccount]);
 
   // 注意：本方法有意遮蔽经由 ...state 展开的同名 store action（签名不同：
   // 接收 Gist 对象并内置确认/报错）。需要原始 store action 的调用方应自行
@@ -600,6 +639,8 @@ export const useGistActions = () => {
     if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
 
     const api = createGitHubApiService(state.githubToken);
+    const mutationToken = ++mutationRunRef.current;
+    activeMutationsRef.current.set(mutationToken, startedAccountId);
     setIsMutating(true);
     try {
       await api.deleteGist(gist.id);
@@ -624,9 +665,12 @@ export const useGistActions = () => {
         'error'
       );
     } finally {
-      setIsMutating(false);
+      activeMutationsRef.current.delete(mutationToken);
+      if (isCurrentAccount(startedAccountId)) {
+        syncMutatingStateForAccount(startedAccountId);
+      }
     }
-  }, [state, t, toast, confirm]);
+  }, [state, t, toast, confirm, syncMutatingStateForAccount]);
 
   // 大文件按需拉取（原 GistDetailModal.HighlightedCode effect 的服务调用部分）。
   // 无 token 时抛出的错误文案与原 setRawError 直写逐字一致，由 View catch 落 rawError。

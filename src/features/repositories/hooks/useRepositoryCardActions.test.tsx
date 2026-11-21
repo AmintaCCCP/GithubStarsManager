@@ -660,18 +660,24 @@ describe('useRepositoryCardActions account switch guards', () => {
     // R15 finding 28：配置明确的后端地址——待删除/待补推标记必须登记发起时
     // 的 (账号, 后端) 复合键，断言具体地址而不是 expect.any(String)。
     mocks.backend.backendUrl = 'https://backend.example.test';
-    const { result } = renderActions();
-    let promise!: Promise<void>;
-    await act(async () => {
-      promise = result.current.unstar();
-    });
-    switchToB();
-    bumpAccountSessionGeneration();
-    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
-    await act(async () => {
-      releaseUnstar();
-      await promise;
-    });
+    try {
+      const { result } = renderActions();
+      let promise!: Promise<void>;
+      await act(async () => {
+        promise = result.current.unstar();
+      });
+      // 取消星标请求在途期间切换账号并更改后端地址：待处理标记仍须使用发起时的后端地址
+      mocks.backend.backendUrl = 'https://other-backend.example.test';
+      switchToB();
+      bumpAccountSessionGeneration();
+      (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+      await act(async () => {
+        releaseUnstar();
+        await promise;
+      });
+    } finally {
+      mocks.backend.backendUrl = null;
+    }
 
     expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
     // 重新激活的 A 已移除该仓库及其 release（其他仓库的 release 保留），

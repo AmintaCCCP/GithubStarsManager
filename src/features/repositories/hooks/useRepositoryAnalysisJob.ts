@@ -354,7 +354,7 @@ export const useRepositoryAnalysisJob = ({
       if (syncOnComplete) {
         backendSynced = await forceSyncToBackend();
       }
-      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
+      if (optimizerRef.current !== optimizer || !isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
       if (!backendSynced) {
         toast(t('app:repositorySlice.push-failed'), 'warning');
         return false;
@@ -376,7 +376,7 @@ export const useRepositoryAnalysisJob = ({
       return true;
     } catch (error) {
       console.error(scope === 'selected' ? 'Bulk AI analysis failed:' : 'AI analysis failed:', error);
-      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
+      if (optimizerRef.current !== optimizer || !isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
       toast(
         scope === 'selected'
           ? (t('useRepositoryAnalysisJob.bulk-ai-analysis-failed'))
@@ -386,15 +386,15 @@ export const useRepositoryAnalysisJob = ({
       return false;
     } finally {
       // 审计修复（C32）：任务自身引用始终释放（仅当仍指向该任务）；共享状态
-      // （loading/进度）只在任务仍归属当前会话时清理——切号后共享状态归新
-      // 会话（switchAccount 已重置 analysisProgress），旧任务不得清掉新任务
-      // 的状态。hook 本地的运行/暂停标记始终复位，使新账号可立即 run()。
-      if (optimizerRef.current === optimizer) {
+      // （loading/进度）只在任务仍持有优化器且归属当前会话时清理——切号或卸载
+      // 释放后共享状态归新任务/新会话，旧任务不得清掉新任务的状态。
+      const ownsActiveJob = optimizerRef.current === optimizer;
+      if (ownsActiveJob) {
         optimizerRef.current = null;
         isRunningRef.current = false;
         stopRequestedRef.current = false;
       }
-      if (isCurrentAccountSession(jobAccountId, jobGeneration)) {
+      if (ownsActiveJob && isCurrentAccountSession(jobAccountId, jobGeneration)) {
         resetVisibleState();
       } else if (mountedRef.current && !isRunningRef.current) {
         setIsRunning(false);

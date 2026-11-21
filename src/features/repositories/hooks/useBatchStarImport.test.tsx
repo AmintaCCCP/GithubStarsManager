@@ -106,16 +106,17 @@ describe('useBatchStarImport', () => {
     expect(mocks.starRepository).not.toHaveBeenCalled();
   });
 
-  it('refuses to star a preview generated before an account switch (R12 finding 9)', async () => {
+  it('refuses to star a preview generated before an A→B→A account switch (generation check)', async () => {
     mocks.storeUser = { id: 1 };
     const { result } = renderHook(() => useBatchStarImport());
     await act(() => result.current.preview('https://github.com/owner/repository'));
     expect(result.current.rows).toHaveLength(1);
 
-    // 预览后切到账号 2（旧预览不得用 B 的 Token 提交）
+    // 预览后切到账号 2 再切回账号 1（账号 ID 相同但会话代次已推进，仍须拒绝提交）
     mocks.storeUser = { id: 2 };
     bumpAccountSessionGeneration();
-    mocks.token = 'token-b';
+    mocks.storeUser = { id: 1 };
+    bumpAccountSessionGeneration();
     await act(() => result.current.starSelected());
 
     expect(mocks.starRepository).not.toHaveBeenCalled();

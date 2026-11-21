@@ -2,10 +2,8 @@ import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import {
-  extractRequestedAccountId,
   hasInvalidAccountHeader,
-  hasPendingDefaultPartitionData,
-  resolveAccountScope,
+  resolveReadableAccountScope,
   resolveWritableAccountScope,
 } from '../db/accountScope.js';
 
@@ -40,16 +38,15 @@ function transformCategory(row: Record<string, unknown>) {
 router.get('/api/categories', (req, res) => {
   try {
     const db = getDb();
-    if (hasInvalidAccountHeader(req)) {
+    const scope = resolveReadableAccountScope(req, db, { preferPendingDefault: true });
+    if (!scope.ok) {
       res.status(409).json({
-        error: getAccountScopeErrorMessage(req),
+        error: scope.error,
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;
     }
-    const headerAccountId = extractRequestedAccountId(req);
-    const accountId = headerAccountId
-      ?? (hasPendingDefaultPartitionData(db) ? 'default' : resolveAccountScope(req, db));
+    const accountId = scope.accountId;
     const rows = db.prepare('SELECT * FROM categories WHERE account_id = ? ORDER BY sort_order ASC, name ASC').all(accountId) as Record<string, unknown>[];
     res.json(rows.map(transformCategory));
   } catch (err) {

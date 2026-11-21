@@ -7,6 +7,7 @@ import {
   forceSyncToBackend,
   hasPendingAccountSync,
   markPendingAccountSync,
+  markPendingRepositoryDeletion,
   prepareForAccountSwitch,
   resetSyncHashes,
   startAutoSync,
@@ -20,9 +21,16 @@ import {
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 
+const { beforeInitHookRef } = vi.hoisted(() => ({
+  beforeInitHookRef: { current: null as (() => Promise<void>) | null },
+}));
+
 vi.mock('./backendAdapter', () => ({
   backend: {
     isAvailable: true,
+    registerBeforeInitHook: (fn: () => Promise<void>) => {
+      beforeInitHookRef.current = fn;
+    },
     // 破坏性推送前会先观察目标分区（非破坏性对账）；默认后端为空。
     fetchRepositories: vi.fn(async () => ({ repositories: [], total: 0 })),
     fetchReleases: vi.fn(),
@@ -972,12 +980,14 @@ describe('round 14 audit fixes (frozen window stack, pending merge, push chain)'
     await yPromise;
     await xPromise;
 
-    const persisted = pendingRecords() as Array<[string, string, string[]]>;
+    const persisted = pendingRecords() as Array<[string, string, string[], Record<string, string[]>]>;
     const recordFor = (url: string) => persisted.find((entry) => entry[1] === url);
     expect(recordFor('http://x')?.[2]).toEqual(['categoryOrder']);
+    expect(recordFor('http://x')?.[3]).toEqual({ categoryOrder: ['edit-in-x'] });
     expect(recordFor('http://y')?.[2]).toEqual(['categoryOrder']);
+    expect(recordFor('http://y')?.[3]).toEqual({ categoryOrder: ['edit-in-y'] });
     // 值归属：切回各自 origin 时恢复的必须是各自窗口内的编辑
-    expect(pendingRecords()).toHaveLength(2);
+    expect(persisted).toHaveLength(2);
   });
 
   it('restores the pre-freeze switch state when the last concurrent window exits (round-14 [19])', async () => {
@@ -1322,5 +1332,190 @@ describe('round 15 audit fixes (reset gating, PUT fingerprint, record revision)'
     expect(record).toBeDefined();
     expect(record?.[2]).toEqual(['categoryOrder']);
     expect(record?.[3]).toEqual({ categoryOrder: ['v2'] });
+  });
+
+  it('does not overwrite enabled remote vectorSearchConfig with local default when flushing categoryOrder (finding 19)', async () => {
+    const enabledRemoteVector = {
+      enabled: true,
+      workerUrl: 'https://vector.remote.test',
+      authToken: 'remote-token',
+      embeddingConfigId: 'emb-1',
+      indexMode: 'readme' as const,
+      readmeMaxChars: 6000,
+      searchThreshold: 0.35,
+      searchTopK: 30,
+      enableHyDE: true,
+      enableReranking: true,
+    };
+    useAppStore.setState({
+      repositories: [createRepository(1)],
+      categoryOrder: ['edited-order'],
+      vectorSearchConfig: {
+        enabled: false,
+        workerUrl: '',
+        authToken: '',
+        embeddingConfigId: '',
+        indexMode: 'readme',
+        readmeMaxChars: 6000,
+        searchThreshold: 0.35,
+        searchTopK: 30,
+        enableHyDE: true,
+        enableReranking: true,
+      },
+    });
+    // 模拟重启后的初始状态：清除初始化写入产生的防抖/脏标记，只保留持久化待推记录
+    cancelPendingAccountSwitchPush();
+    resetSyncHashes();
+    markPendingAccountSync('1', 'http://origin', {
+      dirtySettingKeys: ['categoryOrder'],
+      dirtySettingValues: { categoryOrder: ['edited-order'] },
+    });
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: [createRepository(1)], total: 1 });
+    vi.mocked(backend.fetchVectorSearchConfig).mockResolvedValue(enabledRemoteVector);
+
+    await syncFromBackend();
+    await vi.waitFor(() => expect(backend.syncSettings).toHaveBeenCalled());
+
+    // 拉取对齐了远端向量配置，补推不会把默认禁用配置写回远端
+    expect(useAppStore.getState().vectorSearchConfig.enabled).toBe(true);
+    if (vi.mocked(backend.syncVectorSearchConfig).mock.calls.length > 0) {
+      expect(vi.mocked(backend.syncVectorSearchConfig).mock.calls[0][0]).toMatchObject({
+        enabled: true,
+        workerUrl: 'https://vector.remote.test',
+      });
+    }
+
+    // 若远端向量配置读取失败（未对齐）且本地未编辑向量配置：补推跳过 vectorSearch 分片
+    resetSyncHashes();
+    vi.mocked(backend.syncVectorSearchConfig).mockClear();
+    vi.mocked(backend.fetchVectorSearchConfig).mockRejectedValueOnce(new Error('vector down'));
+    useAppStore.setState({ categoryOrder: ['order-2'] });
+    await syncToBackend();
+    expect(backend.syncVectorSearchConfig).not.toHaveBeenCalled();
+
+    // 用户明确编辑向量配置时仍应推送该分片
+    useAppStore.setState({
+      vectorSearchConfig: { ...useAppStore.getState().vectorSearchConfig, enabled: false, workerUrl: 'https://local.edit' },
+    });
+    await syncToBackend();
+    expect(backend.syncVectorSearchConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ workerUrl: 'https://local.edit' }),
+    );
+  });
+
+  it('only confirms pending deletions actually excluded from the PUT payload and retains newer deletion intent (finding 20)', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    // 仓库 2 此前已取消星标，存在待删除记录
+    markPendingRepositoryDeletion('1', 2, 'http://origin');
+
+    let releaseFetch!: (value: { repositories: Repository[]; total: number; revision: number }) => void;
+    vi.mocked(backend.fetchRepositories).mockImplementationOnce(
+      () => new Promise((resolve) => { releaseFetch = resolve; }),
+    );
+    let releasePut!: () => void;
+    vi.mocked(backend.syncRepositories).mockImplementationOnce(
+      () => new Promise<void>((resolve) => { releasePut = resolve; }),
+    );
+
+    const push = forceSyncToBackend({ reportFailures: true });
+    await vi.waitFor(() => expect(backend.fetchRepositories).toHaveBeenCalled());
+
+    // GET 返回前用户重新加星仓库 2：本次 PUT 载荷会包含仓库 2
+    useAppStore.setState({ repositories: [createRepository(1), createRepository(2)] });
+    releaseFetch({ repositories: [createRepository(1), createRepository(2)], total: 2, revision: 1 });
+    await vi.waitFor(() => expect(backend.syncRepositories).toHaveBeenCalled());
+    const firstPayload = vi.mocked(backend.syncRepositories).mock.calls[0][0] as Repository[];
+    expect(firstPayload.map((r) => r.id)).toEqual([1, 2]);
+
+    // PUT 等待期间用户再次取消星标仓库 2
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    // 模拟下一次排空 PUT 失败，验证旧 PUT 成功后并未清掉仓库 2 的待删除记录
+    vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
+    releasePut();
+    await expect(push).rejects.toThrow('Failed to sync to backend');
+
+    const pendingDeletions = JSON.parse(window.localStorage.getItem('gsm.pendingRepoDeletions') ?? '{}') as Record<string, number[]>;
+    expect(pendingDeletions['http://origin|1']).toContain(2);
+
+    // 当一次确实排除了仓库 2 的 PUT 成功时，待删除记录应被正常清除
+    vi.mocked(backend.syncRepositories).mockResolvedValueOnce(undefined);
+    await expect(forceSyncToBackend({ reportFailures: true })).resolves.toBe(true);
+    const clearedDeletions = JSON.parse(window.localStorage.getItem('gsm.pendingRepoDeletions') ?? '{}') as Record<string, number[]>;
+    expect(clearedDeletions['http://origin|1']).toBeUndefined();
+  });
+
+  it('does not clear a pending record updated by a frozen-window repo addition when an older settings PUT succeeds (finding 22)', async () => {
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['v1'] });
+    }, 'http://origin');
+
+    let releaseSettings!: (value: { tokenUpdateSkipped: boolean; tokenUpdateSuperseded: boolean }) => void;
+    vi.mocked(backend.syncSettings).mockImplementationOnce(
+      () => new Promise((resolve) => { releaseSettings = resolve; }),
+    );
+
+    const push = forceSyncToBackend({ reportFailures: true });
+    await vi.waitFor(() => expect(backend.syncSettings).toHaveBeenCalled());
+
+    // 旧 PUT 在途期间：冻结窗口新增仓库并退出（只更新持久待推记录，不置 _hasPendingLocalChanges）
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ repositories: [createRepository(1), createRepository(2)] });
+    }, 'http://origin');
+
+    releaseSettings({ tokenUpdateSkipped: false, tokenUpdateSuperseded: false });
+    await expect(push).resolves.toBe(true);
+
+    // 旧请求未发送新增仓库：待推记录必须保留
+    expect(hasPendingAccountSync('1')).toBe(true);
+  });
+
+  it('aborts 409 conflict retries and preserves pending state for X when backendUrl switches to Y (finding 23)', async () => {
+    const mutableBackend = backend as unknown as { backendUrl: string | null };
+    mutableBackend.backendUrl = 'http://x';
+    useAppStore.setState({ repositories: [createRepository(1)], categoryOrder: ['edit-x'] });
+
+    const conflictErr = Object.assign(new Error('conflict'), { statusCode: 409, code: 'SNAPSHOT_CONFLICT' });
+    vi.mocked(backend.fetchRepositories).mockResolvedValueOnce({ repositories: [], total: 0, revision: 1 });
+    vi.mocked(backend.syncRepositories).mockImplementationOnce(async () => {
+      // 409 返回前连接切换到 Y
+      mutableBackend.backendUrl = 'http://y';
+      throw conflictErr;
+    });
+
+    await expect(syncToBackend()).resolves.toBe(false);
+
+    // 绝不向 Y 发起重试 GET 或 PUT
+    expect(backend.fetchRepositories).toHaveBeenCalledTimes(1);
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    // 待推状态保留给 X，不归属 Y
+    expect(hasPendingAccountSync('1')).toBe(false);
+    mutableBackend.backendUrl = 'http://x';
+    expect(hasPendingAccountSync('1')).toBe(true);
+
+    // 切回 Y 后推进退避重试计时器：绝不向 Y 触发自动重试
+    mutableBackend.backendUrl = 'http://y';
+    vi.mocked(backend.syncRepositories).mockClear();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+  });
+
+  it('flushes or persists debounced pending edits bound to the original backend in beforeInitHook (finding 85)', async () => {
+    const mutableBackend = backend as unknown as { backendUrl: string | null };
+    mutableBackend.backendUrl = 'http://x';
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    // 产生一次防抖待推编辑（2s 内尚未触发推送）
+    useAppStore.setState({ categoryOrder: ['debounced-edit'] });
+    // 模拟冲刷失败：beforeInitHook 必须在清空内存标志前将待推编辑持久化给原后端 X
+    vi.mocked(backend.syncSettings).mockRejectedValueOnce(new Error('offline'));
+
+    expect(beforeInitHookRef.current).toBeTypeOf('function');
+    await beforeInitHookRef.current!();
+
+    expect(hasPendingAccountSync('1')).toBe(true);
+    const persisted = pendingRecords() as Array<[string, string, string[], Record<string, string[]>]>;
+    const record = persisted.find((entry) => entry[0] === '1' && entry[1] === 'http://x');
+    expect(record?.[2]).toContain('categoryOrder');
+    expect(record?.[3]).toEqual({ categoryOrder: ['debounced-edit'] });
   });
 });

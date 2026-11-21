@@ -24,7 +24,7 @@ import {
 import {
   buildEmbeddingText,
   type EmbeddingClient,
-  type VectorQueryResult,
+  type VectorWideQueryResult,
   type VectorSearchService,
 } from './vectorSearchService';
 
@@ -39,7 +39,7 @@ const GENERIC_PROFILE_TERMS = new Set([
 ]);
 
 interface DenseOutcome {
-  matches: VectorQueryResult[];
+  matches: VectorWideQueryResult[];
   success: boolean;
   error?: string;
   /** 账号隔离范围未就绪（Worker 未建立 accountId 元数据索引）：稠密召回被跳过（C15）。 */

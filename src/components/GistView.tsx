@@ -23,6 +23,7 @@ import {
   CircleDashed,
 } from 'lucide-react';
 import { GistCard } from './GistCard';
+import { getAccountSessionGeneration } from '../store/helpers/accountWorkspace';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
 import { useGistActions, GistDetailSessionSwitchedError, type GistCreateInput, type GistUpdateInput } from '../features/gists/hooks/useGistActions';
@@ -175,8 +176,10 @@ export const GistView: React.FC = () => {
   // 时刻的会话标识为凭据：完成后仅当仍是同一会话才允许编辑器关闭。
   const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput): Promise<boolean> => {
     const initiatingSessionId = user?.id ?? null;
+    const initiatingGeneration = getAccountSessionGeneration();
     await submitGist(input, editingGist);
-    return (useAppStore.getState().user?.id ?? null) === initiatingSessionId;
+    return getAccountSessionGeneration() === initiatingGeneration
+      && (useAppStore.getState().user?.id ?? null) === initiatingSessionId;
   };
 
   return (

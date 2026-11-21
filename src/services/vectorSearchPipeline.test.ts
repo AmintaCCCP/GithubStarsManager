@@ -11,6 +11,7 @@ import {
   hydrateMatches,
   orderByCrossEncoder,
   rankStructuredCandidates,
+  resolveDenseQueryAccountScope,
   runVectorSearchPipeline,
   scoreStructuredSignals,
   toSyntheticScoreMap,
@@ -562,5 +563,50 @@ describe('hydrateMatches 账号隔离（R4 审计修复）', () => {
     // C13：无归属范围时保留原始向量 ID 查找——账号 8 的「8:2」向量绝不能
     // 先剥前缀命中本地仓库 2 并影响其排名；legacy 无前缀向量照常水合。
     expect(ranked.map(item => item.repo.id)).toEqual([1]);
+  });
+});
+
+describe('resolveDenseQueryAccountScope readiness classification', () => {
+  const signal = new AbortController().signal;
+
+  it('scopes queries when worker advertises accountScopedCleanup=true', async () => {
+    const scope = await resolveDenseQueryAccountScope(
+      { query: vi.fn(), getStatus: vi.fn().mockResolvedValue({ vectorCount: 5, dimensions: 1536, accountScopedCleanup: true }) },
+      { accountId: '7', multiAccount: false },
+      signal,
+    );
+    expect(scope).toEqual({ skip: false, accountId: '7' });
+  });
+
+  it('skips with worker-unsupported or metadata-index-not-ready without inferring ownership from single-account state', async () => {
+    const oldWorker = await resolveDenseQueryAccountScope(
+      { query: vi.fn(), getStatus: vi.fn().mockResolvedValue({ vectorCount: 5, dimensions: 1536 }) },
+      { accountId: '7', multiAccount: false },
+      signal,
+    );
+    expect(oldWorker).toEqual({ skip: true, reason: 'worker-unsupported' });
+
+    const notReady = await resolveDenseQueryAccountScope(
+      { query: vi.fn(), getStatus: vi.fn().mockResolvedValue({ vectorCount: 5, dimensions: 1536, accountScopedCleanup: false }) },
+      { accountId: '7', multiAccount: false },
+      signal,
+    );
+    expect(notReady).toEqual({ skip: true, reason: 'metadata-index-not-ready' });
+
+    const failed = await resolveDenseQueryAccountScope(
+      { query: vi.fn(), getStatus: vi.fn().mockRejectedValue(new Error('network')) },
+      { accountId: '7', multiAccount: false },
+      signal,
+    );
+    expect(failed).toEqual({ skip: true, reason: 'status-failed' });
+  });
+
+  it('allows unscoped fallback only when allowLegacyUnscoped is explicitly true', async () => {
+    const confirmed = await resolveDenseQueryAccountScope(
+      { query: vi.fn(), getStatus: vi.fn().mockResolvedValue({ vectorCount: 5, dimensions: 1536 }) },
+      { accountId: '7', multiAccount: false, allowLegacyUnscoped: true },
+      signal,
+    );
+    expect(confirmed).toEqual({ skip: false });
   });
 });

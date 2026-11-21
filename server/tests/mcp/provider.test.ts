@@ -540,9 +540,27 @@ describe('MCP provider discovery', () => {
         vi.stubGlobal('fetch', fetchEmpty);
 
         const emptyRes = await provider.vectorSearch('retrieval', {});
-        expect(emptyRes).toMatchObject({ available: true, matches: [] });
+        // 回填已安排重建时，同一次请求与重建完成前的后续请求都不应报告为正常无匹配
+        expect(emptyRes).toEqual({ available: false, reason: 'vector_rebuild_pending' });
         const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
         expect(row.vector_indexed_at).toBeNull();
+
+        // 重建完成前后续查询仍返回 vector_rebuild_pending（不会因探测标记跳过而误报正常空结果）
+        const fetchStillPending = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }));
+        vi.stubGlobal('fetch', fetchStillPending);
+        const stillPendingRes = await provider.vectorSearch('retrieval', {});
+        expect(stillPendingRes).toEqual({ available: false, reason: 'vector_rebuild_pending' });
+
+        // 客户端重建并写回 vector_indexed_at 后，空结果恢复为正常的 available: true
+        db.prepare("UPDATE repositories SET vector_indexed_at = '2026-01-01T00:00:00Z' WHERE account_id = '222' AND id = 1").run();
+        const fetchAfterRebuild = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }));
+        vi.stubGlobal('fetch', fetchAfterRebuild);
+        const afterRebuildRes = await provider.vectorSearch('retrieval', {});
+        expect(afterRebuildRes).toMatchObject({ available: true, matches: [] });
       } finally {
         db.close();
       }
@@ -598,6 +616,29 @@ describe('MCP provider discovery', () => {
         const result = await provider.vectorSearch('retrieval', {});
         // 探测失败同样属于「覆盖未确认」——不得静默返回空结果
         expect(result).toEqual({ available: false, reason: 'account_metadata_not_indexed' });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('returns default_coverage_unverifiable instead of account_metadata_not_indexed when default partition exceeds probe topK', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        db.prepare("DELETE FROM settings WHERE key = 'active_account_id'").run();
+        const insertStmt = db.prepare(
+          "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, vector_indexed_at) VALUES ('default', ?, ?, ?, ?, 'acme', '[]', '2025-01-01T00:00:00Z')",
+        );
+        for (let i = 1; i <= 51; i++) {
+          insertStmt.run(i, `repo-${i}`, `acme/repo-${i}`, `https://github.com/acme/repo-${i}`);
+        }
+        const fetchOverLimit = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [] }));
+        vi.stubGlobal('fetch', fetchOverLimit);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toEqual({ available: false, reason: 'default_coverage_unverifiable' });
       } finally {
         db.close();
       }

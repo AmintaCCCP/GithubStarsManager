@@ -941,7 +941,11 @@ function isAppMainPageUrl(rawUrl) {
       };
       return stripHash(entry) === stripHash(url);
     }
-    if (isDev && url.protocol === 'http:' && url.port === '5173' && isLoopbackHost(url.hostname)) return true;
+    if (isDev) {
+      if (!appEntryPageUrl) return false;
+      const entry = new URL(appEntryPageUrl);
+      return entry.protocol === 'http:' && url.origin === entry.origin;
+    }
     return false;
   } catch {
     return false;
@@ -955,7 +959,7 @@ function isAppMainPageFrame(event) {
   return isAppMainPageUrl(frame.url);
 }
 
-ipcMain.handle('gh-accounts:save', async (event, tokens) => {
+ipcMain.handle('gh-accounts:save', async (event, tokens, meta) => {
   if (!isAppMainPageFrame(event)) {
     console.warn('[gh-accounts:save] rejected: caller is not the app main page');
     return { success: false, error: 'gh-accounts IPC requires the app main page' };
@@ -968,7 +972,7 @@ ipcMain.handle('gh-accounts:save', async (event, tokens) => {
     console.log('[gh-accounts:save] result: FAIL: missing token map');
     return { success: false, error: 'gh-accounts.save requires a token map' };
   }
-  const result = saveEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, tokens);
+  const result = saveEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, tokens, meta);
   console.log('[gh-accounts:save] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
   return result;
 });

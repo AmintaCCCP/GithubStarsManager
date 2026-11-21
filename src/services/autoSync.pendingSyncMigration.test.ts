@@ -233,4 +233,87 @@ describe('loadPendingSyncAccounts legacy record migration (audit fix)', () => {
     expect(autoSync.hasPendingAccountSync('77')).toBe(false);
     expect(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY)).toBe(JSON.stringify([['77']]));
   });
+
+  it('blocks replacing the saved URL if both source and evaluated writes fail on startup and confirmation still fails (finding 21)', async () => {
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://origin.test/api');
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['77']]));
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const blockBothMarkers = (key: string, value: string) => {
+      if (key === MIGRATION_SOURCE_KEY || key === LEGACY_PENDING_SYNC_EVALUATED_KEY) {
+        throw new Error('QuotaExceededError');
+      }
+      originalSetItem(key, value);
+    };
+    const setItemSpies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(blockBothMarkers),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blockBothMarkers),
+    ];
+    try {
+      const firstStart = await importFresh();
+      const backendWithPersist = firstStart.backend as unknown as {
+        _backendUrl: string | null;
+        persistUrl: (url: string | null) => void;
+        rememberActiveUrl: () => void;
+      };
+      // 两个标记均写入失败时，禁止将已保存 URL 替换为 Y
+      backendWithPersist.persistUrl('https://other.test/api');
+      expect(window.localStorage.getItem(BACKEND_URL_STORAGE_KEY)).toBe('https://origin.test/api');
+      backendWithPersist._backendUrl = 'https://other.test/api';
+      backendWithPersist.rememberActiveUrl();
+      expect(window.localStorage.getItem(BACKEND_URL_STORAGE_KEY)).toBe('https://origin.test/api');
+    } finally {
+      setItemSpies.forEach((spy) => spy.mockRestore());
+    }
+
+    // 存储恢复后，在替换已保存 URL 为 Y 之前先固化原来源 X，重启后仍绑定到 X 而非 Y
+    const secondStart = await importFresh();
+    const backendWithPersist = secondStart.backend as unknown as {
+      _backendUrl: string | null;
+      persistUrl: (url: string | null) => void;
+    };
+    expect(JSON.parse(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY) ?? '[]'))
+      .toEqual([['77', 'https://origin.test/api']]);
+    backendWithPersist.persistUrl('https://other.test/api');
+    expect(window.localStorage.getItem(BACKEND_URL_STORAGE_KEY)).toBe('https://other.test/api');
+  });
+
+  it('persists origin source before replacing saved URL when storage recovers after both startup marker writes failed (finding 21)', async () => {
+    window.localStorage.setItem(BACKEND_URL_STORAGE_KEY, 'https://origin.test/api');
+    window.localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([['77']]));
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const blockBothMarkers = (key: string, value: string) => {
+      if (key === MIGRATION_SOURCE_KEY || key === LEGACY_PENDING_SYNC_EVALUATED_KEY) {
+        throw new Error('QuotaExceededError');
+      }
+      originalSetItem(key, value);
+    };
+    const setItemSpies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(blockBothMarkers),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(blockBothMarkers),
+    ];
+    let firstBackend!: { _backendUrl: string | null; persistUrl: (url: string | null) => void };
+    try {
+      const firstStart = await importFresh();
+      firstBackend = firstStart.backend as unknown as {
+        _backendUrl: string | null;
+        persistUrl: (url: string | null) => void;
+      };
+      expect(window.localStorage.getItem(MIGRATION_SOURCE_KEY)).toBeNull();
+      expect(window.localStorage.getItem(LEGACY_PENDING_SYNC_EVALUATED_KEY)).toBeNull();
+    } finally {
+      setItemSpies.forEach((spy) => spy.mockRestore());
+    }
+
+    // 同一次会话中存储恢复后替换 URL 为 Y：钩子先固化 X 为迁移来源，再允许写入 Y
+    firstBackend.persistUrl('https://other.test/api');
+    expect(window.localStorage.getItem(MIGRATION_SOURCE_KEY)).toBe('https://origin.test/api');
+    expect(window.localStorage.getItem(BACKEND_URL_STORAGE_KEY)).toBe('https://other.test/api');
+
+    // 重启后按已固化来源 X 绑定，绝不绑定到 Y
+    const secondStart = await importFresh();
+    secondStart.backend._backendUrl = 'https://other.test/api';
+    expect(secondStart.autoSync.hasPendingAccountSync('77')).toBe(false);
+    expect(JSON.parse(window.localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY) ?? '[]'))
+      .toEqual([['77', 'https://origin.test/api']]);
+  });
 });

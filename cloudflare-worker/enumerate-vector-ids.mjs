@@ -27,10 +27,16 @@ export function isLegacyVectorId(id) {
  *   返回 { vectors: Array<string|{id}>, nextCursor?: string }，失败时返回 null。
  */
 export function enumerateVectorIds(indexName, listPage) {
+  const ids = new Set();
+  let legacyCount = 0;
+  const fail = (reason) => (
+    legacyCount > 0
+      ? { ok: false, reason, total: ids.size, legacyCount }
+      : { ok: false, reason }
+  );
   try {
     if (!indexName) return { ok: false, reason: 'missing_index_name' };
     if (typeof listPage !== 'function') return { ok: false, reason: 'list_failed' };
-    const ids = new Set();
     let cursor;
     // 分页安全上限（1000/页 × 500 页）：超出按枚举失败处理，避免游标异常死循环。
     const MAX_ENUM_PAGES = 500;
@@ -39,14 +45,20 @@ export function enumerateVectorIds(indexName, listPage) {
     let reachedEnd = false;
     for (let page = 0; page < MAX_ENUM_PAGES; page++) {
       const data = listPage(indexName, cursor);
-      if (!data || !Array.isArray(data.vectors)) return { ok: false, reason: 'list_failed' };
+      if (!data || !Array.isArray(data.vectors)) return fail('list_failed');
       for (const entry of data.vectors) {
         const id = typeof entry === 'string' ? entry : String((entry && entry.id) ?? '');
-        if (id) ids.add(id);
+        if (id && !ids.has(id)) {
+          ids.add(id);
+          if (isLegacyVectorId(id)) legacyCount++;
+        }
       }
       const rawNext = data && data.nextCursor;
       const next = typeof rawNext === 'string' && rawNext ? rawNext : undefined;
       if (!next) {
+        if (data && data.isTruncated === true) {
+          return fail('truncated_without_cursor');
+        }
         reachedEnd = true;
         break;
       }
@@ -54,18 +66,14 @@ export function enumerateVectorIds(indexName, listPage) {
     }
     if (!reachedEnd) {
       // 达到分页上限仍有后续游标：本次枚举不完整，按枚举失败处理（覆盖未验证）。
-      return { ok: false, reason: 'page_limit_exceeded' };
+      return fail('page_limit_exceeded');
     }
     if (ids.size === 0) {
       // 采样查询能命中向量而枚举结果为空：快照矛盾，按枚举失败处理。
       return { ok: false, reason: 'empty_snapshot' };
     }
-    let legacyCount = 0;
-    for (const id of ids) {
-      if (isLegacyVectorId(id)) legacyCount++;
-    }
     return { ok: true, total: ids.size, legacyCount };
   } catch (err) {
-    return { ok: false, reason: err && err.message ? err.message : 'list_failed' };
+    return fail(err && err.message ? err.message : 'list_failed');
   }
 }

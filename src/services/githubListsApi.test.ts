@@ -365,4 +365,41 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
 
     await expect(api.createUserList('t')).rejects.toThrow(/后端代理：ECONNREFUSED/);
   });
+
+  it('不同账号直连写入不共用队列且不发送代理头；同账号跨实例仍串行', async () => {
+    let releaseA1!: () => void;
+    const started: string[] = [];
+    vi.mocked(window.fetch).mockImplementation((_url, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { variables?: { itemId?: string } };
+      const itemId = body.variables?.itemId ?? '';
+      started.push(itemId);
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      expect(headers['X-GitHub-Account-Id']).toBeUndefined();
+      if (itemId === 'item_a1') {
+        return new Promise<Response>((resolve) => {
+          releaseA1 = () => resolve(makeJsonResponse(200, UPDATE_ITEM_DATA));
+        });
+      }
+      return Promise.resolve(makeJsonResponse(200, UPDATE_ITEM_DATA));
+    });
+
+    const apiA1 = new GitHubListsApiService('ghp_a', '100');
+    const apiA2 = new GitHubListsApiService('ghp_a_new');
+    apiA2.setQueueAccountId('100');
+    const apiB = new GitHubListsApiService('ghp_b', '200');
+
+    const pA1 = apiA1.updateUserListsForItem('item_a1', ['L_1']);
+    const pA2 = apiA2.updateUserListsForItem('item_a2', ['L_2']);
+    const pB = apiB.updateUserListsForItem('item_b1', ['L_3']);
+
+    // 账号 B 不受账号 A 阻塞，立即完成；账号 A 的第二个实例等待第一个实例完成。
+    await pB;
+    expect(started).toContain('item_a1');
+    expect(started).toContain('item_b1');
+    expect(started).not.toContain('item_a2');
+
+    releaseA1();
+    await Promise.all([pA1, pA2]);
+    expect(started).toEqual(['item_a1', 'item_b1', 'item_a2']);
+  });
 });

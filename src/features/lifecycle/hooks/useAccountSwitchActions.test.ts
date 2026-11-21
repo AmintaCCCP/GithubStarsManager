@@ -509,9 +509,11 @@ describe('useAccountSwitchActions audit fixes', () => {
       savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
     });
     let releaseAuth: (value: typeof userB | PromiseLike<typeof userB>) => void = () => undefined;
-    mocks.authenticateWithGitHub.mockImplementation(
-      () => new Promise((resolve) => { releaseAuth = resolve; }),
-    );
+    mocks.authenticateWithGitHub
+      .mockImplementationOnce(
+        () => new Promise((resolve) => { releaseAuth = resolve; }),
+      )
+      .mockResolvedValue(userB);
 
     const { result } = renderHook(() => useAccountSwitchActions());
     const pending = result.current.addAccountWithToken('ghp_b');
@@ -756,8 +758,7 @@ describe('useAccountSwitchActions audit fixes', () => {
       const candidateCredentialWrites = backendWrites.filter((candidate) => candidate.method === 'syncSettings' && candidate.url === 'https://candidate.example/api');
       expect(candidateCredentialWrites).toHaveLength(1);
       for (const write of candidateCredentialWrites) {
-        expect(write.payloadKeys).not.toContain('categoryOrder');
-        expect(write.payload).toMatchObject({
+        expect(write.payload).toEqual({
           github_token: 'ghp_b',
           active_account_id: '2',
           user_profile: userB,
@@ -912,8 +913,8 @@ describe('useAccountSwitchActions audit fixes', () => {
     const state = useAppStore.getState();
     expect(state.user?.login).toBe('bob');
     expect(state.backendApiSecret).toBe('candidate-key');
-    // 全部有效账号已登记，无效条目被过滤
-    expect(state.savedAccounts['1']?.githubToken).toBe('tok-a-valid');
+    // 全部有效账号已登记，无效条目被过滤；已有非空本机 PAT 的账号保留本机 PAT，不被未核实的完整条目覆盖
+    expect(state.savedAccounts['1']?.githubToken).toBe('ghp_a');
     expect(state.savedAccounts['3']?.githubToken).toBe('tok-c');
     expect(state.savedAccounts['4']).toBeUndefined();
     expect(state.savedAccounts['5']).toBeUndefined();

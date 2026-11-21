@@ -43,6 +43,12 @@ export interface RepositoryCardActions {
  * Encapsulates RepositoryCard's domain operations while leaving card-local UI
  * state, layout, keyboard handling, and drag behaviour in the view component.
  */
+// 跨卡片实例共享的分析忙标记所有者表：同仓库 ID 在不同账号的卡片实例间
+// 共享 store.analyzingRepositoryIds，仅当当前请求仍是该 repoId 的所有者时
+// 才允许清除共享忙标记，避免账号 A 的旧请求清掉账号 B 的进行中标记。
+let nextAnalyzeRequestOwnerId = 0;
+const analyzingRepoMarkerOwners = new Map<number, number>();
+
 export const useRepositoryCardActions = ({
   repository,
   allCategories,
@@ -108,7 +114,14 @@ export const useRepositoryCardActions = ({
     abortControllerRef.current = null;
     similarityAbortRef.current?.abort();
     similarityAbortRef.current = null;
-    setAnalyzingRepository(repoId, false);
+    const ownerToken = analyzeRequestTokenRef.current;
+    const currentOwner = analyzingRepoMarkerOwners.get(repoId);
+    if (currentOwner === undefined || (ownerToken !== 0 && currentOwner === ownerToken)) {
+      if (ownerToken !== 0 && currentOwner === ownerToken) {
+        analyzingRepoMarkerOwners.delete(repoId);
+      }
+      setAnalyzingRepository(repoId, false);
+    }
   }, [repoId, setAnalyzingRepository]);
 
   const vectorSearchAvailable = useMemo(() => {
@@ -184,8 +197,9 @@ export const useRepositoryCardActions = ({
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const requestToken = analyzeRequestTokenRef.current + 1;
+    const requestToken = ++nextAnalyzeRequestOwnerId;
     analyzeRequestTokenRef.current = requestToken;
+    analyzingRepoMarkerOwners.set(repoId, requestToken);
 
     const analysisStartedAt = performance.now();
     setIsLocallyAnalyzing(true);
@@ -284,10 +298,14 @@ export const useRepositoryCardActions = ({
         abortControllerRef.current = null;
         setIsLocallyAnalyzing(false);
       }
-      // 分析标记清理按请求身份（R2-C19）：本请求仍是该卡片最新请求时清除，
-      // 即使会话已失效（同账号换凭据/切号）也必须清掉旧代次自己的忙标记，
-      // 否则 isAnalyzing 永久为 true；已有新请求接管时绝不清除其标记。
-      if (analyzeRequestTokenRef.current === requestToken) {
+      // 分析标记清理按跨实例共享所有者（R2-C19）：本请求仍是该卡片且仍是该
+      // repoId 的共享标记所有者时才清除，避免账号 A 的旧请求清掉账号 B 正在
+      // 分析同一 repoId 时设置的共享忙标记。
+      if (
+        analyzeRequestTokenRef.current === requestToken
+        && analyzingRepoMarkerOwners.get(repoId) === requestToken
+      ) {
+        analyzingRepoMarkerOwners.delete(repoId);
         setAnalyzingRepository(repoId, false);
       }
     }
@@ -512,9 +530,24 @@ export const useRepositoryCardActions = ({
           : undefined;
         // R12：同 ID 记录在等待期间被重新加星（starred_at 已刷新）时保留它，
         // 绝不按旧响应删除，也不登记待删除（GitHub 上仍为已加星）。
-        const restarred = [liveRecord, parkedRecord].some((record) => (
-          !!record && (record.starred_at ?? undefined) !== (startedStarredAt ?? undefined)
-        ));
+        // 若原记录缺少 starred_at 而当前记录补上了时间戳，无法区分「星标同步
+        // 补齐旧时间」与「真实重新加星」：向 GitHub 核对当前星标状态后再决定。
+        const matchingRecords = [liveRecord, parkedRecord].filter((record): record is Repository => Boolean(record));
+        let restarred = false;
+        if (startedStarredAt !== undefined) {
+          restarred = matchingRecords.some((record) => (record.starred_at ?? undefined) !== startedStarredAt);
+        } else if (matchingRecords.some((record) => record.starred_at !== undefined)) {
+          if (typeof githubApi.isRepositoryStarred === 'function') {
+            try {
+              restarred = await githubApi.isRepositoryStarred(owner, repo);
+            } catch {
+              // 无法确认未加星时保守保留记录，避免误删可能已重新加星的仓库
+              restarred = true;
+            }
+          } else {
+            restarred = true;
+          }
+        }
         if (!restarred && startedAccountId && typeof useAppStore.setState === 'function') {
           const parkedAccountId: string = startedAccountId;
           if (isCurrentAccount(startedAccountId)) {

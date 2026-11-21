@@ -15,6 +15,7 @@ import { createGitHubApiService } from '../../../services/githubApiFactory';
 import type { Repository } from '../../../types';
 import type { ImportedRepositoryCandidate } from '../../../types/repositoryImport';
 import { extractRepositoryCandidates } from '../../../utils/repositoryImport';
+import { findIdentityMatch } from '../../../utils/repositoryIdentity';
 import { isLikelySameLanguage } from '../../../utils/textLanguage';
 
 const MAX_CANDIDATES = 50;
@@ -39,11 +40,34 @@ const recordStarToOwnerSession = (ownerAccountId: string | null, repository: Rep
     useAppStore.setState((state) => {
       const parked = state.accountWorkspaces?.[ownerAccountId];
       if (!parked) return state;
-      if (parked.repositories.some((repo) => repo.id === repository.id)) return state;
+      const existing = findIdentityMatch(repository, parked.repositories);
+      let nextRepositories: Repository[];
+      if (existing) {
+        const existingIndex = parked.repositories.indexOf(existing);
+        nextRepositories = [...parked.repositories];
+        nextRepositories[existingIndex] = {
+          ...repository,
+          id: existing.id,
+          custom_description: existing.custom_description,
+          custom_tags: existing.custom_tags,
+          custom_category: existing.custom_category,
+          category_locked: existing.category_locked,
+          last_edited: existing.last_edited,
+          subscribed_to_releases: existing.subscribed_to_releases,
+          ai_summary: repository.ai_summary ?? existing.ai_summary,
+          ai_tags: repository.ai_tags ?? existing.ai_tags,
+          ai_platforms: repository.ai_platforms ?? existing.ai_platforms,
+          analyzed_at: repository.analyzed_at ?? existing.analyzed_at,
+          analysis_failed: repository.analysis_failed ?? existing.analysis_failed,
+          analysis_error: repository.analysis_error ?? existing.analysis_error,
+        };
+      } else {
+        nextRepositories = [...parked.repositories, repository];
+      }
       return {
         accountWorkspaces: {
           ...state.accountWorkspaces,
-          [ownerAccountId]: { ...parked, repositories: [...parked.repositories, repository] },
+          [ownerAccountId]: { ...parked, repositories: nextRepositories },
         },
       };
     });

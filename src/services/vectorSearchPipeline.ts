@@ -3,7 +3,7 @@ import { AIService, isAbortError } from './aiService';
 import {
   parseAccountScopedVectorId,
   type EmbeddingClient,
-  type VectorQueryResult,
+  type VectorWideQueryResult,
   type VectorSearchService,
 } from './vectorSearchService';
 import {
@@ -274,7 +274,7 @@ export async function resolveDenseQueryAccountScope(
 }
 
 export function hydrateMatches(
-  matches: VectorQueryResult[],
+  matches: VectorWideQueryResult[],
   repoById: Map<string, Repository>,
   options: {
     excludeSource?: Repository;
@@ -816,7 +816,7 @@ export async function runVectorSearchPipeline(
   // 回滚（ACCOUNT_METADATA_NOT_INDEXED）——保留 Worker 错误码，收到该错误时
   // 每次搜索只通知一次 onDenseSkipped（metadata-index-not-ready），随后继续
   // 使用本地召回，绝不发无范围查询。
-  const handleDenseQueryFailure = (stage: 'Raw' | 'Ideal', error: unknown): VectorQueryResult[] => {
+  const handleDenseQueryFailure = (stage: 'Raw' | 'Ideal', error: unknown): VectorWideQueryResult[] => {
     if (isAbortError(error)) throw error;
     const workerCode = (error as { code?: unknown } | null)?.code;
     if (workerCode === 'ACCOUNT_METADATA_NOT_INDEXED') {

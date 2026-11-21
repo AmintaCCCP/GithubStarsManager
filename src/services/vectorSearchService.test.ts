@@ -845,4 +845,69 @@ describe('indexAllRepos account-scope migration (audit fix)', () => {
       setItemSpies.forEach((spy) => spy.mockRestore());
     }
   });
+
+  it('backfills a later-synced repo with legacy vector_indexed_at without re-embedding already migrated repos (finding 47)', async () => {
+    const workerUrl = 'https://w1.example.com';
+    const firstClient = makeIndexClient();
+    const firstService = makeVectorService(workerUrl);
+
+    // 首次迁移快照只有仓库 1
+    const first = await indexAllRepos([makeRepository(1)], firstClient, firstService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+    expect(first.indexedRepoIds).toEqual([1]);
+
+    // 之后后端同步引入带旧 vector_indexed_at 的仓库 2（内容与许可证未变）
+    const secondClient = makeIndexClient();
+    const secondService = makeVectorService(workerUrl);
+    const second = await indexAllRepos([makeRepository(1), makeRepository(2)], secondClient, secondService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+    // 只补写仓库 2，已确认的仓库 1 不重复生成 embedding
+    expect(second.indexedRepoIds).toEqual([2]);
+    const upsertedIds = (secondService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
+    expect(upsertedIds).toEqual([buildAccountScopedVectorId('42', 2)]);
+
+    // 再次增量运行：两个仓库均已在该 Worker 确认，不再上传
+    const thirdClient = makeIndexClient();
+    const thirdService = makeVectorService(workerUrl);
+    const third = await indexAllRepos([makeRepository(1), makeRepository(2)], thirdClient, thirdService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      accountId: '42',
+    });
+    expect(third.indexedRepoIds).toEqual([]);
+  });
+});
+
+describe('VectorSearchService.query accountId validation (finding 99)', () => {
+  it('rejects explicit empty or whitespace accountId instead of falling back to an unscoped query', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ success: true, matches: [] }), { status: 200 }),
+    );
+    try {
+      const service = new VectorSearchService({ workerUrl: 'https://worker.example.com', authToken: 'token' });
+      await expect(service.query([0.1, 0.2], { accountId: '' })).rejects.toThrow(/accountId/i);
+      await expect(service.query([0.1, 0.2], { accountId: '   ' })).rejects.toThrow(/accountId/i);
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      // 未提供 accountId 时保留旧的无范围兼容行为
+      await expect(service.query([0.1, 0.2], {})).resolves.toEqual([]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body));
+      expect(body).not.toHaveProperty('accountId');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });

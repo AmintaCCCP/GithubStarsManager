@@ -359,4 +359,19 @@ describe('ghAccountsStorage save, load, clear', () => {
     };
     assert.deepEqual(saveEncryptedGhAccounts(throwingCtx, { '43': 'github_pat_x' }), { success: true });
   });
+
+  it('atomically persists and reloads clearedRemovalMarkers alongside tokens (v2 envelope)', () => {
+    const { ctx } = makeCtx();
+    const saveRes = saveEncryptedGhAccounts(
+      ctx,
+      { '42': 'ghp_new_42' },
+      { clearedRemovalMarkers: { '42': 'nonce_1_abc', 'bad-id': 'ignored', '7': 'bad\nnonce' } },
+    );
+    assert.deepEqual(saveRes, { success: true });
+    assert.deepEqual(loadEncryptedGhAccounts(ctx), {
+      status: 'loaded',
+      tokens: { '42': 'ghp_new_42' },
+      clearedRemovalMarkers: { '42': 'nonce_1_abc' },
+    });
+  });
 });

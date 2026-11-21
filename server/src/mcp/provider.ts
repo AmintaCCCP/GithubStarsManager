@@ -282,6 +282,9 @@ const FETCH_TIMEOUT_MS = 15_000;
 /** partition_meta 标记：该账号分区的账号元数据回填探测已完成（避免重复探测）。 */
 const VECTOR_BACKFILL_CHECKED_KEY = 'vector_account_backfill_checked';
 
+/** partition_meta 标记：已为该账号分区安排向量全量重建，等待客户端重新索引。 */
+const VECTOR_REBUILD_PENDING_KEY = 'vector_account_rebuild_pending';
+
 /** 诊断探测查询的 topK 上限（与 Worker /query 的 QUERY_TOPK_LIMIT 一致）。 */
 const VECTOR_PROBE_TOPK = 50;
 
@@ -316,11 +319,12 @@ async function probeDefaultPartitionScopedCoverage(
   workerUrl: string,
   queryHeaders: Record<string, string>,
   queryVector: number[],
-): Promise<'has_scoped_vectors' | 'no_scoped_vectors' | 'probe_failed'> {
+): Promise<'has_scoped_vectors' | 'no_scoped_vectors' | 'coverage_unverifiable' | 'probe_failed'> {
   // 覆盖核对的基准：本地 default 分区全部已索引仓库。超过探测 topK 时探测结果
-  // 被 Worker 截断（QUERY_TOPK_LIMIT 上限），无法逐条核对，按未确认处理。
+  // 会被 Worker 截断（QUERY_TOPK_LIMIT 上限），无法逐条核对，返回独立的
+  // coverage_unverifiable 状态，避免误报为索引未就绪。
   const expectedRepoIds = loadDefaultPartitionIndexedRepositoryIds(db);
-  if (expectedRepoIds.length > VECTOR_PROBE_TOPK) return 'probe_failed';
+  if (expectedRepoIds.length > VECTOR_PROBE_TOPK) return 'coverage_unverifiable';
   try {
     const probeResult = await fetchWithBodyTimeout(
       `${workerUrl}/query`,
@@ -488,8 +492,13 @@ async function ensureAccountVectorMetadataBackfill(
     const cleared = db.prepare(
       'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
     ).run(accountId).changes;
-    // 仅当确实清除了索引标记才推进对应账号快照版本。
-    if (cleared > 0) bumpAccountRevision(db, accountId);
+    // 仅当确实清除了索引标记才推进对应账号快照版本并记录「重建待完成」状态，
+    // 让本次及后续请求在客户端完成重建前区分「已安排重建」与「正常无匹配」。
+    if (cleared > 0) {
+      bumpAccountRevision(db, accountId);
+      db.prepare('INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES (?, ?, ?)')
+        .run(accountId, VECTOR_REBUILD_PENDING_KEY, workerIdentity);
+    }
     db.prepare('INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES (?, ?, ?)')
       .run(accountId, VECTOR_BACKFILL_CHECKED_KEY, workerIdentity);
     return true;
@@ -800,12 +809,47 @@ export async function vectorSearch(
       }
     }
   }
+  // 区分「已安排重建」与「重建已完成 / 正常无匹配」：
+  // 回填已清除本地索引标记后，在客户端重新上传带账号元数据的向量（写回
+  // vector_indexed_at）之前，不得把空结果报告为正常的 available: true 无匹配。
+  if (
+    accountId !== 'default'
+    && getPartitionMeta(db, accountId, VECTOR_REBUILD_PENDING_KEY) === workerUrl
+  ) {
+    let hasIndexedAfter = false;
+    let hasAnyRepos = false;
+    try {
+      hasIndexedAfter = Boolean(
+        db
+          .prepare('SELECT 1 AS one FROM repositories WHERE account_id = ? AND vector_indexed_at IS NOT NULL LIMIT 1')
+          .get(accountId),
+      );
+      hasAnyRepos = hasIndexedAfter || Boolean(
+        db
+          .prepare('SELECT 1 AS one FROM repositories WHERE account_id = ? LIMIT 1')
+          .get(accountId),
+      );
+    } catch {
+      // 轻量 stub 缺列/缺表时忽略
+    }
+    if (hasIndexedAfter || !hasAnyRepos) {
+      try {
+        db.prepare('DELETE FROM partition_meta WHERE account_id = ? AND key = ?')
+          .run(accountId, VECTOR_REBUILD_PENDING_KEY);
+      } catch {
+        // 轻量 stub 缺表时忽略
+      }
+    } else if (matches.length === 0) {
+      return { available: false, reason: 'vector_rebuild_pending' };
+    }
+  }
   // Issue #612 R12 审计 ISSUE-2：default 分区不得在「元数据索引已启用但未回填/
   // 覆盖未确认」时静默返回空结果。带 accountId='default' 的查询在旧向量缺少
   // accountId 元数据时同样返回 200 空 matches；本地 default 分区存在已索引仓库
   // 时先做独立探测，逐条核对本地全部已索引仓库是否都能被 default 范围召回——
   // 仅凭「范围内有向量」不能确认覆盖完整（部分回填会把漏召回伪装成正常的
-  // 阈值空结果，R13 审计 14）。未确认（含探测失败 / 无法完整核对）时按与
+  // 阈值空结果，R13 审计 14）。超过探测 topK 上限时返回独立的
+  // default_coverage_unverifiable，避免误报为索引未就绪；其他未确认状态按与
   // account_metadata_not_indexed 一致的迁移状态返回。default 分区没有本地索引
   // 标记时是真「无数据」，保持空结果。
   if (
@@ -814,6 +858,12 @@ export async function vectorSearch(
     && hasIndexedDefaultPartitionRepositories(db)
   ) {
     const coverage = await probeDefaultPartitionScopedCoverage(db, workerUrl, queryHeaders, vector);
+    if (coverage === 'coverage_unverifiable') {
+      logger.warn('mcp.vector', 'Default partition account metadata coverage unverifiable (exceeds probe topK)', {
+        coverage,
+      });
+      return { available: false, reason: 'default_coverage_unverifiable' };
+    }
     if (coverage !== 'has_scoped_vectors') {
       logger.warn('mcp.vector', 'Default partition account metadata coverage unconfirmed', {
         coverage,

@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../../../types';
 import { useVectorSearchActions, type VectorIndexDraft } from './useVectorSearchActions';
 import { useAppStore } from '../../../store/useAppStore';
-import { EMBEDDING_FORMAT_VERSION } from '../../../services/vectorSearchService';
+import {
+  EMBEDDING_FORMAT_VERSION,
+  __resetAccountWorkerVectorCountsForTest,
+  __resetInMemoryAccountScopeMigrationForTest,
+} from '../../../services/vectorSearchService';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
@@ -45,19 +49,34 @@ vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
     ...actual,
     EmbeddingClient: class {},
     VectorSearchService: class {
-      workerId = 'https://worker.example.com';
+      workerId: string;
       cleanup = mocks.cleanup;
       getStatus = mocks.vectorGetStatus;
       testConnection = mocks.vectorTestConnection;
+      constructor(config?: { workerUrl?: string }) {
+        this.workerId = (config?.workerUrl ?? '').trim().replace(/\/+$/, '') || 'https://worker.example.com';
+      }
     },
     indexAllRepos: mocks.indexAllRepos,
     needsReindex: mocks.needsReindex,
-    // 与真实实现同构：分析过滤 → 增量 needsReindex → 按 id 首条去重
-    selectIndexableRepos: (repos: Repository[], options: { incremental?: boolean; formatVersion?: number; currentFormatVersion?: number } = {}) => {
+    // 与真实实现同构：分析过滤 → 增量 needsReindex + 逐仓账号范围迁移 → 按 id 首条去重
+    selectIndexableRepos: (
+      repos: Repository[],
+      options: {
+        incremental?: boolean;
+        formatVersion?: number;
+        currentFormatVersion?: number;
+        accountId?: string | null;
+        workerId?: string | null;
+      } = {},
+    ) => {
       let indexable = repos.filter((repo) => repo.analyzed_at && !repo.analysis_failed);
       if (options.incremental) {
         const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? actual.EMBEDDING_FORMAT_VERSION);
-        indexable = indexable.filter((repo) => mocks.needsReindex(repo, formatVersionChanged));
+        indexable = indexable.filter((repo) => (
+          mocks.needsReindex(repo, formatVersionChanged)
+          || (!!options.accountId && !actual.isRepoAccountScopeMigrated(options.accountId, repo.id, options.workerId))
+        ));
       }
       const seen = new Set<number>();
       return indexable.filter((repo) => {
@@ -118,6 +137,9 @@ const mockUseAppStore = vi.mocked(useAppStore);
 describe('useVectorSearchActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem('gsm.vectorAccountScopeMigrationDone');
+    __resetInMemoryAccountScopeMigrationForTest();
+    __resetAccountWorkerVectorCountsForTest();
     storeState = createStoreState();
     mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
       selector ? selector(storeState) : storeState
@@ -228,6 +250,74 @@ describe('useVectorSearchActions', () => {
     localStorage.removeItem('gsm.vectorAccountScopeMigrationDone');
   });
 
+  it('isolates account-scope migration impact on incremental counts with current format and false predicate (finding 34)', () => {
+    storeState.vectorSearchConfig.embeddingFormatVersion = EMBEDDING_FORMAT_VERSION;
+    (storeState.vectorSearchConfig as { workerUrl?: string }).workerUrl = 'https://worker.example.com';
+    storeState.repositories = [repository, { ...repository, id: 2 } as Repository];
+    mocks.needsReindex.mockReturnValue(false);
+
+    // 迁移前：同一账号、同一 Worker，当前格式且 needsReindex=false，仍因未迁移计为 2
+    const before = renderHook(() => useVectorSearchActions());
+    expect(before.result.current.unindexedRepoCount).toBe(2);
+    expect(before.result.current.incrementalTargetCount).toBe(2);
+
+    // 迁移后：同一账号、同一 Worker 已确认仓库 1 与 2，两者均降为 0
+    localStorage.setItem(
+      'gsm.vectorAccountScopeMigrationDone',
+      JSON.stringify({ '1': { workers: { 'https://worker.example.com': [1, 2] } } }),
+    );
+    const after = renderHook(() => useVectorSearchActions());
+    expect(after.result.current.unindexedRepoCount).toBe(0);
+    expect(after.result.current.incrementalTargetCount).toBe(0);
+  });
+
+  it('computes incrementalTargetCount against the draft workerUrl when provided (finding 100)', () => {
+    storeState.vectorSearchConfig.embeddingFormatVersion = EMBEDDING_FORMAT_VERSION;
+    (storeState.vectorSearchConfig as { workerUrl?: string }).workerUrl = 'https://w1.example.com';
+    localStorage.setItem(
+      'gsm.vectorAccountScopeMigrationDone',
+      JSON.stringify({ '1': { workers: { 'https://w1.example.com': [1, 2] } } }),
+    );
+    storeState.repositories = [repository, { ...repository, id: 2 } as Repository];
+    mocks.needsReindex.mockReturnValue(false);
+
+    // W1 已迁移，计数为 0；表单切换至未迁移的 W2 后，incrementalTargetCount 为 2，
+    // 而已保存配置对应的 unindexedRepoCount 保持 0
+    const { result } = renderHook(() => useVectorSearchActions({ workerUrl: 'https://w2.example.com' }));
+    expect(result.current.incrementalTargetCount).toBe(2);
+    expect(result.current.unindexedRepoCount).toBe(0);
+  });
+
+  it('counts migration backfills on the target worker without double-counting normal incremental updates (finding 3)', async () => {
+    storeState.vectorSearchConfig.embeddingFormatVersion = EMBEDDING_FORMAT_VERSION;
+    (storeState.vectorSearchConfig as { workerUrl?: string }).workerUrl = 'https://w2.example.com';
+    (storeState as { vectorSearchStatus?: { connected: boolean; vectorCount: number; dimensions: number } }).vectorSearchStatus = {
+      connected: true,
+      vectorCount: 0,
+      dimensions: 1536,
+    };
+    storeState.repositories = [
+      { ...repository, id: 1, vector_indexed_at: '2026-08-01T00:00:00.000Z' } as Repository,
+      { ...repository, id: 2, vector_indexed_at: '2026-08-01T00:00:00.000Z' } as Repository,
+    ];
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 2, skipped: 0, errors: 0, indexedRepoIds: [1, 2] });
+    const w2Draft = { ...draft, workerUrl: 'https://w2.example.com' };
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    // 首次向 W2 增量迁移：两个仓库均有旧 vector_indexed_at，但均未在 W2 确认 -> 计数从 0 增至 2
+    await act(async () => { await result.current.incrementalIndex(w2Draft); });
+    expect(mocks.setVectorSearchStatus).toHaveBeenLastCalledWith(expect.objectContaining({ vectorCount: 2 }));
+
+    // 标记已在 W2 完成迁移后，普通增量更新已迁移仓库不再重复累加计数
+    localStorage.setItem(
+      'gsm.vectorAccountScopeMigrationDone',
+      JSON.stringify({ '1': { workers: { 'https://w2.example.com': [1, 2] } } }),
+    );
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 1, errors: 0, indexedRepoIds: [1] });
+    await act(async () => { await result.current.incrementalIndex(w2Draft); });
+    expect(mocks.setVectorSearchStatus).toHaveBeenLastCalledWith(expect.objectContaining({ vectorCount: 2 }));
+  });
+
   it('reports zero unindexed repositories when vector search is disabled', () => {
     storeState.vectorSearchConfig.enabled = false;
     mocks.needsReindex.mockReturnValue(true);
@@ -265,6 +355,9 @@ describe('useVectorSearchActions', () => {
 describe('useVectorSearchActions account switch guards', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem('gsm.vectorAccountScopeMigrationDone');
+    __resetInMemoryAccountScopeMigrationForTest();
+    __resetAccountWorkerVectorCountsForTest();
     storeState = createStoreState();
     mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
       selector ? selector(storeState) : storeState
@@ -570,5 +663,68 @@ describe('useVectorSearchActions account switch guards', () => {
     await act(async () => { await result.current.testWorker({ workerUrl: 'https://worker.example.com', authToken: 'worker-token' }); });
 
     expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
+  });
+
+  it('aborts and clears busy state without committing stale results when worker config changes mid-index (finding 48)', async () => {
+    (storeState as { vectorSearchConfig: { workerUrl?: string; authToken?: string; embeddingFormatVersion?: number; enabled: boolean } }).vectorSearchConfig = {
+      ...storeState.vectorSearchConfig,
+      workerUrl: 'https://w1.example.com',
+      authToken: 'token-1',
+    };
+    mocks.indexAllRepos.mockImplementation(async (_repos: unknown, _embedding: unknown, _vector: unknown, options: { onRepoIndexed?: (id: number) => void }) => {
+      // 用户在 W1 上传期间保存了 W2 配置
+      (storeState as { vectorSearchConfig: { workerUrl?: string; authToken?: string; embeddingFormatVersion?: number; enabled: boolean } }).vectorSearchConfig = {
+        ...storeState.vectorSearchConfig,
+        workerUrl: 'https://w2.example.com',
+        authToken: 'token-2',
+      };
+      options.onRepoIndexed?.(1);
+      return { indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] };
+    });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => {
+      await result.current.rebuildIndex({ ...draft, workerUrl: 'https://w1.example.com', authToken: 'token-1' });
+    });
+
+    // 不得提交旧目标 W1 的仓库打戳、连接状态或格式版本
+    expect(mocks.updateRepositoriesMetadata).not.toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 1, patch: expect.objectContaining({ vector_indexed_at: expect.any(String) }) }),
+    ]));
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
+    expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
+    // 同时清理该任务自己的忙碌状态
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith({ isIndexing: false, phase: null, result: null });
+  });
+
+  it('isolates vector count per account and worker on worker connection test (finding 101)', async () => {
+    (storeState as { vectorSearchConfig: { workerUrl?: string; authToken?: string; embeddingFormatVersion?: number; enabled: boolean } }).vectorSearchConfig = {
+      ...storeState.vectorSearchConfig,
+      workerUrl: 'https://worker.example.com',
+      authToken: 'worker-token',
+    };
+    // 账号 1 在 W1 索引了 20 个仓库
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 20, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const hookA = renderHook(() => useVectorSearchActions());
+    await act(async () => { await hookA.result.current.rebuildIndex(draft); });
+    expect(mocks.setVectorSearchStatus).toHaveBeenLastCalledWith(expect.objectContaining({ vectorCount: 20 }));
+
+    // 切换到无向量的账号 2，共享 vectorSearchStatus 仍保留 20
+    mocks.setVectorSearchStatus.mockClear();
+    (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+    (storeState as { vectorSearchStatus?: { connected: boolean; vectorCount: number; dimensions: number } }).vectorSearchStatus = {
+      connected: true,
+      vectorCount: 20,
+      dimensions: 1536,
+    };
+    mocks.vectorTestConnection.mockResolvedValue({ success: true, vectorCount: 20, dimensions: 1536 });
+
+    const hookB = renderHook(() => useVectorSearchActions());
+    await act(async () => {
+      await hookB.result.current.testWorker({ workerUrl: 'https://worker.example.com', authToken: 'worker-token' });
+    });
+
+    // 账号 2 在 W1 无向量：必须写回 0，绝不把账号 1 的 20 写回账号 2
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 0, dimensions: 1536 });
   });
 });

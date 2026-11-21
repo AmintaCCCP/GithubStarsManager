@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope, resolveWritableAccountScope, hasInvalidAccountHeader, bumpAccountRevision } from '../db/accountScope.js';
+import { resolveReadableAccountScope, resolveWritableAccountScope, bumpAccountRevision } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -35,16 +35,17 @@ function transformRelease(row: Record<string, unknown>) {
 router.get('/api/releases', (req, res) => {
   try {
     const db = getDb();
-    // Issue #612 审计（143）：显式携带但格式无效的账号头（空白 / 非数字）按无效
-    // 请求处理，绝不当作缺失回退到活跃账号 / default 分区读取他人数据。
-    if (hasInvalidAccountHeader(req)) {
+    // Issue #612 审计（143 / 多账号读取隔离）：无效账号头或存在多个真实账号分区
+    // 且未携带账号头时直接返回 409，绝不回退到可变的活跃账号读取他人数据。
+    const scope = resolveReadableAccountScope(req, db);
+    if (!scope.ok) {
       res.status(409).json({
-        error: 'X-GitHub-Account-Id must be a numeric account ID',
+        error: scope.error,
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;
     }
-    const accountId = resolveAccountScope(req, db);
+    const accountId = scope.accountId;
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 50));
     const repoId = req.query.repo_id as string | undefined;

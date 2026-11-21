@@ -183,7 +183,10 @@ describe('ghAccountSecrets save semantics (R2-B1)', () => {
     });
     expect(replacementOk).toBe(true);
     expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
-    expect(getBridgeMock().save).toHaveBeenLastCalledWith({ '42': 'ghp_new_42' });
+    expect(getBridgeMock().save).toHaveBeenLastCalledWith(
+      { '42': 'ghp_new_42' },
+      { clearedRemovalMarkers: { '42': expect.any(String) } },
+    );
   });
 
   it('treats an explicit removal as authoritative even when the same call supplies a token (round-12 audit)', async () => {
@@ -635,5 +638,74 @@ describe('syncGhAccountTokensFromState (R2-B1)', () => {
     } finally {
       window.localStorage.removeItem('gsm.pendingGhAccountRemovals');
     }
+  });
+
+  it('keeps re-authorized PAT across restart even when localStorage marker cleanup fails (atomic clearedRemovalMarkers)', async () => {
+    window.localStorage.clear();
+    // 模拟真实主进程加密文件：保存 tokens 与 clearedRemovalMarkers 于同一原子载荷。
+    let diskPayload: { tokens: Record<string, string>; clearedRemovalMarkers?: Record<string, string> } = {
+      tokens: { '42': 'ghp_old_42', '7': 'ghp_7' },
+    };
+    const saveMock = vi.fn()
+      .mockResolvedValueOnce({ success: false, error: 'disk busy' })
+      .mockImplementation(async (tokens: Record<string, string>, meta?: { clearedRemovalMarkers?: Record<string, string> }) => {
+        diskPayload = {
+          tokens: { ...tokens },
+          ...(meta?.clearedRemovalMarkers ? { clearedRemovalMarkers: { ...meta.clearedRemovalMarkers } } : {}),
+        };
+        return { success: true };
+      });
+    const getMock = vi.fn(async () => ({
+      status: 'loaded' as const,
+      tokens: { ...diskPayload.tokens },
+      ...(diskPayload.clearedRemovalMarkers ? { clearedRemovalMarkers: { ...diskPayload.clearedRemovalMarkers } } : {}),
+    }));
+    setBridge({ get: getMock, save: saveMock });
+
+    const secrets = await importFresh();
+    await secrets.loadGhAccountTokens();
+    // 1) 登出 42 失败：待删标记（含 nonce）已写入 localStorage，磁盘仍留旧 PAT。
+    await expect(secrets.syncGhAccountTokensFromState({ user: null, githubToken: null, savedAccounts: {} }, ['42'])).resolves.toBe(false);
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+
+    // 2) 重新授权 42：bridge.save 成功写入新 PAT 与 clearedRemovalMarkers，但 localStorage 清理失败。
+    const originalStorage = window.localStorage;
+    const failingWriteStorage = {
+      getItem: (key: string) => originalStorage.getItem(key),
+      setItem: () => { throw new Error('localStorage read-only'); },
+      removeItem: () => { throw new Error('localStorage read-only'); },
+      clear: () => originalStorage.clear(),
+      key: (index: number) => originalStorage.key(index),
+      get length() { return originalStorage.length; },
+    } as Storage;
+    Object.defineProperty(window, 'localStorage', { writable: true, value: failingWriteStorage });
+    try {
+      await expect(secrets.syncGhAccountTokensFromState({
+        user: { id: 42 },
+        githubToken: 'ghp_new_42',
+        savedAccounts: { '42': { githubToken: 'ghp_new_42' } },
+      })).resolves.toBe(true);
+      // localStorage 中仍残留旧待删标记。
+      expect(JSON.parse(originalStorage.getItem('gsm.pendingGhAccountRemovals') ?? '[]')).toEqual(['42']);
+    } finally {
+      Object.defineProperty(window, 'localStorage', { writable: true, value: originalStorage });
+    }
+
+    // 3) 重启：启动恢复读到旧标记，但 loadGhAccountTokens 通过加密文件的 clearedRemovalMarkers
+    // 对账解除该标记，既不屏蔽也不删除新 PAT，会话正常恢复。
+    const restarted = await importFresh();
+    const loaded = await restarted.loadGhAccountTokens();
+    expect(loaded).toEqual({ status: 'loaded', tokens: { '42': 'ghp_new_42', '7': 'ghp_7' } });
+    expect(restarted.hasPendingGhAccountSecretRemovals()).toBe(false);
+    expect(window.localStorage.getItem('gsm.pendingGhAccountRemovals')).toBeNull();
+    expect(diskPayload.tokens['42']).toBe('ghp_new_42');
+
+    // 4) 再次登出 42 且保存失败：生成新 nonce，旧 clearedRemovalMarkers 不得解除新退出标记。
+    saveMock.mockResolvedValueOnce({ success: false, error: 'disk busy again' });
+    await expect(restarted.syncGhAccountTokensFromState({ user: null, githubToken: null, savedAccounts: {} }, ['42'])).resolves.toBe(false);
+    const restartedAfterSecondLogout = await importFresh();
+    const loadedAfterSecondLogout = await restartedAfterSecondLogout.loadGhAccountTokens();
+    expect(loadedAfterSecondLogout).toEqual({ status: 'loaded', tokens: { '7': 'ghp_7' } });
+    expect(restartedAfterSecondLogout.hasPendingGhAccountSecretRemovals()).toBe(true);
   });
 });

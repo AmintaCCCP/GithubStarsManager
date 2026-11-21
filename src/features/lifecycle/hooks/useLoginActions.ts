@@ -146,7 +146,11 @@ export const useLoginActions = (): LoginActions => {
         ...(accountId ? { active_account_id: accountId } : {}),
         ...(user ? { user_profile: user } : {}),
       });
-      if (result.tokenUpdateSkipped || result.tokenUpdateSuperseded) {
+      if (
+        result.tokenUpdateSkipped
+        || result.tokenUpdateSuperseded
+        || result.activeAccountUpdateSkipped
+      ) {
         return { ok: false };
       }
       return { ok: true };
@@ -249,7 +253,11 @@ export const useLoginActions = (): LoginActions => {
       ...(accountId ? { active_account_id: accountId } : {}),
       user_profile: user,
     }, undefined, accountId);
-    if (syncResult?.tokenUpdateSkipped === true || syncResult?.tokenUpdateSuperseded === true) {
+    if (
+      syncResult?.tokenUpdateSkipped === true
+      || syncResult?.tokenUpdateSuperseded === true
+      || syncResult?.activeAccountUpdateSkipped === true
+    ) {
       throw new Error('Backend token update was skipped; credentials are not aligned.');
     }
     // R2-B12：候选后端完成 Token 设置不等于登录提交成功——严格仓库拉取失败
@@ -273,11 +281,15 @@ export const useLoginActions = (): LoginActions => {
     // R13 finding 36：透传 syncFromBackend 的分片拉取结果（各分片 HTTP 读取
     // 是否成功；null=拉取未执行/被丢弃/失败）——调用方（登录页）可据此区分
     // 「拉取成功但某分片为空」与「分片读取失败」，忽略返回值的既有调用方不受影响。
-    return await syncFromBackend({
+    const pullResult = await syncFromBackend({
       force: true,
       throwOnRepoFailure: true,
       ...(options?.targetAccountId ? { targetAccountId: options.targetAccountId } : {}),
     });
+    if (pullResult === null) {
+      throw new Error('Strict pull did not run; login must not commit unpulled data');
+    }
+    return pullResult;
   }, []);
 
   const getBackendUrl = useCallback(() => backend.backendUrl, []);

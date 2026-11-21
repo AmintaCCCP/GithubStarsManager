@@ -395,10 +395,11 @@ describe('pushCategoriesToLists 陈旧 isRunning 恢复（round-14 [27]）', () 
 
     await push();
 
-    // 旧任务已结束但状态未复位：isRunning 残留（既有行为），远端槽已释放。
-    expect(state.listsPush.isRunning).toBe(true);
+    // 同账号更新 PAT 使旧任务因会话失效结束且无新槽取代时，listsPush 必须
+    // 回到空闲状态（isRunning=false），避免禁用 UI 推送按钮。
+    expect(state.listsPush.isRunning).toBe(false);
 
-    // 下一轮推送不得被残留 isRunning 阻塞：远端槽已全部释放（无在途任务）。
+    // 下一轮推送正常执行。
     api.getUserLists.mockClear();
     api.resolveRepositoryNodeIds.mockResolvedValue(new Map([['owner/my-cli-app', 'node_1']]));
     await push();
@@ -430,5 +431,66 @@ describe('pushCategoriesToLists 陈旧 isRunning 恢复（round-14 [27]）', () 
     await first;
     expect(state.listsPush.isRunning).toBe(false);
     expect(state.listsPush.message).toBeTruthy();
+  });
+
+  it('等待旧推送排空期间仓库被清空时，在任何远端变更前退出', async () => {
+    const { push, api, state } = makeSliceHarness({
+      currentLists: [{ id: 'L_dev', name: 'devtools', items: ['owner/my-cli-app'] }],
+      categoryListIdMap: { devtools: 'L_dev' },
+      nodeIdMap: new Map([['owner/my-cli-app', 'node_1']]),
+    });
+    let releaseFirst!: () => void;
+    api.resolveRepositoryNodeIds.mockImplementationOnce(
+      () => new Promise<Map<string, string>>((resolve) => { releaseFirst = () => resolve(new Map([['owner/my-cli-app', 'node_1']])); }),
+    );
+
+    const first = push();
+    await vi.waitFor(() => expect(api.resolveRepositoryNodeIds).toHaveBeenCalledTimes(1));
+
+    // 同账号更新 PAT（递增代次），发起新一轮推送并等待旧槽；等待期间清空本地仓库。
+    bumpAccountSessionGeneration();
+    api.getUserLists.mockClear();
+    api.updateUserListsForItem.mockClear();
+    const second = push();
+    state.repositories = [];
+
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(api.getUserLists).not.toHaveBeenCalled();
+    expect(api.updateUserListsForItem).not.toHaveBeenCalled();
+    expect(state.listsPush.isRunning).toBe(false);
+    expect(state.listsPush.error).toBe('No repositories to push');
+  });
+
+  it('其他账号有在途推送时，不阻塞当前账号发起推送', async () => {
+    const harnessB = makeSliceHarness({
+      currentLists: [{ id: 'L_dev', name: 'devtools', items: [] }],
+      categoryListIdMap: { devtools: 'L_dev' },
+      nodeIdMap: new Map([['owner/my-cli-app', 'node_1']]),
+    });
+    (harnessB.state.user as { id?: number; login: string }).id = 200;
+    let releaseB!: () => void;
+    harnessB.api.resolveRepositoryNodeIds.mockImplementationOnce(
+      () => new Promise<Map<string, string>>((resolve) => { releaseB = () => resolve(new Map([['owner/my-cli-app', 'node_1']])); }),
+    );
+
+    const pushB = harnessB.push();
+    await vi.waitFor(() => expect(harnessB.api.resolveRepositoryNodeIds).toHaveBeenCalledTimes(1));
+
+    const harnessA = makeSliceHarness({
+      currentLists: [{ id: 'L_dev', name: 'devtools', items: [] }],
+      categoryListIdMap: { devtools: 'L_dev' },
+      nodeIdMap: new Map([['owner/my-cli-app', 'node_1']]),
+    });
+    (harnessA.state.user as { id?: number; login: string }).id = 100;
+    harnessA.state.listsPush.isRunning = true;
+
+    await harnessA.push();
+    expect(harnessA.api.getUserLists).toHaveBeenCalledTimes(1);
+    expect(harnessA.state.listsPush.isRunning).toBe(false);
+
+    releaseB();
+    await pushB;
   });
 });

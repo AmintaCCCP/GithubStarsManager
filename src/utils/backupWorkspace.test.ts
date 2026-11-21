@@ -334,7 +334,9 @@ describe('multi-account backup helpers (Issue #611)', () => {
       ['repositories'],
       { repositories: [{ ...repo(3, 'imported-indexed'), vector_indexed_at: '2026-05-02T00:00:00.000Z' }] },
     );
-    expect(patch.repositories?.[0].vector_indexed_at).toBeUndefined();
+    expect(patch.repositories).toHaveLength(1);
+    expect(patch.repositories![0].id).toBe(3);
+    expect(patch.repositories![0].vector_indexed_at).toBeUndefined();
   });
 
   it('applies only workspace fields for the selected import types', () => {

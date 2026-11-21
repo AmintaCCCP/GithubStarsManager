@@ -4,6 +4,7 @@ import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
 import {
+  ACCOUNT_ID_PATTERN,
   claimLegacyDefaultIfNeeded,
   getLegacyDefaultClaimedBy,
   hasInvalidAccountHeader,
@@ -108,7 +109,7 @@ function readAccountRows(db: ReturnType<typeof getDb>): AccountEntry[] {
       .all() as Array<{ account_id: string; value: string | null }>;
     for (const row of scopedRows) {
       const accountId = String(row.account_id);
-      if (!accountId || !/^\d+$/.test(accountId) || known.has(accountId)) continue;
+      if (!accountId || !ACCOUNT_ID_PATTERN.test(accountId) || known.has(accountId)) continue;
       if (!row.value) continue; // 显式清空：不合成恢复条目
       let githubToken: string | null = null;
       try {
@@ -136,7 +137,7 @@ function readAccountRows(db: ReturnType<typeof getDb>): AccountEntry[] {
   // null，由客户端走 PAT 设置 / 身份回查流程）。
   try {
     for (const partitionId of collectNonDefaultPartitionIds(db)) {
-      if (!/^\d+$/.test(partitionId) || known.has(partitionId)) continue;
+      if (!ACCOUNT_ID_PATTERN.test(partitionId) || known.has(partitionId)) continue;
       known.add(partitionId);
       entries.push({
         accountId: partitionId,
@@ -212,14 +213,16 @@ router.post('/api/sync/auth', async (req, res) => {
     const bodyAccountId = typeof bodyAccountIdRaw === 'string' ? bodyAccountIdRaw.trim() : '';
     const headerAccountId = req.header('x-github-account-id')?.trim() ?? '';
     // Issue #612 R15（审计 8）：无有效账号头时必须区分请求体 account_id 字段缺失
-    // 与字段无效——显式提供的无效值（如 "forty-two"）直接拒绝，绝不当作「未选择
-    // 账号」进入无头兼容分支（否则唯一可恢复账号的 PAT 会返回给选错账号的调用
-    // 方）。合法账号头保持优先：头部有效时请求体账号选择仅作冗余，其无效值忽略。
-    // 字段真正缺失（未发送 / null / 空串）的旧客户端兼容分支保留不变。
-    if (!/^\d+$/.test(headerAccountId)
-      && typeof bodyAccountIdRaw === 'string'
-      && bodyAccountId !== ''
-      && !/^\d+$/.test(bodyAccountId)) {
+    // 与字段无效——显式提供的无效值（含非字符串如数字 222、非规范数字如 "042"、
+    // 非数字如 "forty-two"）直接拒绝，绝不当作「未选择账号」进入无头兼容分支
+    // （否则唯一可恢复账号的 PAT 会返回给选错账号的调用方）。合法账号头保持
+    // 优先：头部有效时请求体账号选择仅作冗余，其无效值忽略。字段真正缺失
+    // （未发送 / null / 空串）的旧客户端兼容分支保留不变。
+    const hasExplicitBodyAccountId = bodyAccountIdRaw !== undefined && bodyAccountIdRaw !== null;
+    if (!ACCOUNT_ID_PATTERN.test(headerAccountId)
+      && hasExplicitBodyAccountId
+      && (typeof bodyAccountIdRaw !== 'string'
+        || (bodyAccountId !== '' && !ACCOUNT_ID_PATTERN.test(bodyAccountId)))) {
       res.status(409).json({
         error: 'account_id must be a numeric account ID',
         code: 'ACCOUNT_SCOPE_REQUIRED',
@@ -229,9 +232,9 @@ router.post('/api/sync/auth', async (req, res) => {
     // Issue #612 A19：请求体 account_id 与请求头 x-github-account-id 按同一优先级
     // 解析出唯一显式账号；无账号头且未提供 account_id 的旧客户端兼容恢复与全局活跃
     // 账号解析分开，无法安全确定目标账号时不返回其他账号的 PAT，要求显式选择账号。
-    const explicitAccountId = /^\d+$/.test(headerAccountId)
+    const explicitAccountId = ACCOUNT_ID_PATTERN.test(headerAccountId)
       ? headerAccountId
-      : /^\d+$/.test(bodyAccountId)
+      : ACCOUNT_ID_PATTERN.test(bodyAccountId)
         ? bodyAccountId
         : null;
 

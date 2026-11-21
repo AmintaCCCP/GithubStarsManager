@@ -4,10 +4,13 @@ import type { EmbeddingApiType } from '../../../types';
 import {
   EMBEDDING_FORMAT_VERSION,
   EmbeddingClient,
+  getAccountWorkerVectorCount,
+  hasAnyAccountWorkerVectorCount,
   indexAllRepos,
-  isAccountScopeMigrationDone,
+  isRepoAccountScopeMigrated,
   needsReindex,
   selectIndexableRepos,
+  setAccountWorkerVectorCount,
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
@@ -53,11 +56,36 @@ export interface VectorSearchActions {
   abortIndexing: () => void;
 }
 
+const normalizeWorkerUrl = (url: string | undefined | null): string => (url ?? '').trim().replace(/\/+$/, '');
+
+/**
+ * 解析当前 (账号, Worker) 的已知向量计数（第 16 轮审计修复 [101]）：
+ * - 优先使用当前 (账号, Worker) 独立记录的计数；
+ * - 若系统已为其他 (账号, Worker) 记录过计数而当前组合尚无记录（例如账号 A
+ *   索引 20 个后切到无向量的账号 B，或切换到新 Worker W2），返回 0，绝不把
+ *   旧账号/旧 Worker 的计数沿用过来；
+ * - 若从未记录过任何 scoped 计数（旧版本升级或历史状态），回退到现有状态值。
+ */
+const resolveScopedVectorCount = (
+  accountId: string | null | undefined,
+  workerId: string | null | undefined,
+  fallbackStatusCount: number,
+): number => {
+  const scopedCount = getAccountWorkerVectorCount(accountId, workerId);
+  if (scopedCount !== undefined) return scopedCount;
+  return hasAnyAccountWorkerVectorCount() ? 0 : fallbackStatusCount;
+};
+
+export interface UseVectorSearchActionsOptions {
+  /** 表单中正在编辑的 Worker 地址（提供时增量目标计数按该 Worker 计算） */
+  workerUrl?: string;
+}
+
 /**
  * Owns all vector service integration while retaining the store's persisted
  * embedding-format metadata and per-repository indexing stamps unchanged.
  */
-export const useVectorSearchActions = (): VectorSearchActions => {
+export const useVectorSearchActions = (options?: UseVectorSearchActionsOptions): VectorSearchActions => {
   const state = useAppStore(useShallow((store) => ({
     embeddingConfigs: store.embeddingConfigs,
     activeEmbeddingConfig: store.activeEmbeddingConfig,
@@ -88,23 +116,22 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     return storedVersion < EMBEDDING_FORMAT_VERSION;
   }, [state.vectorSearchConfig.embeddingFormatVersion]);
 
+  const draftWorkerUrl = options?.workerUrl;
   const { incrementalTargetCount, unindexedRepoCount } = useMemo(() => {
-    // 与 selectIndexableRepos 的顺序一致：先按增量谓词筛选，再按 id 去重，
-    // 否则同 id 首条无需重建时会漏计第二条待索引记录。mode=null 表示全量目标，
-    // 只做分析状态过滤（对应 formatVersionChanged 时的增量目标）。
-    // 账号范围迁移未完成时，上传路径会忽略增量过滤全量补写（runIndex 中
-    // accountScopeMigrationPending → incremental=false），计数必须复现同一判定，
-    // 否则按钮/徽标会因逐仓计数为 0 而拦住用户完成迁移的唯一增量入口。
+    // 与 selectIndexableRepos 的顺序一致：先按增量谓词 + 逐仓账号范围迁移判定筛选，
+    // 再按 id 去重，否则同 id 首条无需重建时会漏计第二条待索引记录。
+    // 第 16 轮审计修复 [100]：若调用方传入表单中的 workerUrl，incrementalTargetCount
+    // 按表单 Worker 计算；unindexedRepoCount 继续对应已保存配置的 Worker。
     const jobAccountId = accountIdKey(state.user);
-    const workerId = (state.vectorSearchConfig.workerUrl ?? '').replace(/\/+$/, '');
-    const migrationPending = !!jobAccountId && !isAccountScopeMigrationDone(jobAccountId, workerId);
-    const incrementalModeChanged = formatVersionChanged || migrationPending;
-    const countAfter = (mode: boolean | null): number => {
+    const savedWorkerId = normalizeWorkerUrl(state.vectorSearchConfig.workerUrl);
+    const targetWorkerId = draftWorkerUrl !== undefined ? normalizeWorkerUrl(draftWorkerUrl) : savedWorkerId;
+    const countPendingForWorker = (workerId: string): number => {
       const seen = new Set<number>();
       let count = 0;
       for (const repository of state.repositories) {
         if (!repository.analyzed_at || repository.analysis_failed) continue;
-        if (mode !== null && !needsReindex(repository, mode)) continue;
+        const needsMigrationBackfill = !!jobAccountId && !isRepoAccountScopeMigrated(jobAccountId, repository.id, workerId);
+        if (!formatVersionChanged && !needsMigrationBackfill && !needsReindex(repository, false)) continue;
         if (seen.has(repository.id)) continue;
         seen.add(repository.id);
         count += 1;
@@ -112,10 +139,10 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       return count;
     };
     return {
-      incrementalTargetCount: incrementalModeChanged ? countAfter(null) : countAfter(false),
-      unindexedRepoCount: state.vectorSearchConfig.enabled ? countAfter(incrementalModeChanged) : 0,
+      incrementalTargetCount: countPendingForWorker(targetWorkerId),
+      unindexedRepoCount: state.vectorSearchConfig.enabled ? countPendingForWorker(savedWorkerId) : 0,
     };
-  }, [formatVersionChanged, state.repositories, state.user, state.vectorSearchConfig.enabled, state.vectorSearchConfig.workerUrl]);
+  }, [draftWorkerUrl, formatVersionChanged, state.repositories, state.user, state.vectorSearchConfig.enabled, state.vectorSearchConfig.workerUrl]);
 
   const testEmbedding = useCallback(async (draft: EmbeddingDraft) => {
     setTestingEmbedding(true);
@@ -149,16 +176,20 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         // 测试未保存的新 Worker 地址时只写 workerTestResult，绝不覆盖当前已配置 Worker 的共享状态；
         // 仅当被测地址与当前配置一致时更新连接状态与维度并保留已有账号计数。
         const currentStore = useAppStore.getState();
-        const normalizeUrl = (url: string | undefined): string => (url ?? '').trim().replace(/\/+$/, '');
         // 审计修复：URL 相同还不足以代表已保存配置可用——若已保存令牌失效而
         // 用户用尚未保存的新令牌测试成功，仅凭 URL 匹配会把仍使用旧令牌的配置
         // 标成 connected（实际搜索继续用旧令牌并失败）。被测令牌与已保存令牌
         // 一致时才更新已保存配置的连接状态；草稿测试结果仍独立显示。
-        const sameWorkerIndex = normalizeUrl(draft.workerUrl) !== ''
-          && normalizeUrl(draft.workerUrl) === normalizeUrl(currentStore.vectorSearchConfig?.workerUrl)
+        const savedWorkerId = normalizeWorkerUrl(currentStore.vectorSearchConfig?.workerUrl);
+        const sameWorkerIndex = normalizeWorkerUrl(draft.workerUrl) !== ''
+          && normalizeWorkerUrl(draft.workerUrl) === savedWorkerId
           && (draft.authToken ?? '') === (currentStore.vectorSearchConfig?.authToken ?? '');
         if (sameWorkerIndex) {
-          const previousVectorCount = currentStore.vectorSearchStatus?.vectorCount ?? 0;
+          const previousVectorCount = resolveScopedVectorCount(
+            startedAccountId,
+            savedWorkerId,
+            currentStore.vectorSearchStatus?.vectorCount ?? 0,
+          );
           state.setVectorSearchStatus({ connected: true, vectorCount: previousVectorCount, dimensions: result.dimensions });
         }
       }
@@ -199,15 +230,30 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     setAbortController(controller);
     state.setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
     let currentFormatVersion = LEGACY_EMBEDDING_FORMAT_VERSION;
-    // 账号代次校验（Issue #611）：索引可达分钟级；同时保存账号 ID 与会话代次，
-    // 确保 A→B→A 切回且未启动新任务时旧任务也会在检查点中止且不写入共享状态。
+    // 账号代次与目标 Worker 配置校验（Issue #611 + 第 16 轮审计修复 [48]）：
+    // 索引可达分钟级；同时校验任务身份、账号会话代次与目标 Worker 配置，
+    // 防止上传期间切号或保存另一套 Worker 配置后把旧目标的结果写入当前状态。
     const jobAccountId = peekCurrentAccountId();
     const jobGeneration = getAccountSessionGeneration();
+    const startedSavedConfig = useAppStore.getState().vectorSearchConfig;
+    const startedSavedWorkerUrl = normalizeWorkerUrl(startedSavedConfig?.workerUrl);
+    const startedSavedAuthToken = startedSavedConfig?.authToken ?? '';
+    const jobWorkerUrl = normalizeWorkerUrl(draft.workerUrl);
+    const jobAuthToken = draft.authToken ?? '';
     const isCurrentJob = (): boolean => (
       indexJobRef.current?.id === jobId && indexJobRef.current.controller === controller
     );
+    const isTargetWorkerStillCurrent = (): boolean => {
+      const currentConfig = useAppStore.getState().vectorSearchConfig;
+      const currentUrl = normalizeWorkerUrl(currentConfig?.workerUrl);
+      const currentToken = currentConfig?.authToken ?? '';
+      if (currentUrl === startedSavedWorkerUrl && currentToken === startedSavedAuthToken) {
+        return true;
+      }
+      return currentUrl === jobWorkerUrl && currentToken === jobAuthToken;
+    };
     const onAccountChanged = (): boolean => {
-      if (!isCurrentJob() || !isCurrentAccountSession(jobAccountId, jobGeneration)) {
+      if (!isCurrentJob() || !isCurrentAccountSession(jobAccountId, jobGeneration) || !isTargetWorkerStillCurrent()) {
         controller.abort();
         return true;
       }
@@ -224,27 +270,35 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         ? currentState.vectorSearchConfig.embeddingFormatVersion
         : LEGACY_EMBEDDING_FORMAT_VERSION;
       const now = new Date().toISOString();
-      // 标记必须来自实际上传的副本（R12 审计修复）：indexAllRepos 在「该账号
-      // 尚未完成当前 Worker 的账号范围迁移」时会忽略增量过滤、全量补写带前缀
-      // 向量——打戳候选必须复现同一判定，否则被补写的仓库会用空许可证打戳，
-      // 下一次增量索引因许可证不一致再次选中它。
+      // 标记必须来自实际上传的副本（R12 + 第 16 轮审计修复 [47]）：
+      // selectIndexableRepos 按 (accountId, workerId, repoId) 逐仓纳入未迁移补写候选，
+      // 打戳候选复用同一判定，避免补写仓库用空许可证打戳。
       const workerId = typeof clients.vectorService.workerId === 'string' && clients.vectorService.workerId
         ? clients.vectorService.workerId
-        : null;
-      const accountScopeMigrationPending = incremental
-        && !!jobAccountId
-        && !isAccountScopeMigrationDone(jobAccountId, workerId);
+        : (jobWorkerUrl || null);
       const uploadCandidates = selectIndexableRepos(repositories, {
-        incremental: incremental && !accountScopeMigrationPending,
+        incremental,
         formatVersion: currentFormatVersion,
         currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+        accountId: jobAccountId,
+        workerId,
       });
       const licenseById = new Map<number, string | null>();
       for (const repository of uploadCandidates) {
         if (!licenseById.has(repository.id)) licenseById.set(repository.id, repository.license ?? null);
       }
       const stamp = (id: number) => ({ id, patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) } });
-      const newlyIndexed = new Set(repositories.filter((repository) => !repository.vector_indexed_at).map((repository) => repository.id));
+      // 第 16 轮审计修复 [3]：除从未索引的仓库外，目标 Worker 上尚未确认完成
+      // 账号范围迁移的仓库（即使已有旧 vector_indexed_at）在增量补写成功后也应
+      // 计入目标 Worker 的向量数量；普通已迁移仓库的增量更新继续不重复计数。
+      const newlyCountedOnTarget = new Set(
+        repositories
+          .filter((repository) => (
+            !repository.vector_indexed_at
+            || (!!jobAccountId && !isRepoAccountScopeMigrated(jobAccountId, repository.id, workerId))
+          ))
+          .map((repository) => repository.id),
+      );
       if (!incremental) {
         state.updateRepositoriesMetadata(repositories.filter((repository) => (
           repository.vector_indexed_at && !excludedVectorIdSet.has(String(repository.id))
@@ -302,12 +356,18 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       // 索引状态/向量状态/格式版本
       if (onAccountChanged() || controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       state.setVectorIndexingState({ result, isIndexing: false, phase: null });
-      const previousCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
+      const previousCount = resolveScopedVectorCount(
+        jobAccountId,
+        workerId,
+        useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0,
+      );
+      const nextVectorCount = incremental
+        ? previousCount + result.indexedRepoIds.filter((id) => newlyCountedOnTarget.has(id)).length
+        : result.indexed + excludedVectorIdSet.size;
+      setAccountWorkerVectorCount(jobAccountId, workerId, nextVectorCount);
       state.setVectorSearchStatus({
         connected: true,
-        vectorCount: incremental
-          ? previousCount + result.indexedRepoIds.filter((id) => newlyIndexed.has(id)).length
-            : result.indexed + excludedVectorIdSet.size,
+        vectorCount: nextVectorCount,
         dimensions: draft.dimensions,
         lastSyncAt: new Date().toISOString(),
       });

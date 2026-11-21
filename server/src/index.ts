@@ -197,6 +197,10 @@ export function createApp(): express.Express {
     skip: () => process.env.NODE_ENV === 'test',
   });
   app.use(limiter);
+  // 多账号全量备份在顶层保留 v1 兼容副本并在 account_workspaces 中保留全部分区，
+  // 选中账号数据达 30 MiB 时整包可能超过全局 50 MiB 上限；先做鉴权再为导入路由
+  // 放宽 JSON 体积上限，避免未鉴权请求占用内存，同时保证导出的备份可重新导入。
+  app.use('/api/sync/import', authMiddleware, express.json({ limit: '200mb' }));
   app.use(express.json({ limit: '50mb' }));
 
   // Auth middleware for all /api/* except /api/health

@@ -135,6 +135,10 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-vector-behavior-'));
     const configFile = path.join(tempDir, 'deploy-config.json');
     const spawnLog = path.join(tempDir, 'spawn-log.jsonl');
+    const fakeWranglerBin = path.join(tempDir, 'wrangler-stub.js');
+    // 提供隔离的 Wrangler 占位路径，使行为测试不依赖预先安装 cloudflare-worker/node_modules
+    // （生产文件存在性校验与命令替身均保持生效）。
+    fs.writeFileSync(fakeWranglerBin, '// isolated wrangler placeholder for behavior test\n', 'utf-8');
     // workerUrl 指向本机不可达端口：部署后验证快速失败（仅本机连接拒绝，无外网
     // 请求）；indexName 与 wrangler.toml 现值一致——syncWranglerToml 检测到无需
     // 改动时不写入，测试不修改仓库文件（仍以快照断言兜底）。
@@ -161,6 +165,7 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
           ...process.env,
           DEPLOY_CONFIG_FILE: configFile,
           DEPLOY_SPAWN_LOG: spawnLog,
+          DEPLOY_WRANGLER_BIN: fakeWranglerBin,
         },
       });
       // 日志随临时目录一并清理，必须在 rmSync 之前读取
@@ -191,6 +196,11 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     const deployCalls = calls.filter((call) => call.args.includes('deploy') && call.args.includes('--var'));
     assert.ok(deployCalls.length >= 2, 'enable deploy and auto-rollback deploy must both be recorded');
     assert.equal(
+      deployCalls[0].args[0],
+      fakeWranglerBin,
+      'behavior test must resolve wrangler via isolated DEPLOY_WRANGLER_BIN rather than local node_modules'
+    );
+    assert.equal(
       varOverrideOf(deployCalls[0]),
       'ACCOUNT_METADATA_INDEXED:true',
       'enable deploy must actually pass ACCOUNT_METADATA_INDEXED:true to the executor'
@@ -206,7 +216,7 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     const src = fs.readFileSync(path.resolve(WORKER_DIR, 'deploy.mjs'), 'utf-8');
     // --quick 验证失败时按部署模式自动回滚，绝不等待输入。
     assert.ok(
-      src.includes('{ interactive: false })'),
+      src.includes('interactive: false'),
       '--quick must call verification with interactive:false'
     );
     // 快速部署只复用「上次验证通过」的启用标记（强制保留 ≠ 已就绪）。
@@ -276,6 +286,26 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     assert.deepEqual(enumerateVectorIds('idx', () => null), { ok: false, reason: 'list_failed' });
     assert.deepEqual(enumerateVectorIds('idx', () => ({ vectors: [] })), { ok: false, reason: 'empty_snapshot' });
     assert.deepEqual(enumerateVectorIds('', endlessReader), { ok: false, reason: 'missing_index_name' });
+
+    // 截断页缺少可用游标时不得判定枚举完成。
+    assert.deepEqual(
+      enumerateVectorIds('idx', () => ({ vectors: [{ id: '7:42' }], isTruncated: true })),
+      { ok: false, reason: 'truncated_without_cursor' }
+    );
+
+    // 第 1 页观察到纯数字 legacy ID 后第 2 页失败：保留已观察到的 legacy 证据。
+    let failPage = 0;
+    const partialLegacyReader = () => {
+      failPage += 1;
+      if (failPage === 1) {
+        return { vectors: [{ id: '101' }, { id: '7:42' }], nextCursor: 'c2' };
+      }
+      return null;
+    };
+    assert.deepEqual(
+      enumerateVectorIds('idx', partialLegacyReader),
+      { ok: false, reason: 'list_failed', total: 2, legacyCount: 1 }
+    );
   });
 
   it('README documents that any numeric-only legacy vector blocks verified enablement (R12 ISSUE-3)', () => {
@@ -315,5 +345,72 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
   it('wrangler.toml keeps ACCOUNT_METADATA_INDEXED default "false"', () => {
     const toml = fs.readFileSync(path.resolve(WORKER_DIR, 'wrangler.toml'), 'utf-8');
     assert.match(toml, /^ACCOUNT_METADATA_INDEXED = "false"$/m, 'deployment default must stay false');
+  });
+
+  it('cloudflare-worker/worker.js compacts oversized metadata while preserving accountId and rejects oversized accountId', async () => {
+    const { default: worker } = await import(path.resolve(WORKER_DIR, 'worker.js'));
+    let upserted = null;
+    const env = {
+      AUTH_TOKEN: 'secret-token',
+      VECTORIZE: {
+        async upsert(vectors) {
+          upserted = vectors;
+        },
+      },
+    };
+
+    const bigDesc = 'a'.repeat(12000);
+    const resOk = await worker.fetch(
+      new Request('https://example.workers.dev/upsert', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer secret-token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vectors: [
+            {
+              id: '42:7',
+              values: [0.1, 0.2],
+              metadata: {
+                full_name: 'owner/repo',
+                description: bigDesc,
+                language: 'TypeScript',
+                stars: 10,
+                tags: ['ai', 'search'],
+                accountId: '42',
+              },
+            },
+          ],
+        }),
+      }),
+      env
+    );
+    assert.equal(resOk.status, 200);
+    assert.ok(Array.isArray(upserted) && upserted.length === 1);
+    assert.equal(upserted[0].metadata.accountId, '42');
+    assert.ok(Buffer.byteLength(JSON.stringify(upserted[0].metadata), 'utf-8') <= 10240);
+
+    const resBad = await worker.fetch(
+      new Request('https://example.workers.dev/upsert', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer secret-token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vectors: [
+            {
+              id: '42:8',
+              values: [0.1, 0.2],
+              metadata: {
+                full_name: 'owner/repo',
+                description: 'ok',
+                language: 'TS',
+                stars: 1,
+                tags: [],
+                accountId: 'x'.repeat(11000),
+              },
+            },
+          ],
+        }),
+      }),
+      env
+    );
+    assert.equal(resBad.status, 400);
   });
 });

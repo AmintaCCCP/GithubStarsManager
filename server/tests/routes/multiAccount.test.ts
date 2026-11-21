@@ -33,6 +33,9 @@ async function canOpenSqlite(): Promise<boolean> {
 }
 
 const dbAvailable = await canOpenSqlite();
+if (!dbAvailable && process.env.CI) {
+  throw new Error('CI 中 better-sqlite3 必须可加载，多账号隔离测试不能跳过');
+}
 const describeIfDb = dbAvailable ? describe : describe.skip;
 
 const ACCOUNT_A = '111';
@@ -478,6 +481,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .send({ method: 'GET' })
       .expect(409)
       .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+    expect(proxyRequestMock).toHaveBeenCalledTimes(2);
 
     // 单账号/纯 default 库时无头代理请求可回退全局 settings
     db.prepare('DELETE FROM account_settings').run();
@@ -486,6 +490,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
       .send({ method: 'GET' })
       .expect(200);
+    expect(proxyRequestMock).toHaveBeenCalledTimes(3);
     expect(proxyRequestMock.mock.calls[2][0].headers.Authorization).toBe('Bearer global-token');
   });
 
@@ -2109,7 +2114,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
   it('does not let a late async PAT verification overwrite a newer active_account_id switch', async () => {
     const db = getDb();
     let releaseVerification!: (value: unknown) => void;
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { releaseVerification = resolve; }));
+    const verificationGate = new Promise((resolve) => { releaseVerification = resolve; });
+    fetchMock.mockImplementationOnce(() => verificationGate);
 
     const reqA = request(app)
       .put('/api/settings')
@@ -2129,7 +2135,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       releaseVerification({ ok: true, status: 200, json: async () => ({ id: 111 }) });
       await reqA;
     } finally {
-      releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 111 }) });
       // 失败清理也要等待已启动的请求结束：避免请求在后续用例重置共享数据库 /
       // fetchMock 后仍继续写入（与 R2-A1 用例的清理路径一致，吞掉二次错误）。
       await reqA.then(() => undefined, () => undefined);
@@ -2218,7 +2224,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     db.prepare("INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, 'syncMode', 'full')").run(ACCOUNT_A);
 
     let releaseVerification!: (value: unknown) => void;
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { releaseVerification = resolve; }));
+    const verificationGate = new Promise((resolve) => { releaseVerification = resolve; });
+    fetchMock.mockImplementationOnce(() => verificationGate);
 
     const importReq = request(app)
       .post('/api/sync/import')
@@ -2237,7 +2244,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       releaseVerification({ ok: true, status: 200, json: async () => ({ id: 111 }) });
       res = await importReq;
     } finally {
-      releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 111 }) });
       // 失败清理也要等待已启动的请求结束（吞掉二次错误，保留原始断言错误）
       await importReq.then(() => undefined, () => undefined);
     }
@@ -2250,7 +2257,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
   it('skips restoring a verified PAT in sync import if the account credential changed during verification', async () => {
     const db = getDb();
     let releaseVerification!: (value: unknown) => void;
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { releaseVerification = resolve; }));
+    const verificationGate = new Promise((resolve) => { releaseVerification = resolve; });
+    fetchMock.mockImplementationOnce(() => verificationGate);
 
     const importReq = request(app)
       .post('/api/sync/import')
@@ -2274,7 +2282,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       releaseVerification({ ok: true, status: 200, json: async () => ({ id: 111 }) });
       res = await importReq;
     } finally {
-      releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 111 }) });
       // 失败清理也要等待已启动的请求结束（吞掉二次错误，保留原始断言错误）
       await importReq.then(() => undefined, () => undefined);
     }
@@ -2480,7 +2488,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
 
     let releaseVerification!: (value: unknown) => void;
     // 账号 B 工作区真实 PAT 的身份校验保持挂起（导入等待窗口）
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { releaseVerification = resolve; }));
+    const verificationGate = new Promise((resolve) => { releaseVerification = resolve; });
+    fetchMock.mockImplementationOnce(() => verificationGate);
     // 后续轮换请求的身份校验
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 111 }) });
 
@@ -2509,7 +2518,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
       res = await importReq;
     } finally {
-      releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
       await importReq.then(() => undefined, () => undefined);
     }
 
@@ -2706,7 +2715,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
 
     // 设备 1 切到 B：B 的 PAT 校验保持挂起
     let releaseVerification!: (value: unknown) => void;
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { releaseVerification = resolve; }));
+    const verificationGate = new Promise((resolve) => { releaseVerification = resolve; });
+    fetchMock.mockImplementationOnce(() => verificationGate);
     const switchReq = request(app)
       .put('/api/settings')
       .set(authHeaders(ACCOUNT_B))
@@ -2732,7 +2742,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       expect(switchRes.body).toMatchObject({ updated: true });
       expect(switchRes.body.active_account_update_skipped).toBeUndefined();
     } finally {
-      releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
       await switchReq.then(() => undefined, () => undefined);
     }
 
@@ -2756,7 +2766,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
 
     // 设备 1 切到 B：B 的 PAT 校验保持挂起
     let releaseVerification!: (value: unknown) => void;
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { releaseVerification = resolve; }));
+    const verificationGate = new Promise((resolve) => { releaseVerification = resolve; });
+    fetchMock.mockImplementationOnce(() => verificationGate);
     const switchReq = request(app)
       .put('/api/settings')
       .set(authHeaders(ACCOUNT_B))
@@ -2777,7 +2788,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       const switchRes = await switchReq;
       expect(switchRes.body).toMatchObject({ updated: true, active_account_update_skipped: true });
     } finally {
-      releaseVerification?.({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
       await switchReq.then(() => undefined, () => undefined);
     }
 
@@ -2952,7 +2963,10 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     const payload = {
       account_id: ACCOUNT_A,
       allowAccountMigration: true,
-      repositories: [repoRow(1, 'owner/one', { ai_summary: 'from-a-top-level' })],
+      repositories: [
+        repoRow(1, 'owner/one', { ai_summary: 'from-a-top-level' }),
+        repoRow(3, 'owner/three', { ai_summary: 'from-a-top-level-only' }),
+      ],
       account_workspaces: [{
         account_id: ACCOUNT_B,
         repositories: [repoRow(1, 'owner/one', { ai_summary: 'from-b-workspace' }), repoRow(2, 'owner/two')],
@@ -2967,7 +2981,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .expect(200)
       .expect((res) => {
         expect(res.body.migration_overlaps_skipped).toEqual({ repositories: 1, releases: 0, categories: 0 });
-        expect(res.body.imported.repositories).toBe(0);
+        expect(res.body.imported.repositories).toBe(1);
         expect(res.body.imported.account_workspaces_repositories).toBe(2);
       });
 
@@ -2975,6 +2989,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(rows).toEqual([
       { account_id: ACCOUNT_B, id: 1, ai_summary: 'from-b-workspace' },
       { account_id: ACCOUNT_B, id: 2, ai_summary: null },
+      { account_id: ACCOUNT_B, id: 3, ai_summary: 'from-a-top-level-only' },
     ]);
   });
 
@@ -3001,5 +3016,189 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     const entry = (restored.body.accounts as Array<{ accountId: string; user: unknown; githubToken: string | null }>)
       .find((a) => a.accountId === '333');
     expect(entry).toMatchObject({ githubToken: 'fresh-token', user: null });
+  });
+
+  it('rejects non-canonical account IDs with leading zeros (ID 10)', async () => {
+    await request(app)
+      .get('/api/repositories')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}`, 'X-GitHub-Account-Id': '042' })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+
+    await request(app)
+      .put('/api/repositories')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}`, 'X-GitHub-Account-Id': '042' })
+      .send({ repositories: [repoRow(1, 'owner/one')] })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+
+    await request(app)
+      .get('/api/repositories')
+      .set(authHeaders('42'))
+      .expect(200);
+  });
+
+  it('returns 409 for headerless read/export requests when multiple real account partitions exist (ID 11)', async () => {
+    await request(app).put('/api/repositories').set(authHeaders(ACCOUNT_A)).send({ repositories: [repoRow(1, 'owner/one')] }).expect(200);
+    await request(app).put('/api/repositories').set(authHeaders(ACCOUNT_B)).send({ repositories: [repoRow(2, 'owner/two')] }).expect(200);
+
+    const noAccountHeader = { Authorization: `Bearer ${process.env.API_SECRET}` };
+    for (const path of ['/api/repositories', '/api/releases', '/api/categories', '/api/settings']) {
+      await request(app)
+        .get(path)
+        .set(noAccountHeader)
+        .expect(409)
+        .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+    }
+    await request(app)
+      .post('/api/sync/export')
+      .set(noAccountHeader)
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+  });
+
+  it('clears sharing bits on cross-account migration import while preserving them on same-account restore (ID 13)', async () => {
+    const db = getDb();
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_B))
+      .send({
+        account_id: ACCOUNT_A,
+        allowAccountMigration: true,
+        repositories: [repoRow(1, 'owner/one', {
+          ai_summary: 'shared-from-a',
+          ai_shared: 1,
+          ai_summary_shared: 1,
+          ai_tags_shared: 1,
+          ai_platforms_shared: 1,
+        })],
+      })
+      .expect(200);
+    const migrated = db.prepare('SELECT ai_shared, ai_summary_shared, ai_tags_shared, ai_platforms_shared FROM repositories WHERE account_id = ? AND id = 1')
+      .get(ACCOUNT_B) as Record<string, number>;
+    expect(migrated).toEqual({ ai_shared: 0, ai_summary_shared: 0, ai_tags_shared: 0, ai_platforms_shared: 0 });
+
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_A))
+      .send({
+        account_id: ACCOUNT_A,
+        repositories: [repoRow(1, 'owner/one', {
+          ai_summary: 'shared-from-a',
+          ai_shared: 1,
+          ai_summary_shared: 1,
+          ai_tags_shared: 1,
+          ai_platforms_shared: 1,
+        })],
+      })
+      .expect(200);
+    const restored = db.prepare('SELECT ai_shared, ai_summary_shared, ai_tags_shared, ai_platforms_shared FROM repositories WHERE account_id = ? AND id = 1')
+      .get(ACCOUNT_A) as Record<string, number>;
+    expect(restored).toEqual({ ai_shared: 1, ai_summary_shared: 1, ai_tags_shared: 1, ai_platforms_shared: 1 });
+  });
+
+  it('allows empty/whitespace release tag_name, rejects invalid account_workspaces type, and compares numeric vs string category overlap IDs (IDs 15, 54, 55)', async () => {
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_A))
+      .send({
+        repositories: [repoRow(1, 'owner/one')],
+        account_workspaces: 'not-an-array-or-object',
+      })
+      .expect(400)
+      .expect((res) => expect(res.body.code).toBe('INVALID_ACCOUNT_WORKSPACE'));
+
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_B))
+      .send({
+        account_id: ACCOUNT_A,
+        allowAccountMigration: true,
+        releases: [{ id: 10, repo_id: 1, tag_name: '   ', repo_full_name: 'owner/one', repo_name: 'one' }],
+        categories: [{ id: 7, name: 'Top Cat' }],
+        account_workspaces: [{
+          account_id: ACCOUNT_B,
+          repositories: [],
+          releases: [{ id: 11, repo_id: 1, tag_name: '', repo_full_name: 'owner/one', repo_name: 'one' }],
+          categories: [{ id: '7', name: 'Workspace Cat' }],
+        }],
+      })
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.imported.releases).toBe(1);
+        expect(res.body.imported.categories).toBe(0);
+        expect(res.body.migration_overlaps_skipped.categories).toBe(1);
+      });
+  });
+
+  it('copies NULL analyzed_at from adopted shared summary on conflict update instead of using payload timestamp (ID 56)', async () => {
+    const db = getDb();
+    await request(app).put('/api/settings').set(authHeaders(ACCOUNT_A)).send({ ai_result_sharing_enabled: true }).expect(200);
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ repositories: [repoRow(1, 'owner/one', { ai_summary: 'shared-summary', analyzed_at: null })] })
+      .expect(200);
+
+    // First create empty row in B, then conflict-update with only analyzed_at T2 (no ai_summary)
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, ai_summary, analyzed_at)
+      VALUES (?, 1, 'one', 'owner/one', 'https://github.com/owner/one', 'owner', '[]', NULL, NULL)
+    `).run(ACCOUNT_B);
+
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ repositories: [repoRow(1, 'owner/one', { ai_summary: null, analyzed_at: '2026-05-01T00:00:00Z' })] })
+      .expect(200);
+
+    const rowB = db.prepare('SELECT ai_summary, analyzed_at FROM repositories WHERE account_id = ? AND id = 1')
+      .get(ACCOUNT_B) as { ai_summary: string | null; analyzed_at: string | null };
+    expect(rowB.ai_summary).toBe('shared-summary');
+    expect(rowB.analyzed_at).toBeNull();
+  });
+
+  it('omits inherited legacy global user_profile when claimed account has only placeholder id profile (ID 57)', async () => {
+    const db = getDb();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', ?)").run(ACCOUNT_A);
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('user_profile', ?)").run(JSON.stringify({ id: 111, login: 'old-global-alice' }));
+    db.prepare("INSERT OR REPLACE INTO accounts (account_id, user_json) VALUES (?, ?)").run(ACCOUNT_A, JSON.stringify({ id: 111 }));
+
+    const res = await request(app).get('/api/settings').set(authHeaders(ACCOUNT_A)).expect(200);
+    expect(res.body.user_profile).toBeUndefined();
+  });
+
+  it('bumps account profile version during sync import so in-flight PUT /api/settings does not overwrite imported profile (ID 12)', async () => {
+    const db = getDb();
+    let releaseVerification!: (value: unknown) => void;
+    const verificationGate = new Promise((resolve) => { releaseVerification = resolve; });
+    fetchMock.mockImplementationOnce(() => verificationGate);
+
+    const putReq = request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ user_profile: { id: 222, login: 'stale-bob' }, github_token: 'pat-b' })
+      .expect(200);
+    void putReq.then(() => undefined, () => undefined);
+
+    try {
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      await request(app)
+        .post('/api/sync/import')
+        .set(authHeaders(ACCOUNT_B))
+        .send({
+          accounts: [{ account_id: ACCOUNT_B, user_json: JSON.stringify({ id: 222, login: 'imported-bob' }) }],
+        })
+        .expect(200);
+
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      await putReq;
+    } finally {
+      releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      await putReq.then(() => undefined, () => undefined);
+    }
+
+    const row = db.prepare('SELECT user_json FROM accounts WHERE account_id = ?').get(ACCOUNT_B) as { user_json: string };
+    expect(JSON.parse(row.user_json)).toMatchObject({ login: 'imported-bob' });
   });
 });

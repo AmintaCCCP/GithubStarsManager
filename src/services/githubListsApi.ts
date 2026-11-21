@@ -165,11 +165,14 @@ export class GitHubListsApiService {
   private backendUrl: string | null = null;
   private backendAuthToken: string | null = null;
   private backendAccountId: string | null = null;
+  /** 写入队列的账号分区身份（与代理请求头 backendAccountId 分离，直连模式同样按账号隔离队列）。 */
+  private queueAccountId: string | null = null;
   /** 后端代理路径失败后置位，本实例剩余请求走直连（幂等切换，不重复尝试代理）。 */
   private proxyFailed = false;
 
-  constructor(token: string) {
+  constructor(token: string, accountId?: string | null) {
     this.token = token;
+    this.queueAccountId = accountId ?? null;
   }
 
   setBackendUrl(url: string | null): void {
@@ -183,6 +186,11 @@ export class GitHubListsApiService {
   /** 代理请求携带的账号分区（应与本实例 token 的归属账号一致）。 */
   setBackendAccountId(accountId: string | null): void {
     this.backendAccountId = accountId;
+  }
+
+  /** 绑定写入串行队列的账号身份（不影响代理请求头 X-GitHub-Account-Id）。 */
+  setQueueAccountId(accountId: string | null): void {
+    this.queueAccountId = accountId;
   }
 
   private getBackendHeaders(): Record<string, string> {
@@ -811,7 +819,7 @@ export class GitHubListsApiService {
    * 该情形，需要推送后的成员集合校验才能闭环）。
    */
   async updateUserListsForItem(itemId: string, listIds: string[], signal?: AbortSignal): Promise<void> {
-    const queueKey = this.backendAccountId ?? '';
+    const queueKey = this.queueAccountId ?? this.backendAccountId ?? '';
     const previous = USER_LIST_WRITE_QUEUES.get(queueKey) ?? Promise.resolve();
     const run = async (): Promise<void> => {
       if (signal?.aborted) {

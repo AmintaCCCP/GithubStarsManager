@@ -25,8 +25,13 @@ import { forgetV19MigrationInputs, getV19MigrationInputs } from './v19MigrationI
 const GH_ACCOUNT_ID_PATTERN = /^\d{1,20}$/;
 /** GitHub Token 为可打印 ASCII（classic 与 fine-grained 均如此），禁止控制字符。 */
 const GH_TOKEN_PATTERN = /^[\x21-\x7E]{1,512}$/;
+const GH_REMOVAL_NONCE_PATTERN = /^[A-Za-z0-9:_-]{1,64}$/;
 
 export type GhAccountTokenMap = Record<string, string>;
+
+export interface GhAccountsSaveMeta {
+  clearedRemovalMarkers?: Record<string, string>;
+}
 
 /**
  * R2-B1：桌面端安全存储的加载结果语义。
@@ -42,11 +47,11 @@ export type GhAccountsLoadResult =
 /** 主进程 gh-accounts:get 的结构化返回（missing = 磁盘无 Token 文件）。 */
 export type GhAccountsGetPayload =
   | { status: 'missing' }
-  | { status: 'loaded'; tokens: GhAccountTokenMap }
+  | { status: 'loaded'; tokens: GhAccountTokenMap; clearedRemovalMarkers?: Record<string, string> }
   | { status: 'error'; error: string };
 
 interface GhAccountsBridge {
-  save: (tokens: GhAccountTokenMap) => Promise<{ success: boolean; error?: string }>;
+  save: (tokens: GhAccountTokenMap, meta?: GhAccountsSaveMeta) => Promise<{ success: boolean; error?: string }>;
   get: () => Promise<GhAccountsGetPayload>;
   clear: () => Promise<{ success: boolean; error?: string }>;
 }
@@ -79,6 +84,33 @@ let ghAccountTokensFullyLoaded = false;
 let knownDiskTokens: GhAccountTokenMap | null = null;
 
 const PENDING_REMOVED_ACCOUNTS_KEY = 'gsm.pendingGhAccountRemovals';
+const PENDING_REMOVED_ACCOUNT_NONCES_KEY = 'gsm.pendingGhAccountRemovalNonces';
+
+const sanitizeClearedRemovalMarkers = (
+  markers: Record<string, string> | null | undefined,
+): Record<string, string> => {
+  const result: Record<string, string> = {};
+  if (!markers || typeof markers !== 'object' || Array.isArray(markers)) return result;
+  for (const [accountId, nonce] of Object.entries(markers)) {
+    if (!GH_ACCOUNT_ID_PATTERN.test(accountId)) continue;
+    if (typeof nonce !== 'string' || !GH_REMOVAL_NONCE_PATTERN.test(nonce)) continue;
+    result[accountId] = nonce;
+  }
+  return result;
+};
+
+const readPersistedPendingRemovalNonces = (): Record<string, string> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(PENDING_REMOVED_ACCOUNT_NONCES_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return sanitizeClearedRemovalMarkers(parsed as Record<string, string>);
+  } catch {
+    return {};
+  }
+};
 
 /**
  * 读取持久化的待删标记（启动恢复）。损坏数据的处理规则（第 15 轮审计修复）：
@@ -121,13 +153,27 @@ const readPersistedPendingRemovals = (): string[] => {
  * 加密存储删除同样失败，重启后水化会返回仍在磁盘上的旧 PAT 并重新回填该账号。
  * 调用方必须把该失败明确上报（不得静默吞掉），提示「重启后凭据仍可能恢复」。
  */
-const persistPendingRemovals = (ids: Map<string, number>): boolean => {
+const persistPendingRemovals = (
+  ids: Map<string, number>,
+  nonces: Map<string, string> = pendingRemovalNonces,
+): boolean => {
   if (typeof window === 'undefined') return false;
   try {
     if (ids.size === 0) {
       window.localStorage.removeItem(PENDING_REMOVED_ACCOUNTS_KEY);
+      window.localStorage.removeItem(PENDING_REMOVED_ACCOUNT_NONCES_KEY);
     } else {
       window.localStorage.setItem(PENDING_REMOVED_ACCOUNTS_KEY, JSON.stringify(Array.from(ids.keys())));
+      const nonceMap: Record<string, string> = {};
+      for (const accountId of ids.keys()) {
+        const nonce = nonces.get(accountId);
+        if (nonce) nonceMap[accountId] = nonce;
+      }
+      if (Object.keys(nonceMap).length > 0) {
+        window.localStorage.setItem(PENDING_REMOVED_ACCOUNT_NONCES_KEY, JSON.stringify(nonceMap));
+      } else {
+        window.localStorage.removeItem(PENDING_REMOVED_ACCOUNT_NONCES_KEY);
+      }
     }
     return true;
   } catch {
@@ -147,19 +193,40 @@ const persistPendingRemovals = (ids: Map<string, number>): boolean => {
  */
 const pendingRemovedAccountIds = new Map<string, number>();
 
+/** 每个待删账号对应的唯一标记 nonce，随重新授权原子写入 gh-accounts.enc，用于重启对账。 */
+const pendingRemovalNonces = new Map<string, string>();
+
+/** 已原子写入 gh-accounts.enc 但尚未成功从 localStorage 清除的已解除标记。 */
+let unflushedClearedRemovalMarkers: Record<string, string> = {};
+
 let removalIntentVersion = 0;
 
-/** 登记一个待删意图（重复登记产生新版本，使旧请求的提交权失效）。 */
-const registerPendingRemoval = (accountId: string): void => {
-  removalIntentVersion += 1;
-  pendingRemovedAccountIds.set(accountId, removalIntentVersion);
+const generateRemovalNonce = (): string => {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `${Date.now().toString(36)}_${removalIntentVersion}_${rand}`;
 };
 
-// 启动恢复：为每个持久化的待删 ID 登记删除意图版本，使其参与加载过滤与
-// 保存提交（提交规则与运行期登记一致——在首次保存/加载操作发起前即已存在，
-// 属于可被相应请求观察并提交的「已确认持久化」意图）。
+/** 登记一个待删意图（重复登记产生新版本与新 nonce，使旧请求的提交权失效）。 */
+const registerPendingRemoval = (accountId: string, restoredNonce?: string | null): void => {
+  removalIntentVersion += 1;
+  pendingRemovedAccountIds.set(accountId, removalIntentVersion);
+  delete unflushedClearedRemovalMarkers[accountId];
+  if (restoredNonce !== undefined) {
+    if (typeof restoredNonce === 'string' && GH_REMOVAL_NONCE_PATTERN.test(restoredNonce)) {
+      pendingRemovalNonces.set(accountId, restoredNonce);
+    } else {
+      pendingRemovalNonces.delete(accountId);
+    }
+  } else {
+    pendingRemovalNonces.set(accountId, generateRemovalNonce());
+  }
+};
+
+// 启动恢复：为每个持久化的待删 ID 登记删除意图版本与对应 nonce，使其参与
+// 加载过滤、原子重授权对账与保存提交。
+const restoredRemovalNonces = readPersistedPendingRemovalNonces();
 for (const restoredAccountId of readPersistedPendingRemovals()) {
-  registerPendingRemoval(restoredAccountId);
+  registerPendingRemoval(restoredAccountId, restoredRemovalNonces[restoredAccountId] ?? null);
 }
 
 /** 待删标记未能持久化时的明确告警（第 14 轮审计修复：不得静默吞掉）。 */
@@ -224,6 +291,23 @@ const loadGhAccountTokensUnlocked = async (): Promise<GhAccountsLoadResult> => {
   }
   if (payload && typeof payload === 'object' && payload.status === 'loaded') {
     const rawTokens = sanitizeTokenMap(payload.tokens);
+    const diskCleared = sanitizeClearedRemovalMarkers(payload.clearedRemovalMarkers);
+    // 原子重授权对账：若加密文件中已记录某账号的 clearedRemovalMarkers nonce
+    // 且与本地持久化的待删标记 nonce 一致，说明新 PAT 与解除删除已原子落盘，
+    // 只是此前 localStorage 清理失败。此时解除过期标记，避免屏蔽或误删新 PAT。
+    const reconciledCleared: Record<string, string> = {};
+    for (const [accountId, clearedNonce] of Object.entries(diskCleared)) {
+      if (pendingRemovedAccountIds.has(accountId) && pendingRemovalNonces.get(accountId) === clearedNonce) {
+        pendingRemovedAccountIds.delete(accountId);
+        pendingRemovalNonces.delete(accountId);
+        reconciledCleared[accountId] = clearedNonce;
+      }
+    }
+    if (Object.keys(reconciledCleared).length > 0) {
+      if (!persistPendingRemovals(pendingRemovedAccountIds)) {
+        Object.assign(unflushedClearedRemovalMarkers, reconciledCleared);
+      }
+    }
     ghAccountTokensFullyLoaded = true;
     knownDiskTokens = { ...rawTokens };
     // 跨重启保留的待删除账号不得被回填到会话（直到安全存储确认删除成功）
@@ -350,10 +434,22 @@ export const saveGhAccountTokens = (
   // 重授权同时出现时，删除优先——与既有语义一致）。
   const appliedRemovals = Array.from(pendingRemovedAccountIds.keys())
     .filter((accountId) => !replacedAccounts.has(accountId));
+  const clearedMarkersForSave: Record<string, string> = { ...unflushedClearedRemovalMarkers };
   for (const accountId of appliedRemovals) {
     delete payload[accountId];
+    delete clearedMarkersForSave[accountId];
   }
-  const result = await bridge.save(payload);
+  const replacedMarkerNonces: Record<string, string> = {};
+  for (const accountId of replacedAccounts) {
+    const nonce = pendingRemovalNonces.get(accountId);
+    if (nonce) {
+      clearedMarkersForSave[accountId] = nonce;
+      replacedMarkerNonces[accountId] = nonce;
+    }
+  }
+  const result = Object.keys(clearedMarkersForSave).length > 0
+    ? await bridge.save(payload, { clearedRemovalMarkers: clearedMarkersForSave })
+    : await bridge.save(payload);
   if (!result.success) {
     throw new Error(result.error ?? 'gh-accounts save failed');
   }
@@ -361,18 +457,53 @@ export const saveGhAccountTokens = (
   // 版本未被更新」的标记（含被本请求从磁盘删除的与被新 PAT 替换的）——
   // bridge.save 等待期间新登记/更新的删除意图归其所属请求提交，绝不被
   // 较早排队的保存清除（第 14 轮审计修复）。
+  const nextPendingIds = new Map(pendingRemovedAccountIds);
+  const nextPendingNonces = new Map(pendingRemovalNonces);
+  const committedRemovals: string[] = [];
+  const committedReplacedWithNonce: string[] = [];
+  const committedReplacedWithoutNonce: string[] = [];
   for (const accountId of appliedRemovals) {
     if (observedRemovalVersions.get(accountId) === pendingRemovedAccountIds.get(accountId)) {
-      pendingRemovedAccountIds.delete(accountId);
+      nextPendingIds.delete(accountId);
+      nextPendingNonces.delete(accountId);
+      committedRemovals.push(accountId);
     }
   }
   for (const accountId of replacedAccounts) {
     if (observedRemovalVersions.get(accountId) === pendingRemovedAccountIds.get(accountId)) {
-      pendingRemovedAccountIds.delete(accountId);
+      nextPendingIds.delete(accountId);
+      nextPendingNonces.delete(accountId);
+      if (replacedMarkerNonces[accountId]) {
+        committedReplacedWithNonce.push(accountId);
+      } else {
+        committedReplacedWithoutNonce.push(accountId);
+      }
     }
   }
-  if (!persistPendingRemovals(pendingRemovedAccountIds)) {
+  const persisted = persistPendingRemovals(nextPendingIds, nextPendingNonces);
+  if (!persisted && committedReplacedWithoutNonce.length > 0) {
+    // 旧格式（无 nonce）的待删标记无法通过加密文件原子对账，若 localStorage
+    // 清理失败，不得删除内存标记或报告重新授权成功。
     warnUnpersistedRemovalMarker();
+    throw new Error('failed to clear persisted gh-account removal marker');
+  }
+  for (const accountId of [...committedRemovals, ...committedReplacedWithNonce, ...committedReplacedWithoutNonce]) {
+    pendingRemovedAccountIds.delete(accountId);
+    pendingRemovalNonces.delete(accountId);
+  }
+  if (persisted) {
+    for (const accountId of Object.keys(clearedMarkersForSave)) {
+      if (unflushedClearedRemovalMarkers[accountId] === clearedMarkersForSave[accountId]) {
+        delete unflushedClearedRemovalMarkers[accountId];
+      }
+    }
+  } else {
+    warnUnpersistedRemovalMarker();
+    // 有 nonce 的重授权已与新 PAT 原子写入 gh-accounts.enc，保留到后续写入
+    // 直到 localStorage 清理成功，确保重启不会屏蔽或删除新 PAT。
+    for (const accountId of committedReplacedWithNonce) {
+      unflushedClearedRemovalMarkers[accountId] = replacedMarkerNonces[accountId];
+    }
   }
   knownDiskTokens = { ...payload };
   ghAccountTokensFullyLoaded = true;
@@ -428,7 +559,9 @@ export const fillMissingGhAccountTokens = (
   }
   if (Object.keys(fill).length > 0) {
     const payload: GhAccountTokenMap = { ...base, ...fill };
-    const result = await bridge.save(payload);
+    const result = Object.keys(unflushedClearedRemovalMarkers).length > 0
+      ? await bridge.save(payload, { clearedRemovalMarkers: { ...unflushedClearedRemovalMarkers } })
+      : await bridge.save(payload);
     if (!result.success) {
       throw new Error(result.error ?? 'gh-accounts save failed');
     }
@@ -456,8 +589,10 @@ export const clearGhAccountTokens = (): Promise<void> => {
     for (const accountId of Array.from(pendingRemovedAccountIds.keys())) {
       if (observedRemovalVersions.get(accountId) === pendingRemovedAccountIds.get(accountId)) {
         pendingRemovedAccountIds.delete(accountId);
+        pendingRemovalNonces.delete(accountId);
       }
     }
+    unflushedClearedRemovalMarkers = {};
     if (!persistPendingRemovals(pendingRemovedAccountIds)) {
       warnUnpersistedRemovalMarker();
     }

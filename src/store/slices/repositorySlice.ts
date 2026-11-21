@@ -32,6 +32,7 @@ const generateFallbackRepositoryId = (existingRepositories: Repository[]): numbe
 interface ListsRemoteOpSlot {
   promise: Promise<void>;
   controller: AbortController;
+  generation: number;
 }
 const listsRemoteOpSlots = new Map<string, ListsRemoteOpSlot>();
 
@@ -213,15 +214,11 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           accountIdKey(get().user) === sessionAccountId
           && getAccountSessionGeneration() === sessionGeneration
         );
-        // 重入保护：已有回写进行中时直接返回，避免并发创建重复 list 并互相覆盖成员。
-        // 第 14 轮审计修复：isRunning 也可能在任务结束后残留——同账号提交新 PAT
-        // 会递增会话代次但不清除 listsPush，旧推送任务在请求完成/失败后因会话
-        // 检查跳过状态复位，只释放远端槽。此时 listsRemoteOpSlots 已为空
-        //（槽位在任务 finally 中必被释放 ⇒ 空槽表 ⟺ 无任何在途推送任务），残留
-        // 状态不得阻塞下一轮推送；仍有在途任务（任一账号的槽存在）时保持原有的
-        // 提前返回。绕过残留状态的新推送由 runPushTask 整体覆写 listsPush，
-        // 旧任务已结束，不存在清除新任务状态的问题。
-        if (state.listsPush.isRunning && listsRemoteOpSlots.size > 0) return;
+        const slotKey = sessionAccountId ?? accountIdKey(state.user) ?? '';
+        // 重入保护：按当前账号与会话代次的在途槽判断重入，避免并发创建重复 list 并
+        // 互相覆盖成员；其他账号的在途推送或已失效代次的旧推送不得阻塞当前账号重试。
+        const existingSlot = listsRemoteOpSlots.get(slotKey);
+        if (existingSlot && existingSlot.generation === sessionGeneration) return;
         if (!isSessionActive()) return;
         if (!state.githubToken) {
           set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.not-connected-to-github-yet') } });
@@ -240,8 +237,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         //（上方重入保护随之失效），旧任务的 in-flight 重试（updateUserListsForItem
         // 为整集替换、可重放）可能在切换期间仍以旧成员集合提交。同账号新一轮
         // 推送先中止并等待旧任务结束，再重新读取远端成员后提交；不同账号独立。
-        const slotKey = sessionAccountId ?? accountIdKey(state.user) ?? '';
-        const previousSlot = listsRemoteOpSlots.get(slotKey);
+        const previousSlot = existingSlot;
         if (previousSlot) {
           // 旧任务已被同账号新推送取代：中止其 in-flight 重试（尝试/退避边界
           // 停止），绝不用旧成员集合覆盖本轮推送的结果。
@@ -249,7 +245,11 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         }
         let releaseSlot = (): void => {};
         const slotPromise = new Promise<void>((resolve) => { releaseSlot = resolve; });
-        const slot: ListsRemoteOpSlot = { promise: slotPromise, controller: new AbortController() };
+        const slot: ListsRemoteOpSlot = {
+          promise: slotPromise,
+          controller: new AbortController(),
+          generation: sessionGeneration,
+        };
         listsRemoteOpSlots.set(slotKey, slot);
         if (previousSlot) {
           try {
@@ -264,6 +264,9 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           releaseSlot();
           return;
         }
+        if (slotKey && typeof api.setQueueAccountId === 'function') {
+          api.setQueueAccountId(slotKey);
+        }
 
         const runPushTask = async (controller: AbortController): Promise<void> => {
           const signal = controller.signal;
@@ -271,6 +274,12 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
 
           try {
             const { user, repositories, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryListIdMap } = get();
+            if (repositories.length === 0) {
+              if (isSessionActive()) {
+                set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.no-repositories-to-push') } });
+              }
+              return;
+            }
 
             const allCategoriesForPush = getAllCategories(
               customCategories,
@@ -504,8 +513,20 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         try {
           await runPushTask(slot.controller);
         } finally {
+          const isStillLatestSlot = listsRemoteOpSlots.get(slotKey) === slot;
+          if (isStillLatestSlot) {
+            listsRemoteOpSlots.delete(slotKey);
+            // 同账号更新 PAT 会递增会话代次但不清除 listsPush：旧任务因会话失效
+            // 跳过内部状态复位时，若无新任务取代本槽，必须将 listsPush 复为空闲，
+            // 否则 UI 按钮与进度指示器会永久卡在 isRunning=true。
+            if (!isSessionActive()
+              && get().user !== null
+              && accountIdKey(get().user) === sessionAccountId
+              && get().listsPush.isRunning) {
+              set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null } });
+            }
+          }
           releaseSlot();
-          if (listsRemoteOpSlots.get(slotKey) === slot) listsRemoteOpSlots.delete(slotKey);
         }
       },
       deleteRepository: (repoId) => set((state) => {

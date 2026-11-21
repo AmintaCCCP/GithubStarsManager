@@ -1308,6 +1308,8 @@ describe('useAppStore logout and per-account workspaces', () => {
       },
     });
 
+    useAppStore.getState().upsertSavedAccount(userB, 'ghp_b');
+    expect(isSavedAccountRemovedInSession('2')).toBe(false);
     useAppStore.getState().removeSavedAccount('2');
     // 提交回写前的点查：被移除账号在会话内标记为已移除，未移除账号不受影响。
     //（'1' 可能带有更早用例的移除残留——登记是会话级模块状态，这里以从未

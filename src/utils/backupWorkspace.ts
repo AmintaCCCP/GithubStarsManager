@@ -65,24 +65,47 @@ export const validateBackupRepositories = (
   return validated;
 };
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
 /**
  * Gist 列表条目的结构校验（第 13 轮审计修复 [56]）：与导入面板顶层 gists 的
- * 写入前校验同一规则（id 为非空字符串、files 为普通对象）——账号工作区内的
- * accountWorkspaces[*].gists 此前只过数组外壳检查，含 null / 空对象的条目会
- * 进入工作区并写进实时状态与归档快照，消费侧（gistUtils 等）读取条目属性时
- * 抛 TypeError。返回值语义与 validateBackupRepositories 一致。
+ * 写入前校验同一规则（id 为非空字符串、files 为普通对象且每个文件值均为普通对象）——
+ * 账号工作区内的 accountWorkspaces[*].gists 此前只过数组外壳检查，含 null / 空对象
+ * 或 files 值为 null 的条目会进入工作区并写进实时状态与归档快照，消费侧（gistUtils /
+ * githubApi 等）读取条目或文件属性时抛 TypeError。返回值语义与 validateBackupRepositories 一致。
  */
 export const isValidBackupGistEntry = (entry: unknown): boolean => {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+  if (!isPlainObject(entry)) return false;
   const gist = entry as { id?: unknown; files?: unknown };
   return typeof gist.id === 'string' && gist.id.length > 0
-    && !!gist.files && typeof gist.files === 'object' && !Array.isArray(gist.files);
+    && isPlainObject(gist.files)
+    && Object.values(gist.files).every(isPlainObject);
 };
 
 export const validateBackupGists = (value: unknown): unknown[] | null | undefined => {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value)) return null;
   return value.every(isValidBackupGistEntry) ? value : null;
+};
+
+/**
+ * Fork 列表条目的结构校验：要求条目为普通对象，且当 fork 为真值时 owner.login
+ * 为非空字符串——消费侧（useForkTimelineActions）在 fork 为真值时会直接读取
+ * fork.owner.login，缺失 owner 时会抛 TypeError 导致 Fork 视图崩溃。
+ */
+export const isValidBackupForkEntry = (entry: unknown): boolean => {
+  if (!isPlainObject(entry)) return false;
+  const fork = entry as { fork?: unknown; owner?: unknown };
+  if (!fork.fork) return true;
+  return isPlainObject(fork.owner) && typeof fork.owner.login === 'string' && fork.owner.login.length > 0;
+};
+
+export const validateBackupForks = (value: unknown): unknown[] | null | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) return null;
+  return value.every(isValidBackupForkEntry) ? value : null;
 };
 
 
@@ -147,7 +170,7 @@ export const mergeWorkspacesById = (
     gists: mergeList(local.gists, incoming.gists.filter((gist) => isValidBackupGistEntry(gist))),
     starredGists: mergeList(local.starredGists, incoming.starredGists),
     releases: mergeList(local.releases, incoming.releases),
-    forks: mergeList(local.forks, incoming.forks),
+    forks: mergeList(local.forks, incoming.forks.filter((fork) => isValidBackupForkEntry(fork))),
     customCategories: mergeList(local.customCategories, incoming.customCategories),
     readForks: unionIds(local.readForks, incoming.readForks),
     releaseSubscriptions: unionIds(local.releaseSubscriptions, incoming.releaseSubscriptions),
@@ -294,7 +317,7 @@ export const applyAccountWorkspaceForTypes = (
     }
     if (liveFieldIsArray('starredGists')) patch.starredGists = workspace.starredGists;
     if (liveScalarField('selectedGistCategory', (value) => typeof value === 'string')) patch.selectedGistCategory = workspace.selectedGistCategory;
-    if (liveFieldIsArray('forks')) {
+    if (liveFieldIsArray('forks') && validateBackupForks(rawFields?.forks) !== null) {
       patch.forks = workspace.forks;
     }
     if (liveFieldIsArray('readForks')) patch.readForks = new Set(workspace.readForks);
@@ -330,10 +353,6 @@ export const applyAccountWorkspaceForTypes = (
  * 缺失字段必须保留本机值、显式 [] 才清空。该补丁同时用于更新目标账号快照
  * 与当前账号实时应用（面板侧经 applyAccountWorkspaceForTypes 的 rawFields）。
  */
-const isPlainObject = (value: unknown): value is Record<string, unknown> => (
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-);
-
 /**
  * 备份字段级校验（实时补丁与归档补丁共用，审计修复）：字段存在且为真数组
  * 才视为备份提供的有效值——null/缺失/非数组一律按「未提供」处理（保留本机
@@ -378,6 +397,9 @@ const applyValidatedWorkspaceFields = (
   const validatedGists = includeRepos && rawHas('gists')
     ? validateBackupGists(rawAccount.gists)
     : undefined;
+  const validatedForks = includeRepos && rawHas('forks')
+    ? validateBackupForks(rawAccount.forks)
+    : undefined;
   return {
     ...local,
     ...(Array.isArray(validatedRepositories) ? { repositories: validatedRepositories } : {}),
@@ -389,7 +411,7 @@ const applyValidatedWorkspaceFields = (
     ...(includeRepos && rawHas('selectedGistCategory') && typeof rawAccount.selectedGistCategory === 'string'
       ? { selectedGistCategory: incoming.selectedGistCategory }
       : {}),
-    ...(includeRepos && rawIsArray('forks') ? { forks: incoming.forks } : {}),
+    ...(includeRepos && Array.isArray(validatedForks) ? { forks: incoming.forks } : {}),
     ...(includeRepos && rawIsArray('readForks') ? { readForks: incoming.readForks } : {}),
     ...(includeRepos && rawHas('syncMode') && (rawAccount.syncMode === 'stars' || rawAccount.syncMode === 'stars-and-lists')
       ? { syncMode: incoming.syncMode }

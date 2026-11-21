@@ -14,7 +14,7 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
   // 审计修复（B7）：GitHub 账号 Token 经主进程 safeStorage 加密文件
   //（gh-accounts.enc）持久化；Web 构建无此桥，PAT 不持久化。
   ghAccounts: {
-    save: (tokens) => ipcRenderer.invoke('gh-accounts:save', tokens),
+    save: (tokens, meta) => ipcRenderer.invoke('gh-accounts:save', tokens, meta),
     get: () => ipcRenderer.invoke('gh-accounts:get'),
     clear: () => ipcRenderer.invoke('gh-accounts:clear'),
   },

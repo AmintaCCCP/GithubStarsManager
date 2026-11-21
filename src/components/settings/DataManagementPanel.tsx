@@ -282,6 +282,8 @@ const WORKSPACE_FIELD_IMPORT_TYPES: Array<[string, string]> = [
   ['starredGists', 'repositories'],
   ['forks', 'repositories'],
   ['readForks', 'repositories'],
+  ['syncMode', 'repositories'],
+  ['syncModeConfigured', 'repositories'],
   ['releases', 'releases'],
   ['releaseSubscriptions', 'releaseSubscriptions'],
   ['readReleases', 'releaseSubscriptions'],
@@ -299,6 +301,12 @@ const workspaceFieldCarriesData = (field: string, value: unknown): boolean => {
   if (field === 'releaseSourceSettings') {
     return JSON.stringify(normalizeReleaseSourceSettings(value ?? null))
       !== JSON.stringify(normalizeReleaseSourceSettings(null));
+  }
+  if (field === 'syncMode') {
+    return value === 'stars-and-lists';
+  }
+  if (field === 'syncModeConfigured') {
+    return value === true;
   }
   if (Array.isArray(value)) return value.length > 0;
   if (value && typeof value === 'object') return Object.keys(value).length > 0;
@@ -1112,6 +1120,31 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (value === undefined) continue;
         if ((value as unknown[]).some((item) => !item || typeof item !== 'object' || Array.isArray(item))) {
           addLog(t('dataManagementPanel.import-data'), false, `invalid ${String(field)} entry`);
+          showError(t('dataManagementPanel.invalid-backup-file-format'));
+          return;
+        }
+      }
+      // 审计修复（finding 35）：在首次写入前校验 webdavConfigs 条目的 url 字段类型——
+      // 含非字符串 url（如数字）的配置会在替换提交时调用 .trim() 抛异常，此时仓库已被替换。
+      if (importedData.webdavConfigs !== undefined) {
+        if ((importedData.webdavConfigs as unknown[]).some((item) => {
+          const url = (item as { url?: unknown }).url;
+          return url !== undefined && typeof url !== 'string';
+        })) {
+          addLog(t('dataManagementPanel.import-data'), false, 'invalid webdavConfigs url');
+          showError(t('dataManagementPanel.invalid-backup-file-format'));
+          return;
+        }
+      }
+      // 审计修复（finding 29）：在首次写入前逐项校验 customCategories 条目——
+      // 含 null/非对象或缺少有效 id 的条目会在合并读取 c.id 时抛异常，此时仓库已改变。
+      if (importedData.customCategories !== undefined) {
+        if ((importedData.customCategories as unknown[]).some(
+          (item) => !item || typeof item !== 'object' || Array.isArray(item)
+            || typeof (item as { id?: unknown }).id !== 'string'
+            || (item as { id: string }).id.length === 0,
+        )) {
+          addLog(t('dataManagementPanel.import-data'), false, 'invalid customCategories entry');
           showError(t('dataManagementPanel.invalid-backup-file-format'));
           return;
         }
@@ -2123,12 +2156,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           // 提供的字段保持优先（上面的补丁未含该字段即视为未提供）。
           const rawWorkspaceHas = (key: string): boolean => !!rawCurrentAccountWorkspace
             && Object.prototype.hasOwnProperty.call(rawCurrentAccountWorkspace, key);
-          if (!rawWorkspaceHas('syncMode')
-            && (importedData.syncMode === 'stars' || importedData.syncMode === 'stars-and-lists')) {
-            useAppStore.setState({ syncMode: importedData.syncMode });
-          }
-          if (!rawWorkspaceHas('syncModeConfigured') && typeof importedData.syncModeConfigured === 'boolean') {
-            useAppStore.setState({ syncModeConfigured: importedData.syncModeConfigured });
+          if (!backupActiveAccountUnattributed) {
+            if (!rawWorkspaceHas('syncMode')
+              && (importedData.syncMode === 'stars' || importedData.syncMode === 'stars-and-lists')) {
+              useAppStore.setState({ syncMode: importedData.syncMode });
+            }
+            if (!rawWorkspaceHas('syncModeConfigured') && typeof importedData.syncModeConfigured === 'boolean') {
+              useAppStore.setState({ syncModeConfigured: importedData.syncModeConfigured });
+            }
           }
         } else if (!backupActiveAccountUnattributed) {
           // 无当前账号快照（旧版单账号备份没有工作区快照，或 accountWorkspaces

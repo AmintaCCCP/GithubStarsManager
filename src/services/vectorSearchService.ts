@@ -218,6 +218,18 @@ export interface VectorQueryResult {
 }
 
 /**
+ * 宽查询（`wide: true`）返回类型：Worker 使用 `returnMetadata: 'indexed'`，
+ * 仅保证已索引的元数据字段（如 `accountId`），不包含 `description`、`tags` 等未索引字段。
+ */
+export interface VectorWideQueryResult {
+  id: string;
+  score: number;
+  metadata?: {
+    accountId?: string;
+  };
+}
+
+/**
  * 账号隔离的向量 ID（R4 审计修复）：多账号共享同一 VECTORIZE 索引，若沿用
  * `String(repo.id)` 作为向量 ID，两个账号索引同一仓库会以相同 ID 互相覆盖
  * 向量与 metadata（ai_tags/license 串号泄漏）。upsert 统一写入
@@ -377,10 +389,32 @@ export class VectorSearchService {
    */
   async query(
     vector: number[],
+    options: { topK?: number; threshold?: number; accountId?: string; wide: true },
+    signal?: AbortSignal,
+  ): Promise<VectorWideQueryResult[]>;
+  async query(
+    vector: number[],
+    options?: { topK?: number; threshold?: number; accountId?: string; wide?: false },
+    signal?: AbortSignal,
+  ): Promise<VectorQueryResult[]>;
+  async query(
+    vector: number[],
+    options?: { topK?: number; threshold?: number; accountId?: string; wide?: boolean },
+    signal?: AbortSignal,
+  ): Promise<VectorQueryResult[] | VectorWideQueryResult[]>;
+  async query(
+    vector: number[],
     options: { topK?: number; threshold?: number; accountId?: string; wide?: boolean } = {},
     signal?: AbortSignal,
-  ): Promise<VectorQueryResult[]> {
+  ): Promise<VectorQueryResult[] | VectorWideQueryResult[]> {
     const { topK = 20, threshold = 0.35, accountId, wide } = options;
+    // 第 16 轮审计修复 [99]：显式传入空账号或纯空白时直接拒绝，避免退化为无范围查询；
+    // 只有调用方未提供 accountId（undefined）时才保留旧的无范围兼容行为。
+    if (accountId !== undefined) {
+      if (typeof accountId !== 'string' || accountId.trim().length === 0) {
+        throw new Error('accountId must be a non-empty string when provided');
+      }
+    }
     const result = await this.request<{ matches: VectorQueryResult[] }>('/query', {
       method: 'POST',
       // accountId 让 Worker 在 topK 之前按归属过滤（多账号共享索引）。
@@ -391,7 +425,7 @@ export class VectorSearchService {
         vector,
         topK,
         threshold,
-        ...(accountId ? { accountId } : {}),
+        ...(accountId !== undefined ? { accountId } : {}),
         ...(wide ? { wide: true } : {}),
       }),
     }, signal);
@@ -453,13 +487,14 @@ export class VectorSearchService {
   /**
    * 测试 Worker 连通性
    */
-  async testConnection(): Promise<{ success: boolean; vectorCount: number; dimensions: number; error?: string }> {
+  async testConnection(): Promise<{ success: boolean; vectorCount: number; dimensions: number; accountScopedCleanup?: boolean; error?: string }> {
     try {
       const status = await this.getStatus();
       return {
         success: true,
         vectorCount: status.vectorCount,
         dimensions: status.dimensions,
+        ...(status.accountScopedCleanup !== undefined ? { accountScopedCleanup: status.accountScopedCleanup } : {}),
       };
     } catch (error) {
       return {
@@ -491,25 +526,23 @@ export const EMBEDDING_FORMAT_VERSION = 3;
 // ============================================================
 
 const ACCOUNT_SCOPE_MIGRATION_KEY = 'gsm.vectorAccountScopeMigrationDone';
+const ACCOUNT_WORKER_VECTOR_COUNTS_KEY = 'gsm.vectorAccountWorkerCounts';
 
 /**
- * 单账号老用户升级到多账号后的账号范围迁移：
- * 升级前的存量 v3 向量使用无归属的纯数字 ID，多账号共享索引下严格账号查询
- * （按 accountId 过滤）找不到它们；这些仓库的 vector_indexed_at 与嵌入格式
- * 版本均未变化，增量索引不会补写带账号前缀的新向量，旧仓库会从语义搜索中
- * 消失，只能靠用户手动全量重建恢复。
- *
- * 这里按账号记录迁移状态，且记录必须绑定写入它的 Worker（第 12 轮审计修复）：
- * 迁移完成记录以「账号 → Worker 身份（归一化 workerUrl）」存储。账号在
- * Worker W1 完成账号范围上传后切换到 W2 时，旧记录不再豁免增量路径——该账号
- * 重新视为未迁移，直到 W2 完成一次成功的账号范围上传（否则 W2 上内容未变化
- * 的仓库会被 needsReindex 排除，其账号范围向量永远不会写入，语义搜索静默
- * 缺结果）。Worker 绑定不提供向量列举（无法远端探测 legacy 数字 ID），因此
- * 以「该账号是否已在当前 Worker 完成过一次成功的范围上传」为迁移判据——
- * 保守方向是多写一次，不会漏迁。旧格式（string[]，无 Worker 绑定）一律视为
- * 未迁移。
+ * 单账号老用户升级到多账号后的账号范围迁移（第 16 轮审计修复 [47]）：
+ * - 新格式按 `(accountId, workerId)` 记录已确认以带账号前缀 ID 成功写入目标 Worker
+ *   的仓库 ID 集合（`{ workers: Record<string, number[]> }`）。
+ *   这样即使首次迁移只包含仓库 1，之后后端同步引入带有旧 `vector_indexed_at` 的仓库 2，
+ *   增量索引仍会识别仓库 2 尚未在当前 Worker 确认补写，自动将其纳入补写候选，
+ *   同时不会对已确认的仓库 1 重复生成 embedding。
+ * - 兼容读取旧格式 `Record<string, string>`（整账号绑定单个 workerId，记入 `legacyWorkerId`），
+ *   避免已有旧持久化记录或测试夹具失效。
  */
-type AccountScopeMigrationRecord = Record<string, string>;
+interface AccountScopeMigrationEntry {
+  legacyWorkerId?: string;
+  workers: Record<string, number[]>;
+}
+type AccountScopeMigrationStore = Record<string, AccountScopeMigrationEntry>;
 
 /**
  * 会话内迁移完成记录（第 13 轮审计修复 [22]）：localStorage 写入失败（隐私
@@ -517,18 +550,48 @@ type AccountScopeMigrationRecord = Record<string, string>;
  * 读取路径合并内存与持久化记录，使写入失败后本次会话的后续增量索引仍能
  * 识别已完成迁移，不会对全部已分析仓库重复生成 Embedding。
  */
-let inMemoryMigrationDoneWorkers: AccountScopeMigrationRecord = {};
+let inMemoryMigrationStore: AccountScopeMigrationStore = {};
 
-const readPersistedMigrationDoneWorkers = (): AccountScopeMigrationRecord => {
+const sanitizeRepoIdList = (raw: unknown): number[] => {
+  if (!Array.isArray(raw)) return [];
+  const unique = new Set<number>();
+  for (const item of raw) {
+    if (typeof item === 'number' && Number.isInteger(item)) {
+      unique.add(item);
+    }
+  }
+  return [...unique];
+};
+
+const readPersistedMigrationStore = (): AccountScopeMigrationStore => {
   try {
     const raw = localStorage.getItem(ACCOUNT_SCOPE_MIGRATION_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : {};
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const record = parsed as Record<string, unknown>;
-    const result: AccountScopeMigrationRecord = {};
-    for (const [accountId, workerId] of Object.entries(record)) {
-      if (!accountId || typeof workerId !== 'string') continue;
-      result[accountId] = workerId;
+    const result: AccountScopeMigrationStore = {};
+    for (const [accountId, value] of Object.entries(record)) {
+      if (!accountId) continue;
+      if (typeof value === 'string') {
+        result[accountId] = { legacyWorkerId: value, workers: {} };
+        continue;
+      }
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const obj = value as { legacyWorkerId?: unknown; workers?: unknown };
+      const workers: Record<string, number[]> = {};
+      if (obj.workers && typeof obj.workers === 'object' && !Array.isArray(obj.workers)) {
+        for (const [workerKey, ids] of Object.entries(obj.workers as Record<string, unknown>)) {
+          const cleanIds = sanitizeRepoIdList(ids);
+          if (cleanIds.length > 0) workers[workerKey] = cleanIds;
+        }
+      }
+      const entry: AccountScopeMigrationEntry = { workers };
+      if (typeof obj.legacyWorkerId === 'string') {
+        entry.legacyWorkerId = obj.legacyWorkerId;
+      }
+      if (entry.legacyWorkerId !== undefined || Object.keys(workers).length > 0) {
+        result[accountId] = entry;
+      }
     }
     return result;
   } catch {
@@ -536,21 +599,69 @@ const readPersistedMigrationDoneWorkers = (): AccountScopeMigrationRecord => {
   }
 };
 
-const readMigrationDoneWorkers = (): AccountScopeMigrationRecord => ({
-  ...readPersistedMigrationDoneWorkers(),
-  ...inMemoryMigrationDoneWorkers,
-});
+const mergeMigrationEntries = (
+  base: AccountScopeMigrationEntry | undefined,
+  overlay: AccountScopeMigrationEntry | undefined,
+): AccountScopeMigrationEntry | undefined => {
+  if (!base) return overlay;
+  if (!overlay) return base;
+  const workers: Record<string, number[]> = {};
+  for (const [workerKey, ids] of Object.entries(base.workers)) {
+    workers[workerKey] = [...ids];
+  }
+  for (const [workerKey, ids] of Object.entries(overlay.workers)) {
+    workers[workerKey] = [...new Set([...(workers[workerKey] ?? []), ...ids])];
+  }
+  return {
+    ...(overlay.legacyWorkerId !== undefined
+      ? { legacyWorkerId: overlay.legacyWorkerId }
+      : base.legacyWorkerId !== undefined
+        ? { legacyWorkerId: base.legacyWorkerId }
+        : {}),
+    workers,
+  };
+};
 
-const persistMigrationDoneWorkers = (record: AccountScopeMigrationRecord): void => {
+const readMigrationStore = (): AccountScopeMigrationStore => {
+  const persisted = readPersistedMigrationStore();
+  const result: AccountScopeMigrationStore = { ...persisted };
+  for (const [accountId, entry] of Object.entries(inMemoryMigrationStore)) {
+    const merged = mergeMigrationEntries(result[accountId], entry);
+    if (merged) result[accountId] = merged;
+  }
+  return result;
+};
+
+const persistMigrationStore = (store: AccountScopeMigrationStore): void => {
   try {
-    localStorage.setItem(ACCOUNT_SCOPE_MIGRATION_KEY, JSON.stringify(record));
+    localStorage.setItem(ACCOUNT_SCOPE_MIGRATION_KEY, JSON.stringify(store));
   } catch {
     // 存储不可用（隐私模式/配额）时退化为会话内标记（内存记录已同步更新）
   }
 };
 
 /**
- * 该账号是否已完成账号范围迁移（增量索引可沿用既有路径）。
+ * 判断指定仓库在 `(accountId, workerId)` 上是否已确认完成账号范围迁移。
+ * 无账号上下文时返回 true（匿名 legacy 路径）。
+ */
+export function isRepoAccountScopeMigrated(
+  accountId: string | null | undefined,
+  repoId: number,
+  workerId?: string | null,
+): boolean {
+  if (!accountId) return true;
+  const entry = readMigrationStore()[accountId];
+  if (!entry) return false;
+  if (typeof workerId === 'string' && workerId) {
+    if (entry.workers[workerId]?.includes(repoId)) return true;
+    return entry.legacyWorkerId !== undefined && entry.legacyWorkerId === workerId;
+  }
+  if (Object.values(entry.workers).some((ids) => ids.includes(repoId))) return true;
+  return entry.legacyWorkerId !== undefined;
+}
+
+/**
+ * 该账号是否已有针对目标 Worker 的账号范围迁移完成记录。
  * `workerId` 为当前向量 Worker 的绑定身份（归一化 workerUrl）；无法确定
  * Worker 身份（老调用方/测试桩）时退回仅按账号判断的旧行为。
  */
@@ -559,25 +670,106 @@ export function isAccountScopeMigrationDone(
   workerId?: string | null,
 ): boolean {
   if (!accountId) return true;
-  const boundWorker = readMigrationDoneWorkers()[accountId];
-  if (boundWorker === undefined) return false;
-  if (typeof workerId !== 'string' || !workerId) return true;
-  return boundWorker === workerId;
+  const entry = readMigrationStore()[accountId];
+  if (!entry) return false;
+  if (typeof workerId === 'string' && workerId) {
+    if ((entry.workers[workerId]?.length ?? 0) > 0) return true;
+    return entry.legacyWorkerId !== undefined && entry.legacyWorkerId === workerId;
+  }
+  if (Object.values(entry.workers).some((ids) => ids.length > 0)) return true;
+  return entry.legacyWorkerId !== undefined;
 }
 
-function markAccountScopeMigrationDone(accountId: string, workerId?: string | null): void {
-  const record = readMigrationDoneWorkers();
-  if (record[accountId] !== undefined && record[accountId] === (workerId ?? '')) return;
-  const workerValue = typeof workerId === 'string' && workerId ? workerId : '';
+function markAccountScopeReposMigrated(accountId: string, workerId: string | null | undefined, repoIds: number[]): void {
+  if (!accountId || repoIds.length === 0) return;
+  const workerKey = typeof workerId === 'string' && workerId ? workerId : '';
+  const store = readMigrationStore();
+  const existing = store[accountId] ?? { workers: {} };
+  const mergedIds = [...new Set([...(existing.workers[workerKey] ?? []), ...repoIds])];
+  const nextEntry: AccountScopeMigrationEntry = {
+    ...(existing.legacyWorkerId !== undefined ? { legacyWorkerId: existing.legacyWorkerId } : {}),
+    workers: { ...existing.workers, [workerKey]: mergedIds },
+  };
   // 第 13 轮审计修复 [22]：先同步更新内存记录（localStorage 写入失败时会话内
   // 标记仍然生效），再尝试持久化；仅在上传成功后被调用，上传失败保持未完成。
-  inMemoryMigrationDoneWorkers[accountId] = workerValue;
-  persistMigrationDoneWorkers({ ...record, [accountId]: workerValue });
+  inMemoryMigrationStore[accountId] = mergeMigrationEntries(inMemoryMigrationStore[accountId], nextEntry) ?? nextEntry;
+  persistMigrationStore({ ...store, [accountId]: nextEntry });
 }
 
 /** 仅供测试：清空会话内迁移完成记录，模拟一次全新的应用启动。 */
 export const __resetInMemoryAccountScopeMigrationForTest = (): void => {
-  inMemoryMigrationDoneWorkers = {};
+  inMemoryMigrationStore = {};
+};
+
+// ============================================================
+// 按 (账号, Worker) 隔离的向量计数（第 16 轮审计修复 [101]）
+// ============================================================
+
+let inMemoryAccountWorkerCounts: Record<string, number> = {};
+
+const buildAccountWorkerCountKey = (
+  accountId: string | null | undefined,
+  workerId: string | null | undefined,
+): string => `${accountId ?? ''}::${(workerId ?? '').trim().replace(/\/+$/, '')}`;
+
+const readPersistedAccountWorkerCounts = (): Record<string, number> => {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_WORKER_VECTOR_COUNTS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const result: Record<string, number> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+        result[key] = Math.floor(value);
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+};
+
+const readAccountWorkerCounts = (): Record<string, number> => ({
+  ...readPersistedAccountWorkerCounts(),
+  ...inMemoryAccountWorkerCounts,
+});
+
+export function getAccountWorkerVectorCount(
+  accountId: string | null | undefined,
+  workerId: string | null | undefined,
+): number | undefined {
+  const counts = readAccountWorkerCounts();
+  const key = buildAccountWorkerCountKey(accountId, workerId);
+  return Object.prototype.hasOwnProperty.call(counts, key) ? counts[key] : undefined;
+}
+
+export function hasAnyAccountWorkerVectorCount(): boolean {
+  return Object.keys(readAccountWorkerCounts()).length > 0;
+}
+
+export function setAccountWorkerVectorCount(
+  accountId: string | null | undefined,
+  workerId: string | null | undefined,
+  count: number,
+): void {
+  const key = buildAccountWorkerCountKey(accountId, workerId);
+  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  inMemoryAccountWorkerCounts[key] = safeCount;
+  try {
+    const next = { ...readPersistedAccountWorkerCounts(), ...inMemoryAccountWorkerCounts };
+    localStorage.setItem(ACCOUNT_WORKER_VECTOR_COUNTS_KEY, JSON.stringify(next));
+  } catch {
+    // 存储不可用时保留内存记录
+  }
+}
+
+export const __resetAccountWorkerVectorCountsForTest = (): void => {
+  inMemoryAccountWorkerCounts = {};
+  try {
+    localStorage.removeItem(ACCOUNT_WORKER_VECTOR_COUNTS_KEY);
+  } catch {
+    // ignore
+  }
 };
 
 /**
@@ -666,14 +858,23 @@ export function needsReindex(repo: Pick<Repository, 'last_edited' | 'analyzed_at
  */
 export function selectIndexableRepos(
   repos: Repository[],
-  options: { incremental?: boolean; formatVersion?: number; currentFormatVersion?: number } = {},
+  options: {
+    incremental?: boolean;
+    formatVersion?: number;
+    currentFormatVersion?: number;
+    accountId?: string | null;
+    workerId?: string | null;
+  } = {},
 ): Repository[] {
   let indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
   if (options.incremental) {
     // 嵌入文本格式版本变化时，强制重新索引所有向量以避免混合格式
     // 缺失版本号视为 v1（旧格式），仍需触发升级
     const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? EMBEDDING_FORMAT_VERSION);
-    indexable = indexable.filter((r) => needsReindex(r, formatVersionChanged));
+    indexable = indexable.filter((r) => (
+      needsReindex(r, formatVersionChanged)
+      || (!!options.accountId && !isRepoAccountScopeMigrated(options.accountId, r.id, options.workerId))
+    ));
   }
   const seenRepoIds = new Set<number>();
   return indexable.filter((r) => {
@@ -821,21 +1022,18 @@ export async function indexAllRepos(
     throw new Error('batchSize must be a positive integer');
   }
 
-  // 账号范围迁移（审计修复）：增量模式下该账号尚未完成迁移时，强制按全量
-  // 候选补写带账号前缀的向量（升级前的存量 v3 向量可能是无归属数字 ID，
-  // 账号过滤后不可召回）；上传成功后才标记完成，恢复既有增量路径。
-  // 第 12 轮审计修复：迁移完成记录绑定写入它的 Worker——切换 Worker 后该账号
-  // 重新视为未迁移，直到新 Worker 完成一次成功的账号范围上传。
+  // 账号范围迁移（第 16 轮审计修复 [47]）：按 (accountId, workerId, repoId) 逐仓
+  // 判断是否已确认带账号前缀写入目标 Worker；即使先前快照只迁移了仓库 1，之后后端
+  // 同步进来的带旧 vector_indexed_at 的仓库 2 也会自动进入补写候选，且不重嵌仓库 1。
   const workerId = typeof vectorService.workerId === 'string' && vectorService.workerId
     ? vectorService.workerId
     : null;
-  const accountScopeMigrationPending = incremental === true
-    && !!accountId
-    && !isAccountScopeMigrationDone(accountId, workerId);
   const indexable = selectIndexableRepos(repos, {
-    incremental: incremental === true && !accountScopeMigrationPending,
+    incremental: incremental === true,
     formatVersion: options.formatVersion,
     currentFormatVersion: options.currentFormatVersion,
+    accountId,
+    workerId,
   });
   let indexed = 0;
   let errors = 0;
@@ -967,20 +1165,14 @@ export async function indexAllRepos(
     onProgress?.({ phase: 'embedding', done: currentBatch, total: totalBatches });
   }
 
-  // 迁移完成的判定（审计修复 + 第 12 轮扩展）：所有升级前已索引（vector_indexed_at
-  // 存在，即可能带有 legacy 无归属向量）的候选仓库都必须在本轮上传成功——增量
-  // 迁移补写与全量重建同样适用（全量重建不设置 accountScopeMigrationPending，
-  // 但它是用户在没有迁移标记时最先执行的操作：不记录完成会让下一次增量索引
-  // 强制重选全部仓库，未变化仓库被重复嵌入计费）。失败项里存在这类仓库时保持
-  // 迁移待完成——下次运行继续按全量补写；失败项全部是「从未索引」的仓库时，
-  // 它们没有可丢失的 legacy 向量（且后续增量路径会以带前缀 ID 首次写入），可
-  // 安全标记完成，避免永久失败项把每次运行都退化为全量重复嵌入。完成记录绑定
-  // 当前 Worker 身份（workerId），切换 Worker 后重新视为未迁移。
-  if (accountId && (accountScopeMigrationPending || incremental !== true)) {
+  // 迁移完成的判定（第 16 轮审计修复 [47]）：按 (accountId, workerId) 记录已确认
+  // 成功写入的仓库 ID，而非用一次快照标记整个账号完成。若本轮存在带旧
+  // vector_indexed_at 的候选仓库失败，则暂不提交本次确认记录，下次运行继续补写。
+  if (accountId && indexedRepoIds.length > 0) {
     const indexedIdSet = new Set(indexedRepoIds);
     const failedLegacyIndexed = indexable.some((repo) => !indexedIdSet.has(repo.id) && !!repo.vector_indexed_at);
     if (!failedLegacyIndexed) {
-      markAccountScopeMigrationDone(accountId, workerId);
+      markAccountScopeReposMigrated(accountId, workerId, indexedRepoIds);
     }
   }
 
