@@ -1411,7 +1411,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
-              className={`linear-card-tag app-repository-card-tag font-medium ${viewMode === 'list' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-xs'}`}
+              className={`linear-card-tag app-repository-card-tag font-normal ${viewMode === 'list' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5 text-xs'}`}
             >
               {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
@@ -1503,10 +1503,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   handleFindSimilar();
                 }}
                 disabled={isFindingSimilar}
-                className={`absolute -inset-y-1 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline ${isFindingSimilar ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover:opacity-100 group-focus-within/footer:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within/footer:pointer-events-auto focus-visible:pointer-events-auto'}`}
+                className={`app-repository-similar-action absolute -inset-y-1 left-0 flex h-auto items-center space-x-1.5 px-0! py-0! text-xs font-normal text-primary dark:text-primary transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline ${isFindingSimilar ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover:opacity-100 group-focus-within/footer:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within/footer:pointer-events-auto focus-visible:pointer-events-auto'}`}
                 title={t('repositoryCard.find-similar-repositories-2')}
               >
-                {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                {isFindingSimilar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                 <span>{t('repositoryCard.find-similar')}</span>
               </Button>
             )}

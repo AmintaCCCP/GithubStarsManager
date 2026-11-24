@@ -115,8 +115,8 @@ export default {
       fontWeight: {
         'light': '300',
         'normal': '400',
-        'medium': '510',
-        'semibold': '590',
+        'medium': '500',
+        'semibold': '600',
       },
       letterSpacing: {
         'display-xl': '-1.584px',
