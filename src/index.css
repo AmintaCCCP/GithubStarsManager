@@ -621,8 +621,8 @@ html:has(body[data-scroll-locked]) {
   --app-nav-item-height: 2.125rem;
   --app-nav-item-padding-inline: 0.6875rem;
   --app-nav-font-size: 0.84375rem;
-  --app-nav-font-weight: 520;
-  --app-nav-active-font-weight: 560;
+  --app-nav-font-weight: 500;
+  --app-nav-active-font-weight: 500;
   --app-nav-icon-size: 0.9375rem;
   --app-nav-icon-stroke: 1.8;
   --app-nav-active-surface: hsl(var(--card));
@@ -632,14 +632,14 @@ html:has(body[data-scroll-locked]) {
   --app-brand-mark-radius: calc(var(--radius) - 2px);
   --app-brand-mark-shadow: 0 1px 3px color-mix(in srgb, hsl(var(--shadow-color)) 16%, transparent);
   --app-brand-title-size: 0.8125rem;
-  --app-brand-title-weight: 620;
+  --app-brand-title-weight: 600;
   --app-brand-title-tracking: -0.014em;
   --app-brand-title-line-height: 1.25;
   --app-brand-subtitle-size: 0.65625rem;
   --app-brand-subtitle-color: hsl(var(--muted-foreground));
   --app-brand-subtitle-line-height: 1.35;
   --app-header-user-name-size: 0.75rem;
-  --app-header-user-name-weight: 550;
+  --app-header-user-name-weight: 500;
   --app-icon-size: 1rem;
   /* A quiet canvas blend separates the rail without a hard divider. */
   --app-sidebar-surface: color-mix(in srgb, hsl(var(--muted)) 26%, hsl(var(--background)) 74%);
@@ -666,10 +666,10 @@ html:has(body[data-scroll-locked]) {
   --app-sidebar-title-gap: 0.125rem;
   --app-sidebar-line-height: 1.2;
   --app-sidebar-eyebrow-size: 0.625rem;
-  --app-sidebar-eyebrow-weight: 600;
+  --app-sidebar-eyebrow-weight: 500;
   --app-sidebar-eyebrow-tracking: 0.075em;
   --app-sidebar-label-size: 0.6875rem;
-  --app-sidebar-label-weight: 560;
+  --app-sidebar-label-weight: 500;
   --app-sidebar-label-tracking: 0.025em;
   --app-sidebar-caption-size: 0.75rem;
   --app-sidebar-tab-height: 2.5rem;
@@ -679,7 +679,7 @@ html:has(body[data-scroll-locked]) {
   --app-sidebar-item-font-size: 0.875rem;
   --app-sidebar-item-font-weight: var(--app-nav-font-weight);
   --app-sidebar-item-color: color-mix(in srgb, hsl(var(--foreground)) 42%, hsl(var(--muted-foreground)) 58%);
-  --app-sidebar-active-item-font-weight: 550;
+  --app-sidebar-active-item-font-weight: 500;
   --app-sidebar-active-item-color: hsl(var(--foreground));
   --app-sidebar-active-surface: color-mix(in srgb, hsl(var(--primary)) 8%, transparent);
   --app-sidebar-active-border: transparent;
@@ -831,7 +831,7 @@ html:has(body[data-scroll-locked]) {
   --app-command-chip-border: color-mix(in srgb, hsl(var(--border)) 76%, transparent);
   --app-command-chip-color: hsl(var(--muted-foreground));
   --app-command-chip-font-size: 0.6875rem;
-  --app-command-chip-font-weight: 560;
+  --app-command-chip-font-weight: 500;
   --app-command-chip-active-surface: color-mix(in srgb, hsl(var(--primary)) 9%, transparent);
   --app-command-chip-active-border: color-mix(in srgb, hsl(var(--primary)) 24%, hsl(var(--border)) 76%);
   --app-command-chip-active-color: hsl(var(--primary-emphasis, var(--primary)));
@@ -3295,9 +3295,9 @@ html.dark .release-card.is-expanded {
   --app-sidebar-heading-color: hsl(var(--foreground));
   --app-sidebar-item-height: 2.125rem;
   --app-sidebar-item-font-size: 0.8125rem;
-  --app-sidebar-item-font-weight: 470;
+  --app-sidebar-item-font-weight: 400;
   --app-sidebar-item-color: color-mix(in srgb, hsl(var(--foreground)) 58%, hsl(var(--muted-foreground)) 42%);
-  --app-sidebar-active-item-font-weight: 520;
+  --app-sidebar-active-item-font-weight: 500;
   --app-sidebar-active-item-color: color-mix(in srgb, hsl(var(--foreground)) 92%, hsl(var(--muted-foreground)) 8%);
   --app-sidebar-active-surface: color-mix(in srgb, hsl(var(--primary)) 7%, hsl(var(--card)) 93%);
   --app-sidebar-active-border: transparent;
@@ -3814,7 +3814,7 @@ html.dark .release-card.is-expanded {
   --app-native-filter-panel-gap: 0.875rem 1.5rem;
   --app-native-filter-panel-padding: 1rem 1.125rem;
   --app-native-filter-title-size: 0.6875rem;
-  --app-native-filter-title-weight: 620;
+  --app-native-filter-title-weight: 500;
   --app-native-empty-surface: color-mix(in srgb, hsl(var(--card)) 76%, hsl(var(--background)) 24%);
   --app-native-empty-border: color-mix(in srgb, hsl(var(--border-strong)) 45%, transparent);
   --app-native-empty-marker-surface: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)) 90%);
@@ -3897,7 +3897,7 @@ body,
 
 .app-side-eyebrow {
   font-size: 0.625rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: 0.08em;
 }
 
@@ -3906,7 +3906,7 @@ body,
   max-width: none;
   color: hsl(var(--foreground));
   font-size: 0.875rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.25;
   text-overflow: clip;
@@ -3915,7 +3915,7 @@ body,
 
 .app-section-label {
   font-size: 0.625rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: 0.035em;
 }
 
@@ -3940,7 +3940,7 @@ body,
   background: var(--app-native-item-active);
   box-shadow: none;
   color: var(--app-native-item-active-text);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .app-side-item[aria-pressed='true'] svg,
@@ -4174,7 +4174,7 @@ body,
 
 .repository-card .app-repository-card-title {
   font-size: var(--app-native-card-title-size);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .repository-card .app-repository-card-owner {
@@ -4297,7 +4297,7 @@ body,
 
 .app-empty-title {
   font-size: var(--app-native-empty-title-size);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .app-empty-description {
@@ -4407,7 +4407,7 @@ body,
 
 .app-dialog-title {
   font-size: var(--app-native-dialog-title-size);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .app-dialog-content :is(input, textarea, [role='combobox']) {
@@ -4522,7 +4522,7 @@ body,
   --app-native-filter-panel-gap: 0.875rem 1.5rem;
   --app-native-filter-panel-padding: 0.875rem 1rem;
   --app-native-filter-title-size: 0.6875rem;
-  --app-native-filter-title-weight: 620;
+  --app-native-filter-title-weight: 500;
   --app-native-empty-surface: color-mix(in srgb, hsl(var(--card)) 62%, hsl(var(--background)) 38%);
   --app-native-empty-border: color-mix(in srgb, hsl(var(--border)) 48%, transparent);
   --app-native-empty-marker-surface: color-mix(in srgb, hsl(var(--foreground)) 5%, transparent);
@@ -4598,7 +4598,7 @@ body,
   background: var(--app-native-item-active);
   box-shadow: none;
   color: var(--app-native-item-active-text);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .app-header-nav button:hover {
@@ -4617,14 +4617,14 @@ body,
 
 .app-side-eyebrow {
   font-size: 0.625rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: 0.08em;
 }
 
 .app-side-title {
   color: hsl(var(--foreground));
   font-size: 0.875rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.25;
 }
@@ -4662,7 +4662,7 @@ body,
   background: var(--app-native-item-active);
   box-shadow: none;
   color: var(--app-native-item-active-text);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .app-side-item[aria-pressed='true'] svg,
@@ -4718,7 +4718,7 @@ body,
 
 .app-workspace-title {
   font-size: 1.625rem;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .app-workspace-description {
@@ -4802,7 +4802,7 @@ body,
   border-color: var(--app-native-control-border);
   background: var(--app-native-control-surface);
   font-size: 0.6875rem;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .app-command-panel :is(.linear-filter-toggle, .linear-filter-chip).is-active {
@@ -4875,7 +4875,7 @@ body,
 
 .repository-card .app-repository-card-title {
   font-size: var(--app-native-card-title-size);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .repository-card .app-repository-card-owner,
@@ -4956,7 +4956,7 @@ body,
   gap: 0.375rem;
   padding-inline: var(--app-row-action-label-padding-inline);
   font-size: 0.75rem;
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .app-list-row,
@@ -4968,7 +4968,7 @@ body,
 .app-list-row-title {
   color: hsl(var(--foreground));
   font-size: var(--app-row-title-size);
-  font-weight: 610;
+  font-weight: 600;
   letter-spacing: -0.008em;
 }
 
@@ -5063,7 +5063,7 @@ body,
 
 .app-empty-title {
   font-size: var(--app-native-empty-title-size);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .app-empty-description,
@@ -5148,7 +5148,7 @@ body,
 .app-settings-content-panel [data-settings-sections] :is(h3, .text-lg) {
   color: hsl(var(--foreground));
   font-size: 0.9375rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: -0.008em;
 }
 
@@ -5207,7 +5207,7 @@ body,
 
 .app-dialog-title {
   font-size: var(--app-native-dialog-title-size);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .app-dialog-description {
@@ -5259,7 +5259,7 @@ body,
   gap: 0.5rem;
   color: hsl(var(--foreground));
   font-size: 0.8125rem;
-  font-weight: 590;
+  font-weight: 500;
 }
 
 .app-form-label-meta,
@@ -5501,14 +5501,14 @@ body,
 .app-side-eyebrow {
   color: color-mix(in srgb, hsl(var(--muted-foreground)) 82%, transparent);
   font-size: 0.625rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: 0.075em;
 }
 
 .app-side-title {
   color: hsl(var(--foreground));
   font-size: var(--app-final-sidebar-title-size);
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: -0.012em;
 }
 
@@ -5516,7 +5516,7 @@ body,
   margin-inline: 0.5rem;
   color: color-mix(in srgb, hsl(var(--muted-foreground)) 76%, transparent);
   font-size: 0.625rem;
-  font-weight: 610;
+  font-weight: 600;
   letter-spacing: 0.035em;
 }
 
@@ -5547,7 +5547,7 @@ body,
   background: var(--app-final-active-surface);
   color: hsl(var(--foreground));
   box-shadow: none;
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .app-side-item[aria-pressed='true'] svg,
@@ -5640,7 +5640,7 @@ body,
 .app-workspace-title {
   color: hsl(var(--foreground));
   font-size: clamp(1.5rem, 1.8vw, 1.875rem);
-  font-weight: 640;
+  font-weight: 600;
   letter-spacing: -0.035em;
 }
 
@@ -5709,7 +5709,7 @@ body,
   background: color-mix(in srgb, hsl(var(--card)) 66%, transparent);
   color: hsl(var(--foreground));
   font-size: 0.75rem;
-  font-weight: 550;
+  font-weight: 500;
   box-shadow: none;
 }
 
@@ -5798,7 +5798,7 @@ body,
 .repository-card .app-repository-card-title {
   color: hsl(var(--foreground));
   font-size: var(--app-final-card-title-size);
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -5956,7 +5956,7 @@ body,
 
 .app-empty-title {
   font-size: 0.9375rem;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .app-empty-description,
@@ -6066,7 +6066,7 @@ body,
 .app-dialog-title {
   color: hsl(var(--foreground));
   font-size: 1.0625rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: -0.015em;
 }
 
@@ -6162,7 +6162,7 @@ body,
 .app-form-label {
   color: hsl(var(--foreground));
   font-size: 0.8125rem;
-  font-weight: 590;
+  font-weight: 500;
 }
 
 .app-form-hint,
@@ -6332,7 +6332,7 @@ body,
   border-color: transparent;
   background: var(--app-final-active-surface);
   color: hsl(var(--foreground));
-  font-weight: 550;
+  font-weight: 500;
   box-shadow: none;
 }
 
@@ -6624,7 +6624,7 @@ button.ui-switch[data-state='checked'] > span {
 .app-discovery-list .app-list-row-title,
 .app-repository-list .app-repository-card-title {
   font-size: var(--app-row-title-size);
-  font-weight: 610;
+  font-weight: 600;
 }
 
 .app-gist-list .app-list-row-description,
@@ -6705,7 +6705,7 @@ button.ui-switch[data-state='checked'] > span {
 
 .app-settings-content-panel [data-settings-sections] :is(h3, .text-lg) {
   font-size: 0.9375rem;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: -0.008em;
 }
 
@@ -7094,4 +7094,216 @@ button.ui-radio > span svg {
     width: 100%;
     padding: var(--app-settings-block-padding);
   }
+}
+
+/* ========== Commercial Typography, Sidebar Optical Rail & Tactile Depth Polish ==========
+   Token-driven refinements layered cleanly over active theme presets and light/dark mode. */
+html,
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 1. Unified 16px (1rem) left optical rail across all context & category sidebars:
+   header eyebrow/title, section labels, collection rows, nav item icons, notes, and footer. */
+.context-sidebar-head {
+  padding: 0.875rem 0.75rem 0.625rem 1rem;
+}
+
+.context-sidebar-body {
+  padding: 0.25rem 0.5rem 0.875rem;
+}
+
+.app-side-section + .app-side-section {
+  margin-block-start: 0.375rem;
+}
+
+.app-release-asset-filters {
+  padding-inline: 0;
+}
+
+.app-side-eyebrow {
+  font-weight: 500;
+}
+
+.app-side-title {
+  font-weight: 600;
+}
+
+.app-section-label {
+  margin-inline: 0.5rem;
+  color: color-mix(in srgb, hsl(var(--muted-foreground)) 82%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+
+.app-side-group-label {
+  margin-inline: 0.5rem;
+  padding-block: 0.5rem 0.25rem;
+}
+
+.app-collection-row {
+  min-height: 1.75rem;
+  padding-block: 0.375rem 0.25rem;
+  padding-inline: 0.5rem 0.25rem;
+}
+
+.app-collection-row .app-section-label {
+  margin-inline: 0;
+}
+
+.app-side-item,
+.context-sidebar [role='tab'],
+.linear-settings-nav-item {
+  padding-inline: 0.5rem;
+  font-weight: 400;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.app-side-item[aria-pressed='true'],
+.linear-sidebar button[aria-pressed='true'],
+.context-sidebar [role='tab'][aria-selected='true'],
+.linear-settings-nav-item.is-active {
+  border-color: transparent;
+  background: var(--app-final-active-surface);
+  color: hsl(var(--foreground));
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, hsl(var(--border)) 42%, transparent);
+}
+
+.app-side-count {
+  padding: 0.0625rem 0.375rem;
+  background: color-mix(in srgb, hsl(var(--foreground)) 5.5%, transparent);
+  color: color-mix(in srgb, hsl(var(--foreground)) 52%, hsl(var(--muted-foreground)) 48%);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-side-item[aria-pressed='true'] .app-side-count,
+.linear-sidebar button[aria-pressed='true'] .app-side-count,
+.context-sidebar [role='tab'][aria-selected='true'] .app-side-count,
+.linear-settings-nav-item.is-active .app-side-count {
+  background: color-mix(in srgb, hsl(var(--foreground)) 9%, transparent);
+  color: hsl(var(--foreground));
+  font-weight: 500;
+}
+
+.app-side-filter-note {
+  padding-inline: 0.5rem;
+}
+
+.context-sidebar-foot {
+  padding-inline: 1rem;
+}
+
+/* 2. Header navigation & toolbar controls: crisp weight hierarchy and hairline surface depth. */
+.app-header-nav button {
+  font-weight: 400;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.app-header-nav button[data-ui-variant='secondary'],
+.app-header-nav button[aria-pressed='true'] {
+  font-weight: 500;
+}
+
+.app-command-panel .app-command-input,
+.app-page-toolbar .ui-field,
+.app-workspace-content [role='combobox'],
+.app-workspace-content .ui-field {
+  box-shadow: 0 1px 1px color-mix(in srgb, hsl(var(--shadow-color)) 3.5%, transparent);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.app-command-panel .app-command-input:hover,
+.app-page-toolbar .ui-field:hover,
+.app-workspace-content [role='combobox']:hover,
+.app-workspace-content .ui-field:hover {
+  border-color: color-mix(in srgb, hsl(var(--border-strong, var(--border))) 62%, hsl(var(--border)));
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip) {
+  font-weight: 400;
+  box-shadow: 0 1px 1px color-mix(in srgb, hsl(var(--shadow-color)) 3%, transparent);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip).is-active {
+  font-weight: 500;
+}
+
+.app-segmented-control > .app-segmented-control-item[aria-pressed='true'],
+.app-segmented-control > button[aria-pressed='true'] {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, hsl(var(--shadow-color)) 10%, transparent),
+    0 0 0 0.5px color-mix(in srgb, hsl(var(--border)) 65%, transparent);
+}
+
+/* 3. Cards, tags, and card actions: tactile commercial elevation and softer tag hierarchy. */
+.repository-card.ui-card:not(.repository-card--list) {
+  border-color: color-mix(in srgb, hsl(var(--border)) 66%, transparent);
+  background: hsl(var(--card));
+  box-shadow: 0 1px 2px color-mix(in srgb, hsl(var(--shadow-color)) 4%, transparent);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 180ms ease;
+}
+
+.repository-card.ui-card:not(.repository-card--list):hover {
+  border-color: color-mix(in srgb, hsl(var(--border-strong, var(--border))) 76%, hsl(var(--border)));
+  background: hsl(var(--card));
+  box-shadow:
+    0 6px 18px -4px color-mix(in srgb, hsl(var(--shadow-color)) 8%, transparent),
+    0 1px 3px color-mix(in srgb, hsl(var(--shadow-color)) 4%, transparent);
+}
+
+.repository-card .app-repository-card-title {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.linear-card-tag,
+.app-repository-card-tag {
+  border-color: color-mix(in srgb, hsl(var(--border)) 58%, transparent);
+  border-radius: var(--ui-radius-xs);
+  background: color-mix(in srgb, hsl(var(--muted)) 62%, transparent);
+  color: color-mix(in srgb, hsl(var(--foreground)) 68%, hsl(var(--muted-foreground)) 32%);
+  font-weight: 400;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.repository-card:hover .linear-card-tag,
+.repository-card:hover .app-repository-card-tag {
+  border-color: color-mix(in srgb, hsl(var(--border)) 78%, transparent);
+  background: color-mix(in srgb, hsl(var(--muted)) 82%, transparent);
+}
+
+.app-repository-card-footer .app-repository-similar-action {
+  padding: 0;
+  font-weight: 400;
+}
+
+.app-repository-card-footer .app-repository-similar-action:hover {
+  background: transparent;
 }
