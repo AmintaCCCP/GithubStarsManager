@@ -66,8 +66,8 @@ vi.mock('../../services/indexedDbStorage', async (importOriginal) => {
   return {
     ...actual,
     // 真实签名是 (name, entries)——转发参数必须一一对应，否则会静默改写调用语义。
-    setStorageEntries: (name: string, entries: ReadonlyArray<readonly [string, string]>) =>
-      commitGate.wrap(() => actual.setStorageEntries(name, entries)),
+    setStorageEntries: vi.fn((name: string, entries: ReadonlyArray<readonly [string, string]>) =>
+      commitGate.wrap(() => actual.setStorageEntries(name, entries))),
   };
 });
 
@@ -338,6 +338,20 @@ describe('sharded persist storage', () => {
     // 重数据字段引用未变：分片内容保持原样
     expect(await readRaw(shardKeyFor(KEY, 'repositories'))).toBe(repositoriesShardBefore);
     expect(await readRaw(shardKeyFor(KEY, 'gists'))).toBe(gistsShardBefore);
+  });
+
+  it('rejects a success-requiring flush when the commit fails, and the next flush retries', async () => {
+    const state = buildState();
+    debouncedPersistStorage.setItem(KEY, { state, version: 16 });
+    await flushPendingPersistSnapshot();
+
+    debouncedPersistStorage.setItem(KEY, { state: { ...state, language: 'en' }, version: 16 });
+    vi.mocked(setStorageEntries).mockImplementationOnce(() => Promise.reject(new Error('disk full')));
+    await expect(flushPendingPersistSnapshot(true)).rejects.toThrow('disk full');
+
+    // A failed commit does not advance the dirty cache, so a plain flush retries.
+    await expect(flushPendingPersistSnapshot()).resolves.toBeUndefined();
+    expect((await readShardState('core')).language).toBe('en');
   });
 
   it('rewrites the repositories shard when its array reference changes but leaves other heavy shards', async () => {
