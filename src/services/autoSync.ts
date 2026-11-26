@@ -33,6 +33,8 @@ let _storeUnsubscribe: (() => void) | null = null;
 // Prevent overlapping pushes to backend
 let _isPushingToBackend = false;
 let _pushPromise: Promise<boolean> | null = null;
+// In-flight single-slice Vector repair, awaited by full pushes for ordering.
+let _vectorRepairPromise: Promise<void> | null = null;
 // Queue a push if one is requested while a pull is in-flight
 let _hasPendingPush = false;
 // Track unsynced local edits so backend polling does not overwrite them.
@@ -50,16 +52,31 @@ const POLL_INTERVAL = 5000;
 /**
  * Persist only the Vector Search config. A full push would also send slices whose
  * reads failed in this cycle (e.g. an empty AI list), deleting them remotely.
+ *
+ * Ordered against full pushes: waits for an in-flight push, and `syncToBackend`
+ * waits for an in-flight repair, so an older repair can never land after a newer
+ * full push. The config is read after that wait, and the fingerprint is only
+ * adopted when the store still holds what was sent.
  */
 function repairVectorSearchConfig(): void {
-  const config = useAppStore.getState().vectorSearchConfig;
-  void backend.syncVectorSearchConfig(config)
-    .then(() => {
-      _lastHash.vectorSearch = vectorSearchFingerprint(config);
-    })
-    .catch((err) => {
+  const run = async (): Promise<void> => {
+    if (_pushPromise) await _pushPromise;
+    const config = useAppStore.getState().vectorSearchConfig;
+    try {
+      await backend.syncVectorSearchConfig(config);
+      const fingerprint = vectorSearchFingerprint(config);
+      if (vectorSearchFingerprint(useAppStore.getState().vectorSearchConfig) === fingerprint) {
+        _lastHash.vectorSearch = fingerprint;
+      }
+    } catch (err) {
       logger.warn('sync.pushToBackend', 'Vector config repair push failed', err);
-    });
+    }
+  };
+  const current = run();
+  _vectorRepairPromise = current;
+  void current.finally(() => {
+    if (_vectorRepairPromise === current) _vectorRepairPromise = null;
+  });
 }
 
 // Last known backend data fingerprints — skip store update if unchanged
@@ -571,16 +588,15 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
           repairVectorSearchConfig();
         }
       } else {
+        let needsRepairPush = false;
         // Preserve local authToken if backend returned empty or decrypt_failed,
-        // and queue a repair push so the backend is re-synced with it. Without
-        // the push the preserved token stays local-only and the poll loop keeps
-        // re-detecting the backend/effective fingerprint mismatch.
+        // and repair the backend with it. Without the push the preserved token
+        // stays local-only and the poll loop keeps re-detecting the fingerprint
+        // mismatch.
         if (shouldQueueVectorSearchRepairPush(backendConfig, localConfig)) {
           logger.warn('sync.decryptFailed', 'Backend decrypt_failed for vector search authToken, preserving local value');
           backendConfig.authToken = localConfig.authToken;
-          if (reposFetched) {
-            repairVectorSearchConfig();
-          }
+          needsRepairPush = true;
         }
         const vectorConflict = backendConfig.workerUrl
           ? findConflictingVectorProfile(backendConfig.workerUrl)
@@ -591,16 +607,18 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
           notifyProfileConflict({ kind: 'vector', conflictingProfile });
           // Keep the local config: applying a Worker URL another profile owns would
           // route this profile's searches and index writes into a shared index.
-          // Push just the Vector slice so the backend converges on the local value.
-          if (reposFetched) {
-            repairVectorSearchConfig();
-          }
+          needsRepairPush = true;
         } else {
           state.setVectorSearchConfig(backendConfig);
           // Fingerprint the effective store config (after merge/normalization) so it
           // matches the push fingerprint in syncToBackend(); hashing the raw backend
           // payload instead would leave the two sides forever unequal.
           _lastHash.vectorSearch = vectorSearchFingerprint(useAppStore.getState().vectorSearchConfig);
+        }
+        // Repair only after the merged config is in the store, so we push what the
+        // profile actually accepted (e.g. backend workerUrl + preserved token).
+        if (needsRepairPush && reposFetched) {
+          repairVectorSearchConfig();
         }
       }
     }
@@ -695,6 +713,9 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
  */
 export async function syncToBackend(): Promise<boolean> {
   if (!backend.isAvailable) return true;
+  // Let an in-flight single-slice repair land first; a full push that overtook it
+  // could otherwise be overwritten by the older repair.
+  if (_vectorRepairPromise) await _vectorRepairPromise;
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
     await waitForInFlightSync();

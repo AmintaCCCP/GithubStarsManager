@@ -142,6 +142,33 @@ describe('syncFromBackend profile conflict isolation', () => {
     expect(backend.syncAIConfigs).not.toHaveBeenCalled();
   });
 
+  it('repairs the backend with the merged config (pulled URL + preserved token)', async () => {
+    const localToken = 'token-local-2';
+    useAppStore.setState({
+      vectorSearchConfig: {
+        ...baseVectorConfig,
+        workerUrl: 'https://vec.alice.workers.dev',
+        authToken: localToken,
+      },
+    });
+    vi.mocked(backend.fetchVectorSearchConfig).mockResolvedValue({
+      ...baseVectorConfig,
+      workerUrl: 'https://vec.new.workers.dev',
+      authToken: '',
+    });
+
+    await syncFromBackend();
+
+    const config = useAppStore.getState().vectorSearchConfig;
+    expect(config.workerUrl).toBe('https://vec.new.workers.dev');
+    expect(config.authToken).toBe(localToken);
+    await vi.waitFor(() => {
+      expect(backend.syncVectorSearchConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ workerUrl: 'https://vec.new.workers.dev', authToken: localToken }),
+      );
+    });
+  });
+
   it('keeps the local Vector config when the pulled Worker URL belongs to another profile', async () => {
     useAppStore.setState({
       vectorSearchConfig: { ...baseVectorConfig, workerUrl: 'https://vec.alice.workers.dev' },
