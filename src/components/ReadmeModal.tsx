@@ -729,8 +729,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             {showToc && tocItems.length > 0 && (
               <>
                 <div
-                  className="app-readme-toc shrink-0 overflow-y-auto border-r border-subtle bg-navigator p-3 readme-scrollbar"
-                  style={{ width: tocWidth }}
+                  className="app-readme-toc shrink-0 overflow-y-auto border-r border-subtle bg-navigator p-3 readme-scrollbar md:w-[var(--readme-toc-width)]"
+                  style={{ '--readme-toc-width': `${tocWidth}px` } as React.CSSProperties}
                 >
                   <h4 className="mb-2 px-2 text-label-sm font-medium text-tertiary">
                     {t('readmeModal.contents')}

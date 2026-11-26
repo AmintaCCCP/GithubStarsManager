@@ -318,7 +318,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
           releases={isLoading || error ? undefined : releases}
           language={language}
         />
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1" data-testid="release-list">
+        <div className="-mx-5 min-h-0 flex-1 overflow-y-auto px-5" data-testid="release-list">
           {isLoading ? (
             <div className="flex h-40 items-center justify-center gap-2 text-label text-secondary" role="status" aria-live="polite">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -339,10 +339,10 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
               <p className="mb-2 text-label-sm text-tertiary tabular-nums">
                 {t('repositoryReleaseSheet.v1-live-releases-loaded', { v1: releases.length })}
               </p>
-              <Accordion type="multiple" value={expandedReleaseIds} onValueChange={setExpandedReleaseIds} className="rounded-lg bg-raised px-3 shadow-elev-0">
+              <Accordion type="multiple" value={expandedReleaseIds} onValueChange={setExpandedReleaseIds} className="mx-0 overflow-hidden rounded-lg border border-default bg-raised px-3">
                 {visibleReleases.map((release) => (
                   <AccordionItem key={release.id} value={String(release.id)}>
-                    <AccordionTrigger>
+                    <AccordionTrigger className="min-w-0">
                       <span className="flex min-w-0 flex-1 items-center gap-2">
                         <span className="truncate text-label font-semibold text-foreground">{release.tag_name}</span>
                         {release.name && release.name !== release.tag_name && <span className="truncate text-label-sm font-normal text-secondary">{release.name}</span>}

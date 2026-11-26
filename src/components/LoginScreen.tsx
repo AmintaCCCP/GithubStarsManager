@@ -380,7 +380,7 @@ export const LoginScreen: React.FC = () => {
           <div className="mx-auto mb-3 flex size-11 items-center justify-center overflow-hidden rounded-lg bg-paper shadow-elev-0">
             <img src="./icon.png" alt="GitHub Stars Manager" className="h-full w-full object-cover" />
           </div>
-          <h1 className="mb-1 text-title font-semibold text-foreground">GitHub Stars Manager</h1>
+          <h1 className="mb-1 text-title font-semibold text-foreground">GitHub Stars Manager</h1> {/* i18n-allow-literal */}
           <p className="text-label text-secondary">{t('loginScreen.ai-powered-repository-management')}</p>
         </div>
 

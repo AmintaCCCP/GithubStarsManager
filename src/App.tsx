@@ -150,6 +150,20 @@ const RepositoriesView = React.memo(({
     resizeCleanupRef.current?.();
   }, []);
 
+  const persistSidebarWidth = useCallback((width: number) => {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width));
+    } catch {
+      // Ignore storage write failures in restricted environments.
+    }
+  }, []);
+
+  const commitSidebarWidth = useCallback((nextWidth: number) => {
+    const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(nextWidth)));
+    setSidebarWidth(clamped);
+    persistSidebarWidth(clamped);
+  }, [persistSidebarWidth]);
+
   const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -170,27 +184,47 @@ const RepositoriesView = React.memo(({
       window.removeEventListener('pointerup', stopResizing);
       window.removeEventListener('pointercancel', stopResizing);
       resizeCleanupRef.current = null;
-      try {
-        localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(latestWidth));
-      } catch {
-        // Ignore storage write failures in restricted environments.
-      }
+      persistSidebarWidth(latestWidth);
     };
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', stopResizing);
     window.addEventListener('pointercancel', stopResizing);
     resizeCleanupRef.current = stopResizing;
-  }, [sidebarWidth]);
+  }, [sidebarWidth, persistSidebarWidth]);
 
   const handleSidebarResizeReset = useCallback(() => {
-    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
-    try {
-      localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(DEFAULT_SIDEBAR_WIDTH));
-    } catch {
-      // Ignore storage write failures in restricted environments.
+    commitSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+  }, [commitSidebarWidth]);
+
+  const handleSidebarResizeKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 32 : 16;
+    switch (event.key) {
+      case 'ArrowLeft':
+        event.preventDefault();
+        commitSidebarWidth(sidebarWidth - step);
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        commitSidebarWidth(sidebarWidth + step);
+        break;
+      case 'Home':
+        event.preventDefault();
+        commitSidebarWidth(MIN_SIDEBAR_WIDTH);
+        break;
+      case 'End':
+        event.preventDefault();
+        commitSidebarWidth(MAX_SIDEBAR_WIDTH);
+        break;
+      case 'Enter':
+      case '0':
+        event.preventDefault();
+        commitSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+        break;
+      default:
+        break;
     }
-  }, []);
+  }, [sidebarWidth, commitSidebarWidth]);
 
   // 相似仓库视图激活时，列表数据源切换为相似结果，且忽略分类过滤
   const listRepositories = similarView?.active
@@ -209,6 +243,7 @@ const RepositoriesView = React.memo(({
       />
       <div
         role="separator"
+        tabIndex={0}
         aria-orientation="vertical"
         aria-label="Sidebar resizer"
         aria-valuenow={sidebarWidth}
@@ -216,11 +251,12 @@ const RepositoriesView = React.memo(({
         aria-valuemax={MAX_SIDEBAR_WIDTH}
         onPointerDown={handleSidebarResizeStart}
         onDoubleClick={handleSidebarResizeReset}
-        className="group hidden w-2 shrink-0 cursor-col-resize items-stretch justify-center self-stretch select-none lg:flex"
+        onKeyDown={handleSidebarResizeKeyDown}
+        className="group hidden w-2 shrink-0 cursor-col-resize items-stretch justify-center self-stretch rounded-sm select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex"
       >
         <div
           className={`my-2 w-[2px] rounded-full transition-colors duration-micro ease-out-subtle ${
-            isResizingSidebar ? 'bg-accent-solid/70' : 'bg-transparent group-hover:bg-border-alpha-strong'
+            isResizingSidebar ? 'bg-accent-solid/70' : 'bg-transparent group-hover:bg-border-alpha-strong group-focus-visible:bg-border-alpha-strong'
           }`}
         />
       </div>

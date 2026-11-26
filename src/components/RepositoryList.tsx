@@ -588,19 +588,21 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const { unanalyzedCount, analyzedCount, failedCount } = repositoryStats;
 
   return (
-    <div className="space-y-3">
+    <div className="mt-3 space-y-3">
 
       {/* Similar repositories view banner */}
       {similarView?.active && (
-        <SimilarViewBanner
-          anchorRepoName={similarView.anchorRepoName}
-          onReset={resetSimilarView}
-          language={language}
-        />
+        <div className="mb-3">
+          <SimilarViewBanner
+            anchorRepoName={similarView.anchorRepoName}
+            onReset={resetSimilarView}
+            language={language}
+          />
+        </div>
       )}
 
       {/* Controls Bar */}
-      <div className="ui-toolbar app-repository-controls flex flex-col gap-2 py-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="ui-toolbar app-repository-controls flex flex-col gap-2.5 py-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2.5">
 
           {/* AI Analysis Select */}

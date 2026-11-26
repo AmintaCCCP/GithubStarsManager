@@ -1206,9 +1206,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <OverflowActionRow
                 actionRowRef={overflowActionRowRef}
                 testId="list-action-row"
-                className={`app-repository-actions flex min-w-0 flex-1 items-center justify-end gap-0.5 overflow-hidden transition-opacity duration-micro ease-out-subtle ${
-                  isActionsMenuOpen || isAnalyzing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-                }`}
+                className="app-repository-actions flex min-w-0 flex-1 items-center justify-end gap-0.5 overflow-hidden opacity-100"
                 visibleActionCount={visibleOverflowActionCount}
                 primaryActionCount={primaryOverflowActionCount}
                 actionPreferences={actionPreferences}
@@ -1304,9 +1302,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <OverflowActionRow
           actionRowRef={overflowActionRowRef}
           testId="grid-action-row"
-          className={`app-repository-actions flex w-full items-center justify-start gap-0.5 overflow-hidden transition-opacity duration-micro ease-out-subtle ${
-            isActionsMenuOpen || isAnalyzing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-          }`}
+          className="app-repository-actions flex w-full items-center justify-start gap-0.5 overflow-hidden opacity-100"
           visibleActionCount={visibleOverflowActionCount}
           primaryActionCount={primaryOverflowActionCount}
           actionPreferences={actionPreferences}

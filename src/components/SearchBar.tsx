@@ -650,7 +650,7 @@ export const SearchBar: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <div className="ui-toolbar app-command-panel mb-3">
+      <div className="ui-toolbar app-command-panel !mb-3">
       {/* Search Input */}
       <div className="app-command-row relative z-40">
         <div className="flex w-full min-w-0 flex-1 items-center gap-2">

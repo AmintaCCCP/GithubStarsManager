@@ -164,7 +164,7 @@ export const Header: React.FC = () => {
             <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-paper shadow-elev-0">
               <img
                 src="./icon.png"
-                alt="GitHub Stars Manager"
+                alt="GitHub Stars Manager" // i18n-allow-literal
                 className="h-full w-full object-cover"
               />
             </div>
@@ -183,7 +183,7 @@ export const Header: React.FC = () => {
           {/* Navigation - Desktop & Tablet (≥768px) */}
           <nav
             aria-label={t('header.menu')}
-            className="titlebar-no-drag hd-btns hidden h-control items-center gap-0.5 rounded-md bg-fill-hover p-0.5 md:inline-flex"
+            className="titlebar-no-drag hd-btns hidden items-center gap-1 md:inline-flex"
           >
             {visibleMenus.map(menuItem => {
               const meta = MENU_META[menuItem.id];
@@ -198,10 +198,10 @@ export const Header: React.FC = () => {
                   aria-pressed={isActive}
                   title={label}
                   aria-label={label}
-                  className={`motion-press inline-flex h-control-sm items-center justify-center gap-1.5 whitespace-nowrap rounded-sm px-2.5 text-label-sm font-medium select-none outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                  className={`motion-press inline-flex h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-label font-medium select-none outline-none transition-colors duration-micro ease-out-subtle focus-visible:ring-2 focus-visible:ring-ring/50 ${
                     isActive
-                      ? 'bg-floating text-foreground shadow-elev-1'
-                      : 'text-secondary hover:text-foreground'
+                      ? 'bg-fill-selected text-foreground'
+                      : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                   }`}
                 >
                   <Icon className={`size-3.5 shrink-0 ${isActive ? 'text-foreground' : 'text-tertiary'}`} />

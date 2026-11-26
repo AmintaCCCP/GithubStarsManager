@@ -302,11 +302,11 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                   </Button>
                 </div>
               )}
-              <ul className="space-y-1">
+              <ul className="space-y-4">
               {groupedSessions.map((group) => (
                 <li key={group.key} className="list-none">
-                  <p className="px-2 pb-1 pt-2 text-label-sm font-medium text-tertiary">{dateGroupLabel(group.key)}</p>
-                  <ul className="space-y-px">
+                  <p className="mb-2 px-2 pt-1 text-label-sm font-medium text-tertiary">{dateGroupLabel(group.key)}</p>
+                  <ul className="space-y-1.5">
                     {group.sessions.map((session) => {
                       const repository = repositoryById.get(session.repoId);
                       const isUnstarred = !repository;
@@ -315,20 +315,19 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                         ?? repository?.owner.avatar_url
                         ?? `https://github.com/${session.repoFullName.split('/')[0]}.png?size=64`;
                       return (
-                        <li key={session.id} className="flex items-center gap-1 rounded-md transition-colors hover:bg-fill-hover">
-                          <Button
+                        <li key={session.id} className="flex items-center gap-1.5 rounded-md transition-colors hover:bg-fill-hover">
+                          <button
                             type="button"
-                            variant="ghost"
-                            className="h-auto min-w-0 flex-1 items-center justify-start gap-2.5 px-2 py-2 text-left hover:bg-transparent"
+                            className="motion-press flex h-auto min-h-[56px] min-w-0 flex-1 items-center justify-start gap-2.5 rounded-md px-2.5 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                             onClick={() => onSelectSession(targetRepository, session.id)}
                             title={t('globalChatHistorySheet.open-conversation-in-v1', { v1: session.repoFullName })}
                           >
                             <img src={avatarUrl} alt="" className="size-7 shrink-0 rounded-sm object-cover shadow-elev-0" />
-                            <span className="min-w-0 flex-1">
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                               <span className="block truncate text-label font-medium text-foreground">{session.title}</span>
                               <span className="block truncate text-label-sm text-tertiary tabular-nums">{session.repoFullName} · {formatTime(session.updatedAt)}</span>
                             </span>
-                          </Button>
+                          </button>
                           {isUnstarred && (
                             <span className="inline-flex h-5 shrink-0 items-center rounded-xs bg-fill-hover px-1.5 text-caption text-tertiary">
                               {t('globalChatHistorySheet.unstarred-repository')}

@@ -90,75 +90,76 @@ export const RepositoryChatHistoryPanel: React.FC<RepositoryChatHistoryPanelProp
               : t('repositoryChatHistoryPanel.no-matching-conversations-found')}</p>
           </div>
         ) : (
-          (Object.keys(groupedSessions) as HistoryGroup[]).map((group) => groupedSessions[group].length > 0 && (
-            <div key={group} className="mb-3">
-              <h3 className="mb-1 px-2 text-label-sm font-medium text-tertiary">{groupLabels[group]}</h3>
-              <ul className="space-y-px">
-                {groupedSessions[group].map((session) => (
-                  <li key={session.id} className="flex items-center gap-1">
-                    {editingId === session.id ? (
-                      <div className="flex min-w-0 flex-1 items-center gap-1">
-                        <Input
-                          value={editingTitle}
-                          onChange={(event) => setEditingTitle(event.target.value)}
-                          className="h-control min-w-0 text-label-sm"
-                          autoFocus
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' && !disabled && !event.nativeEvent.isComposing) {
-                              onRename(session.id, editingTitle);
-                              setEditingId(null);
-                            }
-                            if (event.key === 'Escape') setEditingId(null);
+          <div className="space-y-4">
+            {(Object.keys(groupedSessions) as HistoryGroup[]).map((group) => groupedSessions[group].length > 0 && (
+              <div key={group}>
+                <h3 className="mb-2 px-2 text-label-sm font-medium text-tertiary">{groupLabels[group]}</h3>
+                <ul className="space-y-1">
+                  {groupedSessions[group].map((session) => (
+                    <li key={session.id} className="flex items-center gap-1.5">
+                      {editingId === session.id ? (
+                        <div className="flex min-w-0 flex-1 items-center gap-1">
+                          <Input
+                            value={editingTitle}
+                            onChange={(event) => setEditingTitle(event.target.value)}
+                            className="h-control min-w-0 text-label-sm"
+                            autoFocus
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' && !disabled && !event.nativeEvent.isComposing) {
+                                onRename(session.id, editingTitle);
+                                setEditingId(null);
+                              }
+                              if (event.key === 'Escape') setEditingId(null);
+                            }}
+                          />
+                          <Button type="button" variant="ghost" size="icon-sm" className="size-control-sm rounded-sm" onClick={() => { onRename(session.id, editingTitle); setEditingId(null); }} disabled={disabled} aria-label={t('repositoryChatSheet.save-title')}>
+                            <Check className="size-3.5" aria-hidden="true" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon-sm" className="size-control-sm rounded-sm" onClick={() => setEditingId(null)} aria-label={t('repositoryChatSheet.cancel-edit')}>
+                            <X className="size-3.5" aria-hidden="true" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`motion-press flex min-h-row-sidebar min-w-0 flex-1 items-center justify-start rounded-sm px-2 py-1.5 text-left text-label font-normal outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                            session.id === activeSessionId
+                              ? 'bg-fill-selected text-foreground'
+                              : 'text-secondary hover:bg-fill-hover hover:text-foreground'
+                          }`}
+                          onClick={() => {
+                            if (!disabled) onSelect(session.id);
                           }}
-                        />
-                        <Button type="button" variant="ghost" size="icon-sm" className="size-control-sm rounded-sm" onClick={() => { onRename(session.id, editingTitle); setEditingId(null); }} disabled={disabled} aria-label={t('repositoryChatSheet.save-title')}>
-                          <Check className="size-3.5" aria-hidden="true" />
-                        </Button>
-                        <Button type="button" variant="ghost" size="icon-sm" className="size-control-sm rounded-sm" onClick={() => setEditingId(null)} aria-label={t('repositoryChatSheet.cancel-edit')}>
-                          <X className="size-3.5" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    ) : (
+                          onDoubleClick={() => { setEditingId(session.id); setEditingTitle(session.title); }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'F2') {
+                              setEditingId(session.id);
+                              setEditingTitle(session.title);
+                            }
+                          }}
+                          aria-disabled={disabled || undefined}
+                          aria-current={session.id === activeSessionId ? 'true' : undefined}
+                        >
+                          <span className="truncate">{session.title}</span>
+                        </button>
+                      )}
                       <Button
                         type="button"
                         variant="ghost"
-                        className={`h-row-sidebar min-w-0 flex-1 justify-start rounded-sm px-2 text-left text-label font-normal ${
-                          session.id === activeSessionId
-                            ? 'bg-fill-selected text-foreground'
-                            : 'text-secondary hover:bg-fill-hover hover:text-foreground'
-                        }`}
-                        onClick={() => {
-                          if (!disabled) onSelect(session.id);
-                        }}
-                        onDoubleClick={() => { setEditingId(session.id); setEditingTitle(session.title); }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'F2') {
-                            setEditingId(session.id);
-                            setEditingTitle(session.title);
-                          }
-                        }}
-                        aria-disabled={disabled || undefined}
-                        aria-current={session.id === activeSessionId ? 'true' : undefined}
+                        size="icon-sm"
+                        className="size-control-sm shrink-0 rounded-sm text-tertiary hover:bg-destructive-tint hover:text-destructive"
+                        onClick={() => onDelete(session.id)}
+                        disabled={disabled}
+                        aria-label={t('repositoryChatHistoryPanel.delete-conversation-v1', { v1: session.title })}
                       >
-                        <span className="truncate">{session.title}</span>
+                        <Trash2 className="size-3.5" aria-hidden="true" />
                       </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="size-control-sm shrink-0 rounded-sm text-tertiary hover:bg-destructive-tint hover:text-destructive"
-                      onClick={() => onDelete(session.id)}
-                      disabled={disabled}
-                      aria-label={t('repositoryChatHistoryPanel.delete-conversation-v1', { v1: session.title })}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden="true" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </section>
