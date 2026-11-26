@@ -3,6 +3,7 @@ import { resetSyncHashes } from '../../services/autoSync';
 import type { AppStoreSlice } from '../types';
 import { accountIdKey, applyAccountWorkspace, captureAccountWorkspace, switchAccountWorkspace } from '../helpers/accountWorkspace';
 import { clearAuthMirror, writeAuthMirror, writeSessionBackendSecret } from '../persistence/authStorage';
+import { syncActiveProfileMetadata } from '../../services/profileStorage';
 
 export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions, 'setUser' | 'setGitHubToken' | 'setBackendApiSecret' | 'logout'>> = (set, get) => ({
       setUser: (user) => {
@@ -23,6 +24,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions, 
         }
         const { githubToken, backendApiSecret } = get();
         writeAuthMirror({ user, githubToken, backendApiSecret });
+        if (user) {
+          syncActiveProfileMetadata({ user });
+        }
       },
       setGitHubToken: (token) => {
         logger.info('store.setGitHubToken', 'Setting GitHub token', { hasToken: !!token });

@@ -6,6 +6,7 @@ import type { Category } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
+import { findConflictingWebdavProfile } from '../../../services/profileStorage';
 import { normalizeBackendUrl } from '../../../utils/backendUrl';
 import { syncLocalGitHubTokenToBackend, tryRestoreAuthFromBackend } from '../../../services/autoSync';
 
@@ -182,6 +183,18 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       state.setReleases(releaseData.releases, { allowEmpty: true });
       state.setAIConfigs(aiConfigData);
       state.setWebDAVConfigs(webdavConfigData);
+      for (const cfg of webdavConfigData) {
+        const conflict = findConflictingWebdavProfile(cfg.url, cfg.path);
+        if (conflict) {
+          toast(
+            t('useBackendSettingsActions.webdav-sync-conflict-warning', {
+              account: conflict.login || conflict.id,
+            }),
+            'warning',
+          );
+          break;
+        }
+      }
       const serverHidden = Array.isArray(settingsData.hiddenDefaultCategoryIds) ? settingsData.hiddenDefaultCategoryIds : [];
       for (const categoryId of serverHidden) if (typeof categoryId === 'string') state.hideDefaultCategory(categoryId);
       for (const categoryId of state.hiddenDefaultCategoryIds) {

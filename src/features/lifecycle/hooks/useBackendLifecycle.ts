@@ -13,6 +13,8 @@ import {
   stopMcpElectronBridge,
 } from '../../../services/mcpElectronBridge';
 import { startPluginSnapshotBridge, stopPluginSnapshotBridge } from '../../../plugins/pluginSnapshotBridge';
+import { mergeServerProfiles, syncActiveProfileMetadata } from '../../../services/profileStorage';
+import { useAppStore } from '../../../store/useAppStore';
 
 /**
  * Owns application-wide backend and Electron MCP startup after Store hydration.
@@ -48,6 +50,31 @@ export const useBackendLifecycle = (hasHydrated: boolean): void => {
           }
           if (!cancelled) {
             unsubscribe = startAutoSync();
+          }
+          // Multi-device profile discovery runs in the background so a stalled
+          // response body can never block Electron MCP or plugin bridge startup.
+          if (!cancelled && backend.profilesSupported) {
+            void backend
+              .listServerProfiles()
+              .then((serverProfiles) => {
+                if (!cancelled && serverProfiles.length > 0) {
+                  const state = useAppStore.getState();
+                  if (state.user) {
+                    syncActiveProfileMetadata(
+                      {
+                        user: state.user,
+                        webdavConfigs: state.webdavConfigs,
+                        vectorSearchConfig: state.vectorSearchConfig,
+                      },
+                      { force: true },
+                    );
+                  }
+                  mergeServerProfiles(serverProfiles);
+                }
+              })
+              .catch(() => {
+                // Non-fatal: profile discovery is best-effort.
+              });
           }
         }
       } catch (error) {

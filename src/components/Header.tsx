@@ -4,14 +4,39 @@
 
 import { useT } from '../i18n/useT';
 import React, { useState, useMemo } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X } from 'lucide-react';
+import {
+  Settings,
+  Calendar,
+  Search,
+  Moon,
+  Sun,
+  LogOut,
+  Compass,
+  GitFork,
+  FileCode2,
+  Menu,
+  X,
+  Check,
+  ChevronDown,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { Button } from './ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useAppStore } from '../store/useAppStore';
 import { resolveTheme } from '../store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
+import { useAccountProfiles } from '../hooks/useAccountProfiles';
+import { AddAccountModal } from './AddAccountModal';
 import { HeaderMenuId, AppState } from '../types';
 
 const MENU_META: Record<HeaderMenuId, {
@@ -51,9 +76,18 @@ export const Header: React.FC = () => {
   })));
   const theme = resolveTheme(themeMode, systemTheme);
 
-  const { confirm } = useDialog();
+  const { confirm, toast } = useDialog();
+  const {
+    profiles,
+    activeProfileId,
+    isSwitching,
+    switchAccount,
+    addAccount,
+    removeProfile,
+  } = useAccountProfiles();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
 
   const visibleMenus = useMemo(() =>
     [...headerMenuConfig]
@@ -175,16 +209,110 @@ export const Header: React.FC = () => {
             {/* User Profile */}
             {user && (
               <div className="flex items-center space-x-2 sm:space-x-3">
-                <img
-                  src={user.avatar_url}
-                  alt={user.name || user.login}
-                  className="w-8 h-8 rounded-full"
-                />
-                <div className="min-w-0 hidden sm:block">
-                  <p className="app-header-user-name truncate">
-                    {user.name || user.login}
-                  </p>
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center space-x-2 rounded-full py-0.5 pl-0.5 pr-1.5 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={t('accountSwitcher.account-menu')}
+                    >
+                      <img
+                        src={user.avatar_url}
+                        alt={user.name || user.login}
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <div className="min-w-0 hidden sm:block text-left">
+                        <p className="app-header-user-name truncate">
+                          {user.name || user.login}
+                        </p>
+                      </div>
+                      {(profiles.length >= 2 || profiles.some((p) => p.id !== activeProfileId)) && (
+                        <ChevronDown className="hidden sm:block h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-60">
+                    {(profiles.length >= 2 || profiles.some((p) => p.id !== activeProfileId)) && (
+                      <>
+                        <DropdownMenuLabel>
+                          {t('accountSwitcher.accounts-label')}
+                        </DropdownMenuLabel>
+                        {profiles.map((profile) => {
+                          const isCurrent = profile.id === activeProfileId;
+                          const displayName = profile.login || profile.name || profile.id;
+                          return (
+                            <DropdownMenuItem
+                              key={profile.id}
+                              disabled={isSwitching}
+                              onSelect={() => {
+                                if (!isCurrent) {
+                                  void switchAccount(profile.id);
+                                }
+                              }}
+                              className="flex items-center justify-between gap-2"
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                {profile.avatarUrl ? (
+                                  <img
+                                    src={profile.avatarUrl}
+                                    alt={displayName}
+                                    className="h-5 w-5 shrink-0 rounded-full"
+                                  />
+                                ) : (
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                                    {displayName.slice(0, 1).toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="truncate text-sm">
+                                  {displayName}
+                                </span>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1">
+                                {isCurrent ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                    <Check className="h-3 w-3" />
+                                    {t('accountSwitcher.active-badge')}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                    aria-label={t('accountSwitcher.remove-account')}
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const confirmed = await confirm(
+                                        t('accountSwitcher.remove-account-confirm-title'),
+                                        t('accountSwitcher.remove-account-confirm-desc', {
+                                          account: displayName,
+                                        }),
+                                        { type: 'warning' },
+                                      );
+                                      if (confirmed) {
+                                        try {
+                                          await removeProfile(profile.id);
+                                        } catch (err) {
+                                          toast(err instanceof Error ? err.message : String(err), 'error');
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuItem onSelect={() => setAddAccountOpen(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      {t('accountSwitcher.add-account')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -213,6 +341,11 @@ export const Header: React.FC = () => {
           </div>
         </div>
       </div>
+      <AddAccountModal
+        open={addAccountOpen}
+        onOpenChange={setAddAccountOpen}
+        onSubmit={addAccount}
+      />
     </header>
   );
 };

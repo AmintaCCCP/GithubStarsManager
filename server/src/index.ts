@@ -8,12 +8,14 @@ import fs from 'node:fs';
 import { parse } from 'parse5';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
+import { profileContextMiddleware } from './middleware/profileContext.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger, morganLoggerStream } from './services/logger.js';
 import { mountStaticFrontend, resolveSpaIndexFile } from './services/staticFrontend.js';
 import { getDb, closeDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
 import healthRouter from './routes/health.js';
+import profilesRouter from './routes/profiles.js';
 import repositoriesRouter from './routes/repositories.js';
 import releasesRouter from './routes/releases.js';
 import categoriesRouter from './routes/categories.js';
@@ -157,6 +159,7 @@ export function createApp(): express.Express {
       allowedHeaders: [
         'Content-Type',
         'Authorization',
+        'X-GSM-Profile',
         'X-MCP-Token',
         'Mcp-Session-Id',
         'mcp-session-id',
@@ -198,9 +201,12 @@ export function createApp(): express.Express {
 
   // Auth middleware for all /api/* except /api/health
   app.use('/api', authMiddleware);
+  // Multi-profile SQLite routing via optional X-GSM-Profile header
+  app.use('/api', profileContextMiddleware);
 
   // Routes
   app.use(healthRouter);
+  app.use(profilesRouter);
 
   // Wave 2: Data CRUD routes
   app.use(repositoriesRouter);

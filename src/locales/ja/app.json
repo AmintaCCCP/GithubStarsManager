@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "警告: このバックアップ内の一部のキーはブロックされています。インポート後、対応する設定にキーを再入力してください。",
     "importing": "インポート中…",
     "merge-import": "マージインポート",
-    "replace-import": "インポートを上書きする"
+    "replace-import": "インポートを上書きする",
+    "webdav-import-conflict-skipped": "アカウント {{account}} と競合する {{count}} 件の WebDAV インポート設定をスキップしました。"
   },
   "diagnosticLogsPanel": {
     "level": "レベル",
@@ -1348,7 +1349,8 @@
     "deploy-tab-manual": "手動ステップ（高度）",
     "one-click-platforms-tip": "プラットフォーム固有のクイックランチャー：",
     "platform-mac-linux": "macOS / Linux: cloudflare-worker で ./deploy.sh を実行",
-    "platform-windows": "Windows: cloudflare-worker で deploy.bat をダブルクリックまたは .\\deploy.ps1 を実行"
+    "platform-windows": "Windows: cloudflare-worker で deploy.bat をダブルクリックまたは .\\deploy.ps1 を実行",
+    "worker-url-conflict": "この Vectorize Worker URL はアカウント {{account}} で既に使用されています。このアカウント専用の Vectorize Worker URL をデプロイしてください。"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV設定",
@@ -1416,5 +1418,36 @@
     "download": "ダウンロード",
     "detected-from-filenames-and-release-metadata-no": "ファイル名と Release メタデータから判定しています。安全性の検証は行わず、自動実行も行いません。下のアセット一覧からいつでも別のアセットを選べます。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "このデバイスに該当しないアセット（ソースコード、チェックサム、署名、デバッグシンボル、blockmap、他のプラットフォームやアーキテクチャ）を {{v1}} 件除外しました。"
+  },
+  "accountSwitcher": {
+    "account-menu": "アカウントメニュー",
+    "accounts-label": "アカウント一覧",
+    "active-badge": "使用中",
+    "add-account": "アカウントを追加",
+    "remove-account": "アカウントを削除",
+    "remove-account-confirm-title": "アカウントを削除",
+    "remove-account-confirm-desc": "{{account}} のローカルデータとプロファイルを削除しますか？接続中のバックエンドにこのプロファイルが保存されている場合、サーバー側のデータも削除される可能性があります。GitHub アカウント自体には影響しません。",
+    "add-account-title": "GitHub アカウントを追加",
+    "add-account-description": "独立したアカウントプロファイルを作成するには GitHub パーソナルアクセストークンを入力してください。",
+    "github-pat-label": "GitHub パーソナルアクセストークン",
+    "github-pat-placeholder": "ghp_... または github_pat_...",
+    "show-token": "トークンを表示",
+    "hide-token": "トークンを隠す",
+    "copy-general-settings": "一般設定をコピー（AI / Embedding / テーマ / 言語）",
+    "cancel": "キャンセル",
+    "add-and-switch": "追加して切り替え",
+    "token-required": "GitHub パーソナルアクセストークンを入力してください。",
+    "duplicate-account-error": "この GitHub アカウントは既に追加されています。",
+    "token-validation-failed": "トークンの検証に失敗しました。トークンとネットワーク接続を確認してください。",
+    "switching-account": "アカウントを切り替えています...",
+    "other-tab-switched-notice": "別のタブでアクティブなアカウントが切り替わりました。同期するため再読み込みしてください。",
+    "reload-now": "再読み込み",
+    "backend-profiles-unsupported-warning": "接続先のバックエンドサーバーはマルチアカウントに対応していません。既定アカウントのデータを保護するためローカル専用モードで動作します。",
+    "logged-out-profile-notice": "現在プロファイル {{profile}} を選択中です（サインアウト中）。",
+    "return-to-default": "デフォルトアカウントに戻る",
+    "switch-to-profile": "{{profile}} に切り替え",
+    "profile-conflict-webdav-warning": "同期された WebDAV 設定が他のアカウント（{{account}}）と競合しています。バックアップの上書きを防ぐため別のサブディレクトリを使用してください。",
+    "profile-conflict-vector-warning": "同期されたベクトル検索 Worker URL が他のアカウント（{{account}}）と競合しています。アカウントごとに専用の Worker URL を使用してください。",
+    "dismiss": "閉じる"
   }
 }

@@ -13,7 +13,8 @@
     "sync-failed": "동기화 실패",
     "sync-from-backend": "백엔드에서 동기화",
     "syncing-from-backend-will-overwrite-local-data-c": "백엔드에서 동기화하면 로컬 데이터를 덮어쓰게 됩니다. 계속하시겠습니까?",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "백엔드에서 동기화됨: 웨어하우스 {{v1}}, 릴리스 {{v2}}, AI 구성 {{v3}}, WebDAV 구성 {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "백엔드에서 동기화됨: 웨어하우스 {{v1}}, 릴리스 {{v2}}, AI 구성 {{v3}}, WebDAV 구성 {{v4}}",
+    "webdav-sync-conflict-warning": "동기화된 WebDAV 설정이 계정 {{account}}와(과) 충돌합니다. 백업 덮어쓰기를 방지하려면 별도의 하위 디렉터리를 사용하세요."
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "먼저 WebDAV 서비스를 구성하고 활성화하십시오.",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "사용자 지정 User-Agent에는 라틴 문자(Latin-1)만 사용할 수 있습니다.",
     "webdav-connection-successful": "WebDAV 연결이 성공했습니다!",
     "webdav-connection-failed-please-check-configurat": "WebDAV 연결에 실패했습니다. 구성을 확인하십시오.",
-    "webdav-test-failed": "WebDAV 테스트 실패"
+    "webdav-test-failed": "WebDAV 테스트 실패",
+    "webdav-target-conflict": "이 WebDAV 경로는 이미 {{account}} 계정에서 사용 중입니다. 백업 덮어쓰기를 방지하려면 {{suggestedPath}} 같은 별도의 하위 디렉터리를 사용하세요."
   },
   "generalPanel": {
     "account-token-hint": "현재 계정 {{login}}. 만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다.",

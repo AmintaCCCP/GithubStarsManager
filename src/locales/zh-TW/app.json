@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "警告：此備份中的部分金鑰已被封鎖。導入後請在對應配置中重新輸入密鑰。",
     "importing": "導入中…",
     "merge-import": "合併導入",
-    "replace-import": "覆蓋導入"
+    "replace-import": "覆蓋導入",
+    "webdav-import-conflict-skipped": "已略過 {{count}} 個與帳戶 {{account}} 衝突的 WebDAV 匯入設定。"
   },
   "diagnosticLogsPanel": {
     "level": "等級",
@@ -1348,7 +1349,8 @@
     "deploy-tab-manual": "手動分步部署（高級）",
     "one-click-platforms-tip": "各平台專用快捷啟動方式：",
     "platform-mac-linux": "macOS / Linux: 進入 cloudflare-worker 運行 ./deploy.sh",
-    "platform-windows": "Windows: 進入 cloudflare-worker 雙擊 deploy.bat 或執行 .\\deploy.ps1"
+    "platform-windows": "Windows: 進入 cloudflare-worker 雙擊 deploy.bat 或執行 .\\deploy.ps1",
+    "worker-url-conflict": "此 Vectorize Worker URL 已被帳號 {{account}} 使用。請為目前帳號部署獨立的 Vectorize Worker URL。"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",
@@ -1416,5 +1418,36 @@
     "download": "下載",
     "detected-from-filenames-and-release-metadata-no": "依檔名與 Release 中繼資料辨識，未驗證安裝包安全性，也不會自動執行。你隨時可以在下方資產清單中手動選擇其他資產。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 個不適用於目前裝置的資產（原始碼、校驗和、簽章、偵錯符號、blockmap、其他平台/架構）。"
+  },
+  "accountSwitcher": {
+    "account-menu": "帳號選單",
+    "accounts-label": "帳號清單",
+    "active-badge": "目前",
+    "add-account": "新增帳號",
+    "remove-account": "移除帳號",
+    "remove-account-confirm-title": "移除帳號",
+    "remove-account-confirm-desc": "確定要移除帳號 {{account}} 的本機設定與快取資料嗎？若已連線的後端儲存了此設定檔，伺服器端資料也可能一併刪除。這不會影響你的 GitHub 帳號。",
+    "add-account-title": "新增 GitHub 帳號",
+    "add-account-description": "輸入 GitHub Personal Access Token 以建立隔離的帳號設定檔。",
+    "github-pat-label": "GitHub 個人存取權杖（PAT）",
+    "github-pat-placeholder": "輸入 ghp_... 或 github_pat_...",
+    "show-token": "顯示權杖",
+    "hide-token": "隱藏權杖",
+    "copy-general-settings": "複製一般設定（AI / Embedding / 主題 / 語言）",
+    "cancel": "關閉",
+    "add-and-switch": "新增並切換",
+    "token-required": "請輸入 GitHub Personal Access Token。",
+    "duplicate-account-error": "此 GitHub 帳號已存在，請勿重複新增。",
+    "token-validation-failed": "權杖驗證失敗，請確認權杖是否正確以及網路連線狀態。",
+    "switching-account": "正在切換帳號...",
+    "other-tab-switched-notice": "偵測到其他分頁已切換目前帳號，請重新整理頁面以保持同步。",
+    "reload-now": "立即重新整理",
+    "backend-profiles-unsupported-warning": "目前的後端伺服器尚未支援多帳號隔離，已自動改為僅本機模式以保護預設帳號資料。",
+    "logged-out-profile-notice": "目前處於帳戶設定檔 {{profile}}（未登入）。",
+    "return-to-default": "返回預設帳戶",
+    "switch-to-profile": "切換至 {{profile}}",
+    "profile-conflict-webdav-warning": "同步下來的 WebDAV 設定與其他帳戶（{{account}}）衝突，請改用獨立子目錄以避免覆蓋備份。",
+    "profile-conflict-vector-warning": "同步下來的向量搜尋 Worker URL 與其他帳戶（{{account}}）衝突，請為不同帳戶使用獨立的 Worker URL。",
+    "dismiss": "關閉"
   }
 }

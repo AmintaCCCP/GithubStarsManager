@@ -6,16 +6,32 @@
  */
 
 const X_AUTH_FILENAME = 'x-auth.enc';
+const PROFILE_ID_PATTERN = /^p_[a-z0-9_-]{1,32}$/;
 
-function getXAuthPath(userDataPath, pathModule) {
-  return pathModule.join(userDataPath, X_AUTH_FILENAME);
+function isValidProfileId(profileId) {
+  return typeof profileId === 'string' && PROFILE_ID_PATTERN.test(profileId);
+}
+
+function getXAuthPath(userDataPath, pathModule, profileId) {
+  if (!profileId || profileId === 'default') {
+    return pathModule.join(userDataPath, X_AUTH_FILENAME);
+  }
+  if (!isValidProfileId(profileId)) {
+    throw new Error(`Invalid profile ID for X auth storage: ${String(profileId)}`);
+  }
+  return pathModule.join(userDataPath, 'profiles', profileId, X_AUTH_FILENAME);
 }
 
 const X_COOKIE_VALUE_PATTERN = /^[\w%+/=.~-]+$/;
 const MAX_COOKIE_LENGTH = 512;
 
-function saveEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, auth) {
-  const filePath = getXAuthPath(userDataPath, pathModule);
+function saveEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, auth, profileId) {
+  let filePath;
+  try {
+    filePath = getXAuthPath(userDataPath, pathModule, profileId);
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
   if (!auth || typeof auth.authToken !== 'string' || typeof auth.ct0 !== 'string') {
     try {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -48,6 +64,10 @@ function saveEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, auth)
   }
 
   try {
+    const dir = pathModule.dirname(filePath);
+    if (dir && !fs.existsSync(dir) && typeof fs.mkdirSync === 'function') {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     const encrypted = safeStorage.encryptString(payload);
     fs.writeFileSync(filePath, encrypted);
     return { success: true };
@@ -56,9 +76,9 @@ function saveEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, auth)
   }
 }
 
-function loadEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }) {
+function loadEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, profileId) {
   try {
-    const filePath = getXAuthPath(userDataPath, pathModule);
+    const filePath = getXAuthPath(userDataPath, pathModule, profileId);
     if (!fs.existsSync(filePath)) return null;
     if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
       return null;
@@ -77,9 +97,9 @@ function loadEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }) {
   }
 }
 
-function clearEncryptedXAuth({ fs, pathModule, userDataPath }) {
+function clearEncryptedXAuth({ fs, pathModule, userDataPath }, profileId) {
   try {
-    const filePath = getXAuthPath(userDataPath, pathModule);
+    const filePath = getXAuthPath(userDataPath, pathModule, profileId);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     return { success: true };
   } catch (error) {

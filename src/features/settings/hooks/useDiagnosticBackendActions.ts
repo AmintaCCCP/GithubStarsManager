@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { LogEntry, LogLevel } from '../../../services/logger';
 import { backend } from '../../../services/backendAdapter';
+import { getProfileHeader } from '../../../services/profileStorage';
+import { readSessionBackendSecret } from '../../../store/persistence/authStorage';
 
 /** Panel log scopes: 'main'/'plugins' come from the desktop diagnostics journal. */
 export type DiagnosticScope = 'all' | 'frontend' | 'backend' | 'main' | 'plugins';
@@ -15,7 +17,8 @@ interface BackendLogsResponse {
 }
 
 const getHeaders = (): HeadersInit => ({
-  Authorization: `Bearer ${sessionStorage.getItem('github-stars-manager-backend-secret')}`,
+  Authorization: `Bearer ${readSessionBackendSecret()}`,
+  ...getProfileHeader(),
 });
 
 /** Encapsulates optional backend diagnostics so the panel remains usable offline. */

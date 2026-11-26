@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "Предупреждение: некоторые ключи в этой резервной копии заблокированы. После импорта повторно введите ключ в соответствующей конфигурации.",
     "importing": "Импорт…",
     "merge-import": "Объединить импорт",
-    "replace-import": "Переопределить импорт"
+    "replace-import": "Переопределить импорт",
+    "webdav-import-conflict-skipped": "Пропущено {{count}} импортированных конфигураций WebDAV из-за конфликта с аккаунтом {{account}}."
   },
   "diagnosticLogsPanel": {
     "level": "уровень",
@@ -1348,7 +1349,8 @@
     "deploy-tab-manual": "Ручные шаги (Расширенный)",
     "one-click-platforms-tip": "Специальные средства быстрого запуска платформы:",
     "platform-mac-linux": "macOS / Linux: в cloudflare-worker запустите ./deploy.sh",
-    "platform-windows": "Windows: в cloudflare-worker дважды щелкните deploy.bat или запустите .\\deploy.ps1"
+    "platform-windows": "Windows: в cloudflare-worker дважды щелкните deploy.bat или запустите .\\deploy.ps1",
+    "worker-url-conflict": "Этот URL Vectorize Worker уже используется аккаунтом {{account}}. Разверните отдельный Vectorize Worker URL для этого аккаунта."
   },
   "webDAVPanel": {
     "webdav-configuration": "Конфигурация WebDAV",
@@ -1416,5 +1418,36 @@
     "download": "Скачать",
     "detected-from-filenames-and-release-metadata-no": "Определяется по именам файлов и метаданным релиза. Безопасность не проверяется, ничего не запускается автоматически. Вы всегда можете выбрать другой файл в списке ниже.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Исключено файлов, не подходящих для этого устройства: {{v1}} (исходный код, контрольные суммы, подписи, отладочные символы, blockmap, другие платформы и архитектуры)."
+  },
+  "accountSwitcher": {
+    "account-menu": "Меню аккаунта",
+    "accounts-label": "Аккаунты",
+    "active-badge": "Активен",
+    "add-account": "Добавить аккаунт",
+    "remove-account": "Удалить аккаунт",
+    "remove-account-confirm-title": "Удалить аккаунт",
+    "remove-account-confirm-desc": "Удалить локальные данные и профиль {{account}}? Если подключённый сервер хранит этот профиль, его серверные данные также могут быть удалены. Это не затронет ваш аккаунт GitHub.",
+    "add-account-title": "Добавить аккаунт GitHub",
+    "add-account-description": "Введите персональный токен доступа GitHub для создания изолированного профиля.",
+    "github-pat-label": "Персональный токен доступа GitHub",
+    "github-pat-placeholder": "ghp_... или github_pat_...",
+    "show-token": "Показать токен",
+    "hide-token": "Скрыть токен",
+    "copy-general-settings": "Копировать общие настройки (ИИ / Embedding / Тема / Язык)",
+    "cancel": "Отмена",
+    "add-and-switch": "Добавить и переключить",
+    "token-required": "Введите персональный токен доступа GitHub.",
+    "duplicate-account-error": "Этот аккаунт GitHub уже добавлен.",
+    "token-validation-failed": "Не удалось проверить токен. Проверьте токен и подключение к сети.",
+    "switching-account": "Переключение аккаунта...",
+    "other-tab-switched-notice": "Активный аккаунт был переключён в другой вкладке. Перезагрузите страницу для синхронизации.",
+    "reload-now": "Перезагрузить",
+    "backend-profiles-unsupported-warning": "Подключённый сервер пока не поддерживает несколько аккаунтов. Включён локальный режим для защиты данных основного аккаунта.",
+    "logged-out-profile-notice": "Текущий профиль: {{profile}} (выход выполнен).",
+    "return-to-default": "Вернуться к основному аккаунту",
+    "switch-to-profile": "Переключиться на {{profile}}",
+    "profile-conflict-webdav-warning": "Синхронизированная конфигурация WebDAV конфликтует с другим аккаунтом ({{account}}). Используйте отдельный подкаталог, чтобы избежать перезаписи резервных копий.",
+    "profile-conflict-vector-warning": "Синхронизированный URL Worker векторного поиска конфликтует с другим аккаунтом ({{account}}). Используйте отдельный URL Worker для каждого аккаунта.",
+    "dismiss": "Закрыть"
   }
 }

@@ -6,6 +6,7 @@ import type { WebDAVConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { WebDAVService } from '../../../services/webdavService';
+import { ACTIVE_PROFILE_ID, findConflictingWebdavProfile } from '../../../services/profileStorage';
 
 export type WebDAVForm = Pick<WebDAVConfig, 'name' | 'url' | 'username' | 'password' | 'path' | 'customUserAgent'>;
 
@@ -18,7 +19,8 @@ export interface WebDAVActions {
 /** Keeps WebDAV validation and remote connection work outside the settings view. */
 export const useWebDAVActions = (): WebDAVActions => {
   const t = useT('settings');
-  const { webdavConfigs, addWebDAVConfig, updateWebDAVConfig } = useAppStore(useShallow((state) => ({
+  const { user, webdavConfigs, addWebDAVConfig, updateWebDAVConfig } = useAppStore(useShallow((state) => ({
+    user: state.user,
     webdavConfigs: state.webdavConfigs,
     addWebDAVConfig: state.addWebDAVConfig,
     updateWebDAVConfig: state.updateWebDAVConfig,
@@ -43,6 +45,21 @@ export const useWebDAVActions = (): WebDAVActions => {
       return false;
     }
 
+    const conflict = findConflictingWebdavProfile(form.url, form.path);
+    if (conflict) {
+      const normalizedBase = form.path.replace(/\/+$/, '');
+      const accountSuffix = user?.login || ACTIVE_PROFILE_ID;
+      const suggestedPath = `${normalizedBase}/account_${accountSuffix}/`;
+      toast(
+        t('useWebDAVActions.webdav-target-conflict', {
+          account: conflict.login || conflict.id,
+          suggestedPath,
+        }),
+        'error',
+      );
+      return false;
+    }
+
     const existingConfig = editingId ? webdavConfigs.find((config) => config.id === editingId) : undefined;
     const config: WebDAVConfig = {
       id: editingId || Date.now().toString(),
@@ -61,7 +78,7 @@ export const useWebDAVActions = (): WebDAVActions => {
       addWebDAVConfig(config);
     }
     return true;
-  }, [addWebDAVConfig, t, toast, updateWebDAVConfig, webdavConfigs]);
+  }, [addWebDAVConfig, t, toast, updateWebDAVConfig, user?.login, webdavConfigs]);
 
   const test = useCallback(async (config: WebDAVConfig) => {
     setTestingId(config.id);

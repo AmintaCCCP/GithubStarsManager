@@ -13,7 +13,8 @@
     "sync-failed": "同步失败",
     "sync-from-backend": "从后端同步",
     "syncing-from-backend-will-overwrite-local-data-c": "从后端同步将覆盖本地数据，是否继续？",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "已从后端同步：仓库 {{v1}}，发布 {{v2}}，AI配置 {{v3}}，WebDAV配置 {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "已从后端同步：仓库 {{v1}}，发布 {{v2}}，AI配置 {{v3}}，WebDAV配置 {{v4}}",
+    "webdav-sync-conflict-warning": "同步的 WebDAV 配置与账户 {{account}} 冲突，请使用独立子目录以避免覆盖备份。"
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "请先配置并激活WebDAV服务。",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "自定义 User-Agent 只能包含拉丁字符（Latin-1）",
     "webdav-connection-successful": "WebDAV连接成功！",
     "webdav-connection-failed-please-check-configurat": "WebDAV连接失败，请检查配置。",
-    "webdav-test-failed": "WebDAV测试失败"
+    "webdav-test-failed": "WebDAV测试失败",
+    "webdav-target-conflict": "该 WebDAV 路径已被账号 {{account}} 使用。请改用独立子目录（例如 {{suggestedPath}}），避免备份相互覆盖。"
   },
   "generalPanel": {
     "account-token-hint": "当前账号 {{login}}。过期后可在此直接更换 token，不必退出登录。",

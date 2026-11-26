@@ -21,6 +21,7 @@ import { changeAppLanguage } from './i18n';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
+import { ProfileStatusBanners } from './components/ProfileStatusBanners';
 import { ListsPushIndicator } from './components/ListsPushIndicator';
 import { PluginPageHost } from './components/PluginPageHost';
 import { useBackendLifecycle } from './features/lifecycle/hooks/useBackendLifecycle';
@@ -348,11 +349,17 @@ function App() {
   }
 
   if (!isAuthenticated) {
-    return <LoginScreen />;
+    return (
+      <>
+        <ProfileStatusBanners />
+        <LoginScreen />
+      </>
+    );
   }
 
   return (
     <div className="ui-shell min-h-screen transition-colors duration-200">
+      <ProfileStatusBanners />
       <UpdateNotificationBanner />
       <Header />
       <main className="app-main">

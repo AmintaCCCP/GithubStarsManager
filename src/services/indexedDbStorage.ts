@@ -1,8 +1,83 @@
 import type { StateStorage } from 'zustand/middleware';
+import { scopedKey } from './profileStorage';
 
-export const DB_NAME = 'github-stars-manager-db';
+export const DB_NAME = scopedKey('github-stars-manager-db');
 const STORE_NAME = 'app_state';
 const DB_VERSION = 1;
+
+const pendingIdbWrites = new Set<Promise<unknown>>();
+
+const trackIdbWrite = <T>(promise: Promise<T>): Promise<T> => {
+  pendingIdbWrites.add(promise);
+  promise.then(
+    () => {
+      pendingIdbWrites.delete(promise);
+    },
+    () => {
+      pendingIdbWrites.delete(promise);
+    },
+  );
+  return promise;
+};
+
+/** Wait for any in-flight IndexedDB write operations to settle. */
+export const flushPendingIdbWrites = async (): Promise<void> => {
+  if (pendingIdbWrites.size === 0) return;
+  await Promise.allSettled(Array.from(pendingIdbWrites));
+};
+
+const deleteIndexedDbByName = (dbName: string, blockedTimeoutMs = 3000): Promise<void> => {
+  if (!canUseIndexedDB()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let blockedTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const cleanup = () => {
+      if (blockedTimer) {
+        clearTimeout(blockedTimer);
+        blockedTimer = undefined;
+      }
+    };
+
+    const finishResolve = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    const finishReject = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+
+    try {
+      const request = window.indexedDB.deleteDatabase(dbName);
+      request.onsuccess = () => finishResolve();
+      request.onerror = () =>
+        finishReject(request.error ?? new Error(`Failed to delete IndexedDB "${dbName}"`));
+      request.onblocked = () => {
+        if (!blockedTimer) {
+          blockedTimer = setTimeout(() => {
+            finishReject(new Error(`INDEXEDDB_DELETE_BLOCKED: "${dbName}" is blocked by another open connection`));
+          }, blockedTimeoutMs);
+        }
+      };
+    } catch (error) {
+      finishReject(error);
+    }
+  });
+};
+
+/** Delete all IndexedDB databases belonging to a specific profile. */
+export const deleteProfileIndexedDbs = async (profileId: string): Promise<void> => {
+  await Promise.all([
+    deleteIndexedDbByName(scopedKey('github-stars-manager-db', profileId)),
+    deleteIndexedDbByName(scopedKey('gsm-repository-chat-db', profileId)),
+  ]);
+};
 
 const canUseIndexedDB = () => typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
 
@@ -82,9 +157,9 @@ const idbGet = async (key: string): Promise<string | null> => {
   });
 };
 
-const idbSet = async (key: string, value: string): Promise<void> => {
+const idbSet = (key: string, value: string): Promise<void> => trackIdbWrite((async () => {
   const db = await openDb();
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).put(value, key);
 
@@ -101,7 +176,7 @@ const idbSet = async (key: string, value: string): Promise<void> => {
       reject(tx.error);
     };
   });
-};
+})());
 
 const idbDelete = async (key: string): Promise<void> => {
   const db = await openDb();
@@ -125,9 +200,9 @@ const idbDelete = async (key: string): Promise<void> => {
 };
 
 /** 单事务批量写入：所有键要么一起提交，要么一起回滚（分片持久化的原子提交点）。 */
-const idbSetMany = async (entries: ReadonlyArray<readonly [string, string]>): Promise<void> => {
+const idbSetMany = (entries: ReadonlyArray<readonly [string, string]>): Promise<void> => trackIdbWrite((async () => {
   const db = await openDb();
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     for (const [key, value] of entries) {
@@ -147,7 +222,7 @@ const idbSetMany = async (entries: ReadonlyArray<readonly [string, string]>): Pr
       reject(tx.error);
     };
   });
-};
+})());
 
 /** 单连接 + 单 readonly 事务批量读取，避免水合阶段并发打开多个连接。 */
 const idbGetMany = async (keys: ReadonlyArray<string>): Promise<Array<string | null>> => {

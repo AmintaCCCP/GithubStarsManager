@@ -7,10 +7,78 @@ import {
   isMcpEnabled,
   timingSafeEqualString,
 } from './settings.js';
+import {
+  acquireProfileDb,
+  isValidProfileId,
+  profileDbExists,
+  releaseProfileDb,
+  runWithDbInstance,
+} from '../db/connection.js';
 import { logger } from '../services/logger.js';
 
+interface SseSessionEntry {
+  transport: SSEServerTransport;
+  profileId: string;
+}
+
 /** Legacy SSE transports keyed by session id (cleaned on connection close). */
-const sseSessions = new Map<string, SSEServerTransport>();
+const sseSessions = new Map<string, SseSessionEntry>();
+
+function resolveRequestedMcpProfile(req: Request): string {
+  const headerProfile = req.header('X-GSM-Profile')?.trim();
+  if (headerProfile) return headerProfile;
+  const queryProfile = typeof req.query.profile === 'string' ? req.query.profile.trim() : '';
+  return queryProfile || 'default';
+}
+
+/**
+ * Bind secondary profile SQLite DB for MCP endpoints when `?profile=p_...` or
+ * `X-GSM-Profile: p_...` is supplied. Missing/default runs on default DB with 0 overhead.
+ * Non-existent profile DBs return 404 without creating phantom `.db` files.
+ */
+export function mcpProfileContextMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const profileId = resolveRequestedMcpProfile(req);
+  if (profileId === 'default') {
+    next();
+    return;
+  }
+
+  if (!isValidProfileId(profileId)) {
+    res.status(400).json({ error: 'Invalid profile parameter', code: 'INVALID_PROFILE_HEADER' });
+    return;
+  }
+
+  if (!profileDbExists(profileId)) {
+    res.status(404).json({ error: 'not found', code: 'MCP_DISABLED' });
+    return;
+  }
+
+  let profileDb;
+  try {
+    profileDb = acquireProfileDb(profileId);
+  } catch (err) {
+    next(err);
+    return;
+  }
+
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    releaseProfileDb(profileId);
+  };
+  res.once('finish', release);
+  res.once('close', release);
+
+  try {
+    runWithDbInstance(profileDb, () => {
+      next();
+    });
+  } catch (err) {
+    release();
+    next(err);
+  }
+}
 
 function extractBearer(req: Request): string | null {
   const header = req.headers.authorization;
@@ -72,9 +140,14 @@ async function handleStreamable(req: Request, res: Response): Promise<void> {
 }
 
 /** Shared SSE connect + cleanup so all SSE entrypoints close transport on disconnect. */
-async function connectSse(messagesPath: string, res: Response): Promise<void> {
-  const transport = new SSEServerTransport(messagesPath, res);
-  sseSessions.set(transport.sessionId, transport);
+async function connectSse(messagesPath: string, req: Request, res: Response): Promise<void> {
+  const profileId = resolveRequestedMcpProfile(req);
+  const scopedMessagesPath =
+    profileId !== 'default'
+      ? `${messagesPath}?profile=${encodeURIComponent(profileId)}`
+      : messagesPath;
+  const transport = new SSEServerTransport(scopedMessagesPath, res);
+  sseSessions.set(transport.sessionId, { transport, profileId });
   res.on('close', () => {
     sseSessions.delete(transport.sessionId);
     const maybeClose = (transport as { close?: () => Promise<void> }).close;
@@ -88,13 +161,14 @@ async function connectSse(messagesPath: string, res: Response): Promise<void> {
 
 async function handleSseMessage(req: Request, res: Response): Promise<void> {
   const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
-  const transport = sseSessions.get(sessionId);
-  if (!transport) {
+  const entry = sseSessions.get(sessionId);
+  const profileId = resolveRequestedMcpProfile(req);
+  if (!entry || entry.profileId !== profileId) {
     res.status(404).json({ error: 'unknown session', code: 'MCP_UNKNOWN_SESSION' });
     return;
   }
   try {
-    await transport.handlePostMessage(req, res, req.body);
+    await entry.transport.handlePostMessage(req, res, req.body);
   } catch (err) {
     logger.errorFromError('mcp.sse', 'SSE message failed', err);
     if (!res.headersSent) res.status(500).json({ error: 'SSE message failed' });
@@ -109,17 +183,17 @@ async function handleSseMessage(req: Request, res: Response): Promise<void> {
  * do not open orphan SSE streams on /mcp. Use /mcp/sse for legacy SSE.
  */
 export function mountMcpRoutes(app: Express): void {
-  app.post('/mcp', mcpAuthMiddleware, (req, res) => {
+  app.post('/mcp', mcpProfileContextMiddleware, mcpAuthMiddleware, (req, res) => {
     void handleStreamable(req, res);
   });
-  app.get('/mcp', mcpAuthMiddleware, (_req, res) => {
+  app.get('/mcp', mcpProfileContextMiddleware, mcpAuthMiddleware, (_req, res) => {
     res.status(405).json({
       jsonrpc: '2.0',
       error: { code: -32000, message: 'Method not allowed. Use POST for Streamable HTTP or GET /mcp/sse for legacy SSE.' },
       id: null,
     });
   });
-  app.delete('/mcp', mcpAuthMiddleware, (_req, res) => {
+  app.delete('/mcp', mcpProfileContextMiddleware, mcpAuthMiddleware, (_req, res) => {
     res.status(405).json({
       jsonrpc: '2.0',
       error: { code: -32000, message: 'Method not allowed.' },
@@ -127,30 +201,30 @@ export function mountMcpRoutes(app: Express): void {
     });
   });
 
-  app.get('/mcp/sse', mcpAuthMiddleware, async (_req, res) => {
+  app.get('/mcp/sse', mcpProfileContextMiddleware, mcpAuthMiddleware, async (req, res) => {
     try {
-      await connectSse('/mcp/sse/messages', res);
+      await connectSse('/mcp/sse/messages', req, res);
     } catch (err) {
       logger.errorFromError('mcp.sse', 'SSE connection failed', err);
       if (!res.headersSent) res.status(500).end();
     }
   });
 
-  app.post('/mcp/sse/messages', mcpAuthMiddleware, (req, res) => {
+  app.post('/mcp/sse/messages', mcpProfileContextMiddleware, mcpAuthMiddleware, (req, res) => {
     void handleSseMessage(req, res);
   });
 
   // Backward-compatible aliases (older docs / clients)
-  app.get('/sse', mcpAuthMiddleware, async (_req, res) => {
+  app.get('/sse', mcpProfileContextMiddleware, mcpAuthMiddleware, async (req, res) => {
     try {
-      await connectSse('/messages', res);
+      await connectSse('/messages', req, res);
     } catch (err) {
       logger.errorFromError('mcp.sse', 'SSE connection failed', err);
       if (!res.headersSent) res.status(500).end();
     }
   });
 
-  app.post('/messages', mcpAuthMiddleware, (req, res) => {
+  app.post('/messages', mcpProfileContextMiddleware, mcpAuthMiddleware, (req, res) => {
     void handleSseMessage(req, res);
   });
 

@@ -13,7 +13,8 @@
     "sync-failed": "Синхронизация не удалась",
     "sync-from-backend": "Синхронизировать с серверной части",
     "syncing-from-backend-will-overwrite-local-data-c": "Синхронизация с серверной части перезапишет локальные данные. Продолжить?",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Синхронизировано с серверной части: хранилище {{v1}}, выпуск {{v2}}, конфигурация AI {{v3}}, конфигурация WebDAV {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Синхронизировано с серверной части: хранилище {{v1}}, выпуск {{v2}}, конфигурация AI {{v3}}, конфигурация WebDAV {{v4}}",
+    "webdav-sync-conflict-warning": "Синхронизированная конфигурация WebDAV конфликтует с аккаунтом {{account}}. Используйте отдельный подкаталог."
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "Сначала настройте и активируйте службу WebDAV.",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "Пользовательский User-Agent может содержать только латинские символы (Latin-1)",
     "webdav-connection-successful": "Соединение WebDAV успешно!",
     "webdav-connection-failed-please-check-configurat": "Не удалось подключиться к WebDAV. Проверьте конфигурацию.",
-    "webdav-test-failed": "Тест WebDAV не пройден"
+    "webdav-test-failed": "Тест WebDAV не пройден",
+    "webdav-target-conflict": "Этот путь WebDAV уже используется аккаунтом {{account}}. Укажите отдельный подкаталог, например {{suggestedPath}}, чтобы не перезаписать резервные копии."
   },
   "generalPanel": {
     "account-token-hint": "Текущий счет {{login}}. По истечении срока действия вы можете напрямую заменить токен здесь, не выходя из системы.",

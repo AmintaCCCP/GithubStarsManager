@@ -13,7 +13,8 @@
     "sync-failed": "Die Synchronisierung ist fehlgeschlagen",
     "sync-from-backend": "Vom Backend aus synchronisieren",
     "syncing-from-backend-will-overwrite-local-data-c": "Durch die Synchronisierung vom Backend werden lokale Daten überschrieben. Möchten Sie fortfahren?",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Vom Backend synchronisiert: Warehouse {{v1}}, Release {{v2}}, AI-Konfiguration {{v3}}, WebDAV-Konfiguration {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Vom Backend synchronisiert: Warehouse {{v1}}, Release {{v2}}, AI-Konfiguration {{v3}}, WebDAV-Konfiguration {{v4}}",
+    "webdav-sync-conflict-warning": "Synchronisierte WebDAV-Konfiguration steht in Konflikt mit Konto {{account}}. Verwenden Sie ein eigenes Unterverzeichnis."
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "Bitte konfigurieren und aktivieren Sie zunächst den WebDAV-Dienst.",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "Benutzerdefinierter User-Agent darf nur lateinische Zeichen (Latin-1) enthalten",
     "webdav-connection-successful": "WebDAV-Verbindung erfolgreich!",
     "webdav-connection-failed-please-check-configurat": "WebDAV-Verbindung fehlgeschlagen, bitte überprüfen Sie die Konfiguration.",
-    "webdav-test-failed": "Der WebDAV-Test ist fehlgeschlagen"
+    "webdav-test-failed": "Der WebDAV-Test ist fehlgeschlagen",
+    "webdav-target-conflict": "Dieser WebDAV-Pfad wird bereits vom Konto {{account}} verwendet. Verwenden Sie ein eigenes Unterverzeichnis wie {{suggestedPath}}, um das Überschreiben von Backups zu vermeiden."
   },
   "generalPanel": {
     "account-token-hint": "Girokonto {{login}}. Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden.",

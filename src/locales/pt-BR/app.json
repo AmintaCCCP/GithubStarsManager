@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "Aviso: algumas chaves neste backup foram bloqueadas. Após a importação, insira novamente a chave na configuração correspondente.",
     "importing": "Importando…",
     "merge-import": "Mesclar importação",
-    "replace-import": "Substituir importação"
+    "replace-import": "Substituir importação",
+    "webdav-import-conflict-skipped": "{{count}} configuração(ões) WebDAV importada(s) ignorada(s) por conflito com a conta {{account}}."
   },
   "diagnosticLogsPanel": {
     "level": "nível",
@@ -1348,7 +1349,8 @@
     "deploy-tab-manual": "Etapas manuais (Avançado)",
     "one-click-platforms-tip": "Iniciadores rápidos específicos da plataforma:",
     "platform-mac-linux": "macOS / Linux: Em cloudflare-worker, execute ./deploy.sh",
-    "platform-windows": "Windows: Em cloudflare-worker, clique duas vezes em deploy.bat ou execute .\\deploy.ps1"
+    "platform-windows": "Windows: Em cloudflare-worker, clique duas vezes em deploy.bat ou execute .\\deploy.ps1",
+    "worker-url-conflict": "Esta URL do Vectorize Worker já está em uso pela conta {{account}}. Implante uma URL independente do Vectorize Worker para esta conta."
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuração WebDAV",
@@ -1416,5 +1418,36 @@
     "download": "Baixar",
     "detected-from-filenames-and-release-metadata-no": "Detectado a partir de nomes de arquivo e metadados da Release. Nenhuma verificação de segurança é feita e nada é executado automaticamente. Você sempre pode escolher outro arquivo na lista abaixo.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} arquivo(s) que não se aplicam a este dispositivo foram excluídos (código-fonte, somas de verificação, assinaturas, símbolos de depuração, blockmaps, outras plataformas ou arquiteturas)."
+  },
+  "accountSwitcher": {
+    "account-menu": "Menu da conta",
+    "accounts-label": "Contas",
+    "active-badge": "Ativa",
+    "add-account": "Adicionar conta",
+    "remove-account": "Remover conta",
+    "remove-account-confirm-title": "Remover conta",
+    "remove-account-confirm-desc": "Remover os dados locais e o perfil de {{account}}? Se um backend conectado armazenar este perfil, os dados no servidor também poderão ser excluídos. Isso não afetará sua conta do GitHub.",
+    "add-account-title": "Adicionar conta do GitHub",
+    "add-account-description": "Insira um token de acesso pessoal do GitHub para criar um perfil de conta isolado.",
+    "github-pat-label": "Token de acesso pessoal do GitHub",
+    "github-pat-placeholder": "ghp_... ou github_pat_...",
+    "show-token": "Mostrar token",
+    "hide-token": "Ocultar token",
+    "copy-general-settings": "Copiar configurações gerais (IA / Embedding / Tema / Idioma)",
+    "cancel": "Cancelar",
+    "add-and-switch": "Adicionar e alternar",
+    "token-required": "Insira um token de acesso pessoal do GitHub.",
+    "duplicate-account-error": "Esta conta do GitHub já foi adicionada.",
+    "token-validation-failed": "Falha ao verificar o token. Verifique o token e a conexão de rede.",
+    "switching-account": "Alternando conta...",
+    "other-tab-switched-notice": "Outra aba alterou a conta ativa. Recarregue a página para manter sincronizado.",
+    "reload-now": "Recarregar",
+    "backend-profiles-unsupported-warning": "O servidor backend conectado ainda não suporta múltiplas contas. Executando em modo apenas local para proteger a conta padrão.",
+    "logged-out-profile-notice": "Atualmente no perfil {{profile}} (desconectado).",
+    "return-to-default": "Voltar para a conta padrão",
+    "switch-to-profile": "Alternar para {{profile}}",
+    "profile-conflict-webdav-warning": "A configuração WebDAV sincronizada conflita com outra conta ({{account}}). Use um subdiretório separado para evitar sobrescrever backups.",
+    "profile-conflict-vector-warning": "A URL do Worker de busca vetorial sincronizada conflita com outra conta ({{account}}). Use uma URL de Worker dedicada por conta.",
+    "dismiss": "Dispensar"
   }
 }

@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "Warning: Some secrets in this backup are masked. Please re-enter them in the respective configurations after import.",
     "importing": "Importing…",
     "merge-import": "Merge Import",
-    "replace-import": "Replace Import"
+    "replace-import": "Replace Import",
+    "webdav-import-conflict-skipped": "Skipped {{count}} imported WebDAV config(s) conflicting with account {{account}}."
   },
   "diagnosticLogsPanel": {
     "level": "Level",
@@ -1348,7 +1349,8 @@
     "deploy-tab-manual": "Manual Steps (Advanced)",
     "one-click-platforms-tip": "Platform-specific quick launchers:",
     "platform-mac-linux": "macOS / Linux: In cloudflare-worker, run ./deploy.sh",
-    "platform-windows": "Windows: In cloudflare-worker, double-click deploy.bat or run .\\deploy.ps1"
+    "platform-windows": "Windows: In cloudflare-worker, double-click deploy.bat or run .\\deploy.ps1",
+    "worker-url-conflict": "This Vectorize Worker URL is already used by account {{account}}. Please deploy an independent Vectorize Worker URL for this account."
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV Configuration",
@@ -1416,5 +1418,36 @@
     "download": "Download",
     "detected-from-filenames-and-release-metadata-no": "Detected from filenames and release metadata. No safety check is performed and nothing runs automatically. You can always pick another asset in the list below.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Excluded {{v1}} asset(s) that do not apply to this device (source code, checksums, signatures, debug symbols, blockmaps, other platforms or architectures)."
+  },
+  "accountSwitcher": {
+    "account-menu": "Account menu",
+    "accounts-label": "Accounts",
+    "active-badge": "Active",
+    "add-account": "Add Account",
+    "remove-account": "Remove account",
+    "remove-account-confirm-title": "Remove Account",
+    "remove-account-confirm-desc": "Remove local data and profile for {{account}}? If a connected backend stores this profile, its server data may also be deleted. This will not affect your GitHub account.",
+    "add-account-title": "Add GitHub Account",
+    "add-account-description": "Enter a GitHub Personal Access Token to add an isolated account profile.",
+    "github-pat-label": "GitHub Personal Access Token",
+    "github-pat-placeholder": "ghp_... or github_pat_...",
+    "show-token": "Show token",
+    "hide-token": "Hide token",
+    "copy-general-settings": "Copy general settings (AI / Embedding / Theme / Language)",
+    "cancel": "Cancel",
+    "add-and-switch": "Add & Switch",
+    "token-required": "Please enter a GitHub Personal Access Token.",
+    "duplicate-account-error": "This GitHub account has already been added.",
+    "token-validation-failed": "Failed to verify token. Please check the token and network connection.",
+    "switching-account": "Switching account...",
+    "other-tab-switched-notice": "Another tab switched the active account. Reload to stay in sync.",
+    "reload-now": "Reload",
+    "backend-profiles-unsupported-warning": "The connected backend server does not support multi-account profiles yet. Running in local-only mode to protect your default account data.",
+    "logged-out-profile-notice": "Currently on profile {{profile}} (signed out).",
+    "return-to-default": "Return to default account",
+    "switch-to-profile": "Switch to {{profile}}",
+    "profile-conflict-webdav-warning": "Synced WebDAV configuration conflicts with another account ({{account}}). Use a separate subdirectory to avoid overwriting backups.",
+    "profile-conflict-vector-warning": "Synced Vector Search Worker URL conflicts with another account ({{account}}). Use a dedicated Worker URL per account.",
+    "dismiss": "Dismiss"
   }
 }
