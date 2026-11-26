@@ -1350,7 +1350,8 @@
     "one-click-platforms-tip": "Iniciadores rápidos específicos de la plataforma:",
     "platform-mac-linux": "macOS / Linux: En cloudflare-worker, ejecutar ./deploy.sh",
     "platform-windows": "Windows: En cloudflare-worker, haga doble clic en deploy.bat o ejecute .\\deploy.ps1",
-    "worker-url-conflict": "Esta URL de Vectorize Worker ya está en uso por la cuenta {{account}}. Despliega una URL de Vectorize Worker independiente para esta cuenta."
+    "worker-url-conflict": "Esta URL de Vectorize Worker ya está en uso por la cuenta {{account}}. Despliega una URL de Vectorize Worker independiente para esta cuenta.",
+    "worker-url-unsaved": "Guarda la URL del Worker antes de crear el índice."
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuración WebDAV",

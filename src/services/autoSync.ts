@@ -893,6 +893,13 @@ export function startAutoSync(options: { preservePending?: boolean } = {}): () =
   if (!options.preservePending) {
     _hasPendingPush = false;
     _hasPendingLocalChanges = false;
+  } else if (_hasPendingLocalChanges) {
+    // The switch aborted with edits still waiting to reach the backend. No new
+    // store change will arm the debounce, so retry the preserved push here.
+    _debounceTimer = setTimeout(() => {
+      _debounceTimer = null;
+      void syncToBackend();
+    }, 2000);
   }
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {

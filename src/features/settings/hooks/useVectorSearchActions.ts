@@ -10,7 +10,7 @@ import {
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
-import { findConflictingVectorProfile } from '../../../services/profileStorage';
+import { findConflictingVectorProfile, normalizeVectorWorkerUrl } from '../../../services/profileStorage';
 import { useT } from '../../../i18n/useT';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
 import { normalizeLicense } from '../../../utils/licenseFilter';
@@ -145,6 +145,27 @@ export const useVectorSearchActions = (): VectorSearchActions => {
 
   const runIndex = useCallback(async (draft: VectorIndexDraft, incremental: boolean) => {
     if (draft.workerUrl.trim()) {
+      // Indexing writes vectors to the draft URL. If that differs from the saved
+      // config the search path keeps querying the old worker, so require a save
+      // first instead of silently filling a worker the app will not use.
+      if (
+        normalizeVectorWorkerUrl(draft.workerUrl) !==
+        normalizeVectorWorkerUrl(state.vectorSearchConfig.workerUrl)
+      ) {
+        state.setVectorIndexingState({
+          isIndexing: false,
+          phase: null,
+          phaseDone: 0,
+          phaseTotal: 0,
+          result: {
+            indexed: 0,
+            skipped: 0,
+            errors: 1,
+            error: t('vectorSearchSettings.worker-url-unsaved'),
+          },
+        });
+        return;
+      }
       const conflict = findConflictingVectorProfile(draft.workerUrl);
       if (conflict) {
         state.setVectorIndexingState({

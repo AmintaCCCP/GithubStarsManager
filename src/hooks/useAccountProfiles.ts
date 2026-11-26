@@ -10,7 +10,9 @@ import {
   DEFAULT_PROFILE_ID,
   PROFILES_REGISTRY_KEY,
   PROFILES_UPDATED_EVENT,
+  clearPendingSeed,
   clearProfileLocalStorage,
+  flushProfileRegistryWrites,
   makeProfileId,
   pickCopyableSettings,
   readProfiles,
@@ -35,6 +37,7 @@ export interface AccountProfilesController {
   isSwitching: boolean;
   otherTabSwitched: boolean;
   backendProfilesUnsupported: boolean;
+  removingProfileIds: string[];
   switchAccount: (targetProfileId: string) => Promise<void>;
   addAccount: (token: string, copySettings: boolean) => Promise<void>;
   removeProfile: (targetProfileId: string) => Promise<void>;
@@ -47,11 +50,25 @@ const flushCurrentProfileBeforeReload = async (): Promise<void> => {
   // repeats until no newer snapshot was scheduled while it was waiting.
   await flushPendingPersistSnapshot(true);
   await flushPendingIdbWrites();
+  await flushProfileRegistryWrites();
   await flushAutoSyncBeforeSwitch(3000);
 };
 
 let globalIsSwitching = false;
 const switchingListeners = new Set<(switching: boolean) => void>();
+
+// Profiles whose removal is mid-flight. Switching to or removing one of them
+// would race the IndexedDB/credential teardown, so both actions are blocked
+// until the removal settles.
+const removingProfileIdsSet = new Set<string>();
+const removingListeners = new Set<(ids: string[]) => void>();
+
+const setProfileRemoving = (profileId: string, removing: boolean): void => {
+  if (removing) removingProfileIdsSet.add(profileId);
+  else removingProfileIdsSet.delete(profileId);
+  const snapshot = Array.from(removingProfileIdsSet);
+  for (const listener of removingListeners) listener(snapshot);
+};
 
 const setGlobalIsSwitching = (next: boolean): void => {
   if (globalIsSwitching === next) return;
@@ -65,6 +82,9 @@ export const useAccountProfiles = (): AccountProfilesController => {
   const t = useT('app');
   const [profiles, setProfiles] = useState<ProfileEntry[]>(() => readProfiles());
   const [isSwitching, setIsSwitching] = useState(() => globalIsSwitching);
+  const [removingProfileIds, setRemovingProfileIds] = useState<string[]>(() =>
+    Array.from(removingProfileIdsSet),
+  );
   const [otherTabSwitched, setOtherTabSwitched] = useState(false);
   const [backendProfilesUnsupported, setBackendProfilesUnsupported] = useState(
     () => backend.profilesUnsupportedWarning,
@@ -86,6 +106,7 @@ export const useAccountProfiles = (): AccountProfilesController => {
     };
 
     switchingListeners.add(setIsSwitching);
+    removingListeners.add(setRemovingProfileIds);
     window.addEventListener(PROFILES_UPDATED_EVENT, refreshProfiles);
     window.addEventListener('storage', handleStorage);
     const unsubscribeBackend =
@@ -97,6 +118,7 @@ export const useAccountProfiles = (): AccountProfilesController => {
 
     return () => {
       switchingListeners.delete(setIsSwitching);
+      removingListeners.delete(setRemovingProfileIds);
       window.removeEventListener(PROFILES_UPDATED_EVENT, refreshProfiles);
       window.removeEventListener('storage', handleStorage);
       unsubscribeBackend();
@@ -117,6 +139,16 @@ export const useAccountProfiles = (): AccountProfilesController => {
 
   const switchAccount = useCallback(async (targetProfileId: string) => {
     if (targetProfileId === ACTIVE_PROFILE_ID || globalIsSwitching) return;
+    if (removingProfileIdsSet.has(targetProfileId)) return;
+    // Re-check the registry: another tab may have removed this profile between
+    // rendering the menu and the click, and writing ACTIVE_PROFILE_ID to a
+    // profile that no longer exists boot-loops on an empty workspace.
+    if (
+      targetProfileId !== DEFAULT_PROFILE_ID &&
+      !readProfiles().some((p) => p.id === targetProfileId)
+    ) {
+      return;
+    }
     setGlobalIsSwitching(true);
     let autoSyncStopped = false;
     try {
@@ -167,6 +199,7 @@ export const useAccountProfiles = (): AccountProfilesController => {
 
     setGlobalIsSwitching(true);
     let autoSyncStopped = false;
+    let profileAdded = false;
     try {
       await flushCurrentProfileBeforeReload();
       autoSyncStopped = true;
@@ -193,12 +226,22 @@ export const useAccountProfiles = (): AccountProfilesController => {
         name: validatedUser.name ?? undefined,
         avatarUrl: validatedUser.avatar_url,
       });
+      profileAdded = true;
+      await flushProfileRegistryWrites();
 
       setActiveProfileId(newProfileId);
       window.location.reload();
     } catch (error) {
       // The flush stops auto-sync; adding the account failed, so resume it.
       if (autoSyncStopped) startAutoSync({ preservePending: true });
+      if (profileAdded) {
+        // The account never became usable (e.g. the registry write failed), so
+        // drop the entry and its seed instead of leaving a phantom profile.
+        removeProfileFromRegistry(newProfileId);
+        clearPendingSeed(newProfileId);
+        setActiveProfileId(ACTIVE_PROFILE_ID);
+        void flushProfileRegistryWrites();
+      }
       setGlobalIsSwitching(false);
       throw error;
     }
@@ -206,39 +249,47 @@ export const useAccountProfiles = (): AccountProfilesController => {
 
   const removeProfile = useCallback(async (targetProfileId: string) => {
     if (targetProfileId === ACTIVE_PROFILE_ID) return;
-    // Delete the server-side profile first. If the backend refuses (409 in use,
-    // 500, network error) keep local data and the registry entry untouched so the
-    // user can retry — otherwise the surviving server DB reappears on the next
-    // multi-device discovery and the account looks undeletable.
-    if (backend.isAvailable && backend.profilesSupported && targetProfileId !== DEFAULT_PROFILE_ID) {
-      let deleted = false;
-      try {
-        deleted = await backend.deleteServerProfile(targetProfileId);
-      } catch {
-        deleted = false;
+    if (globalIsSwitching || removingProfileIdsSet.has(targetProfileId)) return;
+    setProfileRemoving(targetProfileId, true);
+    try {
+      // Delete the server-side profile first. If the backend refuses (409 in use,
+      // 500, network error) keep local data and the registry entry untouched so the
+      // user can retry — otherwise the surviving server DB reappears on the next
+      // multi-device discovery and the account looks undeletable.
+      if (backend.isAvailable && backend.profilesSupported && targetProfileId !== DEFAULT_PROFILE_ID) {
+        let deleted = false;
+        try {
+          deleted = await backend.deleteServerProfile(targetProfileId);
+        } catch {
+          deleted = false;
+        }
+        if (!deleted) {
+          throw new Error(t('accountSwitcher.remove-account-server-failed'));
+        }
       }
-      if (!deleted) {
-        throw new Error(t('accountSwitcher.remove-account-server-failed'));
+      // Clear the desktop credential file before destroying local data. A failure
+      // (e.g. permissions) must abort the removal and keep the registry entry so
+      // the user can retry instead of leaving an orphaned credential behind.
+      if (isElectron()) {
+        try {
+          await clearEncryptedXAuthViaDesktop(targetProfileId);
+        } catch (error) {
+          logger.errorFromError('accountProfiles', 'Failed to clear desktop X credentials before removal', error);
+          throw new Error(t('accountSwitcher.remove-account-credentials-failed'));
+        }
       }
+      // Delete IndexedDB next; if deletion fails or is blocked by another open tab,
+      // abort before modifying localStorage or removing the profile from the registry
+      // so the user can see the error and retry without leaving orphaned data.
+      await deleteProfileIndexedDbs(targetProfileId);
+      clearProfileLocalStorage(targetProfileId);
+      clearPendingSeed(targetProfileId);
+      const next = removeProfileFromRegistry(targetProfileId);
+      await flushProfileRegistryWrites();
+      setProfiles(next);
+    } finally {
+      setProfileRemoving(targetProfileId, false);
     }
-    // Clear the desktop credential file before destroying local data. A failure
-    // (e.g. permissions) must abort the removal and keep the registry entry so
-    // the user can retry instead of leaving an orphaned credential behind.
-    if (isElectron()) {
-      try {
-        await clearEncryptedXAuthViaDesktop(targetProfileId);
-      } catch (error) {
-        logger.errorFromError('accountProfiles', 'Failed to clear desktop X credentials before removal', error);
-        throw new Error(t('accountSwitcher.remove-account-credentials-failed'));
-      }
-    }
-    // Delete IndexedDB next; if deletion fails or is blocked by another open tab,
-    // abort before modifying localStorage or removing the profile from the registry
-    // so the user can see the error and retry without leaving orphaned data.
-    await deleteProfileIndexedDbs(targetProfileId);
-    clearProfileLocalStorage(targetProfileId);
-    const next = removeProfileFromRegistry(targetProfileId);
-    setProfiles(next);
   }, [t]);
 
   const reloadPage = useCallback(async () => {
@@ -259,6 +310,7 @@ export const useAccountProfiles = (): AccountProfilesController => {
     isSwitching,
     otherTabSwitched,
     backendProfilesUnsupported,
+    removingProfileIds,
     switchAccount,
     addAccount,
     removeProfile,

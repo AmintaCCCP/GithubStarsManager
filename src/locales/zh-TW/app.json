@@ -1350,7 +1350,8 @@
     "one-click-platforms-tip": "各平台專用快捷啟動方式：",
     "platform-mac-linux": "macOS / Linux: 進入 cloudflare-worker 運行 ./deploy.sh",
     "platform-windows": "Windows: 進入 cloudflare-worker 雙擊 deploy.bat 或執行 .\\deploy.ps1",
-    "worker-url-conflict": "此 Vectorize Worker URL 已被帳號 {{account}} 使用。請為目前帳號部署獨立的 Vectorize Worker URL。"
+    "worker-url-conflict": "此 Vectorize Worker URL 已被帳號 {{account}} 使用。請為目前帳號部署獨立的 Vectorize Worker URL。",
+    "worker-url-unsaved": "請先儲存 Worker 位址，再建立索引。"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",

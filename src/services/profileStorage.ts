@@ -149,7 +149,7 @@ export const readProfiles = (): ProfileEntry[] => {
   }
 };
 
-export const writeProfiles = (profiles: ProfileEntry[]): void => {
+const writeProfilesRaw = (profiles: ProfileEntry[]): void => {
   if (typeof window === 'undefined') return;
   try {
     const sanitized = profiles.filter((p) => isValidProfileId(p.id));
@@ -159,6 +159,48 @@ export const writeProfiles = (profiles: ProfileEntry[]): void => {
     // ignore quota/security errors
   }
 };
+
+export const writeProfiles = (profiles: ProfileEntry[]): void => {
+  writeProfilesRaw(profiles);
+};
+
+const REGISTRY_LOCK_NAME = 'gsm:profiles-registry';
+let registryWriteChain: Promise<void> = Promise.resolve();
+
+const supportsRegistryLock = (): boolean =>
+  typeof navigator !== 'undefined' && typeof navigator.locks?.request === 'function';
+
+/**
+ * Read-modify-write the registry. When the Web Locks API is available the write
+ * runs inside a cross-tab lock and re-reads the registry there, so it cannot
+ * overwrite an entry another tab wrote after our optimistic read. Falls back to
+ * the synchronous write where locks are unavailable (older engines, tests).
+ */
+const mutateRegistry = (
+  mutate: (existing: ProfileEntry[]) => ProfileEntry[],
+): ProfileEntry[] => {
+  const current = readProfiles();
+  const optimistic = mutate(current);
+  if (optimistic === current) return optimistic;
+
+  if (!supportsRegistryLock()) {
+    writeProfilesRaw(optimistic);
+    return optimistic;
+  }
+
+  registryWriteChain = registryWriteChain
+    .catch(() => undefined)
+    .then(() => navigator.locks.request(REGISTRY_LOCK_NAME, () => {
+      const fresh = readProfiles();
+      const next = mutate(fresh);
+      if (next !== fresh) writeProfilesRaw(next);
+    }))
+    .catch(() => undefined);
+  return optimistic;
+};
+
+/** Resolve once every queued registry write has been applied. */
+export const flushProfileRegistryWrites = (): Promise<void> => registryWriteChain;
 
 export const setActiveProfileId = (profileId: string): void => {
   if (!isValidProfileId(profileId)) {
@@ -172,20 +214,20 @@ export const upsertProfile = (entry: ProfileEntry): ProfileEntry[] => {
   if (!isValidProfileId(entry.id)) {
     return readProfiles();
   }
-  const existing = readProfiles();
-  const idx = existing.findIndex((p) => p.id === entry.id);
-  const next = [...existing];
-  if (idx >= 0) {
-    next[idx] = {
-      ...existing[idx],
-      ...entry,
-      id: entry.id,
-    };
-  } else {
-    next.push({ ...entry });
-  }
-  writeProfiles(next);
-  return next;
+  return mutateRegistry((existing) => {
+    const idx = existing.findIndex((p) => p.id === entry.id);
+    const next = [...existing];
+    if (idx >= 0) {
+      next[idx] = {
+        ...existing[idx],
+        ...entry,
+        id: entry.id,
+      };
+    } else {
+      next.push({ ...entry });
+    }
+    return next;
+  });
 };
 
 export const removeProfileFromRegistry = (
@@ -195,9 +237,7 @@ export const removeProfileFromRegistry = (
   if (profileId === activeProfileId) {
     throw new Error('Cannot remove the active profile');
   }
-  const next = readProfiles().filter((p) => p.id !== profileId);
-  writeProfiles(next);
-  return next;
+  return mutateRegistry((existing) => existing.filter((p) => p.id !== profileId));
 };
 
 export const mergeServerProfiles = (
@@ -238,7 +278,16 @@ export const mergeServerProfiles = (
 
   const result = Array.from(byId.values());
   if (changed) {
-    writeProfiles(result);
+    return mutateRegistry((fresh) => {
+      // Merge into the freshest registry snapshot so an entry written while we
+      // were merging is not dropped.
+      const merged = new Map<string, ProfileEntry>(fresh.map((p) => [p.id, { ...p }]));
+      for (const entry of result) {
+        const prev = merged.get(entry.id);
+        merged.set(entry.id, prev ? { ...prev, ...entry } : entry);
+      }
+      return Array.from(merged.values());
+    });
   }
   return result;
 };
@@ -477,10 +526,18 @@ export const readPendingSeed = (
   expectedProfileId: string = ACTIVE_PROFILE_ID,
 ): PendingProfileSeed | null => parsePendingSeed(expectedProfileId);
 
-/** Remove `gsm:pending-seed` once the seeded state is safely persisted. */
-export const clearPendingSeed = (): void => {
+/**
+ * Remove `gsm:pending-seed` once the seeded state is safely persisted. When an
+ * expected profile ID is given the seed is only deleted if it belongs to that
+ * profile, so a late flush for an abandoned add-account attempt cannot discard
+ * the seed another profile is still waiting to apply.
+ */
+export const clearPendingSeed = (expectedProfileId?: string): void => {
   if (typeof window === 'undefined') return;
   try {
+    if (expectedProfileId !== undefined && readPendingSeed(expectedProfileId) === null) {
+      return;
+    }
     window.localStorage.removeItem(PENDING_SEED_KEY);
   } catch {
     // ignore
@@ -496,7 +553,7 @@ export const consumePendingSeed = (
 ): PendingProfileSeed | null => {
   const seed = parsePendingSeed(expectedProfileId);
   if (!seed) return null;
-  clearPendingSeed();
+  clearPendingSeed(expectedProfileId);
   return seed;
 };
 

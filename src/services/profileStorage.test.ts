@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACTIVE_PROFILE_ID,
   ACTIVE_PROFILE_KEY,
@@ -10,6 +10,7 @@ import {
   clearProfileLocalStorage,
   consumePendingSeed,
   findConflictingVectorProfile,
+  flushProfileRegistryWrites,
   findConflictingWebdavProfile,
   getProfileHeader,
   isDefaultProfile,
@@ -220,6 +221,51 @@ describe('profileStorage', () => {
       expect(readProfiles()).toEqual([{ id: 'p_222', login: 'bob' }]);
       expect(() => findConflictingWebdavProfile('https://dav.example.com', '/x')).not.toThrow();
       expect(() => findConflictingVectorProfile('https://vec.example.workers.dev')).not.toThrow();
+    });
+
+    it('only clears the pending seed that belongs to the requested profile', () => {
+      writePendingSeed({
+        profileId: 'p_222',
+        user: mockUser(222, 'bob'),
+        githubToken: 'seed-token',
+      });
+
+      clearPendingSeed('p_333');
+      expect(readPendingSeed('p_222')).not.toBeNull();
+
+      clearPendingSeed('p_222');
+      expect(readPendingSeed('p_222')).toBeNull();
+    });
+
+    it('re-reads the registry inside the cross-tab lock before writing', async () => {
+      const requestLock = vi.fn(
+        (_name: string, callback: () => void | Promise<void>) =>
+          Promise.resolve(callback()),
+      );
+      Object.defineProperty(navigator, 'locks', {
+        configurable: true,
+        value: { request: requestLock },
+      });
+      try {
+        window.localStorage.setItem(
+          PROFILES_REGISTRY_KEY,
+          JSON.stringify([{ id: 'p_222', login: 'bob' }]),
+        );
+
+        upsertProfile({ id: 'p_333', login: 'carol' });
+        // Another tab updates the registry while our locked write is queued.
+        writeProfiles([{ id: 'p_222', login: 'bob-updated' }]);
+
+        await flushProfileRegistryWrites();
+        expect(requestLock).toHaveBeenCalledTimes(1);
+
+        expect(readProfiles()).toEqual([
+          { id: 'p_222', login: 'bob-updated' },
+          { id: 'p_333', login: 'carol' },
+        ]);
+      } finally {
+        delete (navigator as unknown as Record<string, unknown>).locks;
+      }
     });
 
     it('reads the pending seed without deleting it until the caller clears it', () => {

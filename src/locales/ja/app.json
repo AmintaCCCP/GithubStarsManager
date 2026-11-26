@@ -1350,7 +1350,8 @@
     "one-click-platforms-tip": "プラットフォーム固有のクイックランチャー：",
     "platform-mac-linux": "macOS / Linux: cloudflare-worker で ./deploy.sh を実行",
     "platform-windows": "Windows: cloudflare-worker で deploy.bat をダブルクリックまたは .\\deploy.ps1 を実行",
-    "worker-url-conflict": "この Vectorize Worker URL はアカウント {{account}} で既に使用されています。このアカウント専用の Vectorize Worker URL をデプロイしてください。"
+    "worker-url-conflict": "この Vectorize Worker URL はアカウント {{account}} で既に使用されています。このアカウント専用の Vectorize Worker URL をデプロイしてください。",
+    "worker-url-unsaved": "インデックスを構築する前に Worker URL を保存してください。"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV設定",

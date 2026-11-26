@@ -20,6 +20,7 @@ import {
 import { normalizePersistedState } from '../normalizers/persistedState';
 import {
   clearPendingSeed,
+  ACTIVE_PROFILE_ID,
   readPendingSeed,
   scopedKey,
   syncActiveProfileMetadata,
@@ -464,7 +465,7 @@ customCategoriesCount: normalized.customCategories?.length || 0,
   };
 
   // Apply one-time settings/auth seed for a newly created profile, then delete it.
-  const pendingSeed = readPendingSeed();
+  const pendingSeed = readPendingSeed(ACTIVE_PROFILE_ID);
   if (pendingSeed) {
     pendingSeedAppliedOnBoot = true;
     merged = {
@@ -514,7 +515,7 @@ if (pendingSeedAppliedOnBoot && rehydratedState) {
   }
   void flushPendingPersistSnapshot(true)
     .then(() => {
-      clearPendingSeed();
+      clearPendingSeed(ACTIVE_PROFILE_ID);
     })
     .catch((error: unknown) => {
       logger.warn('store.hydrate', 'Pending profile seed kept: persist failed', error);

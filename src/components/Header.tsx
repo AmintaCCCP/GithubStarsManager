@@ -39,6 +39,7 @@ import { resolveTheme } from '../store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { useAccountProfiles } from '../hooks/useAccountProfiles';
+import type { ProfileEntry } from '../services/profileStorage';
 import { AddAccountModal } from './AddAccountModal';
 import { HeaderMenuId, AppState } from '../types';
 
@@ -84,6 +85,7 @@ export const Header: React.FC = () => {
     profiles,
     activeProfileId,
     isSwitching,
+    removingProfileIds,
     switchAccount,
     addAccount,
     removeProfile,
@@ -100,6 +102,20 @@ export const Header: React.FC = () => {
   );
 
   const t = useT('app');
+
+  // A fresh install has no registry entry for the signed-in profile, so fall
+  // back to the live user data — otherwise the switch submenu renders empty.
+  const menuProfiles = useMemo<ProfileEntry[]>(() => {
+    if (profiles.length > 0) return profiles;
+    return [
+      {
+        id: activeProfileId,
+        login: user?.login,
+        name: user?.name ?? undefined,
+        avatarUrl: user?.avatar_url,
+      },
+    ];
+  }, [profiles, activeProfileId, user]);
 
   const requestRemoveProfile = async (profileId: string, displayName: string) => {
     const confirmed = await confirm(
@@ -236,31 +252,26 @@ export const Header: React.FC = () => {
 
             {/* User Profile */}
             {user && (
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="flex items-center space-x-2 py-0.5 pl-0.5 pr-1.5">
-                  <img
-                    src={user.avatar_url}
-                    alt={user.name || user.login}
-                    className="w-8 h-8 rounded-full"
-                  />
-                  <div className="min-w-0 hidden sm:block text-left">
-                    <p className="app-header-user-name truncate">
-                      {user.name || user.login}
-                    </p>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="app-header-account-trigger flex items-center gap-2 rounded-full py-0.5 pl-0.5 pr-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={t('accountSwitcher.account-menu')}
+                  >
+                    <img
+                      src={user.avatar_url}
+                      alt={user.name || user.login}
                       className="h-8 w-8 rounded-full"
-                      aria-label={t('accountSwitcher.account-menu')}
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
+                    />
+                    <span className="min-w-0 hidden truncate text-left sm:block">
+                      <span className="app-header-user-name block truncate">
+                        {user.name || user.login}
+                      </span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                  </button>
+                </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-60">
                     <DropdownMenuItem onSelect={() => setAddAccountOpen(true)}>
                       <UserPlus className="mr-2 h-4 w-4" />
@@ -272,13 +283,13 @@ export const Header: React.FC = () => {
                         {t('accountSwitcher.switch-account')}
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent className="w-60">
-                        {profiles.map((profile) => {
+                        {menuProfiles.map((profile) => {
                           const isCurrent = profile.id === activeProfileId;
                           const displayName = profile.login || profile.name || profile.id;
                           return (
                             <DropdownMenuItem
                               key={profile.id}
-                              disabled={isSwitching}
+                              disabled={isSwitching || removingProfileIds.includes(profile.id)}
                               onSelect={() => {
                                 if (!isCurrent) {
                                   void switchAccount(profile.id).catch((err) => {
@@ -313,17 +324,17 @@ export const Header: React.FC = () => {
                             </DropdownMenuItem>
                           );
                         })}
-                        {profiles.some((p) => p.id !== activeProfileId) && (
+                        {menuProfiles.some((p) => p.id !== activeProfileId) && (
                           <>
                             <DropdownMenuSeparator />
-                            {profiles
+                            {menuProfiles
                               .filter((p) => p.id !== activeProfileId)
                               .map((profile) => {
                                 const displayName = profile.login || profile.name || profile.id;
                                 return (
                                   <DropdownMenuItem
                                     key={`remove-${profile.id}`}
-                                    disabled={isSwitching}
+                                    disabled={isSwitching || removingProfileIds.includes(profile.id)}
                                     onSelect={() => {
                                       void requestRemoveProfile(profile.id, displayName);
                                     }}
@@ -344,10 +355,8 @@ export const Header: React.FC = () => {
                       <LogOut className="mr-2 h-4 w-4" />
                       {t('header.logout')}
                     </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>

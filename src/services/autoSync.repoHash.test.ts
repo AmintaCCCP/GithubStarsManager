@@ -511,6 +511,11 @@ describe('backend pushes requested during another sync', () => {
     const stop = startAutoSync({ preservePending: true });
     await syncFromBackend();
     expect(backend.fetchRepositories).not.toHaveBeenCalled();
+    // No new store change is coming, so the preserved pending push is retried
+    // on its own debounce timer instead of waiting for the next edit.
+    await vi.waitFor(() => expect(backend.syncRepositories).toHaveBeenCalledTimes(2), {
+      timeout: 4000,
+    });
     stopAutoSync(stop);
   });
 
