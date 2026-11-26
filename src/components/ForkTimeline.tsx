@@ -178,17 +178,6 @@ export const ForkTimeline: React.FC = () => {
             {t('forkTimeline.fork-status')}
           </h3>
         </div>
-        <Button
-          onClick={handleRefresh}
-          disabled={forkIsRefreshing}
-          variant="ghost"
-          size="icon"
-          className="linear-icon-button"
-          title={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
-          aria-label={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
-        >
-          <RefreshCw className={`h-4 w-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
       </div>
       <ContextSidebarBody>
         <section className="app-side-section" aria-label={t('forkTimeline.status')}>
@@ -311,35 +300,49 @@ export const ForkTimeline: React.FC = () => {
       />
 
         {/* Search Bar */}
-        <div className="ui-toolbar app-page-toolbar app-fork-search mb-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
-            <Input
-              type="text"
-              aria-label={t('forkTimeline.search-forks')}
-              placeholder={t('forkTimeline.search-forks-2')}
-              value={searchQuery}
-              onChange={(e) => {
-                setForkSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-8 pr-8"
-            />
-            {searchQuery && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => {
-                  setForkSearchQuery('');
+        <div className="ui-toolbar app-page-toolbar app-fork-search !mt-3 mb-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
+              <Input
+                type="text"
+                aria-label={t('forkTimeline.search-forks')}
+                placeholder={t('forkTimeline.search-forks-2')}
+                value={searchQuery}
+                onChange={(e) => {
+                  setForkSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                aria-label={t('forkTimeline.clear-search')}
-                className="absolute right-1 top-1/2 -translate-y-1/2 text-tertiary hover:text-foreground"
-              >
-                <X className="size-3.5" />
-              </Button>
-            )}
+                className="w-full pl-8 pr-8"
+              />
+              {searchQuery && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    setForkSearchQuery('');
+                    setCurrentPage(1);
+                  }}
+                  aria-label={t('forkTimeline.clear-search')}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-tertiary hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </Button>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleRefresh}
+              disabled={forkIsRefreshing}
+              className="shrink-0 gap-1.5"
+              title={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
+              aria-label={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
+            >
+              <RefreshCw className={`size-3.5 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
+              <span>{forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}</span>
+            </Button>
           </div>
         </div>
 

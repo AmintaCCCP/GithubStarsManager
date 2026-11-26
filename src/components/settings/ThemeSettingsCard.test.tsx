@@ -34,9 +34,10 @@ vi.mock('../../store/useAppStore', async () => {
 
 import { makeT } from '../../i18n/useT';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
-import { THEME_PRESETS } from '../../constants/themePresets';
+import { getThemePreset, THEME_PRESETS } from '../../constants/themePresets';
 import { DEFAULT_REPOSITORY_CARD_FIELDS } from '../../types/repositoryCardFields';
 import { DEFAULT_REPOSITORY_CARD_ACTIONS } from '../../types/repositoryCardActions';
+import { hslTripletToHex } from '../../utils/themeTokens';
 
 const t = makeT('zh', 'app');
 
@@ -213,8 +214,9 @@ describe('ThemeSettingsCard', () => {
     render(<ThemeSettingsCard t={t} />);
     await user.click(screen.getByRole('button', { name: '微调外观' }));
 
+    const expectedAccentHex = hslTripletToHex(getThemePreset('default').darkColors.primary);
     expect(screen.getByRole('button', { name: '蓝色 (#2563eb)' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByLabelText('自定义强调色')).toHaveValue('#765bc4');
+    expect(screen.getByLabelText('自定义强调色')).toHaveValue(expectedAccentHex!);
   });
 
   it('resets every token back to the presets', async () => {

@@ -860,7 +860,7 @@ export const ReleaseTimeline: React.FC = () => {
   );
 
   const releaseToolbar = (
-    <div className="ui-toolbar app-page-toolbar app-release-toolbar">
+    <div className="ui-toolbar app-page-toolbar app-release-toolbar !mt-3">
       <div className="app-release-search-row">
         <div className="relative app-release-search-field">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />

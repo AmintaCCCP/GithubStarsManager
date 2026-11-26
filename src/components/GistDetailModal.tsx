@@ -249,7 +249,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
                 size="sm"
                 aria-pressed={isSelected}
                 onClick={() => setActiveFilename(file.filename)}
-                className={`h-auto min-h-control-sm min-w-0 max-w-full break-all px-2.5 py-1 text-left ${
+                className={`h-auto min-h-control-sm min-w-0 max-w-full whitespace-normal break-all px-2.5 py-1 text-left ${
                   isSelected
                     ? 'bg-fill-selected text-foreground shadow-elev-0'
                     : 'bg-fill-hover/60 text-secondary hover:bg-fill-hover hover:text-foreground'

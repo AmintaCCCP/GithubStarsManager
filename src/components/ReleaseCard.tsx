@@ -215,11 +215,15 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
     <div
       onClick={onMarkAsRead}
       className={`release-card ui-card transition-[color,background-color,border-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant cursor-pointer ${
-        isAnyExpanded ? 'is-expanded' : ''
+        isAnyExpanded ? 'is-expanded !bg-raised hover:!bg-raised' : ''
       }`}
     >
       {/* 头部区域 - 仅显示元信息，不可点击展开 */}
-      <div className="px-3.5 py-3 sm:px-4">
+      <div
+        className={`px-3.5 py-3 sm:px-4 ${
+          isAnyExpanded ? 'transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant' : ''
+        }`}
+      >
         <div className="flex items-stretch justify-between gap-3">
           <div className="flex items-center min-w-0 flex-1">
             <span className="app-unread-marker-slot" aria-hidden="true">
@@ -391,7 +395,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
         style={{ gridTemplateRows: (isAssetsExpanded || isReleaseNotesExpanded || isSummaryExpanded) ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden min-h-0">
-          <div className="px-3.5 sm:px-4 pb-3.5 pt-3 border-t border-subtle">
+          <div className="px-3.5 sm:px-4 pb-3.5 pt-3 border-t border-default bg-sunken">
           {isAssetsExpanded && visibleDownloadLinks.length > 0 && (
             <div className="py-1.5">
               <ReleasePluginRecommendations release={release} language={language} />
@@ -421,7 +425,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 )}
               </div>
 
-              <div className="ui-inset-surface max-h-72 overflow-y-auto divide-y divide-subtle">
+              <div className="max-h-72 overflow-y-auto rounded-md border border-default bg-paper divide-y divide-separator">
                 {visibleDownloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   // 与 sendRpcDownload 使用相同的版本化 key
@@ -483,8 +487,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading}
-                        className={`h-auto flex items-center justify-between gap-3 rounded-none px-3.5 py-2.5 w-full text-left font-normal hover:bg-fill-hover disabled:opacity-60 ${
-                          link.isSourceCode ? 'bg-fill-hover/40' : ''
+                        className={`h-auto min-h-[42px] flex items-center justify-between gap-3 rounded-none px-3 py-2.5 w-full text-left font-normal hover:bg-fill-hover disabled:opacity-60 ${
+                          link.isSourceCode ? 'bg-sunken/60' : ''
                         }`}
                       >
                         {rowBody}
@@ -498,8 +502,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`flex items-center justify-between gap-3 px-3.5 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant ${
-                        link.isSourceCode ? 'bg-fill-hover/40' : ''
+                      className={`min-h-[42px] flex items-center justify-between gap-3 px-3 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant ${
+                        link.isSourceCode ? 'bg-sunken/60' : ''
                       }`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -523,7 +527,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="rounded-md border border-subtle bg-sunken px-4 pt-4 pb-3.5">
+              <div className="rounded-md border border-default bg-paper px-4 pt-4 pb-3.5">
                 <MarkdownRenderer
                   content={isFullContent ? (release.body || '') : truncatedBody}
                   shouldRender={true}
@@ -571,7 +575,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </span>
               </div>
 
-              <div className="relative rounded-md border border-subtle bg-sunken px-4 py-3">
+              <div className="relative rounded-md border border-default bg-paper px-4 py-3">
                 {summary.status === 'loading' && (
                   <div className="flex items-center justify-center gap-2 py-4 text-label-sm text-tertiary">
                     <Loader2 className="size-4 animate-spin" />

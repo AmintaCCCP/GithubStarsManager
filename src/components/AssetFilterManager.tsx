@@ -160,12 +160,12 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
       <div id="asset-filter-panel" className="app-side-list app-side-filter-list">
         {currentSystemFilter && (
-          <div className="app-side-filter-row">
+          <div className="app-side-filter-row relative flex w-full items-center">
             <Button
               variant="ghost"
               onClick={() => onFilterToggle(currentSystemFilter.id)}
               disabled={currentSystemUnsupported}
-              className="app-side-item app-side-multiline-label justify-between"
+              className="app-side-item app-side-multiline-label w-full min-w-0 justify-between rounded-sm px-2 pr-8"
               title={currentSystemUnsupported
                 ? t('assetFilterManager.builtin-ignored')
                 : t('assetFilterManager.builtin-tooltip', { device: currentSystemFilter.label })}
@@ -192,7 +192,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 </span>
               </span>
             </Button>
-            <div className="app-side-row-actions">
+            <div className="app-side-row-actions ml-auto shrink-0 [inset-inline-start:auto] [inset-inline-end:0.375rem] !bg-transparent">
               <span title={t('assetFilterManager.builtin-locked')}>
                 <Lock className="size-3.5 text-tertiary" aria-hidden="true" />
               </span>
@@ -204,21 +204,25 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           const Icon = filter.icon ? ICON_MAP[filter.icon] : Filter;
           const isSelected = selectedFilters.includes(filter.id);
           return (
-            <div key={filter.id} className="app-side-filter-row">
+            <div key={filter.id} className="app-side-filter-row group/filter-row relative flex w-full items-center">
               <Button
                 variant="ghost"
                 onClick={() => onFilterToggle(filter.id)}
-                className="app-side-item justify-between"
+                className={`app-side-item w-full min-w-0 justify-between rounded-sm px-2 ${
+                  filter.isPreset
+                    ? 'group-hover/filter-row:pr-9 group-focus-within/filter-row:pr-9'
+                    : 'group-hover/filter-row:pr-14 group-focus-within/filter-row:pr-14'
+                }`}
                 title={filter.keywords.join(', ')}
                 type="button"
                 aria-pressed={isSelected}
               >
-                <span className="app-side-item-label">
+                <span className="app-side-item-label min-w-0 flex-1">
                   {Icon && <Icon aria-hidden="true" />}
                   <span className="truncate">{filter.name}</span>
                 </span>
               </Button>
-              <div className="app-side-row-actions">
+              <div className="app-side-row-actions ml-auto shrink-0 [inset-inline-start:auto] [inset-inline-end:0.375rem] !bg-transparent">
                 <Button
                   variant="ghost"
                   onClick={() => handleEditFilter(filter)}

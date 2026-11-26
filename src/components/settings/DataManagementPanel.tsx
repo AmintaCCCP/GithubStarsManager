@@ -1956,9 +1956,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
             <div className="space-y-4">
               <AlertDialogDescription asChild>
-                <SettingsNotice tone="destructive" icon={<AlertTriangle />}>
-                  {getDeleteDescription(confirmation.type)}
-                </SettingsNotice>
+                <div>
+                  <SettingsNotice tone="destructive" icon={<AlertTriangle />}>
+                    {getDeleteDescription(confirmation.type)}
+                  </SettingsNotice>
+                </div>
               </AlertDialogDescription>
 
               {confirmation.type === 'all' && user && (

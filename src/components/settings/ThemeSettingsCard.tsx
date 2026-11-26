@@ -1,4 +1,4 @@
-import { useTPair, TranslateFn } from '../../i18n/useT';
+import type { TranslateFn } from '../../i18n/useT';
 import React from 'react';
 import { Check, MonitorCog, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -26,12 +26,30 @@ import { isRepositoryCardFieldVisible } from '../../utils/repositoryCardFields';
 import { RepositoryCardActionsSettings } from './RepositoryCardActionsSettings';
 import { SettingsCard, SettingsDivider, SettingsSection } from './SettingsPrimitives';
 
+const THEME_PRESET_LABEL_KEYS: Partial<Record<ThemePresetId, string>> = {
+  default: 'themeSettingsCard.preset-default',
+  catppuccin: 'themeSettingsCard.preset-catppuccin',
+  dracula: 'themeSettingsCard.preset-dracula',
+  ghostty: 'themeSettingsCard.preset-ghostty',
+  github: 'themeSettingsCard.preset-github',
+  gruvbox: 'themeSettingsCard.preset-gruvbox',
+  haze: 'themeSettingsCard.preset-haze',
+  'night-owl': 'themeSettingsCard.preset-night-owl',
+  nord: 'themeSettingsCard.preset-nord',
+  'one-dark-pro': 'themeSettingsCard.preset-one-dark-pro',
+  paper: 'themeSettingsCard.preset-paper',
+  pierre: 'themeSettingsCard.preset-pierre',
+  'rose-pine': 'themeSettingsCard.preset-rose-pine',
+  solarized: 'themeSettingsCard.preset-solarized',
+  'tokyo-night': 'themeSettingsCard.preset-tokyo-night',
+  vitesse: 'themeSettingsCard.preset-vitesse',
+};
+
 interface ThemeSettingsCardProps {
   t: TranslateFn;
 }
 
 export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
-  const tPair = useTPair();
   const {
     themeMode,
     systemTheme,
@@ -295,7 +313,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                       )}
                     </span>
                     <span className="truncate px-0.5 text-label-sm font-medium text-foreground">
-                      {tPair(preset.labelZh, preset.labelEn)}
+                      {THEME_PRESET_LABEL_KEYS[preset.id] ? t(THEME_PRESET_LABEL_KEYS[preset.id]!) : preset.labelEn}
                     </span>
                   </button>
                 );
