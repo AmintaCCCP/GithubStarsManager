@@ -237,7 +237,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="ui-field w-full"
+            className="w-full"
             placeholder={t('categoryEditModal.enter-category-name')}
             autoFocus
           />
@@ -259,7 +259,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           
           {/* Custom Icon Input */}
           {showCustomInput && (
-            <div className="app-category-custom-icon">
+            <div className="app-category-custom-icon border-0 bg-sunken shadow-elev-0">
               <div className="app-category-custom-icon-row">
                 <Input
                   aria-label={t('categoryEditModal.custom-icon')}
@@ -267,34 +267,35 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                   value={customIcon}
                   onChange={(e) => setCustomIcon(e.target.value)}
                   placeholder={t('categoryEditModal.enter-any-emoji')}
-                  className="ui-field flex-1 text-center"
+                  className="flex-1 text-center"
                   autoFocus
                 />
                 <Button
+                  variant="primary"
+                  size="md"
                   onClick={handleCustomIconSubmit}
                   disabled={!customIcon.trim()}
-                  className="ui-button-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t('categoryEditModal.ok')}
                 </Button>
                 <Button
                   variant="outline"
+                  size="md"
                   onClick={() => {
                     setShowCustomInput(false);
                     setCustomIcon('');
                   }}
-                  className="ui-button"
                 >
                   {t('categoryEditModal.cancel')}
                 </Button>
               </div>
-              <p className="app-form-hint text-primary">
+              <p className="app-form-hint text-accent-text">
                 {t('categoryEditModal.tip-you-can-enter-any-emoji-like-etc')}
               </p>
             </div>
           )}
           
-          <div className="app-category-icon-grid">
+          <div className="app-category-icon-grid border-0 shadow-elev-0">
             {iconGrid}
           </div>
           <div className="app-category-editor-meta">
@@ -306,6 +307,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
               type="button"
               onClick={() => setShowCustomInput(true)}
               variant="ghost"
+              size="sm"
               className="app-category-custom-trigger"
             >
               <Plus aria-hidden="true" />
@@ -324,7 +326,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             type="text"
             value={formData.keywords}
             onChange={(e) => setFormData(prev => ({ ...prev, keywords: e.target.value }))}
-            className="ui-field w-full"
+            className="w-full"
             placeholder={t('categoryEditModal.comma-separated-keywords')}
           />
           <p className="app-form-hint">
@@ -334,8 +336,8 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
 
         {/* Default Category Modified Hint */}
         {category && !category.isCustom && isDefaultCategoryModified && originalCategory && (
-          <div className="app-form-notice">
-            <p className="app-form-hint text-warning">
+          <div className="app-form-notice !border-0 !bg-warning-tint">
+            <p className="app-form-hint !text-warning">
               {t('categoryEditModal.this-default-category-has-been-modified-original', { v1: originalCategory.icon, v2: originalCategory.name })}
             </p>
             <div className="app-form-inline-actions">
@@ -343,6 +345,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
               {hasNameIconModified && (
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => {
                     resetDefaultCategoryNameIcon(category.id);
                     setFormData(prev => ({
@@ -351,7 +354,6 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       icon: originalCategory.icon
                     }));
                   }}
-                  className="ui-button"
                 >
                   {t('categoryEditModal.name-icon')}
                 </Button>
@@ -359,6 +361,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
               {hasKeywordsModified && (
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => {
                     resetDefaultCategoryKeywords(category.id);
                     setFormData(prev => ({
@@ -366,13 +369,13 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       keywords: originalCategory.keywords.join(', ')
                     }));
                   }}
-                  className="ui-button"
                 >
                   {t('categoryEditModal.keywords')}
                 </Button>
               )}
               <Button
                 size="sm"
+                variant="danger"
                 onClick={() => {
                   resetDefaultCategory(category.id);
                   setFormData({
@@ -381,7 +384,6 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                     keywords: originalCategory.keywords.join(', ')
                   });
                 }}
-                className="ui-button text-destructive"
               >
                 {t('categoryEditModal.all')}
               </Button>
@@ -390,8 +392,8 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         )}
 
         {category && !category.isCustom && !isDefaultCategoryModified && (
-          <div className="app-form-notice">
-            <p className="app-form-hint text-primary">
+          <div className="app-form-notice !border-0 !bg-accent-tint">
+            <p className="app-form-hint !text-accent-text">
               {t('categoryEditModal.editing-default-category-will-override-original')}
             </p>
           </div>
@@ -403,10 +405,10 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             {canPush && (
               <Button
                 variant="outline"
+                size="md"
                 onClick={handlePush}
                 disabled={!!hasChanges || isListsPushRunning}
                 title={hasChanges ? t('categoryEditModal.save-changes-before-push') : undefined}
-                className="ui-button"
               >
                 <ListPlus aria-hidden="true" />
                 <span>{t('categoryEditModal.push-to-github-list')}</span>
@@ -414,22 +416,23 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             )}
           </div>
           <div className="app-dialog-actions">
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            className="ui-button"
-          >
-            <X aria-hidden="true" />
-            <span>{t('categoryEditModal.cancel')}</span>
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!hasChanges}
-            className="ui-button-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save aria-hidden="true" />
-            <span>{t('categoryEditModal.save')}</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="md"
+              onClick={handleClose}
+            >
+              <X aria-hidden="true" />
+              <span>{t('categoryEditModal.cancel')}</span>
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleSave}
+              disabled={!hasChanges}
+            >
+              <Save aria-hidden="true" />
+              <span>{t('categoryEditModal.save')}</span>
+            </Button>
           </div>
         </div>
       </div>

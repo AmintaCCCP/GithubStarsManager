@@ -59,12 +59,12 @@ export const ProfileStatusBanners: React.FC = () => {
     <>
       {isSwitching && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-[2px]"
           role="status"
         >
-          <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-5 py-4 shadow-lg">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <span className="text-sm font-medium text-foreground">
+          <div className="flex items-center gap-3 rounded-xl bg-floating px-5 py-3.5 shadow-elev-3">
+            <Loader2 className="size-4 animate-spin text-accent-text" />
+            <span className="text-label font-medium text-foreground">
               {t('accountSwitcher.switching-account')}
             </span>
           </div>
@@ -73,16 +73,16 @@ export const ProfileStatusBanners: React.FC = () => {
 
       {showLoggedOutSwitcher && (
         <div
-          className="border-b border-border bg-muted/60 px-4 py-2 text-sm text-foreground"
+          className="border-b border-subtle bg-navigator px-4 py-2 text-label text-foreground"
           role="region"
           aria-label={t('accountSwitcher.accounts-label')}
         >
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <ArrowLeftRight className="h-4 w-4 shrink-0" />
+            <span className="flex items-center gap-2 text-secondary">
+              <ArrowLeftRight className="size-4 shrink-0 text-tertiary" />
               {t('accountSwitcher.logged-out-profile-notice', { profile: activeProfileLabel })}
             </span>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               {!isDefaultProfile(activeProfileId) && (
                 <Button
                   type="button"
@@ -112,7 +112,7 @@ export const ProfileStatusBanners: React.FC = () => {
             </div>
           </div>
           {switchError && (
-            <p className="mx-auto mt-1 max-w-7xl text-destructive" role="alert">
+            <p className="mx-auto mt-1 max-w-7xl text-label-sm text-destructive" role="alert">
               {switchError}
             </p>
           )}
@@ -121,17 +121,17 @@ export const ProfileStatusBanners: React.FC = () => {
 
       {otherTabSwitched && (
         <div
-          className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-foreground"
+          className="border-b border-subtle bg-warning-tint px-4 py-2 text-label text-foreground"
           role="status"
           aria-live="polite"
         >
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
             <span className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <RefreshCw className="size-4 shrink-0 text-warning" />
               <span>
                 {t('accountSwitcher.other-tab-switched-notice')}
                 {reloadError && (
-                  <span className="ml-2 text-destructive" role="alert">
+                  <span className="ml-2 text-label-sm text-destructive" role="alert">
                     {reloadError}
                   </span>
                 )}
@@ -159,11 +159,11 @@ export const ProfileStatusBanners: React.FC = () => {
 
       {backendProfilesUnsupported && (
         <div
-          className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-foreground"
+          className="border-b border-subtle bg-warning-tint px-4 py-2 text-label text-foreground"
           role="alert"
         >
           <div className="mx-auto flex max-w-7xl items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <AlertTriangle className="size-4 shrink-0 text-warning" />
             <span>{t('accountSwitcher.backend-profiles-unsupported-warning')}</span>
           </div>
         </div>
@@ -171,12 +171,12 @@ export const ProfileStatusBanners: React.FC = () => {
 
       {conflictWarning && (
         <div
-          className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-foreground"
+          className="border-b border-subtle bg-warning-tint px-4 py-2 text-label text-foreground"
           role="alert"
         >
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
             <span className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <AlertTriangle className="size-4 shrink-0 text-warning" />
               <span>
                 {conflictWarning.kind === 'webdav'
                   ? t('accountSwitcher.profile-conflict-webdav-warning', {
@@ -189,13 +189,13 @@ export const ProfileStatusBanners: React.FC = () => {
             </span>
             <Button
               type="button"
-              size="icon"
+              size="icon-sm"
               variant="ghost"
-              className="h-6 w-6 shrink-0"
+              className="shrink-0 text-secondary hover:text-foreground"
               aria-label={t('accountSwitcher.dismiss')}
               onClick={() => setConflictWarning(null)}
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="size-3.5" />
             </Button>
           </div>
         </div>

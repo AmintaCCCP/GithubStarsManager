@@ -37,7 +37,7 @@ function renderWithHighlights(text: string): React.ReactNode[] {
     ? (
         <span
           key={index}
-          className="font-semibold text-primary underline decoration-dashed decoration-primary/50 underline-offset-[3px]"
+          className="font-medium text-accent-text underline decoration-dashed decoration-accent-text/45 underline-offset-[3px]"
         >
           {part}
         </span>
@@ -70,15 +70,15 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
   };
 
   return (
-    <div className="text-xs leading-5 text-muted-foreground">
+    <div className="text-label-sm leading-5 text-secondary">
       {heading && (
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
-          <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+        <h3 className="mb-3 flex items-center gap-2 text-label-lg font-semibold text-foreground">
+          <KeyRound className="size-4 text-tertiary" aria-hidden />
           {t('loginScreen.token-permissions-title')}
         </h3>
       )}
 
-      <div role="tablist" className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+      <div role="tablist" className="mb-4 grid h-control grid-cols-2 gap-0.5 rounded-md bg-fill-hover p-0.5">
         {MODE_TABS.map(({ mode: tabMode, labelKey }) => {
           const selected = mode === tabMode;
           return (
@@ -94,8 +94,8 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
               onClick={() => setMode(tabMode)}
               onKeyDown={(event) => handleTabKeyDown(event, tabMode)}
               className={cn(
-                'rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                selected ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                'motion-press h-control-sm rounded-sm px-2 text-label-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                selected ? 'bg-floating text-foreground shadow-elev-1' : 'text-secondary hover:text-foreground',
               )}
             >
               {t(labelKey)}
@@ -114,16 +114,16 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
           tabIndex={0}
         >
           {tabMode === 'fine-grained' && (
-            <div className="mb-3.5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-relaxed text-foreground">
+            <div className="mb-3.5 rounded-lg bg-warning-tint p-3 text-label-sm leading-relaxed text-foreground">
               <div className="flex items-center gap-1.5 font-medium text-warning">
-                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                <AlertTriangle className="size-4 shrink-0" aria-hidden />
                 <span>{t('loginScreen.token-permissions-fine-warning-title')}</span>
               </div>
-              <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-secondary">
                 <li>{t('loginScreen.token-permissions-fine-warning-star')}</li>
                 <li>{t('loginScreen.token-permissions-fine-warning-lists')}</li>
               </ul>
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-warning/20 pt-2 text-muted-foreground">
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-subtle pt-2 text-secondary">
                 <span>{t('loginScreen.token-permissions-fine-warning-recommend')}</span>
                 <button
                   type="button"
@@ -131,10 +131,10 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
                     setMode('classic');
                     tabRefs.current.classic?.focus();
                   }}
-                  className="inline-flex items-center gap-1 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+                  className="inline-flex items-center gap-1 font-medium text-accent-text underline underline-offset-2 hover:opacity-80"
                 >
                   {t('loginScreen.token-permissions-switch-to-classic')}
-                  <ArrowRight className="h-3 w-3" aria-hidden />
+                  <ArrowRight className="size-3" aria-hidden />
                 </button>
               </div>
             </div>
@@ -143,7 +143,7 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
           <ul className="space-y-2.5">
             {rowsFor(tabMode).map(({ icon: Icon, featureKey, valueKey }) => (
               <li key={featureKey + valueKey} className="flex gap-2.5">
-                <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+                <Icon className="mt-0.5 size-3.5 shrink-0 text-tertiary" aria-hidden />
                 <span className="w-[7.5rem] shrink-0 font-medium text-foreground">{t(featureKey)}</span>
                 <span>{renderWithHighlights(t(valueKey))}</span>
               </li>
@@ -152,13 +152,13 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
         </div>
       ))}
 
-      <div className="mt-4 space-y-2 border-t border-border pt-3">
+      <div className="mt-4 space-y-2 border-t border-subtle pt-3">
         <p className="flex gap-2">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+          <Info className="mt-0.5 size-3.5 shrink-0 text-tertiary" aria-hidden />
           <span>{renderWithHighlights(t('loginScreen.token-permissions-check'))}</span>
         </p>
         <p className="flex gap-2">
-          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
+          <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-status-green" aria-hidden />
           <span>{renderWithHighlights(t('loginScreen.token-permissions-local-storage'))}</span>
         </p>
       </div>
@@ -167,7 +167,7 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
         href={mode === 'fine-grained' ? FINE_GRAINED_TOKEN_URL : CLASSIC_TOKEN_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-4 inline-block font-medium text-primary hover:underline"
+        className="mt-4 inline-block text-label-sm font-medium text-accent-text hover:underline"
       >
         {t('loginScreen.create-token-on-github')}
       </a>

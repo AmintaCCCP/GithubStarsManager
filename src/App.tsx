@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useLayoutEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import React, { Suspense, useEffect, useLayoutEffect, useMemo, useCallback, useDeferredValue, useState, useRef } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
@@ -47,9 +47,27 @@ const LazyGistView = React.lazy(() =>
   import('./components/GistView').then((module) => ({ default: module.GistView }))
 );
 
+const DEFAULT_SIDEBAR_WIDTH = 232;
+const MIN_SIDEBAR_WIDTH = 196;
+const MAX_SIDEBAR_WIDTH = 340;
+const SIDEBAR_WIDTH_STORAGE_KEY = 'gsm:sidebar-width';
+
+function readPersistedSidebarWidth(): number {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    const parsed = raw ? Number(raw) : NaN;
+    if (Number.isFinite(parsed) && parsed >= MIN_SIDEBAR_WIDTH && parsed <= MAX_SIDEBAR_WIDTH) {
+      return Math.round(parsed);
+    }
+  } catch {
+    // Ignore storage read failures in restricted environments.
+  }
+  return DEFAULT_SIDEBAR_WIDTH;
+}
+
 const ViewLoadingFallback: React.FC = () => (
-  <div className="flex min-h-[12rem] items-center justify-center bg-background text-foreground" role="status" aria-live="polite">
-    <div className="animate-pulse text-lg font-medium text-foreground">Loading...</div>
+  <div className="flex min-h-[12rem] items-center justify-center bg-navigator text-foreground" role="status" aria-live="polite">
+    <div className="animate-pulse text-label font-medium text-secondary">Loading...</div>
   </div>
 );
 
@@ -124,43 +142,114 @@ const RepositoriesView = React.memo(({
     }
   }, [similarView?.active, hasActiveQueryOrFilter, exitSimilarView]);
 
+  const [sidebarWidth, setSidebarWidth] = useState<number>(readPersistedSidebarWidth);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => {
+    resizeCleanupRef.current?.();
+  }, []);
+
+  const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = sidebarWidth;
+    let latestWidth = startWidth;
+    setIsResizingSidebar(true);
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const next = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(startWidth + (moveEvent.clientX - startX))));
+      latestWidth = next;
+      setSidebarWidth(next);
+    };
+
+    const stopResizing = () => {
+      setIsResizingSidebar(false);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopResizing);
+      window.removeEventListener('pointercancel', stopResizing);
+      resizeCleanupRef.current = null;
+      try {
+        localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(latestWidth));
+      } catch {
+        // Ignore storage write failures in restricted environments.
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopResizing);
+    window.addEventListener('pointercancel', stopResizing);
+    resizeCleanupRef.current = stopResizing;
+  }, [sidebarWidth]);
+
+  const handleSidebarResizeReset = useCallback(() => {
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(DEFAULT_SIDEBAR_WIDTH));
+    } catch {
+      // Ignore storage write failures in restricted environments.
+    }
+  }, []);
+
   // 相似仓库视图激活时，列表数据源切换为相似结果，且忽略分类过滤
   const listRepositories = similarView?.active
     ? similarView.similarResults
     : (isActive ? searchResults : repositories);
 
   return (
-    <div className="route-workspace">
+    <div
+      className={`route-workspace lg:[&_.linear-sidebar]:border-e-0 ${isResizingSidebar ? 'select-none' : ''}`}
+      style={{ '--app-sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+    >
       <CategorySidebar
         repositories={repositories}
         selectedCategory={selectedCategory}
         onCategorySelect={onCategorySelect}
       />
-      <div className="workspace-content app-workspace-content space-y-5">
-        <WorkspacePageHeader
-          eyebrow={t('categorySidebar.workspace-label')}
-          section={t('header.menu-repositories')}
-          title={selectedCategory === 'all'
-            ? t('categorySidebar.all-repositories')
-            : currentCategory?.name ?? t('categorySidebar.all-repositories')}
-          meta={(
-            <>
-              <span className="app-workspace-meta-pill">
-                {t('categorySidebar.repository-count', { count: currentCategoryRepositories.length })}
-              </span>
-              {analyzedRepositoryCount > 0 && (
-                <span className="app-workspace-meta-pill">
-                  {t('searchResultStats.ai-analyzed-count', { count: analyzedRepositoryCount })}
-                </span>
-              )}
-            </>
-          )}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Sidebar resizer"
+        aria-valuenow={sidebarWidth}
+        aria-valuemin={MIN_SIDEBAR_WIDTH}
+        aria-valuemax={MAX_SIDEBAR_WIDTH}
+        onPointerDown={handleSidebarResizeStart}
+        onDoubleClick={handleSidebarResizeReset}
+        className="group hidden w-2 shrink-0 cursor-col-resize items-stretch justify-center self-stretch select-none lg:flex"
+      >
+        <div
+          className={`my-2 w-[2px] rounded-full transition-colors duration-micro ease-out-subtle ${
+            isResizingSidebar ? 'bg-accent-solid/70' : 'bg-transparent group-hover:bg-border-alpha-strong'
+          }`}
         />
-        <SearchBar />
-        <RepositoryList
-          repositories={listRepositories}
-          selectedCategory={similarView?.active ? 'all' : selectedCategory}
-        />
+      </div>
+      <div className="workspace-content app-workspace-content flex flex-col !p-0 lg:!py-2 lg:!pr-2.5 lg:!pl-0">
+        <div className="min-w-0 flex-1 space-y-4 bg-paper px-4 py-4 shadow-elev-0 sm:px-5 lg:rounded-lg">
+          <WorkspacePageHeader
+            eyebrow={t('categorySidebar.workspace-label')}
+            section={t('header.menu-repositories')}
+            title={selectedCategory === 'all'
+              ? t('categorySidebar.all-repositories')
+              : currentCategory?.name ?? t('categorySidebar.all-repositories')}
+            meta={(
+              <div className="flex items-center gap-2 text-label-sm text-tertiary tabular-nums">
+                <span>{t('categorySidebar.repository-count', { count: currentCategoryRepositories.length })}</span>
+                {analyzedRepositoryCount > 0 && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{t('searchResultStats.ai-analyzed-count', { count: analyzedRepositoryCount })}</span>
+                  </>
+                )}
+              </div>
+            )}
+          />
+          <SearchBar />
+          <RepositoryList
+            repositories={listRepositories}
+            selectedCategory={similarView?.active ? 'all' : selectedCategory}
+          />
+        </div>
       </div>
     </div>
   );
@@ -340,8 +429,8 @@ function App() {
   // Show loading state while store is hydrating to ensure correct theme is applied
   if (!hasHydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-        <div className="animate-pulse text-lg font-medium text-foreground">
+      <div className="flex min-h-screen items-center justify-center bg-navigator text-foreground">
+        <div className="animate-pulse text-label font-medium text-secondary">
           Loading...
         </div>
       </div>
@@ -358,7 +447,7 @@ function App() {
   }
 
   return (
-    <div className="ui-shell min-h-screen transition-colors duration-200">
+    <div className="ui-shell min-h-screen bg-navigator text-foreground transition-colors duration-200">
       <ProfileStatusBanners />
       <UpdateNotificationBanner />
       <Header />

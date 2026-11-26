@@ -32,27 +32,42 @@ export const UpdateNotificationBanner: React.FC = () => {
   };
 
   return (
-    <div className="border-b border-border bg-muted dark:border-border dark:bg-muted/40">
-      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center space-x-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20"><Package className="h-4 w-4 text-primary" /></div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center space-x-2">
-                <h4 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">{t('updateNotificationBanner.new-version-available')} v{updateNotification.version}</h4>
-                <div className="flex items-center space-x-1 text-xs text-muted-foreground dark:text-muted-foreground"><Calendar className="h-3 w-3 shrink-0" /><span>{formatDate(updateNotification.releaseDate)}</span></div>
-              </div>
+    <div className="border-b border-subtle bg-paper px-3 py-2 sm:px-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent-tint text-accent-text">
+            <Package className="size-4" />
+          </div>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <h4 className="truncate text-label font-medium text-foreground">
+              {t('updateNotificationBanner.new-version-available')} v{updateNotification.version}
+            </h4>
+            <div className="flex items-center gap-1 text-label-sm text-tertiary tabular-nums">
+              <Calendar className="size-3 shrink-0" />
+              <span>{formatDate(updateNotification.releaseDate)}</span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center space-x-2">
-            <Button type="button" size="sm" onClick={handleDownload} className="h-8 gap-1.5 px-3 text-xs"><Download className="h-3 w-3" /><span>{t('updateNotificationBanner.download')}</span></Button>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" onClick={dismissUpdateNotification} aria-label={t('updateNotificationBanner.close')} className="h-8 w-8 text-primary"><X className="h-4 w-4" /></Button>
-              </TooltipTrigger>
-              <TooltipContent>{t('updateNotificationBanner.close')}</TooltipContent>
-            </Tooltip>
-          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button type="button" variant="primary" size="sm" onClick={handleDownload}>
+            <Download className="size-3.5" />
+            <span>{t('updateNotificationBanner.download')}</span>
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={dismissUpdateNotification}
+                aria-label={t('updateNotificationBanner.close')}
+                className="text-secondary hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('updateNotificationBanner.close')}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>
