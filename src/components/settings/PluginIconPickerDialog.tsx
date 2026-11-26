@@ -9,6 +9,7 @@ import {
   normalizePluginIconKey,
 } from '../../plugins/pluginIcons';
 import { useAppStore } from '../../store/useAppStore';
+import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Modal } from '../Modal';
@@ -82,17 +83,16 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
       maxWidth="max-w-xl"
       scrollable
     >
-      <div className="space-y-4">
-        {/* Search & Actions Bar */}
+      <div className="space-y-3.5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
             <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('pluginSettingsPanel.search-icons')}
-              className="pl-9"
+              className="pl-8"
               autoFocus
             />
           </div>
@@ -102,25 +102,23 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
               variant="outline"
               size="sm"
               onClick={handleReset}
-              className="shrink-0 text-xs"
+              className="shrink-0"
             >
-              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-              {t('pluginSettingsPanel.reset-icon')}
+              <RotateCcw className="size-3.5" />
+              <span>{t('pluginSettingsPanel.reset-icon')}</span>
             </Button>
           )}
         </div>
 
-        {/* Current Icon Preview */}
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
-          <span className="text-xs text-muted-foreground">{t('pluginSettingsPanel.select-icon')}:</span>
-          <div className="flex items-center gap-2 font-medium">
-            <PluginIcon pluginId={pluginId} className="h-4 w-4 text-primary" />
+        <div className="flex items-center gap-2.5 rounded-md bg-sunken px-3 py-2 text-label shadow-elev-0">
+          <span className="text-label-sm text-secondary">{t('pluginSettingsPanel.select-icon')}:</span>
+          <div className="flex items-center gap-2 font-medium text-foreground">
+            <PluginIcon pluginId={pluginId} className="size-4 text-accent-text" />
             <span>{previewIconLabel}</span>
           </div>
         </div>
 
-        {/* Icon Grid */}
-        <div className="grid max-h-[360px] grid-cols-4 gap-2 overflow-y-auto p-1 sm:grid-cols-6 md:grid-cols-7">
+        <div className="grid max-h-[360px] grid-cols-4 gap-2 overflow-y-auto p-0.5 sm:grid-cols-6 md:grid-cols-7">
           {filteredIcons.map((choice) => {
             const isSelected = selectedIconKey === choice.key;
             const IconComp = choice.icon;
@@ -134,14 +132,15 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
                 onClick={() => handleSelect(choice.key)}
                 title={choiceTitle}
                 aria-label={choiceTitle}
-                className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border p-1.5 text-center transition-[background-color,border-color,color,box-shadow] hover:bg-accent hover:text-accent-foreground ${
+                className={cn(
+                  'motion-press flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-md p-1.5 text-center transition-[background-color,color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
                   isSelected
-                    ? 'border-primary bg-primary/10 text-primary shadow-xs'
-                    : 'border-border/60 bg-card text-foreground'
-                }`}
+                    ? 'bg-accent-tint text-accent-text shadow-elev-0 ring-1 ring-primary'
+                    : 'bg-sunken/60 text-foreground shadow-elev-0 hover:bg-fill-hover',
+                )}
               >
-                <IconComp className="h-5 w-5 shrink-0" />
-                <span className="w-full break-words text-[11px] leading-tight text-muted-foreground">
+                <IconComp className="size-4 shrink-0" />
+                <span className="w-full break-words text-caption leading-tight text-secondary">
                   {choiceLabel}
                 </span>
               </button>
@@ -150,7 +149,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
         </div>
 
         {filteredIcons.length === 0 && (
-          <div className="py-8 text-center text-sm text-muted-foreground">
+          <div className="py-8 text-center text-label-sm text-secondary">
             {t('pluginSettingsPanel.no-icons-found')}
           </div>
         )}

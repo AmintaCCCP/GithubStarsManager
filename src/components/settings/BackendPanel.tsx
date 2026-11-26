@@ -1,4 +1,3 @@
-
 import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -9,6 +8,15 @@ import { Server, Plug, RefreshCw, Upload, Download, CheckCircle, AlertCircle, Ro
 import { useBackendSettingsActions } from '../../features/settings/hooks/useBackendSettingsActions';
 import { useAppStore } from '../../store/useAppStore';
 import type { RouteMode } from '../../types';
+import { cn } from '../../lib/utils';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsRow,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface BackendPanelProps {
   t: TranslateFn;
@@ -53,11 +61,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusIcon = () => {
     switch (status) {
       case 'connected':
-        return <CheckCircle className="w-5 h-5" />;
+        return <CheckCircle className="size-3.5" />;
       case 'checking':
-        return <RefreshCw className="w-5 h-5 animate-spin" />;
+        return <RefreshCw className="size-3.5 animate-spin" />;
       default:
-        return <AlertCircle className="w-5 h-5" />;
+        return <AlertCircle className="size-3.5" />;
     }
   };
 
@@ -73,186 +81,163 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Server className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('backendPanel.backend-server')}
-          </h3>
-        </div>
-        <Badge
-          variant={status === 'connected' ? 'default' : status === 'checking' ? 'secondary' : 'destructive'}
-          className="gap-2 px-3 py-1 text-sm"
-        >
-          {getStatusIcon()}
-          <span>{getStatusText()}</span>
-        </Badge>
-      </div>
-
-      {health && (
-        <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-          <div className="flex items-center space-x-2 mb-2">
-            <CheckCircle className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
-            <span className="font-medium text-foreground dark:text-foreground">
-              {t('backendPanel.connection-ok')}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-            {t('backendPanel.version')}: {health.version}
-          </p>
-        </div>
-      )}
-
-      <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-        <div className="flex items-center space-x-2 mb-1">
-          <Route className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-          <h4 className="text-sm font-medium text-foreground dark:text-foreground">
-            {t('backendPanel.network-request-routing')}
-          </h4>
-        </div>
-        <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-3">
-          {t('backendPanel.choose-where-backend-proxied-github-release-requ')}
-        </p>
-        <RadioGroup
-          value={routeMode}
-          onValueChange={(value) => setRouteMode(value as RouteMode)}
-          className="gap-3"
-        >
-          {routeOptions.map((option) => (
-            <label
-              key={option.value}
-              htmlFor={`route-mode-${option.value}`}
-              className="flex items-start space-x-3 rounded-lg p-2 hover:bg-muted/50 dark:hover:bg-muted/30 cursor-pointer"
+    <SettingsPageStack>
+      <SettingsSection title={t('backendPanel.backend-server')}>
+        <SettingsCard>
+          <SettingsRow
+            icon={<Server />}
+            title={t('backendPanel.backend-server')}
+            description={health ? `${t('backendPanel.connection-ok')} · ${t('backendPanel.version')}: ${health.version}` : t('backendPanel.the-backend-url-is-shared-with-the-login-screen')}
+          >
+            <Badge
+              variant={status === 'connected' ? 'success' : status === 'checking' ? 'secondary' : 'destructive'}
+              className="gap-1.5 px-2 py-0.5 text-label-sm"
             >
-              <RadioGroupItem value={option.value} id={`route-mode-${option.value}`} className="mt-0.5" />
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-foreground dark:text-foreground">{option.label}</div>
-                <div className="text-xs text-muted-foreground dark:text-muted-foreground">{option.hint}</div>
+              {getStatusIcon()}
+              <span>{getStatusText()}</span>
+            </Badge>
+          </SettingsRow>
+          <SettingsDivider />
+          <div className="space-y-3 px-3.5 py-3">
+            <div>
+              <label htmlFor="backend-url" className="mb-1.5 block text-label font-medium text-foreground">
+                {t('backendPanel.backend-url')}
+              </label>
+              <Input
+                id="backend-url"
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="https://example.com"
+              />
+            </div>
+            <div>
+              <label htmlFor="backend-api-secret" className="mb-1.5 block text-label font-medium text-foreground">
+                {t('backendPanel.api-secret')}
+              </label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  id="backend-api-secret"
+                  type="password"
+                  value={secretInput}
+                  onChange={(e) => setSecretInput(e.target.value)}
+                  className="flex-1"
+                  placeholder={t('backendPanel.enter-backend-api-secret-optional')}
+                />
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="lg"
+                  onClick={handleTestConnection}
+                  disabled={status === 'checking'}
+                >
+                  {status === 'checking' ? (
+                    <RefreshCw className="size-4 animate-spin" />
+                  ) : (
+                    <Plug className="size-4" />
+                  )}
+                  <span>{t('backendPanel.test-connection')}</span>
+                </Button>
               </div>
-            </label>
-          ))}
-        </RadioGroup>
+            </div>
+          </div>
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('backendPanel.network-request-routing')}
+        description={t('backendPanel.choose-where-backend-proxied-github-release-requ')}
+      >
+        <SettingsCard>
+          <RadioGroup
+            value={routeMode}
+            onValueChange={(value) => setRouteMode(value as RouteMode)}
+            className="gap-0"
+          >
+            {routeOptions.map((option, index) => (
+              <React.Fragment key={option.value}>
+                {index > 0 && <SettingsDivider />}
+                <label
+                  htmlFor={`route-mode-${option.value}`}
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 px-3.5 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant',
+                    routeMode === option.value && 'bg-fill-selected/50',
+                  )}
+                >
+                  <RadioGroupItem value={option.value} id={`route-mode-${option.value}`} className="mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-label font-medium text-foreground">
+                      <Route className="size-3.5 text-tertiary" aria-hidden="true" />
+                      <span>{option.label}</span>
+                    </div>
+                    <div className="mt-px text-label-sm leading-[18px] text-secondary">{option.hint}</div>
+                  </div>
+                </label>
+              </React.Fragment>
+            ))}
+          </RadioGroup>
+        </SettingsCard>
         {!backendAvailable && (
-          <p className="text-xs text-warning mt-3">
+          <SettingsNotice tone="warning" icon={<AlertCircle />}>
             {t('backendPanel.the-backend-is-unreachable-right-now-so-auto-pre')}
-          </p>
+          </SettingsNotice>
         )}
-        <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-3">
+        <p className="px-0.5 text-label-sm text-tertiary">
           {t('backendPanel.tip-pick-browser-direct-when-the-server-e-g-a-ma')}
         </p>
-      </div>
-
-      <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-        <label htmlFor="backend-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
-          {t('backendPanel.backend-url')}
-        </label>
-        <Input
-          id="backend-url"
-          type="url"
-          value={urlInput}
-          onChange={(e) => setUrlInput(e.target.value)}
-          className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none mb-3"
-          placeholder="https://example.com"
-        />
-        <label htmlFor="backend-api-secret" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
-          {t('backendPanel.api-secret')}
-        </label>
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-          <Input
-            id="backend-api-secret"
-            type="password"
-            value={secretInput}
-            onChange={(e) => setSecretInput(e.target.value)}
-            className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
-            placeholder={t('backendPanel.enter-backend-api-secret-optional')}
-          />
-          <Button
-            onClick={handleTestConnection}
-            disabled={status === 'checking'}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {status === 'checking' ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Plug className="w-4 h-4" />
-            )}
-            <span>{t('backendPanel.test-connection')}</span>
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
-          {t('backendPanel.the-backend-url-is-shared-with-the-login-screen')}
-        </p>
-      </div>
+      </SettingsSection>
 
       {backendAvailable && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-6 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-            <div className="flex items-center space-x-3 mb-4">
-              <Upload className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
-              <div>
-                <h4 className="font-medium text-foreground dark:text-foreground">
-                  {t('backendPanel.sync-to-backend')}
-                </h4>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('backendPanel.upload-local-data-to-backend')}
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={handleSyncToBackend}
-              disabled={isSyncingToBackend}
-              className="h-auto w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        <SettingsSection title={t('backendPanel.sync-to-backend')}>
+          <SettingsCard>
+            <SettingsRow
+              icon={<Upload />}
+              title={t('backendPanel.sync-to-backend')}
+              description={t('backendPanel.upload-local-data-to-backend')}
             >
-              {isSyncingToBackend ? (
-                <RefreshCw className="w-5 h-5 animate-spin" />
-              ) : (
-                <Upload className="w-5 h-5" />
-              )}
-              <span>{isSyncingToBackend ? t('backendPanel.syncing') : t('backendPanel.start-sync')}</span>
-            </Button>
-          </div>
-
-          <div className="p-6 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-            <div className="flex items-center space-x-3 mb-4">
-              <Download className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
-              <div>
-                <h4 className="font-medium text-foreground dark:text-foreground">
-                  {t('backendPanel.sync-from-backend')}
-                </h4>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('backendPanel.download-data-from-backend-to-local')}
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={handleSyncFromBackend}
-              disabled={isSyncingFromBackend}
-              className="h-auto w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={handleSyncToBackend}
+                disabled={isSyncingToBackend}
+              >
+                {isSyncingToBackend ? <RefreshCw className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                <span>{isSyncingToBackend ? t('backendPanel.syncing') : t('backendPanel.start-sync')}</span>
+              </Button>
+            </SettingsRow>
+            <SettingsDivider />
+            <SettingsRow
+              icon={<Download />}
+              title={t('backendPanel.sync-from-backend')}
+              description={t('backendPanel.download-data-from-backend-to-local')}
             >
-              {isSyncingFromBackend ? (
-                <RefreshCw className="w-5 h-5 animate-spin" />
-              ) : (
-                <Download className="w-5 h-5" />
-              )}
-              <span>{isSyncingFromBackend ? t('backendPanel.syncing') : t('backendPanel.start-sync')}</span>
-            </Button>
-          </div>
-        </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={handleSyncFromBackend}
+                disabled={isSyncingFromBackend}
+              >
+                {isSyncingFromBackend ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
+                <span>{isSyncingFromBackend ? t('backendPanel.syncing') : t('backendPanel.start-sync')}</span>
+              </Button>
+            </SettingsRow>
+          </SettingsCard>
+        </SettingsSection>
       )}
 
-      <div className="p-4 bg-background dark:bg-muted/40 rounded-lg">
-        <h4 className="font-medium text-foreground dark:text-foreground mb-2">
-          {t('backendPanel.sync-includes')}
-        </h4>
-        <ul className="text-sm text-muted-foreground dark:text-muted-foreground space-y-1">
-          <li>• {t('backendPanel.github-stars-repository-list')}</li>
-          <li>• {t('backendPanel.release-information')}</li>
-          <li>• {t('backendPanel.ai-service-configurations')}</li>
-          <li>• {t('backendPanel.webdav-configurations')}</li>
-          <li>• {t('backendPanel.category-visibility-settings')}</li>
-        </ul>
-      </div>
-    </div>
+      <SettingsSection title={t('backendPanel.sync-includes')}>
+        <SettingsCard className="px-3.5 py-3">
+          <ul className="space-y-1 text-label-sm text-secondary">
+            <li>• {t('backendPanel.github-stars-repository-list')}</li>
+            <li>• {t('backendPanel.release-information')}</li>
+            <li>• {t('backendPanel.ai-service-configurations')}</li>
+            <li>• {t('backendPanel.webdav-configurations')}</li>
+            <li>• {t('backendPanel.category-visibility-settings')}</li>
+          </ul>
+        </SettingsCard>
+      </SettingsSection>
+    </SettingsPageStack>
   );
 };

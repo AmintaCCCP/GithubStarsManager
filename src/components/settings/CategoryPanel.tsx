@@ -4,11 +4,20 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine, LayoutGrid } from 'lucide-react';
+import { Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../../store/useAppStore';
 import { useDialog } from '../../hooks/useDialog';
 import { validateCategoryName } from '../../utils/categoryUtils';
 import { CategoryGlyph } from '../CategoryGlyph';
+import { Badge } from '../ui/badge';
+import { cn } from '../../lib/utils';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface CategoryPanelProps {
   t: TranslateFn;
@@ -265,243 +274,228 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   }, [setCategoryOrder]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Package className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('categoryPanel.category-management')}
-          </h3>
-        </div>
-        <Button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{t('categoryPanel.add-category')}</span>
-        </Button>
-      </div>
-
-      {/* 分类匹配模式设置 */}
-      <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-        <div className="flex items-center space-x-3 mb-2">
-          <LayoutGrid className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
-          <h4 id="category-match-mode-label" className="font-medium text-foreground dark:text-foreground">
-            {t('categoryPanel.repository-categorization')}
-          </h4>
-        </div>
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-3">
-          {t('categoryPanel.choose-how-repositories-are-assigned-to-categori')}
-        </p>
-        <RadioGroup aria-labelledby="category-match-mode-label" value={categoryMatchMode} onValueChange={(value) => setCategoryMatchMode(value as 'effective' | 'legacy')} className="space-y-3">
-          <div className="flex items-start space-x-3">
-            <RadioGroupItem value="effective" id="category-match-effective" aria-labelledby="category-match-effective-label" className="mt-1" />
-            <div>
-              <label id="category-match-effective-label" htmlFor="category-match-effective" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
-                {t('categoryPanel.match-by-tags-shown-on-cards-recommended')}
-              </label>
-              <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
-                {t('categoryPanel.repositories-are-grouped-by-the-tags-actually-sh')}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-start space-x-3">
-            <RadioGroupItem value="legacy" id="category-match-legacy" aria-labelledby="category-match-legacy-label" className="mt-1" />
-            <div>
-              <label id="category-match-legacy-label" htmlFor="category-match-legacy" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
-                {t('categoryPanel.match-by-ai-generated-tags-only-legacy')}
-              </label>
-              <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
-                {t('categoryPanel.uses-the-legacy-logic-that-categorizes-only-by-a')}
-              </span>
-            </div>
-          </div>
-        </RadioGroup>
-      </div>
+    <SettingsPageStack>
+      <SettingsSection
+        title={t('categoryPanel.repository-categorization')}
+        titleId="category-match-mode-label"
+        description={t('categoryPanel.choose-how-repositories-are-assigned-to-categori')}
+      >
+        <SettingsCard>
+          <RadioGroup
+            aria-labelledby="category-match-mode-label"
+            value={categoryMatchMode}
+            onValueChange={(value) => setCategoryMatchMode(value as 'effective' | 'legacy')}
+            className="gap-0"
+          >
+            <label
+              htmlFor="category-match-effective"
+              className={cn(
+                'flex cursor-pointer items-start gap-3 px-3.5 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant',
+                categoryMatchMode === 'effective' && 'bg-fill-selected/50',
+              )}
+            >
+              <RadioGroupItem value="effective" id="category-match-effective" aria-labelledby="category-match-effective-label" className="mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <span id="category-match-effective-label" className="block text-label font-medium text-foreground">
+                  {t('categoryPanel.match-by-tags-shown-on-cards-recommended')}
+                </span>
+                <span className="mt-px block text-label-sm leading-[18px] text-secondary">
+                  {t('categoryPanel.repositories-are-grouped-by-the-tags-actually-sh')}
+                </span>
+              </div>
+            </label>
+            <SettingsDivider />
+            <label
+              htmlFor="category-match-legacy"
+              className={cn(
+                'flex cursor-pointer items-start gap-3 px-3.5 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant',
+                categoryMatchMode === 'legacy' && 'bg-fill-selected/50',
+              )}
+            >
+              <RadioGroupItem value="legacy" id="category-match-legacy" aria-labelledby="category-match-legacy-label" className="mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <span id="category-match-legacy-label" className="block text-label font-medium text-foreground">
+                  {t('categoryPanel.match-by-ai-generated-tags-only-legacy')}
+                </span>
+                <span className="mt-px block text-label-sm leading-[18px] text-secondary">
+                  {t('categoryPanel.uses-the-legacy-logic-that-categorizes-only-by-a')}
+                </span>
+              </div>
+            </label>
+          </RadioGroup>
+        </SettingsCard>
+      </SettingsSection>
 
       {showAddForm && (
-        <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-          <h4 className="font-medium text-foreground dark:text-foreground mb-4">
-            {t('categoryPanel.add-custom-category')}
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label htmlFor="category-panel-new-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('categoryPanel.category-name')} *
-              </label>
-              <Input
-                id="category-panel-new-name"
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
-                placeholder={t('categoryPanel.e-g-my-projects')}
-              />
+        <SettingsSection title={t('categoryPanel.add-custom-category')}>
+          <SettingsCard className="space-y-4 p-3.5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label htmlFor="category-panel-new-name" className="mb-1.5 block text-label font-medium text-foreground">
+                  {t('categoryPanel.category-name')} *
+                </label>
+                <Input
+                  id="category-panel-new-name"
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder={t('categoryPanel.e-g-my-projects')}
+                />
+              </div>
+              <div>
+                <label htmlFor="category-panel-new-icon" className="mb-1.5 block text-label font-medium text-foreground">
+                  {t('categoryPanel.icon')}
+                </label>
+                <Input
+                  id="category-panel-new-icon"
+                  type="text"
+                  value={newCategoryIcon}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const graphemeCount = Array.from(value).length;
+                    if (graphemeCount <= 2) {
+                      setNewCategoryIcon(value);
+                    }
+                  }}
+                  placeholder="📁"
+                />
+              </div>
             </div>
             <div>
-              <label htmlFor="category-panel-new-icon" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('categoryPanel.icon')}
+              <label htmlFor="category-panel-new-keywords" className="mb-1.5 block text-label font-medium text-foreground">
+                {t('categoryPanel.keywords')}
               </label>
               <Input
-                id="category-panel-new-icon"
+                id="category-panel-new-keywords"
                 type="text"
-                value={newCategoryIcon}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const graphemeCount = Array.from(value).length;
-                  if (graphemeCount <= 2) {
-                    setNewCategoryIcon(value);
-                  }
-                }}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
-                placeholder="📁"
+                value={newCategoryKeywords}
+                onChange={(e) => setNewCategoryKeywords(e.target.value)}
+                placeholder={t('categoryPanel.comma-separated-keywords')}
               />
-            </div>
-          </div>
-          <div className="mb-4">
-            <label htmlFor="category-panel-new-keywords" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-              {t('categoryPanel.keywords')}
-            </label>
-            <Input
-              id="category-panel-new-keywords"
-              type="text"
-              value={newCategoryKeywords}
-              onChange={(e) => setNewCategoryKeywords(e.target.value)}
-              className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
-              placeholder={t('categoryPanel.comma-separated-keywords')}
-            />
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-              {t('categoryPanel.used-to-automatically-match-repositories-to-this')}
-            </p>
-          </div>
-          <div className="flex space-x-3">
-            <Button
-              onClick={handleAddCategory}
-              disabled={!newCategoryName.trim()}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground cursor-not-allowed'}`}
-            >
-              <Save className="w-4 h-4" />
-              <span>{t('categoryPanel.save')}</span>
-            </Button>
-            <Button
-              onClick={() => {
-                setShowAddForm(false);
-                setNewCategoryName('');
-                setNewCategoryIcon('📁');
-                setNewCategoryKeywords('');
-              }}
-              className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
-            >
-              <X className="w-4 h-4" />
-              <span>{t('categoryPanel.cancel')}</span>
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {/* 分类排序区域 */}
-        <div className="border-t border-border dark:border-border pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium text-foreground dark:text-foreground flex items-center">
-              <GripVertical className="w-4 h-4 mr-2" />
-              {t('categoryPanel.category-order')}
-              <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
-                ({allVisibleCategories.length})
-              </span>
-            </h4>
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => setIsReordering(!isReordering)}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  isReordering
-                    ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground'
-                    : 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                }`}
-              >
-                {isReordering ? t('categoryPanel.done') : t('categoryPanel.reorder')}
-              </Button>
-              {categoryOrder.length > 0 && (
-                <Button
-                  onClick={handleResetOrder}
-                  className="px-3 py-1.5 rounded-lg text-sm bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
-                >
-                  {t('categoryPanel.reset')}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {isReordering && (
-            <div className="mb-3 p-3 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border dark:border-border dark:border-border">
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-                {t('categoryPanel.tip-drag-categories-to-quickly-reorder-or-use-bu')}
+              <p className="mt-1.5 text-label-sm text-secondary">
+                {t('categoryPanel.used-to-automatically-match-repositories-to-this')}
               </p>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={handleAddCategory}
+                disabled={!newCategoryName.trim()}
+              >
+                <Save className="size-4" />
+                <span>{t('categoryPanel.save')}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  setShowAddForm(false);
+                  setNewCategoryName('');
+                  setNewCategoryIcon('📁');
+                  setNewCategoryKeywords('');
+                }}
+              >
+                <X className="size-4" />
+                <span>{t('categoryPanel.cancel')}</span>
+              </Button>
+            </div>
+          </SettingsCard>
+        </SettingsSection>
+      )}
 
-          {allVisibleCategories.length === 0 ? (
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground py-4">
-              {t('categoryPanel.no-visible-categories')}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {allVisibleCategories.map((category, index) => {
-                const isEditing = editingId === category.id;
-                const isDefault = !category.isCustom;
-                const isModified = isDefaultCategoryModified(category.id);
-                const originalCategory = originalDefaultCategories.find(c => c.id === category.id);
-                
-                const hasChanges = isEditing && (
-                  editName !== category.name ||
-                  editIcon !== category.icon ||
-                  editKeywords !== (category.keywords?.join(', ') || '')
-                );
-                
-                return (
-                <div
-                  key={category.id}
-                  draggable={isReordering && !isEditing}
-                  onDragStart={(e) => handleDragStart(e, index, category.id)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={(e) => handleDragOver(e, category.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, index)}
-                  className={`flex flex-col p-3 rounded-lg border transition-[background-color,border-color,box-shadow,transform,opacity] ${
-                    category.isCustom
-                      ? 'bg-muted dark:bg-muted/40 border-border dark:border-border dark:border-border dark:border-border'
-                      : 'bg-card dark:bg-card border-border dark:border-border'
-                  } ${isEditing ? 'ring-2 ring-ring' : ''} ${
-                    draggingId === category.id ? 'opacity-50' : ''
-                  } ${
-                    dragOverId === category.id && draggingId !== category.id
-                      ? 'border-border dark:border-primary ring-2 ring-ring transform scale-[1.02]'
-                      : ''
-                  } ${isReordering && !isEditing ? 'cursor-move' : ''}`}
-                >
-                  {isEditing ? (
-                    <>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                          {t('categoryPanel.edit-category')}
-                        </span>
-                        {isDefault && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
-                            {t('categoryPanel.default-category')}
+      <SettingsSection
+        title={(
+          <span className="inline-flex items-center gap-1.5">
+            <span>{t('categoryPanel.category-order')}</span>
+            <span className="tabular-nums text-tertiary">({allVisibleCategories.length})</span>
+          </span>
+        )}
+        actions={(
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant={isReordering ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setIsReordering(!isReordering)}
+            >
+              {isReordering ? t('categoryPanel.done') : t('categoryPanel.reorder')}
+            </Button>
+            {categoryOrder.length > 0 && (
+              <Button type="button" variant="outline" size="sm" onClick={handleResetOrder}>
+                {t('categoryPanel.reset')}
+              </Button>
+            )}
+            <Button type="button" variant="primary" size="sm" onClick={() => setShowAddForm(true)}>
+              <Plus className="size-3.5" />
+              <span>{t('categoryPanel.add-category')}</span>
+            </Button>
+          </div>
+        )}
+      >
+        {isReordering && (
+          <SettingsNotice tone="neutral" icon={<GripVertical />}>
+            {t('categoryPanel.tip-drag-categories-to-quickly-reorder-or-use-bu')}
+          </SettingsNotice>
+        )}
+
+        {allVisibleCategories.length === 0 ? (
+          <SettingsCard className="px-4 py-8 text-center text-label-sm text-secondary">
+            {t('categoryPanel.no-visible-categories')}
+          </SettingsCard>
+        ) : (
+          <SettingsCard>
+            {allVisibleCategories.map((category, index) => {
+              const isEditing = editingId === category.id;
+              const isDefault = !category.isCustom;
+              const isModified = isDefaultCategoryModified(category.id);
+              const originalCategory = originalDefaultCategories.find((c) => c.id === category.id);
+
+              const hasChanges = isEditing && (
+                editName !== category.name ||
+                editIcon !== category.icon ||
+                editKeywords !== (category.keywords?.join(', ') || '')
+              );
+
+              return (
+                <React.Fragment key={category.id}>
+                  {index > 0 && <SettingsDivider />}
+                  <div
+                    draggable={isReordering && !isEditing}
+                    onDragStart={(e) => handleDragStart(e, index, category.id)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => handleDragOver(e, category.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                    className={cn(
+                      'flex flex-col px-3.5 py-2.5 transition-[background-color,opacity] duration-micro ease-out-subtle',
+                      !isEditing && 'hover:bg-fill-hover hover:duration-instant',
+                      isEditing && 'bg-fill-selected/40',
+                      draggingId === category.id && 'opacity-50',
+                      dragOverId === category.id && draggingId !== category.id && 'bg-accent-tint',
+                      isReordering && !isEditing && 'cursor-move',
+                    )}
+                  >
+                    {isEditing ? (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-label font-medium text-foreground">
+                            {t('categoryPanel.edit-category')}
                           </span>
-                        )}
-                      </div>
-                      
-                      {isDefault && isModified && originalCategory && (
-                        <div className="mb-2 p-2 bg-muted dark:bg-muted/40 rounded border border-border dark:border-border dark:border-border dark:border-border">
-                          <p className="text-xs text-muted-foreground dark:text-muted-foreground ">
-                            {t('categoryPanel.modified-original-v1-v2', { v1: originalCategory.icon, v2: originalCategory.name })}
-                          </p>
+                          {isDefault && (
+                            <Badge variant="secondary">{t('categoryPanel.default-category')}</Badge>
+                          )}
                         </div>
-                      )}
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
+
+                        {isDefault && isModified && originalCategory && (
+                          <SettingsNotice tone="neutral">
+                            {t('categoryPanel.modified-original-v1-v2', { v1: originalCategory.icon, v2: originalCategory.name })}
+                          </SettingsNotice>
+                        )}
+
+                        <div className="flex items-center gap-2">
                           <Input
                             type="text"
                             aria-label={t('categoryPanel.edit-category-icon')}
@@ -515,7 +509,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 setEditIcon(value);
                               }
                             }}
-                            className="w-14 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-center text-lg text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
+                            className="w-16 text-center"
                             placeholder="📁"
                           />
                           <Input
@@ -523,44 +517,51 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             aria-label={t('categoryPanel.edit-category-name')}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
+                            className="flex-1"
                             placeholder={t('categoryPanel.category-name-2')}
                           />
                         </div>
-                        <div className="flex items-center space-x-2">
+
+                        <div className="flex items-center gap-2">
                           <Input
                             type="text"
                             aria-label={t('categoryPanel.edit-category-keywords')}
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
+                            className="flex-1"
                             placeholder={t('categoryPanel.keywords-comma-separated')}
                           />
                           <Button
+                            type="button"
+                            variant="primary"
                             size="icon"
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
-                            className={`h-8 w-8 p-0 rounded ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
                             aria-label={t('categoryPanel.save')}
                             title={t('categoryPanel.save')}
                           >
-                            <Save className="w-4 h-4" />
+                            <Save className="size-4" />
                           </Button>
                           <Button
+                            type="button"
+                            variant="outline"
                             size="icon"
                             onClick={handleCancelEdit}
-                            className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
                             aria-label={t('categoryPanel.cancel')}
                             title={t('categoryPanel.cancel')}
                           >
-                            <X className="w-4 h-4" />
+                            <X className="size-4" />
                           </Button>
                         </div>
+
                         {isDefault && isModified && (
-                          <div className="flex items-center space-x-2 pt-1">
-                            <span className="text-xs text-muted-foreground dark:text-muted-foreground">{t('categoryPanel.reset-2')}</span>
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <span className="text-label-sm text-tertiary">{t('categoryPanel.reset-2')}</span>
                             {hasNameIconModified(category.id) && (
                               <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                   resetDefaultCategoryNameIcon(category.id);
                                   if (originalCategory) {
@@ -568,177 +569,174 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                     setEditIcon(originalCategory.icon);
                                   }
                                 }}
-                                className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                               >
                                 {t('categoryPanel.name-icon')}
                               </Button>
                             )}
                             {hasKeywordsModified(category.id) && (
                               <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                   resetDefaultCategoryKeywords(category.id);
                                   if (originalCategory) {
                                     setEditKeywords(originalCategory.keywords?.join(', ') || '');
                                   }
                                 }}
-                                className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                               >
                                 {t('categoryPanel.keywords')}
                               </Button>
                             )}
                             <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleResetDefault(category.id, originalCategory)}
-                              className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             >
                               {t('categoryPanel.all')}
                             </Button>
                           </div>
                         )}
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        {isReordering && (
-                          <GripVertical className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                        )}
-                        <CategoryGlyph
-                          icon={category.icon}
-                          name={category.name}
-                          categoryId={category.id}
-                          className="app-settings-category-glyph"
-                        />
-                        <span className="text-sm font-medium text-foreground dark:text-foreground">
-                          {category.name}
-                        </span>
-                        {category.isCustom && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
-                            {t('categoryPanel.custom')}
+                    ) : (
+                      <div className="flex min-h-8 items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          {isReordering && (
+                            <GripVertical className="size-4 shrink-0 text-tertiary" />
+                          )}
+                          <CategoryGlyph
+                            icon={category.icon}
+                            name={category.name}
+                            categoryId={category.id}
+                            className="app-settings-category-glyph"
+                          />
+                          <span className="truncate text-label font-medium text-foreground">
+                            {category.name}
                           </span>
-                        )}
-                        {!category.isCustom && isModified && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
-                            {t('categoryPanel.modified')}
-                          </span>
-                        )}
-                      </div>
-
-                      {isReordering ? (
-                        <div className="flex items-center space-x-1">
-                          <Button
-                            size="icon"
-                            onClick={() => handleMoveToTop(index)}
-                            disabled={index === 0}
-                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('categoryPanel.move-to-top')}
-                            title={t('categoryPanel.move-to-top')}
-                          >
-                            <ArrowUpToLine className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            onClick={() => handleMoveCategory(index, 'up')}
-                            disabled={index === 0}
-                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('categoryPanel.move-up')}
-                            title={t('categoryPanel.move-up')}
-                          >
-                            <ArrowUp className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            onClick={() => handleMoveCategory(index, 'down')}
-                            disabled={index === allVisibleCategories.length - 1}
-                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('categoryPanel.move-down')}
-                            title={t('categoryPanel.move-down')}
-                          >
-                            <ArrowDown className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            onClick={() => handleMoveToBottom(index)}
-                            disabled={index === allVisibleCategories.length - 1}
-                            className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('categoryPanel.move-to-bottom')}
-                            title={t('categoryPanel.move-to-bottom')}
-                          >
-                            <ArrowDownToLine className="w-4 h-4" />
-                          </Button>
+                          {category.isCustom && (
+                            <Badge variant="secondary">{t('categoryPanel.custom')}</Badge>
+                          )}
+                          {!category.isCustom && isModified && (
+                            <Badge variant="secondary">{t('categoryPanel.modified')}</Badge>
+                          )}
                         </div>
-                      ) : (
-                        <div className="flex items-center space-x-1">
-                          {category.isCustom ? (
-                            <>
+
+                        {isReordering ? (
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleMoveToTop(index)}
+                              disabled={index === 0}
+                              aria-label={t('categoryPanel.move-to-top')}
+                              title={t('categoryPanel.move-to-top')}
+                            >
+                              <ArrowUpToLine className="size-3.5 text-secondary" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleMoveCategory(index, 'up')}
+                              disabled={index === 0}
+                              aria-label={t('categoryPanel.move-up')}
+                              title={t('categoryPanel.move-up')}
+                            >
+                              <ArrowUp className="size-3.5 text-secondary" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleMoveCategory(index, 'down')}
+                              disabled={index === allVisibleCategories.length - 1}
+                              aria-label={t('categoryPanel.move-down')}
+                              title={t('categoryPanel.move-down')}
+                            >
+                              <ArrowDown className="size-3.5 text-secondary" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleMoveToBottom(index)}
+                              disabled={index === allVisibleCategories.length - 1}
+                              aria-label={t('categoryPanel.move-to-bottom')}
+                              title={t('categoryPanel.move-to-bottom')}
+                            >
+                              <ArrowDownToLine className="size-3.5 text-secondary" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleStartEdit(category)}
+                              aria-label={t('categoryPanel.edit')}
+                              title={t('categoryPanel.edit')}
+                            >
+                              <Edit3 className="size-3.5 text-secondary" />
+                            </Button>
+                            {category.isCustom ? (
                               <Button
-                                size="icon"
-                                onClick={() => handleStartEdit(category)}
-                                className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                aria-label={t('categoryPanel.edit')}
-                                title={t('categoryPanel.edit')}
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
                                 onClick={() => handleDeleteCategory(category.id)}
-                                className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                 aria-label={t('categoryPanel.delete')}
                                 title={t('categoryPanel.delete')}
+                                className="text-destructive hover:bg-destructive-tint hover:text-destructive"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="size-3.5" />
                               </Button>
-                            </>
-                          ) : (
-                            <>
+                            ) : (
                               <Button
-                                size="icon"
-                                onClick={() => handleStartEdit(category)}
-                                className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                aria-label={t('categoryPanel.edit')}
-                                title={t('categoryPanel.edit')}
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
                                 onClick={() => hideDefaultCategory(category.id)}
-                                className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
                                 aria-label={t('categoryPanel.hide')}
                                 title={t('categoryPanel.hide')}
                               >
-                                <EyeOff className="w-4 h-4" />
+                                <EyeOff className="size-3.5 text-secondary" />
                               </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );})}
-            </div>
-          )}
-        </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </SettingsCard>
+        )}
+      </SettingsSection>
 
-        {/* 隐藏的默认分类 */}
-        {hiddenDefaultCategories.length > 0 && (
-          <div className="border-t border-border dark:border-border pt-4">
-            <h4 className="font-medium text-foreground dark:text-foreground mb-3 flex items-center">
-              <EyeOff className="w-4 h-4 mr-2" />
-              {t('categoryPanel.hidden-default-categories')}
-              <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
-                ({hiddenDefaultCategories.length})
-              </span>
-            </h4>
+      {hiddenDefaultCategories.length > 0 && (
+        <SettingsSection
+          title={(
+            <span className="inline-flex items-center gap-1.5">
+              <span>{t('categoryPanel.hidden-default-categories')}</span>
+              <span className="tabular-nums text-tertiary">({hiddenDefaultCategories.length})</span>
+            </span>
+          )}
+        >
+          <SettingsCard className="p-3.5">
             <div className="flex flex-wrap gap-2">
               {hiddenDefaultCategories.map((category) => (
                 <Button
                   key={category.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => showDefaultCategory(category.id)}
-                  className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
-                  <Eye className="w-4 h-4" />
+                  <Eye className="size-3.5 text-tertiary" />
                   <CategoryGlyph
                     icon={category.icon}
                     name={category.name}
@@ -749,9 +747,9 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 </Button>
               ))}
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          </SettingsCard>
+        </SettingsSection>
+      )}
+    </SettingsPageStack>
   );
 };

@@ -24,6 +24,14 @@ import { isElectron } from '../../services/electronProxy';
 import { useDialog } from '../../hooks/useDialog';
 import { useMcpActions } from '../../features/settings/hooks/useMcpActions';
 import { MCP_DEFAULT_PORT, normalizeMcpHost } from '../../utils/mcpHost';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsRow,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface McpSettingsPanelProps {
   t: TranslateFn;
@@ -110,283 +118,254 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     : t('mcpSettingsPanel.stopped');
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-3">
-        <Cable className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-          {t('mcpSettingsPanel.mcp-server')}
-        </h3>
-      </div>
-
-      <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+    <SettingsPageStack>
+      <p className="text-label text-secondary">
         {t('mcpSettingsPanel.let-agents-claude-code-cursor-etc-read-your-star')}
       </p>
 
       {error && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
+        <SettingsNotice tone="destructive" icon={<AlertCircle />}>
+          {error}
+        </SettingsNotice>
       )}
 
-      {/* Enable + status */}
-      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h4 className="font-medium text-foreground dark:text-foreground">
-              {t('mcpSettingsPanel.enable-mcp-server')}
-            </h4>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-              {backendMode
-                ? t('mcpSettingsPanel.backend-mode-mounted-at-mcp')
-                : isElectronApp
-                  ? t('mcpSettingsPanel.desktop-local-mode-127-0-0-1')
-                  : t('mcpSettingsPanel.requires-backend-connection')}
-            </p>
-          </div>
-          <Switch
-            checked={mcpConfig.enabled}
-            disabled={saving || loading}
-            onCheckedChange={(checked) => void handleToggle(checked)}
-            aria-label={t('mcpSettingsPanel.enable-mcp-service')}
-          />
-        </div>
+      <SettingsSection title={t('mcpSettingsPanel.mcp-server')}>
+        <SettingsCard>
+          <SettingsRow
+            icon={<Cable />}
+            title={t('mcpSettingsPanel.enable-mcp-server')}
+            description={backendMode
+              ? t('mcpSettingsPanel.backend-mode-mounted-at-mcp')
+              : isElectronApp
+                ? t('mcpSettingsPanel.desktop-local-mode-127-0-0-1')
+                : t('mcpSettingsPanel.requires-backend-connection')}
+          >
+            <Switch
+              checked={mcpConfig.enabled}
+              disabled={saving || loading}
+              onCheckedChange={(checked) => void handleToggle(checked)}
+              aria-label={t('mcpSettingsPanel.enable-mcp-service')}
+            />
+          </SettingsRow>
+          <SettingsDivider />
+          <SettingsRow
+            icon={loading
+              ? <Loader2 className="animate-spin text-tertiary" />
+              : mcpConfig.enabled
+                ? <CheckCircle className="text-status-green" />
+                : <AlertCircle className="text-tertiary" />}
+            title={t('mcpSettingsPanel.status-with-value', { status: statusLabel })}
+          >
+            {backendMode && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => void refreshFromBackend()}
+                aria-label={t('mcpSettingsPanel.refresh')}
+              >
+                <RefreshCw className="size-4 text-secondary" />
+              </Button>
+            )}
+          </SettingsRow>
+        </SettingsCard>
 
-        <div className="flex items-center gap-2 text-sm">
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          ) : mcpConfig.enabled ? (
-            <CheckCircle className="w-4 h-4 text-success" />
-          ) : (
-            <AlertCircle className="w-4 h-4 text-muted-foreground" />
-          )}
-          <span className="text-muted-foreground dark:text-muted-foreground">
-            {t('mcpSettingsPanel.status-with-value', { status: statusLabel })}
-          </span>
-          {backendMode && (
+        {vectorAvailable === false && (
+          <SettingsNotice tone="warning" icon={<AlertCircle />}>
+            {t('mcpSettingsPanel.vector-search-not-configured-gsm-vector-search-w')}
+          </SettingsNotice>
+        )}
+        {vectorAvailable === true && (
+          <SettingsNotice tone="success" icon={<CheckCircle />}>
+            {t('mcpSettingsPanel.vector-search-enabled-gsm-vector-search-is-liste')}
+          </SettingsNotice>
+        )}
+      </SettingsSection>
+
+      {isElectronApp && !backendMode && (
+        <SettingsSection
+          title={t('mcpSettingsPanel.local-listen')}
+          description={t('mcpSettingsPanel.binds-to-127-0-0-1-by-default-local-agents-only')}
+        >
+          <SettingsCard className="px-3.5 py-3.5">
+            <div className="grid max-w-md grid-cols-2 gap-3">
+              <label className="block text-label font-medium text-foreground">
+                {t('mcpSettingsPanel.host')}
+                <Input
+                  type="text"
+                  value={mcpConfig.host}
+                  onChange={(e) => setMcpConfig({ host: e.target.value })}
+                  className="mt-1.5"
+                />
+              </label>
+              <label className="block text-label font-medium text-foreground">
+                {t('mcpSettingsPanel.port')}
+                <NumberInput
+                  min={1}
+                  max={65535}
+                  draftValue={portInput}
+                  onDraftChange={(value) => {
+                    setPortInput(value);
+                    const parsed = Number(value);
+                    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+                      setMcpConfig({ port: parsed });
+                    }
+                  }}
+                  onDraftCommit={(parsed) => {
+                    const port = parsed ?? MCP_DEFAULT_PORT;
+                    setPortInput(String(port));
+                    setMcpConfig({ port });
+                  }}
+                  className="mt-1.5 w-full"
+                />
+              </label>
+            </div>
+          </SettingsCard>
+        </SettingsSection>
+      )}
+
+      <SettingsSection
+        title={t('mcpSettingsPanel.access-token')}
+        description={t('mcpSettingsPanel.token-is-stored-permanently-and-stays-the-same-a')}
+        actions={(
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void handleResetToken()}
+            disabled={saving || !mcpConfig.enabled}
+            title={!mcpConfig.enabled ? t('mcpSettingsPanel.enable-mcp-first') : undefined}
+          >
+            {t('mcpSettingsPanel.reset-token')}
+          </Button>
+        )}
+      >
+        <SettingsCard className="px-3.5 py-3">
+          <div className="flex items-center gap-2">
+            <Input
+              aria-label={t('mcpSettingsPanel.access-token')}
+              type={showToken ? 'text' : 'password'}
+              readOnly
+              value={mcpConfig.token || ''}
+              placeholder={t('mcpSettingsPanel.generated-when-enabled')}
+              className="flex-1 font-mono text-mono-ui"
+            />
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              onClick={() => void refreshFromBackend()}
-              className="ml-auto h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
-              aria-label={t('mcpSettingsPanel.refresh')}
+              onClick={() => setShowToken((v) => !v)}
+              aria-label={showToken ? t('mcpSettingsPanel.hide') : t('mcpSettingsPanel.show')}
             >
-              <RefreshCw className="w-4 h-4 text-muted-foreground" />
+              {showToken ? <EyeOff className="size-4 text-secondary" /> : <Eye className="size-4 text-secondary" />}
             </Button>
-          )}
-        </div>
-
-        {vectorAvailable === false && (
-          <p className="text-xs text-warning">
-            {t('mcpSettingsPanel.vector-search-not-configured-gsm-vector-search-w')}
-          </p>
-        )}
-        {vectorAvailable === true && (
-          <p className="text-xs text-success">
-            {t('mcpSettingsPanel.vector-search-enabled-gsm-vector-search-is-liste')}
-          </p>
-        )}
-      </div>
-
-      {/* Electron local port */}
-      {isElectronApp && !backendMode && (
-        <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
-          <h4 className="font-medium text-foreground dark:text-foreground">
-            {t('mcpSettingsPanel.local-listen')}
-          </h4>
-          <div className="grid grid-cols-2 gap-3 max-w-md">
-            <label className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('mcpSettingsPanel.host')}
-              <Input
-                type="text"
-                value={mcpConfig.host}
-                onChange={(e) => setMcpConfig({ host: e.target.value })}
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm"
-              />
-            </label>
-            <label className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('mcpSettingsPanel.port')}
-              <NumberInput
-                min={1}
-                max={65535}
-                draftValue={portInput}
-                onDraftChange={(value) => {
-                  setPortInput(value);
-                  const parsed = Number(value);
-                  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
-                    setMcpConfig({ port: parsed });
-                  }
-                }}
-                onDraftCommit={(parsed) => {
-                  const port = parsed ?? MCP_DEFAULT_PORT;
-                  setPortInput(String(port));
-                  setMcpConfig({ port });
-                }}
-                className="mt-1 w-full"
-              />
-            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => void copyText('token', mcpConfig.token)}
+              disabled={!mcpConfig.token}
+              aria-label={t('mcpSettingsPanel.copy-token')}
+            >
+              {copiedKey === 'token' ? (
+                <CheckCircle className="size-4 text-status-green" />
+              ) : (
+                <Copy className="size-4 text-secondary" />
+              )}
+            </Button>
           </div>
-          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {t('mcpSettingsPanel.binds-to-127-0-0-1-by-default-local-agents-only')}
-          </p>
-        </div>
-      )}
+        </SettingsCard>
+      </SettingsSection>
 
-      {/* Token */}
-      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="font-medium text-foreground dark:text-foreground">
-            {t('mcpSettingsPanel.access-token')}
-          </h4>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void handleResetToken()}
-            disabled={saving || !mcpConfig.enabled}
-            title={
-              !mcpConfig.enabled
-                ? t('mcpSettingsPanel.enable-mcp-first')
-                : undefined
-            }
-            className="text-sm px-3 py-1.5 rounded-lg border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-muted-foreground dark:text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {t('mcpSettingsPanel.reset-token')}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-          {t('mcpSettingsPanel.token-is-stored-permanently-and-stays-the-same-a')}
-        </p>
-        <div className="flex items-center gap-2">
-          <Input
-            aria-label={t('mcpSettingsPanel.access-token')}
-            type={showToken ? 'text' : 'password'}
-            readOnly
-            value={mcpConfig.token || ''}
-            placeholder={t('mcpSettingsPanel.generated-when-enabled')}
-            className="flex-1 px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm font-mono"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowToken((v) => !v)}
-            className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent"
-            aria-label={showToken ? t('mcpSettingsPanel.hide') : t('mcpSettingsPanel.show')}
-          >
-            {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => void copyText('token', mcpConfig.token)}
-            disabled={!mcpConfig.token}
-            className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-40"
-            aria-label={t('mcpSettingsPanel.copy-token')}
-          >
-            {copiedKey === 'token' ? (
-              <CheckCircle className="w-4 h-4 text-success" />
-            ) : (
-              <Copy className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* URLs + copy config */}
-      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
-        <h4 className="font-medium text-foreground dark:text-foreground">
-          {t('mcpSettingsPanel.connection')}
-        </h4>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground dark:text-muted-foreground w-36 flex-shrink-0">
-              Streamable HTTP
+      <SettingsSection title={t('mcpSettingsPanel.connection')}>
+        <SettingsCard>
+          <div className="flex items-center gap-3 px-3.5 py-2.5">
+            <span className="w-36 shrink-0 text-label-sm font-medium text-secondary">
+              Streamable HTTP {/* i18n-allow-literal */}
             </span>
-            <code className="flex-1 truncate text-xs font-mono text-foreground dark:text-foreground">
+            <code className="min-w-0 flex-1 truncate font-mono text-mono-ui text-foreground">
               {mcpHttpUrl}
             </code>
             <Button
               type="button"
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               onClick={() => void copyText('http', mcpHttpUrl)}
-              className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('mcpSettingsPanel.copy-streamable-http-url')}
             >
-              <Copy className="w-3.5 h-3.5" />
+              <Copy className="size-3.5 text-secondary" />
             </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground dark:text-muted-foreground w-36 flex-shrink-0">
+          <SettingsDivider />
+          <div className="flex items-center gap-3 px-3.5 py-2.5">
+            <span className="w-36 shrink-0 text-label-sm font-medium text-secondary">
               SSE ({t('mcpSettingsPanel.legacy')})
             </span>
-            <code className="flex-1 truncate text-xs font-mono text-foreground dark:text-foreground">
+            <code className="min-w-0 flex-1 truncate font-mono text-mono-ui text-foreground">
               {mcpSseUrl}
             </code>
             <Button
               type="button"
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               onClick={() => void copyText('sse', mcpSseUrl)}
-              className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
               aria-label={t('mcpSettingsPanel.copy-sse-url')}
             >
-              <Copy className="w-3.5 h-3.5" />
+              <Copy className="size-3.5 text-secondary" />
             </Button>
           </div>
-        </div>
+          <SettingsDivider />
+          <div className="space-y-3 px-3.5 py-3.5">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-label font-medium text-foreground">
+                  {t('mcpSettingsPanel.copy-agent-config-json')}
+                </span>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void copyText('json', agentConfigJson)}
+                >
+                  <Copy className="size-3.5" />
+                  <span>{copiedKey === 'json' ? t('mcpSettingsPanel.copied') : t('mcpSettingsPanel.copy-json')}</span>
+                </Button>
+              </div>
+              <pre className="overflow-x-auto rounded-md bg-sunken p-3 font-mono text-mono-ui text-secondary shadow-elev-0">
+                {maskToken(agentConfigJson)}
+              </pre>
+              <p className="mt-1.5 text-label-sm text-secondary">
+                {t('mcpSettingsPanel.prefer-streamable-http-json-above-if-the-client')}
+              </p>
+            </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('mcpSettingsPanel.copy-agent-config-json')}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void copyText('json', agentConfigJson)}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              {copiedKey === 'json' ? t('mcpSettingsPanel.copied') : t('mcpSettingsPanel.copy-json')}
-            </Button>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-label font-medium text-foreground">
+                  {t('mcpSettingsPanel.sse-compatible-config-json')}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void copyText('sse-json', agentSseConfigJson)}
+                >
+                  <Copy className="size-3.5" />
+                  <span>{copiedKey === 'sse-json' ? t('mcpSettingsPanel.copied') : t('mcpSettingsPanel.copy-sse-json')}</span>
+                </Button>
+              </div>
+              <pre className="overflow-x-auto rounded-md bg-sunken p-3 font-mono text-mono-ui text-secondary shadow-elev-0">
+                {maskToken(agentSseConfigJson)}
+              </pre>
+            </div>
           </div>
-          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-muted/40 overflow-x-auto text-foreground dark:text-muted-foreground border border-border/60 dark:border-border">
-            {maskToken(agentConfigJson)}
-          </pre>
-          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
-            {t('mcpSettingsPanel.prefer-streamable-http-json-above-if-the-client')}
-          </p>
-          <div className="flex items-center justify-between mb-2 mt-4">
-            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('mcpSettingsPanel.sse-compatible-config-json')}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void copyText('sse-json', agentSseConfigJson)}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-muted-foreground dark:text-muted-foreground"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              {copiedKey === 'sse-json' ? t('mcpSettingsPanel.copied') : t('mcpSettingsPanel.copy-sse-json')}
-            </Button>
-          </div>
-          <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-muted/40 overflow-x-auto text-foreground dark:text-muted-foreground border border-border/60 dark:border-border">
-            {maskToken(agentSseConfigJson)}
-          </pre>
-        </div>
-      </div>
+        </SettingsCard>
+      </SettingsSection>
 
-      <div className="p-4 rounded-xl border border-border dark:border-border bg-background/50 dark:bg-muted/20 text-xs text-muted-foreground dark:text-muted-foreground space-y-1">
-        <p>
-          {t('mcpSettingsPanel.read-only-tools-gsm-status-gsm-search-repos-gsm')}
-        </p>
-        <p>
-          {t('mcpSettingsPanel.optional-gsm-vector-search-when-vector-search-is')}
-        </p>
-      </div>
-    </div>
+      <SettingsNotice tone="neutral">
+        <p>{t('mcpSettingsPanel.read-only-tools-gsm-status-gsm-search-repos-gsm')}</p>
+        <p className="mt-1">{t('mcpSettingsPanel.optional-gsm-vector-search-when-vector-search-is')}</p>
+      </SettingsNotice>
+    </SettingsPageStack>
   );
 };

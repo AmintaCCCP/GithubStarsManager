@@ -1,4 +1,3 @@
-
 import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -11,6 +10,13 @@ import { useShallow } from 'zustand/react/shallow';
 import { useWebDAVActions } from '../../features/settings/hooks/useWebDAVActions';
 import { useDialog } from '../../hooks/useDialog';
 import { Modal } from '../Modal';
+import { cn } from '../../lib/utils';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsPageStack,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface WebDAVPanelProps {
   t: TranslateFn;
@@ -76,7 +82,6 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
   };
 
   const handleCloseAutoFocus = (event: Event) => {
-    // 打开按钮已不在文档中时保留 Radix 默认行为，再清空表单。
     if (openerRef.current?.isConnected) event.preventDefault();
     handleClose();
   };
@@ -98,27 +103,127 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
   const handleTest = (config: WebDAVConfig) => test(config);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Cloud className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('webDAVPanel.webdav-configuration')}
-          </h3>
-        </div>
-        <div className="flex items-center gap-2">
-          {showForm && (
-            <Button variant="outline" onClick={handleClose}>
-              <X className="w-4 h-4" />
-              <span>{t('webDAVPanel.cancel')}</span>
+    <SettingsPageStack>
+      <SettingsSection
+        title={t('webDAVPanel.active-webdav-configuration')}
+        actions={(
+          <div className="flex items-center gap-2">
+            {showForm && (
+              <Button type="button" variant="outline" size="sm" onClick={handleClose}>
+                <X className="size-3.5" />
+                <span>{t('webDAVPanel.cancel')}</span>
+              </Button>
+            )}
+            <Button type="button" variant="primary" size="sm" onClick={(event) => handleAdd(event.currentTarget)}>
+              <Plus className="size-3.5" />
+              <span>{t('webDAVPanel.add-webdav')}</span>
             </Button>
-          )}
-          <Button variant="default" onClick={(event) => handleAdd(event.currentTarget)}>
-            <Plus className="w-4 h-4" />
-            <span>{t('webDAVPanel.add-webdav')}</span>
-          </Button>
-        </div>
-      </div>
+          </div>
+        )}
+      >
+        {webdavConfigs.length === 0 ? (
+          <SettingsCard className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+            <Cloud className="size-10 text-tertiary stroke-[1.5]" aria-hidden="true" />
+            <p className="text-label font-medium text-foreground">
+              {t('webDAVPanel.no-webdav-services-configured-yet')}
+            </p>
+            <p className="max-w-sm text-label-sm text-secondary">
+              {t('webDAVPanel.click-the-button-above-to-add-webdav-configurati')}
+            </p>
+          </SettingsCard>
+        ) : (
+          <SettingsCard>
+            <RadioGroup
+              value={activeWebDAVConfig || ''}
+              onValueChange={setActiveWebDAVConfig}
+              aria-label={t('webDAVPanel.active-webdav-configuration')}
+              className="gap-0"
+            >
+              {webdavConfigs.map((config, index) => {
+                const isSelected = config.id === activeWebDAVConfig;
+                return (
+                  <React.Fragment key={config.id}>
+                    {index > 0 && <SettingsDivider />}
+                    <div
+                      className={cn(
+                        'flex min-h-14 items-center justify-between gap-4 px-3.5 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant',
+                        isSelected && 'bg-fill-selected/50',
+                      )}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <RadioGroupItem
+                          value={config.id}
+                          id={`active-webdav-${config.id}`}
+                          aria-label={config.name || t('webDAVPanel.webdav-configuration-2')}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate text-label font-medium text-foreground">{config.name}</h4>
+                          <p className="mt-px truncate text-label-sm text-secondary">
+                            {config.url} • {config.path}
+                          </p>
+                          {config.passwordStatus === 'decrypt_failed' && (
+                            <p className="mt-1 text-label-sm text-warning">
+                              {t('webDAVPanel.the-stored-webdav-password-could-not-be-decrypte')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleTest(config)}
+                          disabled={testingId === config.id}
+                          aria-label={t('webDAVPanel.test-connection')}
+                          title={t('webDAVPanel.test-connection')}
+                        >
+                          {testingId === config.id ? (
+                            <RefreshCw className="size-4 animate-spin text-secondary" />
+                          ) : (
+                            <Plug className="size-4 text-secondary" />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={(event) => handleEdit(config, event.currentTarget)}
+                          aria-label={t('webDAVPanel.edit')}
+                          title={t('webDAVPanel.edit')}
+                        >
+                          <Edit3 className="size-4 text-secondary" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={async () => {
+                            const confirmed = await confirm(
+                              t('webDAVPanel.delete-webdav-configuration'),
+                              t('webDAVPanel.this-action-cannot-be-undone'),
+                              { type: 'danger', confirmText: t('webDAVPanel.delete') },
+                            );
+                            if (confirmed) {
+                              deleteWebDAVConfig(config.id);
+                            }
+                          }}
+                          aria-label={t('webDAVPanel.delete')}
+                          title={t('webDAVPanel.delete')}
+                          className="text-destructive hover:bg-destructive-tint hover:text-destructive"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </RadioGroup>
+          </SettingsCard>
+        )}
+      </SettingsSection>
 
       <Modal
         isOpen={showForm}
@@ -129,12 +234,12 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         scrollable
         footer={(
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={handleClose}>
-              <X className="w-4 h-4" />
+            <Button type="button" variant="outline" size="md" onClick={handleClose}>
+              <X className="size-4" />
               <span>{t('webDAVPanel.cancel')}</span>
             </Button>
-            <Button variant="default" onClick={handleSave}>
-              <Check className="w-4 h-4" />
+            <Button type="button" variant="primary" size="md" onClick={handleSave}>
+              <Check className="size-4" />
               <span>{t('webDAVPanel.save')}</span>
             </Button>
           </div>
@@ -142,180 +247,87 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="webdav-name" className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="webdav-name" className="mb-1.5 block text-label font-medium text-foreground">
               {t('webDAVPanel.configuration-name')} *
             </label>
             <Input
               id="webdav-name"
               type="text"
               value={form.name}
-              onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full"
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder={t('webDAVPanel.e-g-nutstore')}
             />
           </div>
 
           <div>
-            <label htmlFor="webdav-url" className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="webdav-url" className="mb-1.5 block text-label font-medium text-foreground">
               {t('webDAVPanel.webdav-url')} *
             </label>
             <Input
               id="webdav-url"
               type="url"
               value={form.url}
-              onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
-              className="w-full"
+              onChange={(e) => setForm((prev) => ({ ...prev, url: e.target.value }))}
               placeholder="https://dav.jianguoyun.com/dav/"
             />
           </div>
 
           <div>
-            <label htmlFor="webdav-username" className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="webdav-username" className="mb-1.5 block text-label font-medium text-foreground">
               {t('webDAVPanel.username')} *
             </label>
             <Input
               id="webdav-username"
               type="text"
               value={form.username}
-              onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
-              className="w-full"
+              onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
               placeholder={t('webDAVPanel.webdav-username')}
             />
           </div>
 
           <div>
-            <label htmlFor="webdav-password" className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="webdav-password" className="mb-1.5 block text-label font-medium text-foreground">
               {t('webDAVPanel.password')} *
             </label>
             <Input
               id="webdav-password"
               type="password"
               value={form.password}
-              onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
-              className="w-full"
+              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
               placeholder={t('webDAVPanel.webdav-password')}
             />
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="webdav-path" className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="webdav-path" className="mb-1.5 block text-label font-medium text-foreground">
               {t('webDAVPanel.path')} *
             </label>
             <Input
               id="webdav-path"
               type="text"
               value={form.path}
-              onChange={(e) => setForm(prev => ({ ...prev, path: e.target.value }))}
-              className="w-full"
+              onChange={(e) => setForm((prev) => ({ ...prev, path: e.target.value }))}
               placeholder="/github-stars-manager/"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="webdav-custom-user-agent" className="mb-1 block text-sm font-medium text-foreground">
+            <label htmlFor="webdav-custom-user-agent" className="mb-1.5 block text-label font-medium text-foreground">
               {t('webDAVPanel.custom-user-agent')}
             </label>
             <Input
               id="webdav-custom-user-agent"
               type="text"
               value={form.customUserAgent}
-              onChange={(e) => setForm(prev => ({ ...prev, customUserAgent: e.target.value }))}
-              className="w-full"
+              onChange={(e) => setForm((prev) => ({ ...prev, customUserAgent: e.target.value }))}
               placeholder="rclone/v1.68.0"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1.5 text-label-sm text-secondary">
               {t('webDAVPanel.custom-user-agent-hint')}
             </p>
           </div>
         </div>
       </Modal>
-
-      <RadioGroup
-        value={activeWebDAVConfig || ''}
-        onValueChange={setActiveWebDAVConfig}
-        aria-label={t('webDAVPanel.active-webdav-configuration')}
-        className="space-y-3"
-      >
-        {webdavConfigs.map(config => (
-          <div
-            key={config.id}
-            className={`p-4 rounded-lg border transition-colors ${
-              config.id === activeWebDAVConfig
-                ? 'border-border bg-accent/50 dark:border-border/[0.12] dark:bg-accent/60'
-                : 'border-border dark:border-border hover:border-border dark:hover:border-border-strong'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <RadioGroupItem
-                  value={config.id}
-                  id={`active-webdav-${config.id}`}
-                  aria-label={config.name || t('webDAVPanel.webdav-configuration-2')}
-                />
-                <div>
-                  <h4 className="font-medium text-foreground dark:text-foreground">{config.name}</h4>
-                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                    {config.url} • {config.path}
-                  </p>
-                  {config.passwordStatus === 'decrypt_failed' && (
-                    <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground ">
-                      {t('webDAVPanel.the-stored-webdav-password-could-not-be-decrypte')}
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Button
-                  onClick={() => handleTest(config)}
-                  disabled={testingId === config.id}
-                  className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors disabled:opacity-50"
-                  aria-label={t('webDAVPanel.test-connection')}
-                  title={t('webDAVPanel.test-connection')}
-                >
-                  {testingId === config.id ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Plug className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  onClick={(event) => handleEdit(config, event.currentTarget)}
-                  className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
-                  aria-label={t('webDAVPanel.edit')}
-                  title={t('webDAVPanel.edit')}
-                >
-                  <Edit3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={async () => {
-                    const confirmed = await confirm(
-                      t('webDAVPanel.delete-webdav-configuration'),
-                      t('webDAVPanel.this-action-cannot-be-undone'),
-                      { type: 'danger', confirmText: t('webDAVPanel.delete') }
-                    );
-                    if (confirmed) {
-                      deleteWebDAVConfig(config.id);
-                    }
-                  }}
-                  className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
-                  aria-label={t('webDAVPanel.delete')}
-                  title={t('webDAVPanel.delete')}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </RadioGroup>
-        {webdavConfigs.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
-            <Cloud className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>{t('webDAVPanel.no-webdav-services-configured-yet')}</p>
-            <p className="text-sm">{t('webDAVPanel.click-the-button-above-to-add-webdav-configurati')}</p>
-          </div>
-        )}
-    </div>
+    </SettingsPageStack>
   );
 };

@@ -26,8 +26,8 @@ import {
 } from '../../types/repositoryCardActions';
 import { normalizeRepositoryCardActions } from '../../utils/repositoryCardActions';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Switch } from '../ui/switch';
+import { SettingsCard, SettingsDivider, SettingsSection } from './SettingsPrimitives';
 
 const ACTION_LABEL_KEYS: Record<BuiltinRepositoryCardActionId, string> = {
   analyze: 'repositoryCard.analyze-with-ai-2',
@@ -133,77 +133,79 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">{hint}</p>
-        <div className="space-y-2">
-          {displayedActions.map((item, index) => {
-            const isPlugin = isPluginActionId(item.id);
-            let label = '';
-            let iconNode: React.ReactNode = null;
-            let subtitleNode: React.ReactNode = null;
+    <SettingsSection
+      title={title}
+      description={hint}
+      actions={(
+        <Button type="button" variant="outline" size="sm" onClick={handleReset}>
+          {resetLabel}
+        </Button>
+      )}
+    >
+      <SettingsCard>
+        {displayedActions.map((item, index) => {
+          const isPlugin = isPluginActionId(item.id);
+          let label = '';
+          let iconNode: React.ReactNode = null;
+          let subtitleNode: React.ReactNode = null;
 
-            if (isPlugin) {
-              const pluginAction = pluginActionMap.get(item.id);
-              label = pluginAction?.title || item.id;
-              iconNode = (
-                <PluginIcon
-                  pluginId={pluginAction?.pluginId}
-                  icon={pluginAction?.icon}
-                  className="h-4 w-4 shrink-0 text-muted-foreground"
-                />
+          if (isPlugin) {
+            const pluginAction = pluginActionMap.get(item.id);
+            label = pluginAction?.title || item.id;
+            iconNode = (
+              <PluginIcon
+                pluginId={pluginAction?.pluginId}
+                icon={pluginAction?.icon}
+                className="size-4 shrink-0 text-tertiary"
+              />
+            );
+            if (pluginAction?.pluginName) {
+              subtitleNode = (
+                <span className="ml-1.5 text-label-sm font-normal text-secondary">
+                  ({pluginAction.pluginName})
+                </span>
               );
-              if (pluginAction?.pluginName) {
-                subtitleNode = (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    ({pluginAction.pluginName})
-                  </span>
-                );
-              }
-            } else {
-              const builtinId = item.id as BuiltinRepositoryCardActionId;
-              label = t(ACTION_LABEL_KEYS[builtinId]);
-              const IconComp = BUILTIN_ICONS[builtinId];
-              iconNode = IconComp ? (
-                <IconComp className="h-4 w-4 shrink-0 text-muted-foreground" />
-              ) : null;
             }
+          } else {
+            const builtinId = item.id as BuiltinRepositoryCardActionId;
+            label = t(ACTION_LABEL_KEYS[builtinId]);
+            const IconComp = BUILTIN_ICONS[builtinId];
+            iconNode = IconComp ? (
+              <IconComp className="size-4 shrink-0 text-tertiary" />
+            ) : null;
+          }
 
-            return (
-              <div
-                key={item.id}
-                className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
-              >
+          return (
+            <React.Fragment key={item.id}>
+              {index > 0 && <SettingsDivider />}
+              <div className="flex min-h-12 items-center gap-3 px-3.5 py-2">
                 {iconNode}
-                <span className="min-w-0 flex-1 truncate text-sm">
+                <span className="min-w-0 flex-1 truncate text-label font-medium text-foreground">
                   {label}
                   {subtitleNode}
                 </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  disabled={index === 0}
-                  aria-label={moveUpLabel(label)}
-                  onClick={() => move(index, -1)}
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  disabled={index === displayedActions.length - 1}
-                  aria-label={moveDownLabel(label)}
-                  onClick={() => move(index, 1)}
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === 0}
+                    aria-label={moveUpLabel(label)}
+                    onClick={() => move(index, -1)}
+                  >
+                    <ChevronUp className="size-3.5 text-secondary" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === displayedActions.length - 1}
+                    aria-label={moveDownLabel(label)}
+                    onClick={() => move(index, 1)}
+                  >
+                    <ChevronDown className="size-3.5 text-secondary" />
+                  </Button>
+                </div>
                 <Switch
                   checked={item.visible}
                   aria-label={visibilityLabel(label)}
@@ -216,18 +218,10 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
                   }
                 />
               </div>
-            );
-          })}
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleReset}
-        >
-          {resetLabel}
-        </Button>
-      </CardContent>
-    </Card>
+            </React.Fragment>
+          );
+        })}
+      </SettingsCard>
+    </SettingsSection>
   );
 };

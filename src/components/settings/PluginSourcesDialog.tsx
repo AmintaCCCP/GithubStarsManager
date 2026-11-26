@@ -7,6 +7,7 @@ import type { MarketplaceSourceEntry, MarketplaceState } from '../../plugins/typ
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Modal } from '../Modal';
+import { SettingsCard, SettingsDivider } from './SettingsPrimitives';
 
 interface PluginSourcesDialogProps {
   isOpen: boolean;
@@ -29,7 +30,6 @@ const GITHUB_URL_PATTERN = /^https:\/\/github\.com\/[^\s/]+\/[^\s/]+(?:\/[^\s]+)
 
 /**
  * 插件源管理弹窗：源是 GitHub 仓库目录，增删改后主进程会立即重新遍历。
- * "查"由列表本身承担；插件的浏览在父级市场弹窗里。
  */
 export const PluginSourcesDialog: React.FC<PluginSourcesDialogProps> = ({ isOpen, onClose, t, entries, onChanged }) => {
   const { confirm, toast } = useDialog();
@@ -37,7 +37,6 @@ export const PluginSourcesDialog: React.FC<PluginSourcesDialogProps> = ({ isOpen
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // 弹窗关闭时清掉未提交的表单，避免下次打开带着半截输入。
   useEffect(() => {
     if (!isOpen) {
       setEditing(null);
@@ -95,7 +94,7 @@ export const PluginSourcesDialog: React.FC<PluginSourcesDialogProps> = ({ isOpen
     const approved = await confirm(
       t('pluginSettingsPanel.sources-remove-title'),
       t('pluginSettingsPanel.sources-remove-message-v1', { v1: sourceLabel }),
-      { confirmText: t('pluginSettingsPanel.sources-remove-confirm'), type: 'warning' }
+      { confirmText: t('pluginSettingsPanel.sources-remove-confirm'), type: 'warning' },
     );
     if (!approved) return;
     setBusy(true);
@@ -122,107 +121,113 @@ export const PluginSourcesDialog: React.FC<PluginSourcesDialogProps> = ({ isOpen
       maxWidth="max-w-2xl"
       scrollable
     >
-      <p className="text-sm text-muted-foreground">{t('pluginSettingsPanel.sources-description')}</p>
+      <p className="text-label text-secondary">{t('pluginSettingsPanel.sources-description')}</p>
 
       {editing === null ? (
-        <div className="mt-4">
-          <Button type="button" size="sm" onClick={startAdd} disabled={busy} data-testid="plugin-sources-add">
-            <Plus className="mr-2 h-4 w-4" />
-            {t('pluginSettingsPanel.sources-add')}
+        <div className="mt-3.5">
+          <Button type="button" variant="primary" size="sm" onClick={startAdd} disabled={busy} data-testid="plugin-sources-add">
+            <Plus className="size-3.5" />
+            <span>{t('pluginSettingsPanel.sources-add')}</span>
           </Button>
         </div>
       ) : null}
 
       {editing !== null ? (
-        <form
-          className="mt-4 space-y-3 rounded-lg border border-border p-4"
-          data-testid="plugin-sources-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submit();
-          }}
-        >
-          <div>
-            <label htmlFor="plugin-source-name" className="block text-sm font-medium">
-              {t('pluginSettingsPanel.sources-name')}
-            </label>
-            <Input
-              id="plugin-source-name"
-              value={editing.name}
-              onChange={(event) => setEditing({ ...editing, name: event.target.value })}
-              placeholder={t('pluginSettingsPanel.sources-name-placeholder')}
-              className="mt-1"
-              maxLength={200}
-            />
-          </div>
-          <div>
-            <label htmlFor="plugin-source-url" className="block text-sm font-medium">
-              {t('pluginSettingsPanel.sources-url')}
-            </label>
-            <Input
-              id="plugin-source-url"
-              value={editing.url}
-              onChange={(event) => setEditing({ ...editing, url: event.target.value })}
-              placeholder={t('pluginSettingsPanel.sources-url-placeholder')}
-              className="mt-1 font-mono text-xs"
-              maxLength={2048}
-              required
-            />
-            <p className="mt-1 text-xs text-muted-foreground">{t('pluginSettingsPanel.sources-url-hint')}</p>
-          </div>
-          {formError && <p className="text-xs text-destructive" data-testid="plugin-sources-form-error">{formError}</p>}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setEditing(null)} disabled={busy}>
-              {t('pluginSettingsPanel.cancel')}
-            </Button>
-            <Button type="submit" size="sm" disabled={busy}>
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t('pluginSettingsPanel.sources-save')}
-            </Button>
-          </div>
-        </form>
+        <SettingsCard className="mt-3.5 p-3.5">
+          <form
+            className="space-y-3"
+            data-testid="plugin-sources-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
+          >
+            <div>
+              <label htmlFor="plugin-source-name" className="mb-1.5 block text-label font-medium text-foreground">
+                {t('pluginSettingsPanel.sources-name')}
+              </label>
+              <Input
+                id="plugin-source-name"
+                value={editing.name}
+                onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+                placeholder={t('pluginSettingsPanel.sources-name-placeholder')}
+                maxLength={200}
+              />
+            </div>
+            <div>
+              <label htmlFor="plugin-source-url" className="mb-1.5 block text-label font-medium text-foreground">
+                {t('pluginSettingsPanel.sources-url')}
+              </label>
+              <Input
+                id="plugin-source-url"
+                value={editing.url}
+                onChange={(event) => setEditing({ ...editing, url: event.target.value })}
+                placeholder={t('pluginSettingsPanel.sources-url-placeholder')}
+                className="font-mono text-mono-ui"
+                maxLength={2048}
+                required
+              />
+              <p className="mt-1.5 text-label-sm text-secondary">{t('pluginSettingsPanel.sources-url-hint')}</p>
+            </div>
+            {formError && <p className="text-label-sm text-destructive" data-testid="plugin-sources-form-error">{formError}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditing(null)} disabled={busy}>
+                {t('pluginSettingsPanel.cancel')}
+              </Button>
+              <Button type="submit" variant="primary" size="sm" disabled={busy}>
+                {busy && <Loader2 className="size-3.5 animate-spin" />}
+                <span>{t('pluginSettingsPanel.sources-save')}</span>
+              </Button>
+            </div>
+          </form>
+        </SettingsCard>
       ) : null}
 
-      <div className="mt-4 space-y-2" data-testid="plugin-sources-list">
+      <div className="mt-4" data-testid="plugin-sources-list">
         {entries.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          <SettingsCard className="px-6 py-8 text-center text-label-sm text-secondary">
             {t('pluginSettingsPanel.sources-empty')}
-          </div>
+          </SettingsCard>
         ) : (
-          entries.map((entry) => (
-            <div
-              key={entry.source.id}
-              className="flex items-center justify-between gap-3 rounded border border-border px-3 py-2"
-              data-testid={`plugin-source-${entry.source.id}`}
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{entry.source.name ?? entry.source.url}</p>
-                <p className="truncate font-mono text-xs text-muted-foreground">{entry.source.url}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={busy}
-                  aria-label={t('pluginSettingsPanel.sources-edit-source-v1', { v1: entry.source.name ?? entry.source.url })}
-                  onClick={() => startEdit(entry)}
+          <SettingsCard>
+            {entries.map((entry, index) => (
+              <React.Fragment key={entry.source.id}>
+                {index > 0 && <SettingsDivider />}
+                <div
+                  className="flex min-h-13 items-center justify-between gap-3 px-3.5 py-2.5"
+                  data-testid={`plugin-source-${entry.source.id}`}
                 >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={busy}
-                  aria-label={t('pluginSettingsPanel.sources-remove-source-v1', { v1: entry.source.name ?? entry.source.url })}
-                  onClick={() => void remove(entry)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            </div>
-          ))
+                  <div className="min-w-0">
+                    <p className="truncate text-label font-medium text-foreground">{entry.source.name ?? entry.source.url}</p>
+                    <p className="truncate font-mono text-mono-ui text-secondary">{entry.source.url}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={busy}
+                      aria-label={t('pluginSettingsPanel.sources-edit-source-v1', { v1: entry.source.name ?? entry.source.url })}
+                      onClick={() => startEdit(entry)}
+                    >
+                      <Pencil className="size-3.5 text-secondary" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={busy}
+                      aria-label={t('pluginSettingsPanel.sources-remove-source-v1', { v1: entry.source.name ?? entry.source.url })}
+                      onClick={() => void remove(entry)}
+                      className="text-destructive hover:bg-destructive-tint hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </React.Fragment>
+            ))}
+          </SettingsCard>
         )}
       </div>
     </Modal>
