@@ -796,13 +796,13 @@ textarea::-webkit-resizer {
 }
 
 @keyframes dialogIn {
-  from { opacity: 0; transform: translate(-50%, calc(-50% + 6px * var(--motion-scale))) scale(calc(1 - 0.03 * var(--motion-scale))); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  from { opacity: 0; transform: translateY(calc(6px * var(--motion-scale))) scale(calc(1 - 0.03 * var(--motion-scale))); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes dialogOut {
-  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  to { opacity: 0; transform: translate(-50%, calc(-50% + 4px * var(--motion-scale))) scale(calc(1 - 0.02 * var(--motion-scale))); }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(calc(4px * var(--motion-scale))) scale(calc(1 - 0.02 * var(--motion-scale))); }
 }
 
 .motion-scrim[data-state="open"] {
@@ -2028,10 +2028,10 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
   box-shadow: none;
 }
 
-.app-command-row > .flex:last-child > :is(button, [role='combobox']),
-.app-command-controls :is(button, [role='combobox']),
-.app-page-toolbar :is(button:not([role='switch']), [role='combobox']),
-.app-repository-controls :is(button, [role='combobox']) {
+.app-command-row > .flex:last-child > :is(button:not([role='radio']):not([role='checkbox']):not([role='switch']), [role='combobox']),
+.app-command-controls :is(button:not([role='radio']):not([role='checkbox']):not([role='switch']), [role='combobox']),
+.app-page-toolbar :is(button:not([role='radio']):not([role='checkbox']):not([role='switch']), [role='combobox']),
+.app-repository-controls :is(button:not([role='radio']):not([role='checkbox']):not([role='switch']), [role='combobox']) {
   height: var(--h-control);
   min-height: var(--h-control);
   align-items: center;
