@@ -384,64 +384,70 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const activeTabItem = tabs.find((tab) => tab.id === activeTab);
 
-  const renderSectionLabel = (section: SettingsTabItem['section']) => (
-    section === 'app'
-      ? t('settingsPanel.section-app')
-      : section === 'ai-data'
-        ? t('settingsPanel.section-ai-data')
-        : t('settingsPanel.section-connection')
-  );
+  const sidebarSections = (
+    [
+      { id: 'app', label: t('settingsPanel.section-app') },
+      { id: 'ai-data', label: t('settingsPanel.section-ai-data') },
+      { id: 'connection', label: t('settingsPanel.section-connection') },
+    ] as const
+  )
+    .map((section) => ({
+      ...section,
+      items: tabs.filter((tab) => tab.section === section.id),
+    }))
+    .filter((section) => section.items.length > 0);
 
   const renderSidebarRows = () => (
-    tabs.map((tab, index) => {
-      const showSectionLabel = index === 0 || tabs[index - 1].section !== tab.section;
-      const isActive = activeTab === tab.id;
-      return (
-        <React.Fragment key={tab.id}>
-          {showSectionLabel && (
-            <p
-              className={cn(
-                'px-2 pb-1 text-label-sm font-medium text-tertiary select-none',
-                index === 0 ? 'pt-1' : 'pt-3',
-              )}
-              aria-hidden="true"
-            >
-              {renderSectionLabel(tab.section)}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={() => handleTabChange(tab.id)}
-            role="tab"
-            id={`settings-tab-${tab.id}`}
-            aria-selected={isActive}
-            aria-controls={`settings-tabpanel-${tab.id}`}
-            className={cn(
-              'flex h-row-sidebar w-full items-center gap-2 rounded-sm px-2 text-left text-label select-none -outline-offset-2 transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant',
-              isActive
-                ? 'bg-fill-selected text-foreground'
-                : 'text-secondary hover:bg-fill-hover hover:text-foreground',
-            )}
-          >
-            <span className={cn('size-4 shrink-0 [&_svg]:size-4', isActive ? 'text-foreground' : 'text-tertiary')}>
-              {tab.icon}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{tab.label}</span>
-            {tab.badge != null && (
-              <span
-                aria-label={`${tab.label}: ${tab.badge}`}
+    sidebarSections.map((section) => (
+      <div key={section.id} className="app-side-section">
+        <p
+          className="app-section-label app-side-group-label text-label-sm font-medium text-tertiary select-none"
+          aria-hidden="true"
+        >
+          {section.label}
+        </p>
+        <div className="app-side-list">
+          {section.items.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                role="tab"
+                id={`settings-tab-${tab.id}`}
+                aria-selected={isActive}
+                aria-controls={`settings-tabpanel-${tab.id}`}
                 className={cn(
-                  'ml-auto shrink-0 text-label-sm tabular-nums',
-                  isActive ? 'text-foreground' : 'text-tertiary',
+                  'app-side-item flex h-row-sidebar min-h-row-sidebar w-full items-center justify-between gap-2 rounded-sm px-2 text-left text-label select-none -outline-offset-2 transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant',
+                  isActive
+                    ? 'bg-fill-selected font-medium text-foreground'
+                    : 'font-normal text-secondary hover:bg-fill-hover hover:text-foreground',
                 )}
               >
-                {tab.badge > 99 ? '99+' : tab.badge}
-              </span>
-            )}
-          </button>
-        </React.Fragment>
-      );
-    })
+                <span className="app-side-item-label min-w-0 flex-1">
+                  <span className={cn('flex size-4 shrink-0 items-center justify-center [&_svg]:size-4', isActive ? 'text-foreground' : 'text-tertiary')}>
+                    {tab.icon}
+                  </span>
+                  <span className="truncate">{tab.label}</span>
+                </span>
+                {tab.badge != null && (
+                  <span
+                    aria-label={`${tab.label}: ${tab.badge}`}
+                    className={cn(
+                      'app-side-count ml-auto shrink-0 text-label-sm tabular-nums',
+                      isActive ? 'font-medium text-foreground' : 'font-normal text-tertiary',
+                    )}
+                  >
+                    {tab.badge > 99 ? '99+' : tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ))
   );
 
   const renderTabContent = () => {
@@ -508,15 +514,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           className="h-[85vh] max-w-5xl overflow-hidden bg-paper p-0"
         >
           <div className="flex h-full min-h-0 flex-col md:flex-row">
-            <div className="hidden w-56 shrink-0 flex-col border-r border-subtle bg-navigator md:flex">
-              <div className="flex h-12 shrink-0 items-center gap-2 border-b border-subtle px-4">
+            <div className="hidden w-(--app-sidebar-width) shrink-0 flex-col border-r border-subtle bg-navigator md:flex">
+              <div className="context-sidebar-head h-12 shrink-0 justify-start gap-2 px-4">
                 <Settings className="size-4 text-tertiary" strokeWidth={1.75} />
-                <DialogTitle id="settings-modal-title" className="text-label-lg font-semibold text-foreground">
+                <DialogTitle id="settings-modal-title" className="app-side-title">
                   {t('settingsPanel.settings')}
                 </DialogTitle>
               </div>
               <nav
-                className="grid gap-px overflow-y-auto px-2 py-2.5"
+                className="context-sidebar-body"
                 role="tablist"
                 aria-label={t('settingsPanel.settings-tabs')}
               >
@@ -583,7 +589,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
           <ContextSidebarBody
             as="nav"
-            className="grid gap-px px-2 pb-4"
             role="tablist"
             aria-label={t('settingsPanel.settings-tabs')}
           >
