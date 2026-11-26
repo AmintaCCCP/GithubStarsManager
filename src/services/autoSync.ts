@@ -47,6 +47,21 @@ let _pollTimer: ReturnType<typeof setInterval> | null = null;
 // Polling interval in milliseconds
 const POLL_INTERVAL = 5000;
 
+/**
+ * Persist only the Vector Search config. A full push would also send slices whose
+ * reads failed in this cycle (e.g. an empty AI list), deleting them remotely.
+ */
+function repairVectorSearchConfig(): void {
+  const config = useAppStore.getState().vectorSearchConfig;
+  void backend.syncVectorSearchConfig(config)
+    .then(() => {
+      _lastHash.vectorSearch = vectorSearchFingerprint(config);
+    })
+    .catch((err) => {
+      logger.warn('sync.pushToBackend', 'Vector config repair push failed', err);
+    });
+}
+
 // Last known backend data fingerprints — skip store update if unchanged
 const _lastHash = {
   repos: '',
@@ -425,9 +440,6 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
     const state = useAppStore.getState();
 
     const reposFetched = reposResult.status === 'fulfilled';
-    // WebDAV ids dropped by the profile-conflict filter. An active selection that
-    // points at one must be cleared instead of dangling on a missing config.
-    const rejectedWebdavIds = new Set<string>();
 
     // Update store then commit hash — hash only changes if setter succeeds
     if (changed.repos && reposResult.status === 'fulfilled') {
@@ -516,7 +528,6 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
           notifyProfileConflict({ kind: 'webdav', conflictingProfile });
           const local = localConfigs.find(lc => lc.id === cfg.id);
           if (local) acceptedConfigs.push(local);
-          else rejectedWebdavIds.add(cfg.id);
           continue;
         }
         acceptedConfigs.push(cfg);
@@ -557,7 +568,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       // wipe a locally-configured vector search — keep local and push it up.
       if (shouldPreserveLocalVectorSearch(backendConfig, localConfig, _lastHash.vectorSearch === '')) {
         if (reposFetched) {
-          _hasPendingPush = true;
+          repairVectorSearchConfig();
         }
       } else {
         // Preserve local authToken if backend returned empty or decrypt_failed,
@@ -568,7 +579,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
           logger.warn('sync.decryptFailed', 'Backend decrypt_failed for vector search authToken, preserving local value');
           backendConfig.authToken = localConfig.authToken;
           if (reposFetched) {
-            _hasPendingPush = true;
+            repairVectorSearchConfig();
           }
         }
         const vectorConflict = backendConfig.workerUrl
@@ -580,9 +591,9 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
           notifyProfileConflict({ kind: 'vector', conflictingProfile });
           // Keep the local config: applying a Worker URL another profile owns would
           // route this profile's searches and index writes into a shared index.
-          // Queue a repair push so the backend is corrected with the local value.
+          // Push just the Vector slice so the backend converges on the local value.
           if (reposFetched) {
-            _hasPendingPush = true;
+            repairVectorSearchConfig();
           }
         } else {
           state.setVectorSearchConfig(backendConfig);
@@ -601,7 +612,11 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       }
       if (typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null) {
         const nextActive = settings.activeWebDAVConfig as string | null;
-        state.setActiveWebDAVConfig(nextActive && rejectedWebdavIds.has(nextActive) ? null : nextActive);
+        // Validate against the configs actually kept in the store: a settings pull
+        // that arrives later than the WebDAV list must not resurrect an id that a
+        // previous pull filtered out as conflicting.
+        const knownWebdavIds = new Set(useAppStore.getState().webdavConfigs.map((cfg) => cfg.id));
+        state.setActiveWebDAVConfig(nextActive && !knownWebdavIds.has(nextActive) ? null : nextActive);
       }
       if (typeof settings.activeEmbeddingConfig === 'string' || settings.activeEmbeddingConfig === null) {
         state.setActiveEmbeddingConfig(settings.activeEmbeddingConfig as string | null);

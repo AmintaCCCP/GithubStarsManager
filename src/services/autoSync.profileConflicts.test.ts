@@ -126,6 +126,22 @@ describe('syncFromBackend profile conflict isolation', () => {
     expect(useAppStore.getState().activeWebDAVConfig).toBeNull();
   });
 
+  it('repairs only the Vector slice when another slice failed to load', async () => {
+    vi.mocked(backend.fetchAIConfigs).mockRejectedValue(new Error('ai read failed'));
+    useAppStore.setState({
+      vectorSearchConfig: { ...baseVectorConfig, workerUrl: 'https://vec.alice.workers.dev' },
+    });
+    vi.mocked(backend.fetchVectorSearchConfig).mockResolvedValue({
+      ...baseVectorConfig,
+      workerUrl: OTHER_PROFILE_VECTOR_URL,
+    });
+
+    await syncFromBackend();
+    await vi.waitFor(() => expect(backend.syncVectorSearchConfig).toHaveBeenCalled());
+
+    expect(backend.syncAIConfigs).not.toHaveBeenCalled();
+  });
+
   it('keeps the local Vector config when the pulled Worker URL belongs to another profile', async () => {
     useAppStore.setState({
       vectorSearchConfig: { ...baseVectorConfig, workerUrl: 'https://vec.alice.workers.dev' },
