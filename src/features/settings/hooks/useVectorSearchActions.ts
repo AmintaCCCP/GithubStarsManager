@@ -10,6 +10,8 @@ import {
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
+import { findConflictingVectorProfile, normalizeVectorWorkerUrl } from '../../../services/profileStorage';
+import { useT } from '../../../i18n/useT';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
 import { normalizeLicense } from '../../../utils/licenseFilter';
 
@@ -50,6 +52,7 @@ export interface VectorSearchActions {
  * embedding-format metadata and per-repository indexing stamps unchanged.
  */
 export const useVectorSearchActions = (): VectorSearchActions => {
+  const t = useT('app');
   const state = useAppStore(useShallow((store) => ({
     embeddingConfigs: store.embeddingConfigs,
     activeEmbeddingConfig: store.activeEmbeddingConfig,
@@ -141,6 +144,47 @@ export const useVectorSearchActions = (): VectorSearchActions => {
   }, [activeConfig, state.githubToken]);
 
   const runIndex = useCallback(async (draft: VectorIndexDraft, incremental: boolean) => {
+    if (draft.workerUrl.trim()) {
+      // Indexing writes vectors to the draft URL. If that differs from the saved
+      // config the search path keeps querying the old worker, so require a save
+      // first instead of silently filling a worker the app will not use.
+      if (
+        normalizeVectorWorkerUrl(draft.workerUrl) !==
+        normalizeVectorWorkerUrl(state.vectorSearchConfig.workerUrl)
+      ) {
+        state.setVectorIndexingState({
+          isIndexing: false,
+          phase: null,
+          phaseDone: 0,
+          phaseTotal: 0,
+          result: {
+            indexed: 0,
+            skipped: 0,
+            errors: 1,
+            error: t('vectorSearchSettings.worker-url-unsaved'),
+          },
+        });
+        return;
+      }
+      const conflict = findConflictingVectorProfile(draft.workerUrl);
+      if (conflict) {
+        state.setVectorIndexingState({
+          isIndexing: false,
+          phase: null,
+          phaseDone: 0,
+          phaseTotal: 0,
+          result: {
+            indexed: 0,
+            skipped: 0,
+            errors: 1,
+            error: t('vectorSearchSettings.worker-url-conflict', {
+              account: conflict.login || conflict.id,
+            }),
+          },
+        });
+        return;
+      }
+    }
     const clients = createClients(draft);
     if (!clients) return;
     const controller = new AbortController();
@@ -227,7 +271,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     } finally {
       setAbortController(null);
     }
-  }, [createClients, state]);
+  }, [createClients, state, t]);
 
   const rebuildIndex = useCallback((draft: VectorIndexDraft) => runIndex(draft, false), [runIndex]);
   const incrementalIndex = useCallback((draft: VectorIndexDraft) => runIndex(draft, true), [runIndex]);

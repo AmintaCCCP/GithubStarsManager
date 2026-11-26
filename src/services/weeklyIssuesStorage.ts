@@ -7,6 +7,7 @@
  */
 
 import type { GitHubRepoDetailRead } from './githubApi';
+import { scopedKey } from './profileStorage';
 
 /** 命中"开源"标题且正文含仓库链接的投稿 issue（正文缓存供"查看原贴"离线渲染）。 */
 export interface WeeklyStoredIssue {
@@ -59,7 +60,8 @@ const normalizeMeta = (meta: WeeklySyncMeta | null | undefined): WeeklySyncMeta 
   historyComplete: meta?.historyComplete === true,
 });
 
-const DB_NAME = 'github-stars-weekly';
+// Same name as before for the default profile; suffixed per profile otherwise.
+const DB_NAME = scopedKey('github-stars-weekly');
 const DB_VERSION = 1;
 const ISSUES_STORE = 'issues';
 const REPOS_STORE = 'repos';

@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "경고: 이 백업의 일부 키가 차단되었습니다. 가져온 후 해당 구성에 키를 다시 입력하세요.",
     "importing": "가져오는 중...",
     "merge-import": "병합 가져오기",
-    "replace-import": "가져오기 재정의"
+    "replace-import": "가져오기 재정의",
+    "webdav-import-conflict-skipped": "계정 {{account}}와(과) 충돌하는 {{count}}개의 가져온 WebDAV 설정을 건너뛰었습니다."
   },
   "diagnosticLogsPanel": {
     "level": "수준",
@@ -1348,7 +1349,9 @@
     "deploy-tab-manual": "수동 단계 (고급)",
     "one-click-platforms-tip": "플랫폼별 빠른 실행기:",
     "platform-mac-linux": "macOS / Linux: cloudflare-worker에서 ./deploy.sh 실행",
-    "platform-windows": "Windows: cloudflare-worker에서 deploy.bat를 두 번 클릭하거나 .\\deploy.ps1 실행"
+    "platform-windows": "Windows: cloudflare-worker에서 deploy.bat를 두 번 클릭하거나 .\\deploy.ps1 실행",
+    "worker-url-conflict": "이 Vectorize Worker URL은 이미 {{account}} 계정에서 사용 중입니다. 이 계정에 독립된 Vectorize Worker URL을 배포해 주세요.",
+    "worker-url-unsaved": "인덱스를 빌드하기 전에 Worker URL을 저장하세요."
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV 구성",
@@ -1416,5 +1419,39 @@
     "download": "다운로드",
     "detected-from-filenames-and-release-metadata-no": "파일 이름과 Release 메타데이터로 판별합니다. 보안 검사는 하지 않으며 자동으로 실행되지 않습니다. 아래 자산 목록에서 언제든 다른 자산을 선택할 수 있습니다.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "이 기기에 해당하지 않는 자산 {{v1}}개를 제외했습니다(소스 코드, 체크섬, 서명, 디버그 기호, blockmap, 다른 플랫폼 또는 아키텍처)."
+  },
+  "accountSwitcher": {
+    "account-menu": "계정 메뉴",
+    "accounts-label": "계정 목록",
+    "active-badge": "사용 중",
+    "add-account": "계정 추가",
+    "switch-account": "계정 전환",
+    "remove-account": "계정 제거",
+    "remove-account-confirm-title": "계정 제거",
+    "remove-account-confirm-desc": "{{account}} 계정의 로컬 데이터와 프로필을 제거하시겠습니까? 이 프로필의 저장된 리포지토리, AI 요약, AI 태그, 사용자 지정 태그, 리포지토리 채팅 기록이 삭제되며 GitHub에서 복구할 수 없습니다. 연결된 백엔드에 이 프로필이 저장되어 있는 경우 서버 데이터도 함께 삭제될 수 있습니다. GitHub 계정에는 영향을 주지 않습니다.",
+    "remove-account-server-failed": "서버에서 계정을 삭제하지 못했습니다. 로컬 데이터는 유지되었습니다. 다시 시도해 주세요.",
+    "remove-account-credentials-failed": "저장된 X 자격 증명을 삭제하지 못했습니다. 계정은 유지되었습니다. 다시 시도해 주세요.",
+    "add-account-title": "GitHub 계정 추가",
+    "add-account-description": "분리된 계정 프로필을 만들려면 GitHub 개인 액세스 토큰을 입력하세요.",
+    "github-pat-label": "GitHub 개인 액세스 토큰",
+    "github-pat-placeholder": "ghp_... 또는 github_pat_...",
+    "show-token": "토큰 표시",
+    "hide-token": "토큰 숨기기",
+    "copy-general-settings": "일반 설정 복사 (AI / Embedding / 테마 / 언어)",
+    "cancel": "취소",
+    "add-and-switch": "추가 및 전환",
+    "token-required": "GitHub 개인 액세스 토큰을 입력하세요.",
+    "duplicate-account-error": "이미 추가된 GitHub 계정입니다.",
+    "token-validation-failed": "토큰 확인에 실패했습니다. 토큰과 네트워크 연결을 확인하세요.",
+    "switching-account": "계정을 전환하는 중...",
+    "other-tab-switched-notice": "다른 탭에서 활성 계정이 전환되었습니다. 동기화를 유지하려면 새로고침하세요.",
+    "reload-now": "새로고침",
+    "backend-profiles-unsupported-warning": "연결된 백엔드 서버가 아직 다중 계정 프로필을 지원하지 않습니다. 기본 계정 데이터를 보호하기 위해 로컬 전용 모드로 실행합니다.",
+    "logged-out-profile-notice": "현재 {{profile}} 프로필에 있습니다(로그아웃됨).",
+    "return-to-default": "기본 계정으로 돌아가기",
+    "switch-to-profile": "{{profile}}(으)로 전환",
+    "profile-conflict-webdav-warning": "동기화된 WebDAV 설정이 다른 계정({{account}})과 충돌합니다. 백업 덮어쓰기를 방지하려면 별도의 하위 디렉터리를 사용하세요.",
+    "profile-conflict-vector-warning": "동기화된 벡터 검색 Worker URL이 다른 계정({{account}})과 충돌합니다. 계정마다 별도의 Worker URL을 사용하세요.",
+    "dismiss": "닫기"
   }
 }

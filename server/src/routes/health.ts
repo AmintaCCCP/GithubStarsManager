@@ -11,6 +11,7 @@ router.get('/api/health', (_req, res) => {
     // Non-sensitive hint for the UI: whether /api calls expect a Bearer token.
     // False only in the explicit ALLOW_INSECURE_NO_AUTH dev mode.
     authRequired: config.apiSecret !== null && config.apiSecret !== '',
+    profilesSupported: true,
   });
 });
 

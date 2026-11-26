@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "警告：此备份中的部分密钥已被屏蔽。导入后请在相应配置中重新输入密钥。",
     "importing": "导入中…",
     "merge-import": "合并导入",
-    "replace-import": "覆盖导入"
+    "replace-import": "覆盖导入",
+    "webdav-import-conflict-skipped": "已跳过 {{count}} 个与账户 {{account}} 冲突的 WebDAV 导入配置。"
   },
   "diagnosticLogsPanel": {
     "level": "级别",
@@ -1348,7 +1349,9 @@
     "deploy-tab-manual": "手动分步部署（高级）",
     "one-click-platforms-tip": "各平台专用快捷启动方式：",
     "platform-mac-linux": "macOS / Linux: 进入 cloudflare-worker 运行 ./deploy.sh",
-    "platform-windows": "Windows: 进入 cloudflare-worker 双击 deploy.bat 或运行 .\\deploy.ps1"
+    "platform-windows": "Windows: 进入 cloudflare-worker 双击 deploy.bat 或运行 .\\deploy.ps1",
+    "worker-url-conflict": "该 Vectorize Worker URL 已被账号 {{account}} 使用。请为当前账号部署独立的 Vectorize Worker URL。",
+    "worker-url-unsaved": "请先保存 Worker 地址，再构建索引。"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",
@@ -1416,5 +1419,39 @@
     "download": "下载",
     "detected-from-filenames-and-release-metadata-no": "按文件名与 Release 元数据识别，未验证安装包安全性，也不会自动运行。你始终可以在下方资产列表中手动选择其他资产。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 个不适用于当前设备的资产（源代码、校验和、签名、调试符号、blockmap、其他平台/架构）。"
+  },
+  "accountSwitcher": {
+    "account-menu": "账号菜单",
+    "accounts-label": "账号列表",
+    "active-badge": "当前",
+    "add-account": "添加账号",
+    "switch-account": "切换账号",
+    "remove-account": "移除账号",
+    "remove-account-confirm-title": "移除账号",
+    "remove-account-confirm-desc": "确定移除账号 {{account}} 的本地配置、已保存的仓库数据、AI 摘要、AI 标签、自定义标签与聊天记录吗？这些数据无法从 GitHub 还原。若已连接后端保存了该配置，服务端数据也可能被删除。不会影响你的 GitHub 账号本身。",
+    "remove-account-server-failed": "无法在服务端删除该账号，本地数据已保留，请重试。",
+    "remove-account-credentials-failed": "无法清除本机保存的 X 凭据，账号未被移除，请重试。",
+    "add-account-title": "添加 GitHub 账号",
+    "add-account-description": "输入 GitHub Personal Access Token 以创建一个隔离的账号配置。",
+    "github-pat-label": "GitHub 个人访问令牌（PAT）",
+    "github-pat-placeholder": "ghp_... 或 github_pat_...",
+    "show-token": "显示令牌",
+    "hide-token": "隐藏令牌",
+    "copy-general-settings": "复制通用设置（AI / Embedding / 主题 / 语言）",
+    "cancel": "取消",
+    "add-and-switch": "添加并切换",
+    "token-required": "请输入 GitHub Personal Access Token。",
+    "duplicate-account-error": "该 GitHub 账号已存在，无需重复添加。",
+    "token-validation-failed": "令牌验证失败，请检查令牌是否有效以及网络连接。",
+    "switching-account": "正在切换账号...",
+    "other-tab-switched-notice": "检测到其他标签页已切换当前账号，请刷新页面以保持同步。",
+    "reload-now": "立即刷新",
+    "backend-profiles-unsupported-warning": "当前后端服务暂不支持多账号隔离，已自动切换为仅本地模式以保护默认账号数据。",
+    "logged-out-profile-notice": "当前处于账户配置 {{profile}}（未登录）。",
+    "return-to-default": "返回默认账户",
+    "switch-to-profile": "切换到 {{profile}}",
+    "profile-conflict-webdav-warning": "同步下来的 WebDAV 配置与其他账户（{{account}}）冲突，请改用独立子目录以避免覆盖备份。",
+    "profile-conflict-vector-warning": "同步下来的向量搜索 Worker URL 与其他账户（{{account}}）冲突，请为不同账户使用独立的 Worker URL。",
+    "dismiss": "关闭"
   }
 }

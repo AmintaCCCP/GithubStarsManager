@@ -32,6 +32,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
 import { useVectorSearchActions } from '../../features/settings/hooks/useVectorSearchActions';
+import { findConflictingVectorProfile } from '../../services/profileStorage';
 
 interface VectorSearchSettingsProps {
   t: TranslateFn;
@@ -115,6 +116,18 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
     setTimeout(() => setEmbeddingSaved(false), 2000);
   };
   const handleSaveWorkerConfig = () => {
+    if (formWorkerUrl.trim()) {
+      const conflict = findConflictingVectorProfile(formWorkerUrl);
+      if (conflict) {
+        toast(
+          t('vectorSearchSettings.worker-url-conflict', {
+            account: conflict.login || conflict.id,
+          }),
+          'error',
+        );
+        return;
+      }
+    }
     setVectorSearchConfig({
       workerUrl: formWorkerUrl, authToken: formAuthToken, embeddingConfigId: activeEmbeddingConfig || '',
       indexMode: formIndexMode, readmeMaxChars: formReadmeMaxChars, searchThreshold: formSearchThreshold,
@@ -130,7 +143,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const handleIncrementalIndex = () => incrementalIndex(draft());
   const handleAbortIndexing = () => abortIndexing();
   const { isIndexing, phase, phaseDone, phaseTotal, result: indexResult } = vectorIndexingState;
-  const isConfigComplete = !!(activeConfig && formBaseUrl && formModel && (formApiType === 'ollama' || formApiKey) && formWorkerUrl && formAuthToken);
+  const hasWorkerUrlConflict = Boolean(formWorkerUrl.trim() && findConflictingVectorProfile(formWorkerUrl));
+  const isConfigComplete = !!(activeConfig && formBaseUrl && formModel && (formApiType === 'ollama' || formApiKey) && formWorkerUrl && formAuthToken && !hasWorkerUrlConflict);
 
   return (
     <div className="space-y-6">

@@ -847,10 +847,10 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
   }
 });
 
-ipcMain.handle('x-auth:save', async (_event, auth) => {
+ipcMain.handle('x-auth:save', async (_event, auth, profileId) => {
   if (auth === null || auth === undefined) {
     console.log('[x-auth:save] clearing (null payload)');
-    return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, null);
+    return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, null, profileId);
   }
   if (typeof auth !== 'object' || Array.isArray(auth)) {
     console.warn('[x-auth:save] rejected: invalid auth payload type');
@@ -860,7 +860,7 @@ ipcMain.handle('x-auth:save', async (_event, auth) => {
   const ct0 = typeof auth.ct0 === 'string' ? auth.ct0.trim().replace(/^["']|["']$/g, '').trim() : '';
   if (!authToken && !ct0) {
     console.log('[x-auth:save] clearing (empty tokens)');
-    return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, null);
+    return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, null, profileId);
   }
   if (
     !authToken ||
@@ -873,19 +873,19 @@ ipcMain.handle('x-auth:save', async (_event, auth) => {
     console.warn('[x-auth:save] rejected: invalid auth cookies', { authTokenLen: authToken.length, ct0Len: ct0.length });
     return { success: false, error: 'invalid auth cookies' };
   }
-  const result = saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, { authToken, ct0 });
+  const result = saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, { authToken, ct0 }, profileId);
   console.log('[x-auth:save] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
   return result;
 });
 
-ipcMain.handle('x-auth:get', async () => {
-  const result = loadEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage });
+ipcMain.handle('x-auth:get', async (_event, profileId) => {
+  const result = loadEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, profileId);
   console.log('[x-auth:get] result:', result ? 'found credentials' : 'no credentials on disk');
   return result;
 });
 
-ipcMain.handle('x-auth:clear', async () => {
-  const result = clearEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData') });
+ipcMain.handle('x-auth:clear', async (_event, profileId) => {
+  const result = clearEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData') }, profileId);
   console.log('[x-auth:clear] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
   return result;
 });

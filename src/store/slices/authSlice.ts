@@ -3,6 +3,7 @@ import { resetSyncHashes } from '../../services/autoSync';
 import type { AppStoreSlice } from '../types';
 import { accountIdKey, applyAccountWorkspace, captureAccountWorkspace, switchAccountWorkspace } from '../helpers/accountWorkspace';
 import { clearAuthMirror, writeAuthMirror, writeSessionBackendSecret } from '../persistence/authStorage';
+import { ACTIVE_PROFILE_ID, clearPendingSeed, syncActiveProfileMetadata } from '../../services/profileStorage';
 
 export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions, 'setUser' | 'setGitHubToken' | 'setBackendApiSecret' | 'logout'>> = (set, get) => ({
       setUser: (user) => {
@@ -23,6 +24,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions, 
         }
         const { githubToken, backendApiSecret } = get();
         writeAuthMirror({ user, githubToken, backendApiSecret });
+        if (user) {
+          syncActiveProfileMetadata({ user });
+        }
       },
       setGitHubToken: (token) => {
         logger.info('store.setGitHubToken', 'Setting GitHub token', { hasToken: !!token });
@@ -46,6 +50,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions, 
           : current.accountWorkspaces;
         clearAuthMirror();
         writeSessionBackendSecret(null);
+        // A logout must not leave a seed behind: a later boot would silently
+        // re-authenticate the account the user just signed out of.
+        clearPendingSeed(ACTIVE_PROFILE_ID);
         // Reset sync fingerprints so the next force sync (e.g. backend
         // login restore) applies every shard even if the backend data has
         // not changed since this session.

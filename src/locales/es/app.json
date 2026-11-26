@@ -887,7 +887,8 @@
     "warning-some-secrets-in-this-backup-are-masked-p": "Advertencia: algunas claves de esta copia de seguridad han sido bloqueadas. Después de la importación, vuelva a ingresar la clave en la configuración correspondiente.",
     "importing": "Importador…",
     "merge-import": "Importación de fusión",
-    "replace-import": "Anular importación"
+    "replace-import": "Anular importación",
+    "webdav-import-conflict-skipped": "Se omitieron {{count}} configuración(es) WebDAV importada(s) en conflicto con la cuenta {{account}}."
   },
   "diagnosticLogsPanel": {
     "level": "nivel",
@@ -1348,7 +1349,9 @@
     "deploy-tab-manual": "Pasos manuales (Avanzado)",
     "one-click-platforms-tip": "Iniciadores rápidos específicos de la plataforma:",
     "platform-mac-linux": "macOS / Linux: En cloudflare-worker, ejecutar ./deploy.sh",
-    "platform-windows": "Windows: En cloudflare-worker, haga doble clic en deploy.bat o ejecute .\\deploy.ps1"
+    "platform-windows": "Windows: En cloudflare-worker, haga doble clic en deploy.bat o ejecute .\\deploy.ps1",
+    "worker-url-conflict": "Esta URL de Vectorize Worker ya está en uso por la cuenta {{account}}. Despliega una URL de Vectorize Worker independiente para esta cuenta.",
+    "worker-url-unsaved": "Guarda la URL del Worker antes de crear el índice."
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuración WebDAV",
@@ -1416,5 +1419,39 @@
     "download": "Descargar",
     "detected-from-filenames-and-release-metadata-no": "Se detecta a partir de nombres de archivo y metadatos del Release. No se comprueba la seguridad ni se ejecuta nada automáticamente. Siempre puedes elegir otro recurso en la lista de abajo.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Se excluyeron {{v1}} recursos que no aplican a este dispositivo (código fuente, sumas de verificación, firmas, símbolos de depuración, blockmaps, otras plataformas o arquitecturas)."
+  },
+  "accountSwitcher": {
+    "account-menu": "Menú de cuenta",
+    "accounts-label": "Cuentas",
+    "active-badge": "Activa",
+    "add-account": "Añadir cuenta",
+    "switch-account": "Cambiar de cuenta",
+    "remove-account": "Eliminar cuenta",
+    "remove-account-confirm-title": "Eliminar cuenta",
+    "remove-account-confirm-desc": "¿Eliminar los datos locales y el perfil de {{account}}? Se eliminarán los repositorios guardados, los resúmenes de IA, las etiquetas de IA, las etiquetas personalizadas y el historial de chat de repositorios de este perfil; no se pueden recuperar desde GitHub. Si un backend conectado almacena este perfil, sus datos en el servidor también podrían eliminarse. Esto no afectará a tu cuenta de GitHub.",
+    "remove-account-server-failed": "No se pudo eliminar la cuenta en el servidor. Se conservaron los datos locales; inténtalo de nuevo.",
+    "remove-account-credentials-failed": "No se pudieron eliminar las credenciales de X guardadas. La cuenta se conservó; inténtalo de nuevo.",
+    "add-account-title": "Añadir cuenta de GitHub",
+    "add-account-description": "Introduce un token de acceso personal de GitHub para crear un perfil de cuenta aislado.",
+    "github-pat-label": "Token de acceso personal de GitHub",
+    "github-pat-placeholder": "ghp_... o github_pat_...",
+    "show-token": "Mostrar token",
+    "hide-token": "Ocultar token",
+    "copy-general-settings": "Copiar ajustes generales (IA / Embedding / Tema / Idioma)",
+    "cancel": "Cancelar",
+    "add-and-switch": "Añadir y cambiar",
+    "token-required": "Introduce un token de acceso personal de GitHub.",
+    "duplicate-account-error": "Esta cuenta de GitHub ya ha sido añadida.",
+    "token-validation-failed": "No se pudo verificar el token. Comprueba el token y tu conexión.",
+    "switching-account": "Cambiando de cuenta...",
+    "other-tab-switched-notice": "Otra pestaña cambió la cuenta activa. Recarga la página para mantener la sincronización.",
+    "reload-now": "Recargar",
+    "backend-profiles-unsupported-warning": "El servidor backend conectado aún no admite perfiles multicuenta. Ejecutando en modo solo local para proteger la cuenta predeterminada.",
+    "logged-out-profile-notice": "Actualmente en el perfil {{profile}} (sesión cerrada).",
+    "return-to-default": "Volver a la cuenta predeterminada",
+    "switch-to-profile": "Cambiar a {{profile}}",
+    "profile-conflict-webdav-warning": "La configuración de WebDAV sincronizada entra en conflicto con otra cuenta ({{account}}). Usa un subdirectorio distinto para evitar sobrescribir copias de seguridad.",
+    "profile-conflict-vector-warning": "La URL del Worker de búsqueda vectorial sincronizada entra en conflicto con otra cuenta ({{account}}). Usa una URL de Worker dedicada por cuenta.",
+    "dismiss": "Descartar"
   }
 }

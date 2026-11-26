@@ -56,6 +56,12 @@ import {
 import { Github } from '../ui/brand-icons';
 import { useAppStore } from '../../store/useAppStore';
 import { removePersistedSnapshot } from '../../store/persistence/storage';
+import {
+  ACTIVE_PROFILE_ID,
+  clearProfileLocalStorage,
+  findConflictingWebdavProfile,
+  scopedKey,
+} from '../../services/profileStorage';
 import { normalizePluginCustomIcons } from '../../store/normalizers/persistedState';
 import { useShallow } from 'zustand/react/shallow';
 import { isThemePresetId } from '../../constants/themePresets';
@@ -345,45 +351,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   }, []);
 
   const clearAllStorage = async () => {
-    // App-owned localStorage keys and prefixes
-    const APP_LOCALSTORAGE_KEYS = [
-      'github-stars-search-history',
-      'lastSearchTime',
-    ];
-    const APP_LOCALSTORAGE_PREFIXES = [
-      'github-stars-manager',
-    ];
+    // Only clear the active profile's scoped localStorage/sessionStorage keys.
+    // Never wipe gsm:profiles, gsm:active-profile, gsm:pending-seed,
+    // github-stars-manager-backend-url, or other profiles' data.
+    clearProfileLocalStorage(ACTIVE_PROFILE_ID);
 
-    // Clear localStorage - only remove app-owned keys
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        const isExactMatch = APP_LOCALSTORAGE_KEYS.includes(key);
-        const isPrefixMatch = APP_LOCALSTORAGE_PREFIXES.some(prefix => key.startsWith(prefix));
-        if (isExactMatch || isPrefixMatch) {
-          keysToRemove.push(key);
-        }
-      }
-    }
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
-
-    // App-owned sessionStorage keys
-    const APP_SESSIONSTORAGE_KEYS = [
-      'github-stars-manager-backend-secret',
-    ];
-
-    // Clear sessionStorage - only remove app-owned keys
-    APP_SESSIONSTORAGE_KEYS.forEach((key) => sessionStorage.removeItem(key));
-
-    // Clear IndexedDB - only remove the specific database used by this app.
+    // Clear IndexedDB - only remove the active profile's persisted snapshot.
     // 走持久化层的串行删除：除磁盘清扫外，还会在串行写链上取消待写、完成删除并
     // 重置分片判脏簿记——直接调底层 removeItem 会让随后的 store 重置写入以过期
     // 基准判脏，只补写部分分片，而 meta 仍声明全部分片。
     // 必须 await 删除真正落盘（zustand v4 的 clearStorage 不回传 Promise）：
     // 若链上还有排队的大写入，2 秒后的 reload 可能早于删除提交，数据复活。
     try {
-      await removePersistedSnapshot(useAppStore.persist.getOptions().name ?? 'github-stars-manager');
+      await removePersistedSnapshot(useAppStore.persist.getOptions().name ?? scopedKey('github-stars-manager'));
     } catch (error) {
       console.error('Failed to clear IndexedDB', error);
       throw new Error('IndexedDB clear failed');
@@ -614,8 +594,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           isSubscribed: undefined,
         }
       });
-      localStorage.removeItem('github-stars-search-history');
-      localStorage.removeItem('lastSearchTime');
+      localStorage.removeItem(scopedKey('github-stars-search-history'));
+      localStorage.removeItem(scopedKey('lastSearchTime'));
       setSearchHistoryVersion(v => v + 1);
       addLog(t('dataManagementPanel.delete-search-history'), true);
       showSuccess(t('dataManagementPanel.search-history-deleted'));
@@ -768,6 +748,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const importedData = importPreview.data.data;
       // Legacy compatibility: treat missing flag as true (older exports contained keys)
       const wasIncluded = importedData.includeKeysInBackup ?? true;
+      let skippedWebdavConflicts = 0;
+      let firstConflictAccount = '';
 
       if (mode === 'replace') {
         if (selectedTypes.includes('repositories') && importedData.repositories) {
@@ -788,7 +770,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             ...cfg,
             password: wasIncluded && isRealSecret(cfg.password) ? cfg.password : store.webdavConfigs.find(c => c.id === cfg.id)?.password || ''
           }));
-          store.setWebDAVConfigs(restoredConfigs);
+          const nonConflictingConfigs = restoredConfigs.filter(cfg => {
+            const conflict = findConflictingWebdavProfile(cfg.url, cfg.path);
+            if (conflict) {
+              skippedWebdavConflicts += 1;
+              if (!firstConflictAccount) firstConflictAccount = conflict.login || conflict.id;
+              return false;
+            }
+            return true;
+          });
+          store.setWebDAVConfigs(nonConflictingConfigs);
         }
         if (selectedTypes.includes('customCategories')) {
           if (importedData.customCategories) {
@@ -946,6 +937,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           const existingIds = new Set(store.webdavConfigs.map(c => c.id));
           const newConfigs = importedData.webdavConfigs
             .filter(c => !existingIds.has(c.id))
+            .filter(cfg => {
+              const conflict = findConflictingWebdavProfile(cfg.url, cfg.path);
+              if (conflict) {
+                skippedWebdavConflicts += 1;
+                if (!firstConflictAccount) firstConflictAccount = conflict.login || conflict.id;
+                return false;
+              }
+              return true;
+            })
             .map(cfg => ({
               ...cfg,
               password: wasIncluded && isRealSecret(cfg.password) ? cfg.password : ''
@@ -1142,6 +1142,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             setBackendApiSecret(importedUiSettings.backendApiSecret);
           }
         }
+      }
+
+      if (skippedWebdavConflicts > 0) {
+        showError(
+          t('dataManagementPanel.webdav-import-conflict-skipped', {
+            count: skippedWebdavConflicts,
+            account: firstConflictAccount,
+          }),
+        );
       }
 
       // 如果导入的数据包含屏蔽的密钥，提示用户
@@ -1535,7 +1544,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const searchHistoryCount = (() => {
     try {
-      const saved = localStorage.getItem('github-stars-search-history');
+      const saved = localStorage.getItem(scopedKey('github-stars-search-history'));
       if (saved) {
         const parsed = JSON.parse(saved);
         return Array.isArray(parsed) ? parsed.length : 0;

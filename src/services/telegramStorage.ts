@@ -7,6 +7,7 @@
  */
 
 import type { GitHubRepoDetailRead } from './githubApi';
+import { scopedKey } from './profileStorage';
 
 /** 频道消息（正文缓存供"查看消息原文"离线渲染） */
 export interface TelegramStoredMessage {
@@ -75,7 +76,8 @@ const normalizeMeta = (meta: TelegramSyncMeta | null | undefined): TelegramSyncM
     : {},
 });
 
-const DB_NAME = 'github-stars-telegram';
+// Same name as before for the default profile; suffixed per profile otherwise.
+const DB_NAME = scopedKey('github-stars-telegram');
 const DB_VERSION = 1;
 const MESSAGES_STORE = 'messages';
 const REPOS_STORE = 'repos';

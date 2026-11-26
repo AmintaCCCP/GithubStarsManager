@@ -13,7 +13,8 @@
     "sync-failed": "同期に失敗しました",
     "sync-from-backend": "バックエンドから同期する",
     "syncing-from-backend-will-overwrite-local-data-c": "バックエンドから同期するとローカル データが上書きされます。続行しますか?",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "バックエンドから同期: ウェアハウス {{v1}}、リリース {{v2}}、AI 構成 {{v3}}、WebDAV 構成 {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "バックエンドから同期: ウェアハウス {{v1}}、リリース {{v2}}、AI 構成 {{v3}}、WebDAV 構成 {{v4}}",
+    "webdav-sync-conflict-warning": "同期された WebDAV 設定がアカウント {{account}} と競合しています。バックアップの上書きを防ぐため別のサブディレクトリを使用してください。"
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "最初に WebDAV サービスを設定してアクティブ化してください。",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "カスタム User-Agent にはラテン文字（Latin-1）のみを使用できます",
     "webdav-connection-successful": "WebDAV接続に成功しました！",
     "webdav-connection-failed-please-check-configurat": "WebDAV 接続に失敗しました。構成を確認してください。",
-    "webdav-test-failed": "WebDAVテストに失敗しました"
+    "webdav-test-failed": "WebDAVテストに失敗しました",
+    "webdav-target-conflict": "この WebDAV パスはアカウント {{account}} で既に使用されています。バックアップの上書きを防ぐため、{{suggestedPath}} のような別のサブディレクトリを指定してください。"
   },
   "generalPanel": {
     "account-token-hint": "現在のアカウント {{login}}。有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。",

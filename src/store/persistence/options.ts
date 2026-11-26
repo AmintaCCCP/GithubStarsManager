@@ -18,11 +18,20 @@ import {
   PersistedAppState,
 } from '../schema';
 import { normalizePersistedState } from '../normalizers/persistedState';
+import {
+  clearPendingSeed,
+  ACTIVE_PROFILE_ID,
+  readPendingSeed,
+  scopedKey,
+  syncActiveProfileMetadata,
+} from '../../services/profileStorage';
 import { writeAuthMirror } from './authStorage';
-import { debouncedPersistStorage } from './storage';
+import { debouncedPersistStorage, flushPendingPersistSnapshot } from './storage';
+
+let pendingSeedAppliedOnBoot = false;
 
 export const appPersistenceOptions: PersistOptions<AppStoreState, PersistedAppState> = {
-  name: 'github-stars-manager',
+  name: scopedKey('github-stars-manager'),
   version: 17,
   storage: debouncedPersistStorage as PersistStorage<PersistedAppState>,
 partialize: (state) => ({
@@ -450,26 +459,67 @@ customCategoriesCount: normalized.customCategories?.length || 0,
 
   // Keep the synchronous localStorage mirror aligned with the hydrated
   // auth state (covers restores that came from IndexedDB or the mirror).
-  const merged = {
-...currentState,
-...normalized,
+  let merged: AppStoreState = {
+    ...currentState,
+    ...normalized,
   };
+
+  // Apply one-time settings/auth seed for a newly created profile, then delete it.
+  const pendingSeed = readPendingSeed(ACTIVE_PROFILE_ID);
+  if (pendingSeed) {
+    pendingSeedAppliedOnBoot = true;
+    merged = {
+      ...merged,
+      ...(pendingSeed.copiedSettings as Partial<AppStoreState> | undefined),
+      user: pendingSeed.user,
+      githubToken: pendingSeed.githubToken,
+      isAuthenticated: true,
+    };
+    syncActiveProfileMetadata({ user: pendingSeed.user });
+  }
+
   writeAuthMirror({
-user: merged.user ?? null,
-githubToken: typeof merged.githubToken === 'string' ? merged.githubToken : null,
-backendApiSecret: typeof merged.backendApiSecret === 'string' ? merged.backendApiSecret : null,
+    user: merged.user ?? null,
+    githubToken: typeof merged.githubToken === 'string' ? merged.githubToken : null,
+    backendApiSecret: typeof merged.backendApiSecret === 'string' ? merged.backendApiSecret : null,
   });
 
   return merged;
 },
 onRehydrateStorage: (state) => {
   const hydrationStart = Date.now();
-  return (_rehydratedState, error) => {
+  return (rehydratedState, error) => {
 const elapsedMs = Date.now() - hydrationStart;
 if (error) {
   logger.errorFromError('store.hydrate', 'Store hydration failed', error, { elapsedMs });
 } else {
   logger.info('store.hydrate', 'Store hydration complete', { elapsedMs });
+  if (rehydratedState) {
+    // Config changes update the profile registry synchronously while the
+    // snapshot write is debounced. If the app exited before that write, the
+    // restored configs may differ from the registry, hiding shared targets
+    // from conflict detection — re-sync once after hydration.
+    syncActiveProfileMetadata({
+      webdavConfigs: rehydratedState.webdavConfigs,
+      vectorSearchConfig: rehydratedState.vectorSearchConfig,
+    });
+  }
+}
+if (pendingSeedAppliedOnBoot && rehydratedState) {
+  pendingSeedAppliedOnBoot = false;
+  // Trigger persistence of the newly seeded profile immediately. The seed is
+  // only cleared once that write actually lands, so a failed persist replays
+  // the seed on the next boot instead of losing the new account.
+  if (rehydratedState.user) {
+    rehydratedState.setUser(rehydratedState.user);
+  }
+  void flushPendingPersistSnapshot(true)
+    .then(() => {
+      clearPendingSeed(ACTIVE_PROFILE_ID);
+    })
+    .catch((error: unknown) => {
+      logger.warn('store.hydrate', 'Pending profile seed kept: persist failed', error);
+    });
 }
 state.setHasHydrated(true);
   };

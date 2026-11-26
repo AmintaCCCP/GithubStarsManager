@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { getProfileHeader } from './profileStorage';
 import { createCombinedAbortController } from '../utils/abortUtils';
 
 const GITHUB_GRAPHQL_ENDPOINT = 'https://api.github.com/graphql';
@@ -175,7 +176,10 @@ export class GitHubListsApiService {
   }
 
   private getBackendHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...getProfileHeader(),
+    };
     if (this.backendAuthToken) {
       headers.Authorization = `Bearer ${this.backendAuthToken}`;
     }

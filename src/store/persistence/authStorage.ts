@@ -1,8 +1,9 @@
 
 import type { GitHubUser } from '../../types';
+import { scopedKey } from '../../services/profileStorage';
 
-const BACKEND_SECRET_SESSION_KEY = 'github-stars-manager-backend-secret';
-const AUTH_MIRROR_KEY = 'github-stars-manager-auth';
+const BACKEND_SECRET_SESSION_BASE_KEY = 'github-stars-manager-backend-secret';
+const AUTH_MIRROR_KEY = scopedKey('github-stars-manager-auth');
 
 interface AuthMirror {
   user: GitHubUser | null;
@@ -45,22 +46,25 @@ export const clearAuthMirror = (): void => {
   }
 };
 
-export const readSessionBackendSecret = (): string | null => {
+export const readSessionBackendSecret = (profileId?: string): string | null => {
   if (typeof window === 'undefined') return null;
   try {
-    return window.sessionStorage.getItem(BACKEND_SECRET_SESSION_KEY);
+    const key = scopedKey(BACKEND_SECRET_SESSION_BASE_KEY, profileId);
+    return window.sessionStorage.getItem(key);
   } catch {
     return null;
   }
 };
 
-export const writeSessionBackendSecret = (secret: string | null): void => {
+export const writeSessionBackendSecret = (secret: string | null, profileId?: string): void => {
   if (typeof window === 'undefined') return;
   try {
+    const key = scopedKey(BACKEND_SECRET_SESSION_BASE_KEY, profileId);
     if (secret) {
-      window.sessionStorage.setItem(BACKEND_SECRET_SESSION_KEY, secret);
+      // codeql[js/clear-text-storage-of-sensitive-data] Session-scoped and per-tab by design: the secret must survive a profile-switch reload, is never written to disk, and is cleared when the tab closes.
+      window.sessionStorage.setItem(key, secret);
     } else {
-      window.sessionStorage.removeItem(BACKEND_SECRET_SESSION_KEY);
+      window.sessionStorage.removeItem(key);
     }
   } catch {
     // Storage may be blocked or unavailable; IndexedDB remains the durable path.

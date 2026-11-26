@@ -887,7 +887,8 @@
     "importing": "Importieren…",
     "merge-import": "Import zusammenführen",
     "replace-import": "Import überschreiben",
-    "version": "Version:"
+    "version": "Version:",
+    "webdav-import-conflict-skipped": "{{count}} importierte WebDAV-Konfiguration(en) wegen Konflikt mit Konto {{account}} übersprungen."
   },
   "diagnosticLogsPanel": {
     "level": "Ebene",
@@ -1348,7 +1349,9 @@
     "deploy-tab-manual": "Manuelle Schritte (Erweitert)",
     "one-click-platforms-tip": "Plattformspezifische Schnellstarter:",
     "platform-mac-linux": "macOS / Linux: In cloudflare-worker ./deploy.sh ausführen",
-    "platform-windows": "Windows: In cloudflare-worker auf deploy.bat doppelklicken oder .\\deploy.ps1 ausführen"
+    "platform-windows": "Windows: In cloudflare-worker auf deploy.bat doppelklicken oder .\\deploy.ps1 ausführen",
+    "worker-url-conflict": "Diese Vectorize-Worker-URL wird bereits vom Konto {{account}} verwendet. Bitte stellen Sie eine eigene Vectorize-Worker-URL für dieses Konto bereit.",
+    "worker-url-unsaved": "Speichern Sie die Worker-URL, bevor Sie den Index erstellen."
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV-Konfiguration",
@@ -1416,5 +1419,39 @@
     "download": "Herunterladen",
     "detected-from-filenames-and-release-metadata-no": "Erkannt anhand von Dateinamen und Release-Metadaten. Es findet keine Sicherheitsprüfung statt und es wird nichts automatisch ausgeführt. Du kannst unten jederzeit eine andere Datei auswählen.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} Datei(en) ausgeschlossen, die nicht zu diesem Gerät passen (Quellcode, Prüfsummen, Signaturen, Debug-Symbole, Blockmaps, andere Plattformen oder Architekturen)."
+  },
+  "accountSwitcher": {
+    "account-menu": "Kontomenü",
+    "accounts-label": "Konten",
+    "active-badge": "Aktiv",
+    "add-account": "Konto hinzufügen",
+    "switch-account": "Konto wechseln",
+    "remove-account": "Konto entfernen",
+    "remove-account-confirm-title": "Konto entfernen",
+    "remove-account-confirm-desc": "Lokale Daten und Profil für {{account}} entfernen? Dabei werden gespeicherte Repositories, KI-Zusammenfassungen, KI-Tags, eigene Tags und der Repository-Chatverlauf dieses Profils gelöscht; diese lassen sich nicht aus GitHub wiederherstellen. Wenn ein verbundenes Backend dieses Profil speichert, können auch dessen Serverdaten gelöscht werden. Ihr GitHub-Konto bleibt unverändert.",
+    "remove-account-server-failed": "Das Konto konnte auf dem Server nicht gelöscht werden. Lokale Daten wurden beibehalten; bitte erneut versuchen.",
+    "remove-account-credentials-failed": "X-Zugangsdaten konnten nicht gelöscht werden. Das Konto wurde beibehalten; bitte erneut versuchen.",
+    "add-account-title": "GitHub-Konto hinzufügen",
+    "add-account-description": "Geben Sie ein persönliches GitHub-Zugriffstoken ein, um ein isoliertes Kontoprofil zu erstellen.",
+    "github-pat-label": "Persönliches GitHub-Zugriffstoken",
+    "github-pat-placeholder": "ghp_... oder github_pat_...",
+    "show-token": "Token anzeigen",
+    "hide-token": "Token ausblenden",
+    "copy-general-settings": "Allgemeine Einstellungen kopieren (KI / Embedding / Design / Sprache)",
+    "cancel": "Abbrechen",
+    "add-and-switch": "Hinzufügen & wechseln",
+    "token-required": "Bitte geben Sie ein persönliches GitHub-Zugriffstoken ein.",
+    "duplicate-account-error": "Dieses GitHub-Konto wurde bereits hinzugefügt.",
+    "token-validation-failed": "Token-Prüfung fehlgeschlagen. Bitte prüfen Sie das Token und die Netzwerkverbindung.",
+    "switching-account": "Konto wird gewechselt...",
+    "other-tab-switched-notice": "Ein anderer Tab hat das aktive Konto gewechselt. Laden Sie die Seite neu, um synchron zu bleiben.",
+    "reload-now": "Neu laden",
+    "backend-profiles-unsupported-warning": "Der verbundene Backend-Server unterstützt noch keine Mehrkonten-Profile. Lokaler Modus aktiv, um das Standardkonto zu schützen.",
+    "logged-out-profile-notice": "Aktuell im Profil {{profile}} (abgemeldet).",
+    "return-to-default": "Zum Standardkonto zurückkehren",
+    "switch-to-profile": "Zu {{profile}} wechseln",
+    "profile-conflict-webdav-warning": "Die synchronisierte WebDAV-Konfiguration steht in Konflikt mit einem anderen Konto ({{account}}). Verwenden Sie ein eigenes Unterverzeichnis, um Überschreibungen zu vermeiden.",
+    "profile-conflict-vector-warning": "Die synchronisierte Vector-Search-Worker-URL steht in Konflikt mit einem anderen Konto ({{account}}). Verwenden Sie pro Konto eine eigene Worker-URL.",
+    "dismiss": "Schließen"
   }
 }

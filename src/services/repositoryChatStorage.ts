@@ -7,10 +7,12 @@ import type {
   ToolEvidence,
 } from '../types/repositoryChat';
 
-const DB_NAME = 'gsm-repository-chat-db';
+import { scopedKey } from './profileStorage';
+
+const DB_NAME = scopedKey('gsm-repository-chat-db');
 const DB_VERSION = 2;
-const FALLBACK_KEY = 'gsm-repository-chat-fallback-v1';
-const FALLBACK_MODE_KEY = 'gsm-repository-chat-use-fallback-v1';
+const FALLBACK_KEY = scopedKey('gsm-repository-chat-fallback-v1');
+const FALLBACK_MODE_KEY = scopedKey('gsm-repository-chat-use-fallback-v1');
 const STORE_NAMES = ['sessions', 'messages', 'toolEvents', 'evidence', 'feedback'] as const;
 type StoreName = typeof STORE_NAMES[number];
 

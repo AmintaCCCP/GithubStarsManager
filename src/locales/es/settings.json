@@ -13,7 +13,8 @@
     "sync-failed": "Error de sincronización",
     "sync-from-backend": "Sincronización desde el backend",
     "syncing-from-backend-will-overwrite-local-data-c": "La sincronización desde el backend sobrescribirá los datos locales. ¿Quieres continuar?",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Sincronizado desde backend: Almacén {{v1}}, Versión {{v2}}, Configuración AI {{v3}}, Configuración WebDAV {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Sincronizado desde backend: Almacén {{v1}}, Versión {{v2}}, Configuración AI {{v3}}, Configuración WebDAV {{v4}}",
+    "webdav-sync-conflict-warning": "La configuración WebDAV sincronizada entra en conflicto con la cuenta {{account}}. Usa un subdirectorio separado."
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "Primero configure y active el servicio WebDAV.",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "El User-Agent personalizado solo puede contener caracteres latinos (Latin-1)",
     "webdav-connection-successful": "¡Conexión WebDAV exitosa!",
     "webdav-connection-failed-please-check-configurat": "La conexión WebDAV falló, verifique la configuración.",
-    "webdav-test-failed": "La prueba WebDAV falló"
+    "webdav-test-failed": "La prueba WebDAV falló",
+    "webdav-target-conflict": "Esta ruta WebDAV ya está en uso por la cuenta {{account}}. Usa un subdirectorio distinto como {{suggestedPath}} para evitar sobrescribir copias de seguridad."
   },
   "generalPanel": {
     "account-token-hint": "Cuenta corriente {{login}}. Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión.",

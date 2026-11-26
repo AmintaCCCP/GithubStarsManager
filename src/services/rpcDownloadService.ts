@@ -1,6 +1,7 @@
 import type { RpcDownloadConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { backend } from './backendAdapter';
+import { getProfileHeader } from './profileStorage';
 
 interface RpcTestResult {
   success: boolean;
@@ -15,7 +16,10 @@ interface RpcDownloadResult {
 }
 
 function getAuthHeaders(apiSecret?: string): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getProfileHeader(),
+  };
   if (apiSecret) {
     headers['Authorization'] = `Bearer ${apiSecret}`;
   }

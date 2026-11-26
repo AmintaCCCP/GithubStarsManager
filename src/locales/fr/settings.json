@@ -13,7 +13,8 @@
     "sync-failed": "La synchronisation a échoué",
     "sync-from-backend": "Synchronisation depuis le backend",
     "syncing-from-backend-will-overwrite-local-data-c": "La synchronisation depuis le backend écrasera les données locales. Voulez-vous continuer ?",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Synchronisé depuis le backend : Warehouse {{v1}}, Release {{v2}}, Configuration AI {{v3}}, Configuration WebDAV {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Synchronisé depuis le backend : Warehouse {{v1}}, Release {{v2}}, Configuration AI {{v3}}, Configuration WebDAV {{v4}}",
+    "webdav-sync-conflict-warning": "La configuration WebDAV synchronisée est en conflit avec le compte {{account}}. Utilisez un sous-répertoire distinct."
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "Veuillez d'abord configurer et activer le service WebDAV.",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "Le User-Agent personnalisé ne peut contenir que des caractères latins (Latin-1)",
     "webdav-connection-successful": "Connexion WebDAV réussie !",
     "webdav-connection-failed-please-check-configurat": "La connexion WebDAV a échoué, veuillez vérifier la configuration.",
-    "webdav-test-failed": "Le test WebDAV a échoué"
+    "webdav-test-failed": "Le test WebDAV a échoué",
+    "webdav-target-conflict": "Ce chemin WebDAV est déjà utilisé par le compte {{account}}. Utilisez un sous-dossier distinct tel que {{suggestedPath}} pour éviter d'écraser les sauvegardes."
   },
   "generalPanel": {
     "account-token-hint": "Compte courant {{login}}. Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter.",

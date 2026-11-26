@@ -76,7 +76,7 @@ const createStoreState = () => ({
     baseUrl: 'https://example.com/v1', apiKey: 'key', model: 'text-embedding-3-small', dimensions: 1536, isActive: true,
   }],
   activeEmbeddingConfig: 'embedding',
-  vectorSearchConfig: { embeddingFormatVersion: 1, enabled: true },
+  vectorSearchConfig: { embeddingFormatVersion: 1, enabled: true, workerUrl: 'https://worker.example.com' },
   repositories: [repository],
   githubToken: null,
   setVectorSearchStatus: mocks.setVectorSearchStatus,
@@ -164,6 +164,19 @@ describe('useVectorSearchActions', () => {
     mocks.needsReindex.mockReturnValue(true);
     const { result } = renderHook(() => useVectorSearchActions());
     expect(result.current.unindexedRepoCount).toBe(0);
+  });
+
+  it('refuses to index against a worker URL that was never saved', async () => {
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => {
+      await result.current.rebuildIndex({ ...draft, workerUrl: 'https://other.example.com' });
+    });
+
+    expect(mocks.indexAllRepos).not.toHaveBeenCalled();
+    expect(mocks.setVectorIndexingState).toHaveBeenCalledWith(
+      expect.objectContaining({ isIndexing: false, result: expect.objectContaining({ errors: 1 }) }),
+    );
   });
 
   it('treats an AbortError from cleanup as a cancelled index operation', async () => {

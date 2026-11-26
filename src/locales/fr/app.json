@@ -887,7 +887,8 @@
     "importing": "Importation…",
     "merge-import": "Fusionner l'importation",
     "replace-import": "Remplacer l'importation",
-    "version": "Version:"
+    "version": "Version:",
+    "webdav-import-conflict-skipped": "{{count}} configuration(s) WebDAV importée(s) ignorée(s) en raison d'un conflit avec le compte {{account}}."
   },
   "diagnosticLogsPanel": {
     "level": "niveau",
@@ -1348,7 +1349,9 @@
     "deploy-tab-manual": "Étapes manuelles (Avancé)",
     "one-click-platforms-tip": "Lanceurs rapides spécifiques à la plateforme :",
     "platform-mac-linux": "macOS / Linux : Dans cloudflare-worker, exécutez ./deploy.sh",
-    "platform-windows": "Windows : Dans cloudflare-worker, double-cliquez sur deploy.bat ou exécutez .\\deploy.ps1"
+    "platform-windows": "Windows : Dans cloudflare-worker, double-cliquez sur deploy.bat ou exécutez .\\deploy.ps1",
+    "worker-url-conflict": "Cette URL Vectorize Worker est déjà utilisée par le compte {{account}}. Veuillez déployer une URL Vectorize Worker distincte pour ce compte.",
+    "worker-url-unsaved": "Enregistrez l'URL du Worker avant de construire l'index."
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuration WebDAV",
@@ -1416,5 +1419,39 @@
     "download": "Télécharger",
     "detected-from-filenames-and-release-metadata-no": "Détecté à partir des noms de fichiers et des métadonnées de la Release. Aucun contrôle de sécurité n'est effectué et rien ne s'exécute automatiquement. Vous pouvez toujours choisir un autre fichier dans la liste ci-dessous.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} fichier(s) écarté(s) car ils ne concernent pas cet appareil (code source, sommes de contrôle, signatures, symboles de débogage, blockmaps, autres plateformes ou architectures)."
+  },
+  "accountSwitcher": {
+    "account-menu": "Menu du compte",
+    "accounts-label": "Comptes",
+    "active-badge": "Actif",
+    "add-account": "Ajouter un compte",
+    "switch-account": "Changer de compte",
+    "remove-account": "Supprimer le compte",
+    "remove-account-confirm-title": "Supprimer le compte",
+    "remove-account-confirm-desc": "Supprimer les données locales et le profil de {{account}} ? Cela supprime les dépôts enregistrés, les résumés IA, les étiquettes IA, les étiquettes personnalisées et l'historique des discussions de ce profil ; ces données ne peuvent pas être restaurées depuis GitHub. Si un serveur connecté stocke ce profil, ses données serveur peuvent également être supprimées. Cela n'affectera pas votre compte GitHub.",
+    "remove-account-server-failed": "Impossible de supprimer le compte sur le serveur. Les données locales ont été conservées ; veuillez réessayer.",
+    "remove-account-credentials-failed": "Impossible de supprimer les identifiants X enregistrés. Le compte a été conservé ; réessayez.",
+    "add-account-title": "Ajouter un compte GitHub",
+    "add-account-description": "Saisissez un jeton d'accès personnel GitHub pour créer un profil de compte isolé.",
+    "github-pat-label": "Jeton d'accès personnel GitHub",
+    "github-pat-placeholder": "ghp_... ou github_pat_...",
+    "show-token": "Afficher le jeton",
+    "hide-token": "Masquer le jeton",
+    "copy-general-settings": "Copier les paramètres généraux (IA / Embedding / Thème / Langue)",
+    "cancel": "Annuler",
+    "add-and-switch": "Ajouter et basculer",
+    "token-required": "Veuillez saisir un jeton d'accès personnel GitHub.",
+    "duplicate-account-error": "Ce compte GitHub a déjà été ajouté.",
+    "token-validation-failed": "Échec de la vérification du jeton. Vérifiez le jeton et la connexion réseau.",
+    "switching-account": "Changement de compte...",
+    "other-tab-switched-notice": "Un autre onglet a changé le compte actif. Rechargez la page pour rester synchronisé.",
+    "reload-now": "Recharger",
+    "backend-profiles-unsupported-warning": "Le serveur backend connecté ne prend pas encore en charge le multi-compte. Mode local uniquement activé pour protéger le compte par défaut.",
+    "logged-out-profile-notice": "Actuellement sur le profil {{profile}} (déconnecté).",
+    "return-to-default": "Revenir au compte par défaut",
+    "switch-to-profile": "Passer à {{profile}}",
+    "profile-conflict-webdav-warning": "La configuration WebDAV synchronisée est en conflit avec un autre compte ({{account}}). Utilisez un sous-répertoire distinct pour éviter d'écraser les sauvegardes.",
+    "profile-conflict-vector-warning": "L'URL Worker de recherche vectorielle synchronisée est en conflit avec un autre compte ({{account}}). Utilisez une URL Worker dédiée par compte.",
+    "dismiss": "Fermer"
   }
 }

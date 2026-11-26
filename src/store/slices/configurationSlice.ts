@@ -1,6 +1,7 @@
 
 import type { AppStoreSlice } from '../types';
 import { mergeVectorSearchConfig, normalizeMcpConfig } from '../schema';
+import { syncActiveProfileMetadata } from '../../services/profileStorage';
 
 export const createConfigurationSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'addAIConfig'
@@ -45,20 +46,31 @@ export const createConfigurationSlice: AppStoreSlice<Pick<import('../types').App
       })),
 
       // WebDAV actions
-      addWebDAVConfig: (config) => set((state) => ({
-        webdavConfigs: [...state.webdavConfigs, config]
-      })),
-      updateWebDAVConfig: (id, updates) => set((state) => ({
-        webdavConfigs: state.webdavConfigs.map(config =>
+      addWebDAVConfig: (config) => set((state) => {
+        const webdavConfigs = [...state.webdavConfigs, config];
+        syncActiveProfileMetadata({ webdavConfigs });
+        return { webdavConfigs };
+      }),
+      updateWebDAVConfig: (id, updates) => set((state) => {
+        const webdavConfigs = state.webdavConfigs.map(config =>
           config.id === id ? { ...config, ...updates } : config
-        )
-      })),
-      deleteWebDAVConfig: (id) => set((state) => ({
-        webdavConfigs: state.webdavConfigs.filter(config => config.id !== id),
-        activeWebDAVConfig: state.activeWebDAVConfig === id ? null : state.activeWebDAVConfig
-      })),
+        );
+        syncActiveProfileMetadata({ webdavConfigs });
+        return { webdavConfigs };
+      }),
+      deleteWebDAVConfig: (id) => set((state) => {
+        const webdavConfigs = state.webdavConfigs.filter(config => config.id !== id);
+        syncActiveProfileMetadata({ webdavConfigs });
+        return {
+          webdavConfigs,
+          activeWebDAVConfig: state.activeWebDAVConfig === id ? null : state.activeWebDAVConfig,
+        };
+      }),
       setActiveWebDAVConfig: (activeWebDAVConfig) => set({ activeWebDAVConfig }),
-      setWebDAVConfigs: (webdavConfigs) => set({ webdavConfigs }),
+      setWebDAVConfigs: (webdavConfigs) => {
+        syncActiveProfileMetadata({ webdavConfigs });
+        set({ webdavConfigs });
+      },
       setLastBackup: (lastBackup) => set({ lastBackup }),
 
       // Embedding actions
@@ -90,9 +102,11 @@ export const createConfigurationSlice: AppStoreSlice<Pick<import('../types').App
       }),
 
       // Vector Search actions
-      setVectorSearchConfig: (config) => set((state) => ({
-        vectorSearchConfig: mergeVectorSearchConfig(state.vectorSearchConfig, config)
-      })),
+      setVectorSearchConfig: (config) => set((state) => {
+        const vectorSearchConfig = mergeVectorSearchConfig(state.vectorSearchConfig, config);
+        syncActiveProfileMetadata({ vectorSearchConfig });
+        return { vectorSearchConfig };
+      }),
       setVectorSearchStatus: (status) => set({ vectorSearchStatus: status }),
       setMcpConfig: (config) =>
         set((state) => ({

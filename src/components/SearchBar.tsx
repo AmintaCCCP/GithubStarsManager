@@ -10,6 +10,7 @@ import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, L
 import { BatchStarImportDialog } from './BatchStarImportDialog';
 import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
+import { scopedKey } from '../services/profileStorage';
 import { useShallow } from 'zustand/react/shallow';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useSearchActions } from '../features/repositories/hooks/useSearchActions';
@@ -231,7 +232,7 @@ export const SearchBar: React.FC = () => {
     setSearchSuggestions([...new Set(suggestions)]);
 
     // Load search history from localStorage
-    const savedHistory = localStorage.getItem('github-stars-search-history');
+    const savedHistory = localStorage.getItem(scopedKey('github-stars-search-history'));
     if (savedHistory) {
       try {
         const history = JSON.parse(savedHistory);
@@ -387,7 +388,7 @@ export const SearchBar: React.FC = () => {
     if (searchQuery.trim() && !searchHistory.includes(searchQuery.trim())) {
       const newHistory = [searchQuery.trim(), ...searchHistory.slice(0, 9)];
       setSearchHistory(newHistory);
-      localStorage.setItem('github-stars-search-history', JSON.stringify(newHistory));
+      localStorage.setItem(scopedKey('github-stars-search-history'), JSON.stringify(newHistory));
     }
 
     await aiSearch(searchQuery, applyFilters);
@@ -473,7 +474,7 @@ export const SearchBar: React.FC = () => {
 
   const clearSearchHistory = () => {
     setSearchHistory([]);
-    localStorage.removeItem('github-stars-search-history');
+    localStorage.removeItem(scopedKey('github-stars-search-history'));
     setShowSearchHistory(false);
   };
 

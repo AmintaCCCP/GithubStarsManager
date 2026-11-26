@@ -378,18 +378,6 @@ const writeShardedSnapshot = async (
     return;
   }
 
-  if (hydratedIncomplete) {
-    // 最近一次水合存在读取失败：水合结果不完整，写盘会用默认值覆盖磁盘上
-    // 仍然完好的真实分片。拒绝写入直到下一次完整读取成功。
-    logger.errorFromError(
-      'store.persist',
-      'Skipping persist write: last hydration was incomplete; refusing to overwrite',
-      new Error('hydrated incomplete'),
-      { source },
-    );
-    return;
-  }
-
   // 载荷中的 version 必须是 persist 版本号（水合时驱动 migrate），
   // writeVersion 仅用于丢弃过期的写入调度。
   const persistVersion = typeof value.version === 'number' ? value.version : 0;
@@ -414,6 +402,20 @@ const writeShardedSnapshot = async (
       return remaining === 0;
     });
     if (stillCoolingMs > 0) armDeferredLargeShardWrite(stillCoolingMs);
+  }
+  if (hydratedIncomplete) {
+    // 最近一次水合存在读取失败：水合结果不完整，写盘会用默认值覆盖磁盘上
+    // 仍然完好的真实分片。没有脏数据时本来就不会写盘，可正常返回；有脏数据
+    // 则拒绝写入，并让严格 flush 看到失败而不是以为 reload 屏障已满足。
+    if (dirty.length === 0) return;
+    const refusal = new Error('hydrated incomplete');
+    logger.errorFromError(
+      'store.persist',
+      'Skipping persist write: last hydration was incomplete; refusing to overwrite',
+      refusal,
+      { source },
+    );
+    throw refusal;
   }
   if (dirty.length === 0) return;
 
@@ -469,7 +471,7 @@ const writeShardedSnapshot = async (
     entries.push([metaKeyFor(name), JSON.stringify(meta)]);
   } catch (e) {
     logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
-    return;
+    throw e instanceof Error ? e : new Error(String(e));
   }
 
   const writeStartedAt = performance.now();
@@ -477,11 +479,12 @@ const writeShardedSnapshot = async (
     await setStorageEntries(name, entries);
   } catch (error) {
     // 提交失败（原子回滚）：旧快照原样保留，无数据丢失，等待下次变更重试。
+    // 向上抛出，让切换账号/重载前的 flush 知道落盘失败，不能继续 reload。
     logger.errorFromError('store.persist', 'Sharded persist write failed; previous snapshot kept', error, {
       source,
       shards: dirty,
     });
-    return;
+    throw error;
   }
   const writeMs = Math.round(performance.now() - writeStartedAt);
   if (writeMs > 50) {
@@ -528,16 +531,18 @@ const enqueueShardedWrite = (
   writeVersion: number,
   source: 'idle' | 'flush',
   shardFilter?: ReadonlyArray<PersistenceShardName>,
+  reportFailure = false,
 ): Promise<void> => {
-  // 链尾兜底 catch：writeChain 永不 reject，调用方（idle 的 void 调度、
-  // pagehide 的同步事件处理器）不会产生 unhandled rejection。
-  writeChain = writeChain
+  const write = writeChain
     .catch(() => undefined)
-    .then(() => writeShardedSnapshot(name, value, writeVersion, source, shardFilter))
-    .catch((error: unknown) => {
-      logger.errorFromError('store.persist', 'Persist write chain failed', error, { source });
-    });
-  return writeChain;
+    .then(() => writeShardedSnapshot(name, value, writeVersion, source, shardFilter));
+  // 链尾兜底 catch：writeChain 永不 reject，调用方（idle 的 void 调度、
+  // pagehide 的同步事件处理器）不会产生 unhandled rejection。需要知道落盘
+  // 是否成功的调用方（切换账号/重载前的 flush）传 reportFailure 拿如实 reject 的 Promise。
+  writeChain = write.catch((error: unknown) => {
+    logger.errorFromError('store.persist', 'Persist write chain failed', error, { source });
+  });
+  return reportFailure ? write : writeChain;
 };
 
 /**
@@ -607,22 +612,42 @@ const dispatchIdleShardedWrite = (): void => {
   }
 };
 
-const flushPendingPersistSnapshot = (): Promise<void> => {
-  if (latestPersistName === null || latestPersistValue === null) return Promise.resolve();
+/**
+ * Flush the pending snapshot. With `requireSuccess` the returned Promise rejects
+ * when the write could not be committed, so switch/reload flows can abort
+ * instead of discarding unsaved state. Strict flushes also repeat until no
+ * newer snapshot was scheduled while waiting (bounded), otherwise a state change
+ * right after the barrier would be left on the old side of a reload.
+ */
+const flushPendingPersistSnapshot = async (requireSuccess = false): Promise<void> => {
+  if (!requireSuccess) {
+    if (latestPersistName === null || latestPersistValue === null) return;
+    cancelPendingPersistTasks();
+    await enqueueShardedWrite(latestPersistName, latestPersistValue, persistWriteVersion, 'flush');
+    return;
+  }
 
-  cancelPendingPersistTasks();
-  const name = latestPersistName;
-  const value = latestPersistValue;
-  const scheduledVersion = persistWriteVersion;
-  return enqueueShardedWrite(name, value, scheduledVersion, 'flush');
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (latestPersistName === null || latestPersistValue === null) return;
+    cancelPendingPersistTasks();
+    const name = latestPersistName;
+    const value = latestPersistValue;
+    const scheduledVersion = persistWriteVersion;
+    await enqueueShardedWrite(name, value, scheduledVersion, 'flush', undefined, true);
+    if (persistWriteVersion === scheduledVersion) return;
+  }
+  throw new Error('Persist snapshot kept changing while flushing');
 };
 
 const registerPersistFlushListeners = (): void => {
   if (persistFlushListenersRegistered || typeof window === 'undefined') return;
   persistFlushListenersRegistered = true;
 
-  window.addEventListener('pagehide', flushPendingPersistSnapshot);
-  window.addEventListener('beforeunload', flushPendingPersistSnapshot);
+  const flushOnPageExit = () => {
+    void flushPendingPersistSnapshot();
+  };
+  window.addEventListener('pagehide', flushOnPageExit);
+  window.addEventListener('beforeunload', flushOnPageExit);
 
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {

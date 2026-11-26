@@ -7,9 +7,9 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
   xFetchTimeline: (handle) => ipcRenderer.invoke('x-fetch-timeline', handle),
   xFetchGraphQL: (url, auth) => ipcRenderer.invoke('x-fetch-graphql', url, auth),
   xAuth: {
-    save: (auth) => ipcRenderer.invoke('x-auth:save', auth),
-    get: () => ipcRenderer.invoke('x-auth:get'),
-    clear: () => ipcRenderer.invoke('x-auth:clear'),
+    save: (auth, profileId) => ipcRenderer.invoke('x-auth:save', auth, profileId),
+    get: (profileId) => ipcRenderer.invoke('x-auth:get', profileId),
+    clear: (profileId) => ipcRenderer.invoke('x-auth:clear', profileId),
   },
   telegramFetchChannel: (channel, before) => ipcRenderer.invoke('telegram-fetch-channel', channel, before),
   // WebDAV：主进程代发 DAV 请求，绕开渲染进程的 CORS 限制

@@ -11,9 +11,14 @@ const {
 } = require('./xAuthStorage');
 
 describe('xAuthStorage path helper', () => {
-  it('nests x-auth.enc under userDataPath', () => {
-    const res = getXAuthPath('/mock/user/data', path);
-    assert.equal(res, path.join('/mock/user/data', X_AUTH_FILENAME));
+  it('nests x-auth.enc under userDataPath for default and scopes secondary profiles', () => {
+    assert.equal(getXAuthPath('/mock/user/data', path), path.join('/mock/user/data', X_AUTH_FILENAME));
+    assert.equal(getXAuthPath('/mock/user/data', path, 'default'), path.join('/mock/user/data', X_AUTH_FILENAME));
+    assert.equal(
+      getXAuthPath('/mock/user/data', path, 'p_work_1'),
+      path.join('/mock/user/data', 'profiles', 'p_work_1', X_AUTH_FILENAME),
+    );
+    assert.throws(() => getXAuthPath('/mock/user/data', path, '../escape'));
   });
 });
 

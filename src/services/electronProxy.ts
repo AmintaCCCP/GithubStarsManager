@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import type { ElectronPluginAPI } from '../plugins/types';
 import type { LogEntry } from './logger';
+import { ACTIVE_PROFILE_ID } from './profileStorage';
 
 /** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
 export type McpLocalConfig = McpServiceConfig;
@@ -143,9 +144,9 @@ interface ElectronAPI {
     timedOut?: boolean;
   }>;
   xAuth?: {
-    save: (auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; error?: string }>;
-    get: () => Promise<{ authToken: string; ct0: string } | null>;
-    clear: () => Promise<{ success: boolean; error?: string }>;
+    save: (auth: { authToken: string; ct0: string }, profileId?: string) => Promise<{ success: boolean; error?: string }>;
+    get: (profileId?: string) => Promise<{ authToken: string; ct0: string } | null>;
+    clear: (profileId?: string) => Promise<{ success: boolean; error?: string }>;
   };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
@@ -225,29 +226,36 @@ export const fetchXGraphQLViaDesktop = async (
   return result.body;
 };
 
-/** X 鉴权 Cookie 本地安全读取（Electron safeStorage 加密保存在本机）。非桌面环境返回 null。 */
-export const loadEncryptedXAuthViaDesktop = async (): Promise<{ authToken: string; ct0: string } | null> => {
+/** X 鉴权 Cookie 本地安全读取（Electron safeStorage 加密保存在本机，按 profile 隔离）。非桌面环境返回 null。 */
+export const loadEncryptedXAuthViaDesktop = async (
+  profileId: string = ACTIVE_PROFILE_ID,
+): Promise<{ authToken: string; ct0: string } | null> => {
   if (!window.electronAPI?.xAuth?.get) return null;
   try {
-    return await window.electronAPI.xAuth.get();
+    return await window.electronAPI.xAuth.get(profileId);
   } catch {
     return null;
   }
 };
 
-/** X 鉴权 Cookie 本地安全写入（Electron safeStorage 加密保存在本机）。 */
-export const saveEncryptedXAuthViaDesktop = async (auth: { authToken: string; ct0: string }): Promise<void> => {
+/** X 鉴权 Cookie 本地安全写入（Electron safeStorage 加密保存在本机，按 profile 隔离）。 */
+export const saveEncryptedXAuthViaDesktop = async (
+  auth: { authToken: string; ct0: string },
+  profileId: string = ACTIVE_PROFILE_ID,
+): Promise<void> => {
   if (!window.electronAPI?.xAuth?.save) return;
-  const result = await window.electronAPI.xAuth.save(auth);
+  const result = await window.electronAPI.xAuth.save(auth, profileId);
   if (result && !result.success) {
     throw new Error(result.error || 'failed to save X authentication');
   }
 };
 
-/** X 鉴权 Cookie 本地安全清理。 */
-export const clearEncryptedXAuthViaDesktop = async (): Promise<void> => {
+/** X 鉴权 Cookie 本地安全清理（按 profile 隔离）。 */
+export const clearEncryptedXAuthViaDesktop = async (
+  profileId: string = ACTIVE_PROFILE_ID,
+): Promise<void> => {
   if (!window.electronAPI?.xAuth?.clear) return;
-  const result = await window.electronAPI.xAuth.clear();
+  const result = await window.electronAPI.xAuth.clear(profileId);
   if (result && !result.success) {
     throw new Error(result.error || 'failed to clear X authentication');
   }

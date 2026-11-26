@@ -1,6 +1,7 @@
 import { translateBackendError } from '../utils/backendErrors';
 import { normalizeBackendUrl } from '../utils/backendUrl';
 import { logger } from './logger';
+import { getProfileHeader, isDefaultProfile } from './profileStorage';
 import { setBackendAvailability, setBackendProbed } from './scrapeSupport';
 
 import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
@@ -81,6 +82,7 @@ export const getBackendAuthHeaders = (): Record<string, string> => {
   }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...getProfileHeader(),
   };
   if (secret) {
     headers['Authorization'] = `Bearer ${secret}`;
@@ -98,6 +100,9 @@ const readStoredBackendUrl = (): string | null => {
 
 class BackendAdapter {
   private _backendUrl: string | null = null;
+  private _authRequired = true;
+  private _profilesSupported = false;
+  private _profilesUnsupportedWarning = false;
   private _availabilityListeners = new Set<() => void>();
   private _beforeInitHook: (() => Promise<void>) | null = null;
 
@@ -161,11 +166,25 @@ class BackendAdapter {
           if (res.ok) {
             const data = await res.json();
             if (data.status === 'ok') {
+              const supportsProfiles = data.profilesSupported === true;
+              if (!isDefaultProfile() && !supportsProfiles) {
+                // Old backend server does not support X-GSM-Profile isolation.
+                // Refuse connection to stay local-only and never push isFullSync: true
+                // into the default account's server database.
+                this._profilesSupported = false;
+                this._profilesUnsupportedWarning = true;
+                this.commitBackendUrl(null);
+                logger.warn('backendAdapter', 'Backend does not support multi-account profiles; staying local-only for non-default profile', { url: baseUrl });
+                return;
+              }
+              this._authRequired = data.authRequired !== false;
+              this._profilesSupported = supportsProfiles;
+              this._profilesUnsupportedWarning = false;
               // In-memory commit only. Persistence is an explicit caller
               // decision (rememberActiveUrl) after its own auth checks, so a
               // candidate that later fails authentication is never remembered.
               this.commitBackendUrl(baseUrl);
-              logger.info('backendAdapter', 'Backend connected', { url: baseUrl });
+              logger.info('backendAdapter', 'Backend connected', { url: baseUrl, profilesSupported: supportsProfiles });
               return;
             }
           }
@@ -176,9 +195,15 @@ class BackendAdapter {
         }
       }
 
+      this._authRequired = true;
+      this._profilesSupported = false;
+      this._profilesUnsupportedWarning = false;
       this.commitBackendUrl(null);
       logger.info('backendAdapter', 'Backend not available, using local-only mode');
     } catch {
+      this._authRequired = true;
+      this._profilesSupported = false;
+      this._profilesUnsupportedWarning = false;
       this.commitBackendUrl(null);
       logger.info('backendAdapter', 'Backend not available, using local-only mode');
     } finally {
@@ -191,6 +216,18 @@ class BackendAdapter {
 
   get isAvailable(): boolean {
     return this._backendUrl !== null;
+  }
+
+  get authRequired(): boolean {
+    return this._authRequired;
+  }
+
+  get profilesSupported(): boolean {
+    return this._profilesSupported;
+  }
+
+  get profilesUnsupportedWarning(): boolean {
+    return this._profilesUnsupportedWarning;
   }
 
   get backendUrl(): string | null {
@@ -1061,6 +1098,52 @@ class BackendAdapter {
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Update MCP config error');
     return res.json();
+  }
+
+  // === Multi-account profile management ===
+
+  async listServerProfiles(timeoutMs = 10000): Promise<Array<{ id: string; login?: string; avatarUrl?: string; name?: string }>> {
+    if (!this._backendUrl || !this._profilesSupported) return [];
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error('listServerProfiles timed out'));
+      }, timeoutMs);
+    });
+    try {
+      const res = await Promise.race([
+        this.fetchWithTimeout(
+          `${this._backendUrl}/profiles`,
+          {
+            headers: this.getAuthHeaders(),
+            signal: controller.signal,
+          },
+          timeoutMs,
+        ),
+        deadline,
+      ]);
+      if (!res.ok) return [];
+      const data = await Promise.race([
+        res.json() as Promise<{ profiles?: Array<{ id: string; login?: string; avatarUrl?: string; name?: string }> }>,
+        deadline,
+      ]);
+      return Array.isArray(data?.profiles) ? data.profiles : [];
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  async deleteServerProfile(id: string): Promise<boolean> {
+    if (!this._backendUrl || !this._profilesSupported) return false;
+    const res = await this.fetchWithTimeout(`${this._backendUrl}/profiles/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    // 404 means the server profile is already gone (e.g. a retry after a local
+    // cleanup failure), so treat it as success instead of blocking removal.
+    return res.ok || res.status === 404;
   }
 }
 

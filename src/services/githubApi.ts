@@ -22,6 +22,7 @@ import {
   WorkflowDefinition,
 } from '../types';
 import { logger } from './logger';
+import { getProfileHeader } from './profileStorage';
 import { redactInline } from '../utils/logSanitizer';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 import { secureRandomString } from '../utils/cryptoRandom';
@@ -480,7 +481,10 @@ export class GitHubApiService {
   }
 
   private getBackendHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...getProfileHeader(),
+    };
     if (this.backendAuthToken) {
       headers.Authorization = `Bearer ${this.backendAuthToken}`;
     }

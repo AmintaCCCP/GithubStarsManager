@@ -13,7 +13,8 @@
     "sync-failed": "Sync failed",
     "sync-from-backend": "Sync from Backend",
     "syncing-from-backend-will-overwrite-local-data-c": "Syncing from backend will overwrite local data. Continue?",
-    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Synced from backend: repos {{v1}}, releases {{v2}}, AI configs {{v3}}, WebDAV configs {{v4}}"
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Synced from backend: repos {{v1}}, releases {{v2}}, AI configs {{v3}}, WebDAV configs {{v4}}",
+    "webdav-sync-conflict-warning": "Synced WebDAV config conflicts with account {{account}}. Use a separate subdirectory to avoid overwriting backups."
   },
   "useBackupActions": {
     "please-configure-and-activate-webdav-service-fir": "Please configure and activate WebDAV service first.",
@@ -70,7 +71,8 @@
     "custom-user-agent-invalid-chars": "Custom User-Agent can only contain Latin-1 characters",
     "webdav-connection-successful": "WebDAV connection successful!",
     "webdav-connection-failed-please-check-configurat": "WebDAV connection failed. Please check configuration.",
-    "webdav-test-failed": "WebDAV test failed"
+    "webdav-test-failed": "WebDAV test failed",
+    "webdav-target-conflict": "This WebDAV path is already used by account {{account}}. Use a separate subdirectory such as {{suggestedPath}} to avoid overwriting backups."
   },
   "generalPanel": {
     "account-token-hint": "Signed in as {{login}}. Update an expired token here without logging out.",

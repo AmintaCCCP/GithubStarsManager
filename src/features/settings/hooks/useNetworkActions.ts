@@ -6,6 +6,7 @@ import type { ProxyConfig, RpcDownloadConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { backend } from '../../../services/backendAdapter';
 import { electronProxy, isElectron } from '../../../services/electronProxy';
+import { getProfileHeader } from '../../../services/profileStorage';
 import { testRpcDownload } from '../../../services/rpcDownloadService';
 
 type ConnectionResult = { success: boolean; error?: string };
@@ -82,7 +83,10 @@ export const useNetworkActions = (): NetworkActions => {
     const loadRpcConfig = async () => {
       try {
         const base = await getRpcBaseUrl();
-        const headers: Record<string, string> = backendApiSecret ? { Authorization: `Bearer ${backendApiSecret}` } : {};
+        const headers: Record<string, string> = {
+          ...(backendApiSecret ? { Authorization: `Bearer ${backendApiSecret}` } : {}),
+          ...getProfileHeader(),
+        };
         const response = await fetch(`${base}/settings/rpc-download`, { headers });
         if (!response.ok) return;
         const data = await response.json() as Partial<RpcDownloadConfig> & { hasSecret?: boolean };
@@ -108,6 +112,7 @@ export const useNetworkActions = (): NetworkActions => {
   const backendHeaders = useCallback((): Record<string, string> => ({
     'Content-Type': 'application/json',
     ...(backendApiSecret ? { Authorization: `Bearer ${backendApiSecret}` } : {}),
+    ...getProfileHeader(),
   }), [backendApiSecret]);
 
   const putProxy = useCallback(async (config: ProxyConfig) => {

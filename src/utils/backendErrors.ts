@@ -1,4 +1,5 @@
 import { isAppLanguage, type AppLanguage } from '../i18n/languages';
+import { scopedKey } from '../services/profileStorage';
 
 const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   // Auth
@@ -67,7 +68,7 @@ const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
 
 function getCurrentLanguage(): AppLanguage {
   try {
-    const storeData = localStorage.getItem('github-stars-manager');
+    const storeData = localStorage.getItem(scopedKey('github-stars-manager'));
     if (storeData) {
       const parsed = JSON.parse(storeData);
       const lang = parsed.state?.language;
