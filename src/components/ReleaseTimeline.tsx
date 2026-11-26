@@ -1330,7 +1330,7 @@ export const ReleaseTimeline: React.FC = () => {
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
                   aria-expanded={isExpanded}
                   aria-controls={`release-group-${repository.id}`}
-                  className="h-auto w-full flex items-center justify-between rounded-none px-3.5 py-2.5 font-normal hover:bg-fill-hover"
+                  className="!h-auto w-full flex items-center justify-between rounded-none px-3.5 py-2.5 font-normal hover:bg-fill-hover"
                 >
                   <span className="flex items-center gap-2.5 min-w-0">
                     <span className="app-unread-marker-slot" aria-hidden="true">

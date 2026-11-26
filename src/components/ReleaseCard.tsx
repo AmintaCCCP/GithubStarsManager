@@ -487,7 +487,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           handleRpcDownload(link);
                         }}
                         disabled={isDownloading}
-                        className={`h-auto min-h-[42px] flex items-center justify-between gap-3 rounded-none px-3 py-2.5 w-full text-left font-normal hover:bg-fill-hover disabled:opacity-60 ${
+                        className={`!h-auto min-h-[42px] flex items-center justify-between gap-3 rounded-none px-3 py-2.5 w-full text-left font-normal hover:bg-fill-hover disabled:opacity-60 ${
                           link.isSourceCode ? 'bg-sunken/60' : ''
                         }`}
                       >
