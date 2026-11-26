@@ -101,6 +101,20 @@ export const Header: React.FC = () => {
 
   const t = useT('app');
 
+  const requestRemoveProfile = async (profileId: string, displayName: string) => {
+    const confirmed = await confirm(
+      t('accountSwitcher.remove-account-confirm-title'),
+      t('accountSwitcher.remove-account-confirm-desc', { account: displayName }),
+      { type: 'warning' },
+    );
+    if (!confirmed) return;
+    try {
+      await removeProfile(profileId);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error');
+    }
+  };
+
   const requestLogout = async () => {
     const confirmed = await confirm(
       t('header.logout-confirmation'),
@@ -290,43 +304,39 @@ export const Header: React.FC = () => {
                                   {displayName}
                                 </span>
                               </div>
-                              <div className="flex shrink-0 items-center gap-1">
-                                {isCurrent ? (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
-                                    <Check className="h-3 w-3" />
-                                    {t('accountSwitcher.active-badge')}
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    aria-label={t('accountSwitcher.remove-account')}
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const confirmed = await confirm(
-                                        t('accountSwitcher.remove-account-confirm-title'),
-                                        t('accountSwitcher.remove-account-confirm-desc', {
-                                          account: displayName,
-                                        }),
-                                        { type: 'warning' },
-                                      );
-                                      if (confirmed) {
-                                        try {
-                                          await removeProfile(profile.id);
-                                        } catch (err) {
-                                          toast(err instanceof Error ? err.message : String(err), 'error');
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              </div>
+                              {isCurrent && (
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                  <Check className="h-3 w-3" />
+                                  {t('accountSwitcher.active-badge')}
+                                </span>
+                              )}
                             </DropdownMenuItem>
                           );
                         })}
+                        {profiles.some((p) => p.id !== activeProfileId) && (
+                          <>
+                            <DropdownMenuSeparator />
+                            {profiles
+                              .filter((p) => p.id !== activeProfileId)
+                              .map((profile) => {
+                                const displayName = profile.login || profile.name || profile.id;
+                                return (
+                                  <DropdownMenuItem
+                                    key={`remove-${profile.id}`}
+                                    disabled={isSwitching}
+                                    onSelect={() => {
+                                      void requestRemoveProfile(profile.id, displayName);
+                                    }}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span className="truncate">
+                                      {t('accountSwitcher.remove-account')}: {displayName}
+                                    </span>
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                          </>
+                        )}
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSeparator />

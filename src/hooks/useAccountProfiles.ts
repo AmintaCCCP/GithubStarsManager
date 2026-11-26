@@ -43,9 +43,8 @@ export interface AccountProfilesController {
 
 const flushCurrentProfileBeforeReload = async (): Promise<void> => {
   // Abort the switch/reload if a write cannot be committed; reloading would
-  // discard the in-memory state that never reached disk. Two passes: a store
-  // change while the first flush is in flight queues a write behind it.
-  await flushPendingPersistSnapshot(true);
+  // discard the in-memory state that never reached disk. The strict flush also
+  // repeats until no newer snapshot was scheduled while it was waiting.
   await flushPendingPersistSnapshot(true);
   await flushPendingIdbWrites();
   await flushAutoSyncBeforeSwitch(3000);
@@ -133,7 +132,7 @@ export const useAccountProfiles = (): AccountProfilesController => {
     } catch (error) {
       // The flush stops auto-sync; if the switch itself failed the page stays
       // open, so resume it or local edits stop reaching the backend.
-      if (autoSyncStopped) startAutoSync();
+      if (autoSyncStopped) startAutoSync({ preservePending: true });
       setGlobalIsSwitching(false);
       throw error;
     }
@@ -199,7 +198,7 @@ export const useAccountProfiles = (): AccountProfilesController => {
       window.location.reload();
     } catch (error) {
       // The flush stops auto-sync; adding the account failed, so resume it.
-      if (autoSyncStopped) startAutoSync();
+      if (autoSyncStopped) startAutoSync({ preservePending: true });
       setGlobalIsSwitching(false);
       throw error;
     }

@@ -61,7 +61,6 @@ export const ProfileStatusBanners: React.FC = () => {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
           role="status"
-          aria-live="assertive"
         >
           <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-5 py-4 shadow-lg">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />

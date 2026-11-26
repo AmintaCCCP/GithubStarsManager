@@ -121,13 +121,29 @@ export const readProfiles = (): ProfileEntry[] => {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is ProfileEntry =>
-        Boolean(item) &&
-        typeof item === 'object' &&
-        typeof (item as ProfileEntry).id === 'string' &&
-        isValidProfileId((item as ProfileEntry).id),
-    );
+    // Normalize every optional field: the registry can be hand-edited or written
+    // by an older/newer build, and a non-array webdavTargets would make conflict
+    // detection throw (`targets.some`).
+    const entries: ProfileEntry[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue;
+      const rawItem = item as Record<string, unknown>;
+      if (typeof rawItem.id !== 'string' || !isValidProfileId(rawItem.id)) continue;
+      const entry: ProfileEntry = { id: rawItem.id };
+      if (typeof rawItem.login === 'string') entry.login = rawItem.login;
+      if (typeof rawItem.name === 'string') entry.name = rawItem.name;
+      if (typeof rawItem.avatarUrl === 'string') entry.avatarUrl = rawItem.avatarUrl;
+      if (Array.isArray(rawItem.webdavTargets)) {
+        entry.webdavTargets = rawItem.webdavTargets.filter(
+          (target): target is string => typeof target === 'string',
+        );
+      }
+      if (typeof rawItem.vectorWorkerUrl === 'string') {
+        entry.vectorWorkerUrl = rawItem.vectorWorkerUrl;
+      }
+      entries.push(entry);
+    }
+    return entries;
   } catch {
     return [];
   }
@@ -420,13 +436,7 @@ export const writePendingSeed = (seed: PendingProfileSeed): void => {
   window.localStorage.setItem(PENDING_SEED_KEY, JSON.stringify(sanitizedSeed));
 };
 
-/**
- * Consume and delete `gsm:pending-seed` if it matches the booting profile ID.
- * Returns null if absent, malformed, or intended for another profile.
- */
-export const consumePendingSeed = (
-  expectedProfileId: string = ACTIVE_PROFILE_ID,
-): PendingProfileSeed | null => {
+const parsePendingSeed = (expectedProfileId: string): PendingProfileSeed | null => {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(PENDING_SEED_KEY);
@@ -439,13 +449,11 @@ export const consumePendingSeed = (
       !parsed.user ||
       typeof parsed.githubToken !== 'string'
     ) {
-      window.localStorage.removeItem(PENDING_SEED_KEY);
       return null;
     }
     if (parsed.profileId !== expectedProfileId) {
       return null;
     }
-    window.localStorage.removeItem(PENDING_SEED_KEY);
     return {
       profileId: parsed.profileId,
       user: parsed.user,
@@ -456,13 +464,40 @@ export const consumePendingSeed = (
           : undefined,
     };
   } catch {
-    try {
-      window.localStorage.removeItem(PENDING_SEED_KEY);
-    } catch {
-      // ignore
-    }
     return null;
   }
+};
+
+/**
+ * Read `gsm:pending-seed` without deleting it. The boot path keeps the seed
+ * until the seeded state has actually been persisted, so a crash before the
+ * snapshot write replays the seed instead of silently losing it.
+ */
+export const readPendingSeed = (
+  expectedProfileId: string = ACTIVE_PROFILE_ID,
+): PendingProfileSeed | null => parsePendingSeed(expectedProfileId);
+
+/** Remove `gsm:pending-seed` once the seeded state is safely persisted. */
+export const clearPendingSeed = (): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(PENDING_SEED_KEY);
+  } catch {
+    // ignore
+  }
+};
+
+/**
+ * Consume and delete `gsm:pending-seed` if it matches the booting profile ID.
+ * Returns null if absent, malformed, or intended for another profile.
+ */
+export const consumePendingSeed = (
+  expectedProfileId: string = ACTIVE_PROFILE_ID,
+): PendingProfileSeed | null => {
+  const seed = parsePendingSeed(expectedProfileId);
+  if (!seed) return null;
+  clearPendingSeed();
+  return seed;
 };
 
 /**

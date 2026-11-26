@@ -410,6 +410,22 @@ describe('sharded persist storage', () => {
     expect(rehydrated?.state).toMatchObject({ themeMode: 'dark', language: 'zh' });
   });
 
+  it('strict flush writes a snapshot scheduled while the first write was in flight', async () => {
+    const state = buildState();
+    debouncedPersistStorage.setItem(KEY, { state, version: 16 });
+    await flushPendingPersistSnapshot();
+
+    commitGate.arm();
+    debouncedPersistStorage.setItem(KEY, { state: { ...state, themeMode: 'light' }, version: 16 });
+    const flushInFlight = flushPendingPersistSnapshot(true);
+    await commitGate.waitReached();
+    debouncedPersistStorage.setItem(KEY, { state: { ...state, themeMode: 'dark' }, version: 16 });
+    commitGate.release();
+    await flushInFlight;
+
+    expect((await readShardState('core')).themeMode).toBe('dark');
+  });
+
   it('rebuilds the full shard set when removeItem follows a write still in flight', async () => {
     const state = buildState();
     commitGate.arm();

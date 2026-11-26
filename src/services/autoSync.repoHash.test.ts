@@ -503,6 +503,17 @@ describe('backend pushes requested during another sync', () => {
     expect(vi.mocked(backend.syncRepositories).mock.calls[1][0]).toEqual(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
   });
 
+  it('restarts sync with pending edits preserved after a failed push', async () => {
+    vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
+    await expect(syncToBackend()).resolves.toBe(false);
+
+    // Switch failure recovery restarts sync without dropping the pending push.
+    const stop = startAutoSync({ preservePending: true });
+    await syncFromBackend();
+    expect(backend.fetchRepositories).not.toHaveBeenCalled();
+    stopAutoSync(stop);
+  });
+
   it('keeps edits made during an active pull when auto-sync is stopped mid-pull', async () => {
     const gate = deferred<{ repositories: Repository[]; total: number }>();
     vi.mocked(backend.fetchRepositories).mockReturnValueOnce(gate.promise);

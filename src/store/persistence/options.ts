@@ -19,7 +19,8 @@ import {
 } from '../schema';
 import { normalizePersistedState } from '../normalizers/persistedState';
 import {
-  consumePendingSeed,
+  clearPendingSeed,
+  readPendingSeed,
   scopedKey,
   syncActiveProfileMetadata,
 } from '../../services/profileStorage';
@@ -463,7 +464,7 @@ customCategoriesCount: normalized.customCategories?.length || 0,
   };
 
   // Apply one-time settings/auth seed for a newly created profile, then delete it.
-  const pendingSeed = consumePendingSeed();
+  const pendingSeed = readPendingSeed();
   if (pendingSeed) {
     pendingSeedAppliedOnBoot = true;
     merged = {
@@ -505,11 +506,19 @@ if (error) {
 }
 if (pendingSeedAppliedOnBoot && rehydratedState) {
   pendingSeedAppliedOnBoot = false;
-  // Trigger persistence of the newly seeded profile immediately.
+  // Trigger persistence of the newly seeded profile immediately. The seed is
+  // only cleared once that write actually lands, so a failed persist replays
+  // the seed on the next boot instead of losing the new account.
   if (rehydratedState.user) {
     rehydratedState.setUser(rehydratedState.user);
   }
-  void flushPendingPersistSnapshot();
+  void flushPendingPersistSnapshot(true)
+    .then(() => {
+      clearPendingSeed();
+    })
+    .catch((error: unknown) => {
+      logger.warn('store.hydrate', 'Pending profile seed kept: persist failed', error);
+    });
 }
 state.setHasHydrated(true);
   };

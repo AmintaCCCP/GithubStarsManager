@@ -381,13 +381,16 @@ const writeShardedSnapshot = async (
   if (hydratedIncomplete) {
     // 最近一次水合存在读取失败：水合结果不完整，写盘会用默认值覆盖磁盘上
     // 仍然完好的真实分片。拒绝写入直到下一次完整读取成功。
+    const refusal = new Error('hydrated incomplete');
     logger.errorFromError(
       'store.persist',
       'Skipping persist write: last hydration was incomplete; refusing to overwrite',
-      new Error('hydrated incomplete'),
+      refusal,
       { source },
     );
-    return;
+    // Keep refusing to overwrite the disk snapshot, but let strict flushes see
+    // the refusal instead of reporting a successful reload barrier.
+    throw refusal;
   }
 
   // 载荷中的 version 必须是 persist 版本号（水合时驱动 migrate），
@@ -613,16 +616,28 @@ const dispatchIdleShardedWrite = (): void => {
 /**
  * Flush the pending snapshot. With `requireSuccess` the returned Promise rejects
  * when the write could not be committed, so switch/reload flows can abort
- * instead of discarding unsaved state.
+ * instead of discarding unsaved state. Strict flushes also repeat until no
+ * newer snapshot was scheduled while waiting (bounded), otherwise a state change
+ * right after the barrier would be left on the old side of a reload.
  */
-const flushPendingPersistSnapshot = (requireSuccess = false): Promise<void> => {
-  if (latestPersistName === null || latestPersistValue === null) return Promise.resolve();
+const flushPendingPersistSnapshot = async (requireSuccess = false): Promise<void> => {
+  if (!requireSuccess) {
+    if (latestPersistName === null || latestPersistValue === null) return;
+    cancelPendingPersistTasks();
+    await enqueueShardedWrite(latestPersistName, latestPersistValue, persistWriteVersion, 'flush');
+    return;
+  }
 
-  cancelPendingPersistTasks();
-  const name = latestPersistName;
-  const value = latestPersistValue;
-  const scheduledVersion = persistWriteVersion;
-  return enqueueShardedWrite(name, value, scheduledVersion, 'flush', undefined, requireSuccess);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (latestPersistName === null || latestPersistValue === null) return;
+    cancelPendingPersistTasks();
+    const name = latestPersistName;
+    const value = latestPersistValue;
+    const scheduledVersion = persistWriteVersion;
+    await enqueueShardedWrite(name, value, scheduledVersion, 'flush', undefined, true);
+    if (persistWriteVersion === scheduledVersion) return;
+  }
+  throw new Error('Persist snapshot kept changing while flushing');
 };
 
 const registerPersistFlushListeners = (): void => {

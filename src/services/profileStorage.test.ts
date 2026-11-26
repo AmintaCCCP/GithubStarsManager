@@ -6,6 +6,7 @@ import {
   DEFAULT_PROFILE_ID,
   PENDING_SEED_KEY,
   PROFILES_REGISTRY_KEY,
+  clearPendingSeed,
   clearProfileLocalStorage,
   consumePendingSeed,
   findConflictingVectorProfile,
@@ -19,6 +20,7 @@ import {
   normalizeWebdavTarget,
   pickCopyableSettings,
   readActiveProfileIdAtBoot,
+  readPendingSeed,
   readProfiles,
   removeProfileFromRegistry,
   scopedKey,
@@ -201,6 +203,38 @@ describe('profileStorage', () => {
 
       // Second read returns null
       expect(consumePendingSeed('p_222')).toBeNull();
+    });
+  });
+
+  describe('profile registry sanitization', () => {
+    it('ignores malformed optional fields instead of throwing in conflict detection', () => {
+      window.localStorage.setItem(
+        PROFILES_REGISTRY_KEY,
+        JSON.stringify([
+          { id: 'p_222', login: 'bob', webdavTargets: 'not-an-array', vectorWorkerUrl: 42 },
+          { id: 'not a valid id', webdavTargets: ['https://dav.example.com/x'] },
+          null,
+        ]),
+      );
+
+      expect(readProfiles()).toEqual([{ id: 'p_222', login: 'bob' }]);
+      expect(() => findConflictingWebdavProfile('https://dav.example.com', '/x')).not.toThrow();
+      expect(() => findConflictingVectorProfile('https://vec.example.workers.dev')).not.toThrow();
+    });
+
+    it('reads the pending seed without deleting it until the caller clears it', () => {
+      writePendingSeed({
+        profileId: ACTIVE_PROFILE_ID,
+        user: mockUser(7, 'peek'),
+        githubToken: 'peek-token',
+      });
+
+      expect(readPendingSeed()?.githubToken).toBe('peek-token');
+      expect(window.localStorage.getItem(PENDING_SEED_KEY)).not.toBeNull();
+
+      clearPendingSeed();
+      expect(readPendingSeed()).toBeNull();
+      expect(window.localStorage.getItem(PENDING_SEED_KEY)).toBeNull();
     });
   });
 

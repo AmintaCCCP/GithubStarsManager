@@ -864,8 +864,12 @@ export async function forceSyncToBackend(options: { reportFailures?: boolean } =
 /**
  * Subscribe to Zustand store changes and auto-push to backend with 2s debounce.
  * Returns an unsubscribe function for cleanup.
+ *
+ * `preservePending` keeps the pending-push markers set by a previous failed
+ * push (used when a profile switch aborts and sync is restarted), so a poll
+ * cannot overwrite edits that still need pushing.
  */
-export function startAutoSync(): () => void {
+export function startAutoSync(options: { preservePending?: boolean } = {}): () => void {
   // Guard: if already running, stop previous instance first
   if (_storeUnsubscribe) {
     _storeUnsubscribe();
@@ -886,8 +890,10 @@ export function startAutoSync(): () => void {
     _isSyncingFromBackendActive = false;
   }
   _isPushingToBackend = false;
-  _hasPendingPush = false;
-  _hasPendingLocalChanges = false;
+  if (!options.preservePending) {
+    _hasPendingPush = false;
+    _hasPendingLocalChanges = false;
+  }
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
     if (_isSyncingFromBackend) return;
@@ -973,7 +979,7 @@ export function stopAutoSync(unsubscribe?: () => void): void {
  * local changes before switching profiles and reloading the page.
  */
 export async function flushAutoSyncBeforeSwitch(timeoutMs = 3000): Promise<void> {
-  const hadPending = _hasPendingLocalChanges || _debounceTimer !== null;
+  const hadPending = _hasPendingLocalChanges || _debounceTimer !== null || _pushPromise !== null;
   stopAutoSync();
   if (!hadPending || !backend.isAvailable) return;
 
