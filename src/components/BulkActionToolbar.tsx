@@ -101,21 +101,21 @@ const PluginBulkMenu: React.FC<{
           size="icon"
           disabled={disabled}
           aria-label={t('bulkActionToolbar.plugin-actions')}
-          className="h-9 w-9 shrink-0 rounded-lg bg-muted text-muted-foreground hover:bg-accent hover:text-foreground sm:h-10 sm:w-10"
+          className="size-control shrink-0 rounded-md bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground"
         >
-          <Plug className="h-4 w-4 sm:h-5 sm:w-5" />
+          <Plug className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {actions.map((action) => (
           <DropdownMenuItem key={`${action.pluginId}:${action.id}`} onSelect={() => void runAction(action)}>
-            <PluginIcon pluginId={action.pluginId} icon={action.icon} className="mr-2 h-4 w-4" />
+            <PluginIcon pluginId={action.pluginId} icon={action.icon} className="mr-2 size-4" />
             {action.title}
           </DropdownMenuItem>
         ))}
         {exporters.map((exporter) => (
           <DropdownMenuItem key={`${exporter.pluginId}:export:${exporter.id}`} onSelect={() => void runExporter(exporter)}>
-            <FolderOpen className="mr-2 h-4 w-4" />
+            <FolderOpen className="mr-2 size-4" />
             {exporter.title}
           </DropdownMenuItem>
         ))}
@@ -274,48 +274,50 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-card dark:bg-card border-t border-border dark:border-border shadow-lg z-50 ${
+      className={`fixed bottom-0 left-0 right-0 z-50 border-t border-subtle bg-floating shadow-elev-3 ${
         isClosing ? 'animate-slide-down' : 'animate-slide-up'
       } ${isShaking ? 'animate-shake' : ''}`}
       onClick={handleToolbarClick}
     >
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+      <div className="mx-auto max-w-7xl px-4 py-2.5 sm:px-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {/* Selection Info */}
-          <div className="flex items-center justify-between sm:justify-start space-x-2 sm:space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground">
-                {t('bulkActionToolbar.selected-selectedcount', { selectedCount: selectedCount })}
-              </span>
-            </div>
+          <div className="flex items-center justify-between gap-3 sm:justify-start">
+            <span className="text-label font-semibold text-foreground tabular-nums">
+              {t('bulkActionToolbar.selected-selectedcount', { selectedCount: selectedCount })}
+            </span>
 
             {/* Quick Actions */}
-            <div className="flex items-center space-x-1 sm:space-x-2">
+            <div className="flex items-center gap-1">
               <Button
+                type="button"
                 variant="ghost"
+                size="sm"
                 onClick={onSelectAll}
                 disabled={isProcessing}
-                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-control-sm gap-1 rounded-sm px-2 text-label-sm text-secondary hover:text-foreground"
                 title={t('bulkActionToolbar.select-all-on-page')}
               >
-                <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4" />
+                <CheckSquare className="size-3.5" />
                 <span>{t('bulkActionToolbar.select-all')}</span>
               </Button>
               <Button
+                type="button"
                 variant="ghost"
+                size="sm"
                 onClick={handleDeselectAll}
                 disabled={isProcessing}
-                className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-control-sm gap-1 rounded-sm px-2 text-label-sm text-secondary hover:text-foreground"
                 title={t('bulkActionToolbar.deselect-all')}
               >
-                <Square className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Square className="size-3.5" />
                 <span>{t('bulkActionToolbar.deselect-all-2')}</span>
               </Button>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-between sm:justify-start space-x-1 sm:space-x-2 overflow-x-auto pb-1 sm:pb-0 -mx-2 px-2 sm:mx-0 sm:px-0">
+          <div className="-mx-1 flex items-center justify-between gap-1 overflow-x-auto px-1 pb-0.5 sm:mx-0 sm:justify-start sm:px-0 sm:pb-0">
             <Button
               type="button"
               variant="ghost"
@@ -323,16 +325,16 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.unstar-selected-repositories')}
               onClick={(e) => handleAction('unstar', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'unstar'
-                  ? 'bg-destructive text-destructive-foreground hover:opacity-90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-destructive-solid text-on-destructive hover:bg-destructive-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
             >
               {isProcessing && showConfirm === 'unstar' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Star className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Star className="size-4" />
               )}
             </Button>
 
@@ -343,16 +345,16 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.categorize-selected-repositories')}
               onClick={(e) => handleAction('categorize', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'categorize'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-accent-solid text-on-accent hover:bg-accent-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
             >
               {isProcessing && showConfirm === 'categorize' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+                <FolderOpen className="size-4" />
               )}
             </Button>
 
@@ -363,16 +365,16 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.generate-ai-summaries')}
               onClick={(e) => handleAction('ai-summary', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'ai-summary'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-accent-solid text-on-accent hover:bg-accent-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
             >
               {isProcessing && showConfirm === 'ai-summary' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Bot className="size-4" />
               )}
             </Button>
 
@@ -383,16 +385,16 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.subscribe-to-releases')}
               onClick={(e) => handleAction('subscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'subscribe'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-accent-solid text-on-accent hover:bg-accent-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
             >
               {isProcessing && showConfirm === 'subscribe' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Bell className="size-4" />
               )}
             </Button>
 
@@ -403,16 +405,16 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.unsubscribe-from-releases')}
               onClick={(e) => handleAction('unsubscribe', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'unsubscribe'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-accent-solid text-on-accent hover:bg-accent-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
             >
               {isProcessing && showConfirm === 'unsubscribe' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <BellOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                <BellOff className="size-4" />
               )}
             </Button>
 
@@ -423,16 +425,16 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.lock-categories')}
               onClick={(e) => handleAction('lock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'lock-category'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-accent-solid text-on-accent hover:bg-accent-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
             >
               {isProcessing && showConfirm === 'lock-category' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Lock className="size-4" />
               )}
             </Button>
 
@@ -443,16 +445,16 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.unlock-categories')}
               onClick={(e) => handleAction('unlock-category', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'unlock-category'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-accent-solid text-on-accent hover:bg-accent-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
             >
               {isProcessing && showConfirm === 'unlock-category' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Unlock className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Unlock className="size-4" />
               )}
             </Button>
 
@@ -463,17 +465,17 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               aria-label={t('bulkActionToolbar.bulk-restore')}
               onClick={(e) => handleAction('restore', e)}
               disabled={isProcessing}
-              className={`flex-shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 p-0 rounded-lg transition-colors ${
+              className={`size-control shrink-0 rounded-md p-0 ${
                 showConfirm === 'restore'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  ? 'bg-accent-solid text-on-accent hover:bg-accent-solid'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
+              }`}
               title={t('bulkActionToolbar.bulk-restore')}
             >
               {isProcessing && showConfirm === 'restore' ? (
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
+                <RotateCcw className="size-4" />
               )}
             </Button>
 
@@ -488,16 +490,18 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               />
             )}
 
-            <div className="hidden sm:block w-px h-6 bg-muted dark:bg-accent mx-2"></div>
+            <div className="mx-1.5 hidden h-5 w-px bg-separator sm:block" />
 
             <Button
+              type="button"
               variant="ghost"
+              size="icon"
               onClick={handleClose}
               disabled={isProcessing}
-              className="flex-shrink-0 p-2 text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+              className="size-control shrink-0 rounded-md p-0 text-tertiary hover:text-foreground"
               title={t('bulkActionToolbar.close-toolbar')}
             >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              <X className="size-4" />
             </Button>
           </div>
         </div>
@@ -508,7 +512,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
         <div
           role="status"
           aria-live="polite"
-          className="fixed z-[60] rounded-lg bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-lg pointer-events-none animate-fade-in"
+          className="popover-styled motion-popover pointer-events-none fixed z-[60] px-2.5 py-1 text-label-sm text-foreground"
           style={{
             left: tooltip.x,
             top: tooltip.y,
@@ -516,7 +520,6 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           }}
         >
           {tooltip.message}
-          <div className="absolute left-1/2 -bottom-1 h-2 w-2 -translate-x-1/2 rotate-45 transform bg-popover"></div>
         </div>
       )}
     </div>

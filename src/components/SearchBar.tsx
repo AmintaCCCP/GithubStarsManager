@@ -46,9 +46,9 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="gap-2">
+        <Button type="button" variant="outline" size="md" className="h-control rounded-md gap-1.5">
           <span>{t(`searchBar.sort-${value}`)}</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="size-3.5 text-tertiary" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
@@ -57,7 +57,7 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange }) => {
             <DropdownMenuRadioItem
               key={option}
               value={option}
-              className={value === option ? 'bg-primary/10 text-primary dark:bg-primary/20' : undefined}
+              className={value === option ? 'bg-fill-selected text-foreground font-medium' : undefined}
             >
               {t(`searchBar.sort-${option}`)}
             </DropdownMenuRadioItem>
@@ -196,10 +196,10 @@ export const SearchBar: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
-  const filterChipBaseClass = 'linear-filter-chip flex items-center space-x-2 px-3 py-1.5 text-sm';
-  const filterChipActiveClass = 'is-active font-medium';
-  const filterChipInactiveClass = '';
-  const filterTagBaseClass = 'linear-filter-chip px-3 py-1.5 text-sm';
+  const filterChipBaseClass = 'h-control-sm rounded-sm px-2 text-label-sm font-medium gap-1.5 transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant';
+  const filterChipActiveClass = 'bg-accent-tint text-accent-text hover:bg-accent-tint-strong hover:text-accent-text';
+  const filterChipInactiveClass = 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground';
+  const filterTagBaseClass = filterChipBaseClass;
 
   useEffect(() => {
     // Extract unique languages, tags, and platforms from repositories
@@ -650,12 +650,12 @@ export const SearchBar: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <div className="ui-toolbar app-command-panel p-4 sm:p-5 mb-5">
+      <div className="ui-toolbar app-command-panel mb-3">
       {/* Search Input */}
-      <div className="app-command-row relative z-40 mb-4">
+      <div className="app-command-row relative z-40">
         <div className="flex w-full min-w-0 flex-1 items-center gap-2">
           <div className="relative min-w-0 flex-1">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-tertiary" aria-hidden="true" />
         <Input
           ref={searchInputRef}
           type="text"
@@ -670,43 +670,57 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="app-command-input h-10 w-full pl-10 pr-3"
+          className="h-control-lg w-full rounded-md pl-8 pr-8 text-label"
         />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={handleClearSearch}
+            aria-label={t('searchBar.clear-search')}
+            title={t('searchBar.clear-search')}
+            className="motion-press absolute right-1 top-1/2 -translate-y-1/2 inline-grid size-6 place-items-center rounded-sm text-tertiary hover:bg-fill-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <X className="size-3.5" aria-hidden="true" />
+          </button>
+        )}
 
         {/* Search History Dropdown */}
         {showSearchHistory && searchHistory.length > 0 && (
           <div
             id="search-history-dropdown"
             ref={searchDropdownRef}
-            className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+            className="popover-styled motion-popover absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto p-1"
           >
-            <div className="p-2 border-b border-border/60 dark:border-border/60 flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
+            <div className="flex items-center justify-between border-b border-subtle px-2 py-1.5">
+              <span className="text-label-sm font-medium text-tertiary">
                 {t('searchBar.search-history')}
               </span>
               <Button
                 type="button"
                 variant="ghost"
+                size="sm"
                 onClick={clearSearchHistory}
-                className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                className="h-control-sm px-1.5 text-label-sm text-tertiary hover:text-foreground"
               >
                 {t('searchBar.clear')}
               </Button>
             </div>
-            {searchHistory.map((historyQuery, index) => (
-              <Button
-                type="button"
-                variant="ghost"
-                key={index}
-                data-search-option
-                onClick={() => handleHistoryItemClick(historyQuery)}
-                onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
-                className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
-              >
-                <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70" />
-                <span className="truncate">{historyQuery}</span>
-              </Button>
-            ))}
+            <div className="pt-1">
+              {searchHistory.map((historyQuery, index) => (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  key={index}
+                  data-search-option
+                  onClick={() => handleHistoryItemClick(historyQuery)}
+                  onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
+                  className="flex min-h-row-menu w-full items-center justify-start gap-2 rounded-md px-2 py-1 text-left text-label font-normal text-foreground hover:bg-fill-hover"
+                >
+                  <Search className="size-3.5 shrink-0 text-tertiary" />
+                  <span className="truncate">{historyQuery}</span>
+                </Button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -715,78 +729,69 @@ export const SearchBar: React.FC = () => {
           <div
             id="search-suggestions-dropdown"
             ref={searchDropdownRef}
-            className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+            className="popover-styled motion-popover absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto p-1"
           >
-            <div className="p-2 border-b border-border/60 dark:border-border/60">
-              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
+            <div className="border-b border-subtle px-2 py-1.5">
+              <span className="text-label-sm font-medium text-tertiary">
                 {t('searchBar.search-suggestions')}
               </span>
             </div>
-            {searchSuggestions
-              .filter(suggestion =>
-                suggestion.toLowerCase().includes(searchQuery.toLowerCase()) &&
-                suggestion.toLowerCase() !== searchQuery.toLowerCase()
-              )
-              .slice(0, 5)
-              .map((suggestion, index) => (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  key={index}
-                  data-search-option
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
-                  className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
-                >
-                  <div className="w-4 h-4 flex items-center justify-center">
-                    <div className="w-2 h-2 bg-muted dark:bg-muted/40 rounded-full"></div>
-                  </div>
-                  <span className="truncate">{suggestion}</span>
-                </Button>
-              ))}
+            <div className="pt-1">
+              {searchSuggestions
+                .filter(suggestion =>
+                  suggestion.toLowerCase().includes(searchQuery.toLowerCase()) &&
+                  suggestion.toLowerCase() !== searchQuery.toLowerCase()
+                )
+                .slice(0, 5)
+                .map((suggestion, index) => (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    key={index}
+                    data-search-option
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
+                    className="flex min-h-row-menu w-full items-center justify-start gap-2 rounded-md px-2 py-1 text-left text-label font-normal text-foreground hover:bg-fill-hover"
+                  >
+                    <span className="flex size-3.5 items-center justify-center">
+                      <span className="size-1.5 rounded-full bg-border-strong" />
+                    </span>
+                    <span className="truncate">{suggestion}</span>
+                  </Button>
+                ))}
+            </div>
           </div>
         )}
           </div>
-          <div className="relative flex shrink-0 items-center gap-1 sm:gap-2">
-          {searchQuery && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleClearSearch}
-              aria-label={t('searchBar.clear-search')}
-              size="icon"
-              className="h-8 w-8 text-muted-foreground"
-              title={t('searchBar.clear-search')}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          )}
+          <div className="relative flex shrink-0 items-center gap-1.5">
           <Button
             onClick={handleAISearch}
-            variant="default"
+            variant="primary"
+            size="md"
             aria-label={isSearching ? t('searchBar.ai-searching') : t('searchBar.ai-search')}
             disabled={isSearching || !searchQuery.trim()}
-            className="flex shrink-0 items-center sm:px-4"
+            className="h-control shrink-0 rounded-md px-2.5"
             title={activeAIConfig
               ? t('searchBar.use-configured-ai-service-for-semantic-search-an')
               : t('searchBar.use-local-intelligent-ranking-algorithm-for-sear')}
           >
-            <Bot className="w-4 h-4" />
+            <Bot className="size-3.5" />
             <span className="hidden sm:inline">{isSearching ? t('searchBar.ai-searching') : t('searchBar.ai-search')}</span>
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
+            size="md"
             onClick={openGlobalChatHistory}
-            className="app-command-secondary-action app-repository-secondary-action flex items-center gap-2 px-3 text-sm"
+            className="h-control shrink-0 rounded-md px-2.5"
             aria-label={t('searchBar.chat-history')}
             title={t('searchBar.view-chat-history-across-repositories')}
           >
-            <History className="h-4 w-4" aria-hidden="true" />
+            <History className="size-3.5 text-secondary" aria-hidden="true" />
             <span className="hidden sm:inline">{t('searchBar.chat-history')}</span>
           </Button>
           {isSearching && searchPhase && (
-            <span className="max-w-[12rem] truncate text-xs text-muted-foreground dark:text-muted-foreground animate-pulse whitespace-nowrap">
+            <span className="max-w-[12rem] truncate text-label-sm text-tertiary animate-pulse whitespace-nowrap">
               {searchPhase}
             </span>
           )}
@@ -797,14 +802,14 @@ export const SearchBar: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 aria-label={t('searchBar.about-ai-search')}
-                className="h-8 w-8 shrink-0 text-muted-foreground"
+                className="size-control shrink-0 rounded-md text-tertiary hover:text-foreground"
               >
-                <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                <AlertCircle className="size-4" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" align="end" className="w-80 max-w-xs whitespace-normal break-words text-left">
-              <p className="mb-1 font-medium">{t('searchBar.about-ai-search-2')}</p>
-              <p className="leading-relaxed text-primary-foreground/80">
+              <p className="mb-1 font-medium text-foreground">{t('searchBar.about-ai-search-2')}</p>
+              <p className="leading-relaxed text-secondary">
                 {activeAIConfig ? t('searchBar.ai-semantic-search-mode-uses-configured-ai-servi') : t('searchBar.fallback-mode-basic-text-search-with-default-sor')}
               </p>
             </TooltipContent>
@@ -815,22 +820,22 @@ export const SearchBar: React.FC = () => {
 
       {/* Search Status Indicator */}
       {searchQuery && (
-        <div className="app-command-status mb-4 flex items-center justify-between text-sm">
-          <div className="flex items-center space-x-2">
+        <div className="app-command-status flex flex-wrap items-center justify-between gap-2 text-label-sm">
+          <div className="flex items-center gap-1.5">
             {isRealTimeSearch ? (
-              <div className="flex items-center space-x-2 text-primary dark:text-primary">
-                <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+              <div className="flex items-center gap-1.5 text-accent-text">
+                <div className="size-1.5 bg-accent-solid rounded-full animate-pulse"></div>
                 <span>{t('searchBar.real-time-search-mode-matching-repository-names')}</span>
               </div>
             ) : searchFilters.query ? (
-              <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground ">
-                <Bot className="w-4 h-4" />
+              <div className="flex items-center gap-1.5 text-secondary">
+                <Bot className="size-3.5 text-tertiary" />
                 <span>{t('searchBar.ai-semantic-search-mode-intelligent-matching-and')}</span>
               </div>
             ) : null}
           </div>
           {isRealTimeSearch && (
-            <div className="text-muted-foreground dark:text-muted-foreground">
+            <div className="text-tertiary">
               {t('searchBar.press-enter-or-click-ai-search-for-deep-search')}
             </div>
           )}
@@ -838,21 +843,25 @@ export const SearchBar: React.FC = () => {
       )}
 
       {/* Filter Controls */}
-      <div className="app-command-filters flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="app-command-filter-group flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="app-command-filters flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="app-command-filter-group flex flex-wrap items-center gap-1.5">
           <Button
-            variant="ghost"
+            type="button"
+            variant="outline"
+            size="md"
             aria-expanded={showFilters}
             aria-controls="advanced-filters-panel"
             onClick={() => setShowFilters(!showFilters)}
-            className={`linear-filter-toggle app-repository-secondary-action flex items-center space-x-2 px-3 py-2 text-sm ${
-              showFilters || activeFiltersCount > 0 ? 'is-active' : ''
+            className={`h-control rounded-md px-2.5 gap-1.5 ${
+              showFilters || activeFiltersCount > 0
+                ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)] hover:bg-accent-tint-strong hover:text-accent-text'
+                : 'text-secondary hover:text-foreground'
             }`}
           >
-            <SlidersHorizontal className="w-4 h-4" />
+            <SlidersHorizontal className="size-3.5" />
             <span>{t('searchBar.filters')}</span>
             {activeFiltersCount > 0 && (
-              <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-xs bg-accent-solid px-1 text-caption text-on-accent tabular-nums">
                 {activeFiltersCount}
               </span>
             )}
@@ -860,21 +869,24 @@ export const SearchBar: React.FC = () => {
 
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
+            size="md"
             onClick={() => setBatchStarOpen(true)}
-            className="linear-filter-toggle app-repository-secondary-action flex items-center space-x-2 px-3 py-2 text-sm"
+            className="h-control rounded-md px-2.5 gap-1.5 text-secondary hover:text-foreground"
           >
-            <Link2 className="w-4 h-4" aria-hidden="true" />
+            <Link2 className="size-3.5" aria-hidden="true" />
             <span>{repositoryT('batchStar.title')}</span>
           </Button>
 
           {activeFiltersCount > 0 && (
             <Button
+              type="button"
               variant="ghost"
+              size="md"
               onClick={clearFilters}
-              className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground transition-colors"
+              className="h-control rounded-md px-2 gap-1 text-tertiary hover:text-foreground"
             >
-              <X className="w-4 h-4" />
+              <X className="size-3.5" />
               <span>{t('searchBar.clear-all')}</span>
             </Button>
           )}
@@ -882,46 +894,51 @@ export const SearchBar: React.FC = () => {
         </div>
 
         {/* Sort Controls + Sync Button */}
-        <div className="app-command-controls relative z-30 flex items-center gap-2">
+        <div className="app-command-controls relative z-30 flex items-center gap-1.5">
           <SortByDropdown
             value={searchFilters.sortBy}
             onChange={(value) => setSearchFilters({ sortBy: value })}
           />
           <Button
+            type="button"
             onClick={() => setSearchFilters({
               sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc'
             })}
-            variant="ghost"
+            variant="outline"
+            size="icon"
             aria-label={searchFilters.sortOrder === 'desc' ? t('searchBar.sort-descending') : t('searchBar.sort-ascending')}
-            className="ui-button px-3 py-2 text-sm"
+            className="size-control rounded-md text-secondary hover:text-foreground"
           >
-            {searchFilters.sortOrder === 'desc' ? <ArrowDown className="w-4 h-4" aria-hidden="true" /> : <ArrowUp className="w-4 h-4" aria-hidden="true" />}
+            {searchFilters.sortOrder === 'desc' ? <ArrowDown className="size-3.5" aria-hidden="true" /> : <ArrowUp className="size-3.5" aria-hidden="true" />}
           </Button>
 
           {/* Sync Button */}
-          <div className="flex items-center gap-2 ml-1">
+          <div className="flex items-center gap-1.5 ml-0.5">
             <DropdownMenu>
               <div className="flex items-center">
-                <div className="ui-button-primary inline-flex items-stretch overflow-hidden">
+                <div className="inline-flex h-control items-stretch overflow-hidden rounded-md bg-accent-solid text-on-accent shadow-elev-0">
                   <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => { void syncStars(); }}
                     disabled={isSyncingStars}
-                    className="inline-flex items-center gap-1.5 rounded-none border-0 bg-transparent px-3 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
+                    className="h-control rounded-none border-0 bg-transparent px-2.5 text-label font-medium text-on-accent shadow-none hover:bg-white/10 hover:text-on-accent disabled:opacity-50"
                     title={t('searchBar.sync-starred-repositories')}
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`size-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
                     <span className="whitespace-nowrap">{t('searchBar.sync')}</span>
                   </Button>
+                  <span className="my-1.5 w-px bg-white/25" aria-hidden="true" />
                   <DropdownMenuTrigger asChild>
                     <Button
                       type="button"
+                      variant="ghost"
                       disabled={isSyncingStars}
                       aria-label={t('searchBar.more-sync-options')}
-                      className="group inline-flex items-center rounded-none border-0 bg-transparent px-1.5 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
+                      className="group h-control rounded-none border-0 bg-transparent px-1.5 text-on-accent shadow-none hover:bg-white/10 hover:text-on-accent disabled:opacity-50"
                       title={t('searchBar.more-sync-options')}
                     >
-                      <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                      <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
                     </Button>
                   </DropdownMenuTrigger>
                 </div>
@@ -930,14 +947,14 @@ export const SearchBar: React.FC = () => {
                 <DropdownMenuItem
                   disabled={isSyncingStars}
                   onSelect={() => { void syncStars('stars-only'); }}
-                  className="justify-start text-sm"
+                  className="justify-start"
                 >
                   <span className="whitespace-nowrap">{t('searchBar.sync-starred-repos-only')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={isSyncingStars}
                   onSelect={() => { void handleStarAndListSync(); }}
-                  className="justify-start text-sm"
+                  className="justify-start"
                 >
                   <span className="whitespace-nowrap">{t('searchBar.sync-starred-repos-lists')}</span>
                 </DropdownMenuItem>
@@ -950,14 +967,14 @@ export const SearchBar: React.FC = () => {
                   variant="ghost"
                   size="icon"
                   aria-label={t('searchBar.last-synced')}
-                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                  className="size-control shrink-0 rounded-md text-tertiary hover:text-foreground"
                 >
-                  <Clock className="h-4 w-4" aria-hidden="true" />
+                  <Clock className="size-3.5" aria-hidden="true" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" align="end" className="whitespace-nowrap">
-                <p className="font-medium">{t('searchBar.last-synced')}</p>
-                <p className="mt-1 text-primary-foreground/80">{formatLastSync(lastSync)}</p>
+                <p className="font-medium text-foreground">{t('searchBar.last-synced')}</p>
+                <p className="mt-0.5 text-secondary tabular-nums">{formatLastSync(lastSync)}</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -967,13 +984,16 @@ export const SearchBar: React.FC = () => {
 
       {/* Advanced Filters */}
       {showFilters && (
-        <div id="advanced-filters-panel" className="app-command-filter-panel">
+        <div
+          id="advanced-filters-panel"
+          className="mt-1 grid grid-cols-1 gap-x-5 gap-y-3.5 rounded-lg bg-paper p-3.5 shadow-elev-1 md:grid-cols-2"
+        >
           {/* Status Filters */}
           <div>
-            <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+            <h4 className="mb-2 text-label-sm font-medium text-tertiary">
               {t('searchBar.status-filters')}
             </h4>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {/* 已AI分析 - 仅在存在已分析仓库或当前已选择时显示，且与"分析失败"互斥 */}
               {(statusStats.analyzed > 0 || searchFilters.isAnalyzed === true) && searchFilters.analysisFailed !== true && (
                 <Button
@@ -989,9 +1009,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <CheckCircle className="w-4 h-4" />
+                  <CheckCircle className="size-3.5" />
                   <span>{t('searchBar.ai-analyzed')}</span>
-                  <span className="text-xs opacity-70">({statusStats.analyzed})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.analyzed})</span>
                 </Button>
               )}
               {/* 未AI分析 - 仅在存在未分析仓库时显示 */}
@@ -1009,9 +1029,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="size-3.5" />
                   <span>{t('searchBar.not-analyzed')}</span>
-                  <span className="text-xs opacity-70">({statusStats.notAnalyzed})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.notAnalyzed})</span>
                 </Button>
               )}
               {/* 分析失败 - 仅在存在失败仓库或当前已选择时显示，且与"已AI分析"互斥 */}
@@ -1029,9 +1049,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <AlertCircle className="w-4 h-4" />
+                  <AlertCircle className="size-3.5" />
                   <span>{t('searchBar.analysis-failed')}</span>
-                  <span className="text-xs opacity-70">({statusStats.failed})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.failed})</span>
                 </Button>
               )}
               {/* 已订阅Release - 仅在存在已订阅仓库或当前已选择时显示 */}
@@ -1049,9 +1069,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <Bell className="w-4 h-4" />
+                  <Bell className="size-3.5" />
                   <span>{t('searchBar.subscribed-to-releases')}</span>
-                  <span className="text-xs opacity-70">({statusStats.subscribed})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.subscribed})</span>
                 </Button>
               )}
               {/* 未订阅Release - 仅在存在未订阅仓库时显示 */}
@@ -1069,9 +1089,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <BellOff className="w-4 h-4" />
+                  <BellOff className="size-3.5" />
                   <span>{t('searchBar.not-subscribed-to-releases')}</span>
-                  <span className="text-xs opacity-70">({statusStats.notSubscribed})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.notSubscribed})</span>
                 </Button>
               )}
               {/* 已自定义 - 仅在存在已自定义仓库或当前已选择时显示 */}
@@ -1089,9 +1109,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <Edit3 className="w-4 h-4" />
+                  <Edit3 className="size-3.5" />
                   <span>{t('searchBar.customized')}</span>
-                  <span className="text-xs opacity-70">({statusStats.edited})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.edited})</span>
                 </Button>
               )}
               {/* 分类已锁定 - 仅在存在已锁定仓库或当前已选择时显示 */}
@@ -1109,9 +1129,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <Lock className="w-4 h-4" />
+                  <Lock className="size-3.5" />
                   <span>{t('searchBar.category-locked')}</span>
-                  <span className="text-xs opacity-70">({statusStats.locked})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.locked})</span>
                 </Button>
               )}
               {/* 分类未锁定 - 仅在存在未锁定仓库或当前已选择时显示 */}
@@ -1129,9 +1149,9 @@ export const SearchBar: React.FC = () => {
                       : filterChipInactiveClass
                   }`}
                 >
-                  <Unlock className="w-4 h-4" />
+                  <Unlock className="size-3.5" />
                   <span>{t('searchBar.category-unlocked')}</span>
-                  <span className="text-xs opacity-70">({statusStats.notLocked})</span>
+                  <span className="text-caption opacity-70 tabular-nums">({statusStats.notLocked})</span>
                 </Button>
               )}
             </div>
@@ -1140,10 +1160,10 @@ export const SearchBar: React.FC = () => {
           {/* Languages */}
           {availableLanguages.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+              <h4 className="mb-2 text-label-sm font-medium text-tertiary">
                 {t('searchBar.programming-languages')}
               </h4>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {availableLanguages.slice(0, 12).map(language => (
                   <Button
                     key={language}
@@ -1166,23 +1186,23 @@ export const SearchBar: React.FC = () => {
           {/* Platforms */}
           {availablePlatforms.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+              <h4 className="mb-2 text-label-sm font-medium text-tertiary">
                 {t('searchBar.supported-platforms')}
               </h4>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {availablePlatforms.map(platform => (
                   <Button
                     key={platform}
                     onClick={() => handlePlatformToggle(platform)}
                     aria-pressed={searchFilters.platforms.includes(platform)}
                     variant="ghost"
-                  className={`${filterChipBaseClass} ${
+                    className={`${filterChipBaseClass} ${
                       searchFilters.platforms.includes(platform)
                         ? filterChipActiveClass
                         : filterChipInactiveClass
                     }`}
                   >
-                    {React.createElement(getPlatformIcon(platform), { className: "w-4 h-4" })}
+                    {React.createElement(getPlatformIcon(platform), { className: "size-3.5" })}
                     <span>{getPlatformDisplayName(platform)}</span>
                   </Button>
                 ))}
@@ -1193,10 +1213,10 @@ export const SearchBar: React.FC = () => {
           {/* Licenses */}
           {availableLicenses.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+              <h4 className="mb-2 text-label-sm font-medium text-tertiary">
                 {t('searchBar.license')}
               </h4>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {availableLicenses.map(license => (
                   <Button
                     key={license}
@@ -1221,10 +1241,10 @@ export const SearchBar: React.FC = () => {
           {/* Tags */}
           {availableTags.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+              <h4 className="mb-2 text-label-sm font-medium text-tertiary">
                 {t('searchBar.tags')}
               </h4>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {availableTags.slice(0, 15).map(tag => (
                   <Button
                     key={tag}
@@ -1246,12 +1266,12 @@ export const SearchBar: React.FC = () => {
 
           {/* Star Range */}
           <div>
-            <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+            <h4 className="mb-2 text-label-sm font-medium text-tertiary">
               {t('searchBar.star-count-range')}
             </h4>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4 sm:gap-4">
-              <div className="flex items-center space-x-2">
-                <label htmlFor="minimum-stars" className="text-sm text-muted-foreground dark:text-muted-foreground">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+              <div className="flex items-center gap-2">
+                <label htmlFor="minimum-stars" className="text-label text-secondary">
                   {t('searchBar.min')}
                 </label>
                 <NumberInput
@@ -1262,11 +1282,11 @@ export const SearchBar: React.FC = () => {
                   step={1}
                   placeholder="0"
                   allowUndefined
-                  className="app-star-range-input w-24 text-sm dark:bg-muted/40"
+                  className="app-star-range-input h-control w-24 text-label tabular-nums"
                 />
               </div>
-              <div className="flex items-center space-x-2">
-                <label htmlFor="maximum-stars" className="text-sm text-muted-foreground dark:text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <label htmlFor="maximum-stars" className="text-label text-secondary">
                   {t('searchBar.max')}
                 </label>
                 <NumberInput
@@ -1277,17 +1297,17 @@ export const SearchBar: React.FC = () => {
                   step={1}
                   placeholder="∞"
                   allowUndefined
-                  className="app-star-range-input w-24 text-sm dark:bg-muted/40"
+                  className="app-star-range-input h-control w-24 text-label tabular-nums"
                 />
               </div>
             </div>
             {searchFilters.minStars !== undefined && searchFilters.maxStars !== undefined && searchFilters.minStars > searchFilters.maxStars && (
-              <p className="text-xs text-destructive mt-1.5 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
+              <p className="mt-1.5 flex items-center gap-1 text-caption text-destructive-text">
+                <AlertCircle className="size-3" />
                 {t('searchBar.min-cannot-be-greater-than-max')}
               </p>
             )}
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {[
                 { label: '1K', value: 1000 },
                 { label: '5K', value: 5000 },
@@ -1298,10 +1318,10 @@ export const SearchBar: React.FC = () => {
                 <Button
                   key={preset.label}
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setSearchFilters({ minStars: preset.value })}
-                  className="h-7 rounded px-2 text-xs text-muted-foreground transition-colors hover:bg-accent"
+                  className="h-control-sm rounded-sm bg-fill-hover px-2 text-caption text-secondary tabular-nums transition-colors hover:bg-fill-selected hover:text-foreground"
                 >
                   ≥{preset.label}
                 </Button>
@@ -1312,10 +1332,10 @@ export const SearchBar: React.FC = () => {
           {/* Repository Health 客观事实过滤（见 src/utils/repositoryHealth.ts）。
               这里刻意不放「健康 / 不健康」之类主观筛选，只按可验证事实过滤。 */}
           <div>
-            <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+            <h4 className="mb-2 text-label-sm font-medium text-tertiary">
               {t('searchBar.repository-health-facts')}
             </h4>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               <Button
                 onClick={() => setSearchFilters({
                   healthArchived: searchFilters.healthArchived === true ? undefined : true,
@@ -1327,7 +1347,7 @@ export const SearchBar: React.FC = () => {
                   searchFilters.healthArchived === true ? filterChipActiveClass : filterChipInactiveClass
                 }`}
               >
-                <Archive className="w-4 h-4" />
+                <Archive className="size-3.5" />
                 <span>{t('searchBar.archived')}</span>
               </Button>
               <Button
@@ -1341,7 +1361,7 @@ export const SearchBar: React.FC = () => {
                   searchFilters.healthRecentActivity === true ? filterChipActiveClass : filterChipInactiveClass
                 }`}
               >
-                <Clock className="w-4 h-4" />
+                <Clock className="size-3.5" />
                 <span>{t('searchBar.pushed-in-12-months')}</span>
               </Button>
               <Button
@@ -1355,7 +1375,7 @@ export const SearchBar: React.FC = () => {
                   searchFilters.healthHasLicense === false ? filterChipActiveClass : filterChipInactiveClass
                 }`}
               >
-                <AlertCircle className="w-4 h-4" />
+                <AlertCircle className="size-3.5" />
                 <span>{t('searchBar.no-declared-license')}</span>
               </Button>
             </div>

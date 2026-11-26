@@ -67,26 +67,29 @@ export const SearchDemo: React.FC = () => {
 
   if (!showDemo) {
     return (
-      <div className="bg-gradient-to-r from-accent/70 to-background dark:from-accent/40 dark:to-background rounded-xl border border-border p-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-primary/20 dark:bg-primary/20 rounded-lg">
-              <Lightbulb className="w-5 h-5 text-primary dark:text-primary" />
+      <div className="mb-4 rounded-lg bg-raised p-4 shadow-elev-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="inline-grid size-control-lg place-items-center rounded-md bg-accent-tint text-accent-text">
+              <Lightbulb className="size-4" />
             </div>
             <div>
-              <h3 className="font-medium text-foreground dark:text-foreground">
+              <h3 className="text-label-lg font-semibold text-foreground">
                 {t('searchDemo.search-feature-upgrade')}
               </h3>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+              <p className="text-label-sm text-secondary">
                 {t('searchDemo.experience-new-real-time-and-ai-semantic-search')}
               </p>
             </div>
           </div>
           <Button
+            type="button"
+            variant="primary"
+            size="md"
             onClick={() => setShowDemo(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+            className="h-control shrink-0 rounded-md"
           >
-            <Play className="w-4 h-4" />
+            <Play className="size-3.5" />
             <span>{t('searchDemo.view-demo')}</span>
           </Button>
         </div>
@@ -95,17 +98,17 @@ export const SearchDemo: React.FC = () => {
   }
 
   return (
-    <div className="bg-card dark:bg-card rounded-xl border border-border dark:border-border p-6 mb-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-primary rounded-lg">
-            <Search className="w-5 h-5 text-primary-foreground" />
+    <div className="mb-4 rounded-lg bg-raised p-5 shadow-elev-1">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="inline-grid size-control-lg place-items-center rounded-md bg-accent-tint text-accent-text">
+            <Search className="size-4" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
+            <h3 className="text-label-lg font-semibold text-foreground">
               {t('searchDemo.search-feature-demo')}
             </h3>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+            <p className="text-label-sm text-secondary">
               {t('searchDemo.click-examples-below-to-experience-different-sea')}
             </p>
           </div>
@@ -116,18 +119,18 @@ export const SearchDemo: React.FC = () => {
           size="icon"
           onClick={() => setShowDemo(false)}
           aria-label={t('searchDemo.close-search-demo')}
-          className="text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
+          className="size-control rounded-md text-tertiary hover:text-foreground"
         >
           ×
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* 实时搜索示例 */}
-        <div className="space-y-3">
-          <div className="flex items-center space-x-2 mb-3">
-            <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-            <h4 className="font-medium text-foreground dark:text-foreground">
+        <div className="space-y-2">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="size-1.5 rounded-full bg-accent-solid animate-pulse" />
+            <h4 className="text-label font-medium text-foreground">
               {t('searchDemo.real-time-search')}
             </h4>
           </div>
@@ -140,19 +143,19 @@ export const SearchDemo: React.FC = () => {
                 variant="ghost"
                 aria-pressed={selectedExample?.query === example.query}
                 onClick={() => handleExampleClick(example)}
-                className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-[background-color,border-color] ${
+                className={`h-auto w-full flex-col items-start justify-start rounded-md p-2.5 text-left transition-[background-color,box-shadow] ${
                   selectedExample?.query === example.query
-                    ? 'border-primary bg-muted dark:bg-primary/20'
-                    : 'border-border hover:border-border dark:border-border dark:hover:border-border'
+                    ? 'bg-fill-selected shadow-[inset_0_0_0_1px_var(--focus-ring)]'
+                    : 'bg-sunken shadow-[inset_0_0_0_1px_var(--border-subtle)] hover:bg-fill-hover'
                 }`}
               >
-                <span className="flex items-center space-x-2 mb-1">
-                  <Search className="w-4 h-4 text-primary" />
-                  <code className="text-sm font-mono bg-muted dark:bg-muted/40 px-2 py-1 rounded">
+                <span className="mb-1 flex items-center gap-2">
+                  <Search className="size-3.5 text-accent-text" />
+                  <code className="rounded-xs bg-raised px-1.5 py-0.5 font-mono text-mono-ui text-foreground">
                     {example.query}
                   </code>
                 </span>
-                <span className="block text-xs text-muted-foreground dark:text-muted-foreground">
+                <span className="block text-label-sm font-normal text-secondary">
                   {example.description}
                 </span>
               </Button>
@@ -160,10 +163,10 @@ export const SearchDemo: React.FC = () => {
         </div>
 
         {/* AI搜索示例 */}
-        <div className="space-y-3">
-          <div className="flex items-center space-x-2 mb-3">
-            <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-            <h4 className="font-medium text-foreground dark:text-foreground">
+        <div className="space-y-2">
+          <div className="mb-2 flex items-center gap-2">
+            <Bot className="size-3.5 text-tertiary" />
+            <h4 className="text-label font-medium text-foreground">
               {t('searchDemo.ai-semantic-search')}
             </h4>
           </div>
@@ -176,19 +179,19 @@ export const SearchDemo: React.FC = () => {
                 variant="ghost"
                 aria-pressed={selectedExample?.query === example.query}
                 onClick={() => handleExampleClick(example)}
-                className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-[background-color,border-color] ${
+                className={`h-auto w-full flex-col items-start justify-start rounded-md p-2.5 text-left transition-[background-color,box-shadow] ${
                   selectedExample?.query === example.query
-                    ? 'border-border dark:border-border bg-muted dark:bg-muted/40 '
-                    : 'border-border hover:border-border dark:border-border dark:hover:border-border'
+                    ? 'bg-fill-selected shadow-[inset_0_0_0_1px_var(--focus-ring)]'
+                    : 'bg-sunken shadow-[inset_0_0_0_1px_var(--border-subtle)] hover:bg-fill-hover'
                 }`}
               >
-                <span className="flex items-center space-x-2 mb-1">
-                  <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-                  <code className="text-sm font-mono bg-muted dark:bg-muted/40 px-2 py-1 rounded">
+                <span className="mb-1 flex items-center gap-2">
+                  <Bot className="size-3.5 text-tertiary" />
+                  <code className="rounded-xs bg-raised px-1.5 py-0.5 font-mono text-mono-ui text-foreground">
                     {example.query}
                   </code>
                 </span>
-                <span className="block text-xs text-muted-foreground dark:text-muted-foreground">
+                <span className="block text-label-sm font-normal text-secondary">
                   {example.description}
                 </span>
               </Button>
@@ -198,34 +201,34 @@ export const SearchDemo: React.FC = () => {
 
       {/* 选中示例的详细信息 */}
       {selectedExample && (
-        <div className="bg-background dark:bg-muted/20 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
+        <div className="rounded-md bg-sunken p-3.5">
+          <div className="mb-2 flex items-center gap-2">
             {selectedExample.type === 'realtime' ? (
-              <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+              <div className="size-1.5 rounded-full bg-accent-solid animate-pulse" />
             ) : (
-              <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+              <Bot className="size-3.5 text-tertiary" />
             )}
-            <h5 className="font-medium text-foreground dark:text-foreground">
+            <h5 className="text-label font-medium text-foreground">
               {selectedExample.description}
             </h5>
           </div>
-          
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+
+          <div className="space-y-1.5">
+            <p className="text-label-sm text-secondary">
               {t('searchDemo.expected-results')}
             </p>
             <ul className="space-y-1">
               {selectedExample.expectedResults.map((result, index) => (
-                <li key={index} className="flex items-center space-x-2 text-sm text-foreground dark:text-muted-foreground">
-                  <CheckCircle className="w-3 h-3 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
+                <li key={index} className="flex items-center gap-2 text-label-sm text-foreground">
+                  <CheckCircle className="size-3.5 shrink-0 text-tertiary" />
                   <span>{result}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="mt-4 p-3 bg-muted dark:bg-primary/20 rounded-lg">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
+          <div className="mt-3 rounded-sm bg-fill-hover p-2.5">
+            <p className="text-label-sm text-secondary">
               {selectedExample.type === 'realtime' ? (
                 t('searchDemo.real-time-search-instantly-shows-matching-reposi')
               ) : (
@@ -237,33 +240,33 @@ export const SearchDemo: React.FC = () => {
       )}
 
       {/* 使用提示 */}
-      <div className="mt-6 pt-6 border-t border-border dark:border-border">
-        <h4 className="font-medium text-foreground dark:text-foreground mb-3">
+      <div className="mt-5 border-t border-subtle pt-4">
+        <h4 className="mb-2.5 text-label font-medium text-foreground">
           {t('searchDemo.usage-tips')}
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-primary rounded-full"></div>
-              <span className="font-medium text-foreground dark:text-muted-foreground">
+        <div className="grid grid-cols-1 gap-4 text-label-sm md:grid-cols-2">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="size-1.5 rounded-full bg-accent-solid" />
+              <span className="font-medium text-foreground">
                 {t('searchDemo.real-time-search')}
               </span>
             </div>
-            <ul className="space-y-1 text-muted-foreground dark:text-muted-foreground ml-4">
+            <ul className="ml-3.5 space-y-1 text-secondary">
               <li>• {t('searchDemo.automatically-triggered-while-typing')}</li>
               <li>• {t('searchDemo.matches-repository-names')}</li>
               <li>• {t('searchDemo.supports-chinese-ime')}</li>
               <li>• {t('searchDemo.fast-response-time')}</li>
             </ul>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-              <span className="font-medium text-foreground dark:text-muted-foreground">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Bot className="size-3.5 text-tertiary" />
+              <span className="font-medium text-foreground">
                 {t('searchDemo.ai-semantic-search')}
               </span>
             </div>
-            <ul className="space-y-1 text-muted-foreground dark:text-muted-foreground ml-6">
+            <ul className="ml-5 space-y-1 text-secondary">
               <li>• {t('searchDemo.click-ai-search-button-to-trigger')}</li>
               <li>• {t('searchDemo.supports-natural-language-queries')}</li>
               <li>• {t('searchDemo.cross-language-matching')}</li>

@@ -34,7 +34,7 @@ const KeywordChips: React.FC<{
   if (items.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {items.map((item, index) => {
         const conflicting = isConflicting?.(item) ?? false;
         return (
@@ -42,21 +42,21 @@ const KeywordChips: React.FC<{
             key={`${item}-${index}`}
             title={conflicting ? conflictTitle : undefined}
             className={cn(
-              'flex items-center gap-1 rounded-md border bg-muted px-2 py-1',
+              'inline-flex h-6 items-center gap-1 rounded-xs bg-fill-hover px-2',
               conflicting
-                ? 'border-amber-500/70 dark:border-amber-500/70'
-                : 'border-border'
+                ? 'shadow-[inset_0_0_0_1px_hsl(var(--warning))]'
+                : 'shadow-[inset_0_0_0_1px_var(--border-subtle)]'
             )}
           >
             <Badge
               variant="secondary"
-              className="h-auto rounded-sm border-0 bg-transparent px-0 text-sm font-medium text-secondary-foreground"
+              className="h-auto rounded-xs border-0 bg-transparent px-0 text-label-sm font-medium text-foreground"
             >
               {item}
             </Badge>
             {conflicting && conflictTitle && (
               <>
-                <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-500" aria-hidden="true" />
+                <AlertTriangle className="size-3 text-warning" aria-hidden="true" />
                 <span className="sr-only">{conflictTitle}</span>
               </>
             )}
@@ -66,9 +66,9 @@ const KeywordChips: React.FC<{
               size="icon"
               onClick={() => onRemove(index)}
               aria-label={removeLabel(item)}
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground transition-colors"
+              className="size-5 rounded-xs p-0 text-tertiary hover:text-foreground"
             >
-              <X className="w-3 h-3" />
+              <X className="size-3" />
             </Button>
           </div>
         );
@@ -84,9 +84,9 @@ const FieldHint: React.FC<{ text: string }> = ({ text }) => (
       <button
         type="button"
         aria-label={text}
-        className="flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground transition-colors"
+        className="flex size-4 shrink-0 cursor-help items-center justify-center rounded-full text-tertiary hover:text-foreground transition-colors"
       >
-        <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+        <HelpCircle className="size-3.5" aria-hidden="true" />
       </button>
     </TooltipTrigger>
     <TooltipContent side="top" className="max-w-72 whitespace-normal break-words text-left">
@@ -129,30 +129,30 @@ const RepoPickerPanel: React.FC<{
     role="group"
     aria-label={title}
     className={cn(
-      'mt-3 rounded-lg border p-3',
+      'mt-3 rounded-lg p-3',
       accent === 'primary'
-        ? 'border-primary/40 bg-primary/5 dark:border-primary/40 dark:bg-primary/5'
-        : 'border-destructive/40 bg-destructive/5 dark:border-destructive/40 dark:bg-destructive/5',
+        ? 'bg-accent-tint shadow-[inset_0_0_0_1px_var(--accent-tint-strong)]'
+        : 'bg-destructive-tint shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--destructive-solid)_28%,transparent)]',
     )}
   >
     <div className="flex items-center justify-between gap-2">
       <p
         className={cn(
-          'text-sm font-medium',
-          accent === 'primary' ? 'text-primary dark:text-primary' : 'text-destructive dark:text-destructive',
+          'text-label font-medium',
+          accent === 'primary' ? 'text-accent-text' : 'text-destructive',
         )}
       >
         {title}
       </p>
       {selected.length > 0 && (
-        <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs rounded-full whitespace-nowrap">
+        <span className="inline-flex h-5 items-center rounded-xs bg-accent-solid px-1.5 text-caption text-on-accent tabular-nums whitespace-nowrap">
           {selectedCountText}
         </span>
       )}
     </div>
 
-    <div className="relative mt-3">
-      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
+    <div className="relative mt-2.5">
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-tertiary" aria-hidden="true" />
       <Input
         type="text"
         value={search}
@@ -160,17 +160,17 @@ const RepoPickerPanel: React.FC<{
         placeholder={searchPlaceholder}
         aria-label={searchPlaceholder}
         autoFocus
-        className="w-full pl-8 pr-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
+        className="h-control-lg w-full pl-8 pr-3 text-label"
       />
     </div>
 
-    <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-border dark:border-border" role="listbox" aria-multiselectable="true">
+    <div className="mt-2 max-h-60 divide-y divide-separator overflow-y-auto rounded-md bg-paper shadow-elev-0" role="listbox" aria-multiselectable="true">
       {!hasReleaseRepos ? (
-        <p className="px-3 py-6 text-center text-sm text-muted-foreground dark:text-muted-foreground">
+        <p className="px-3 py-6 text-center text-label text-secondary">
           {noReleaseReposText}
         </p>
       ) : options.length === 0 ? (
-        <p className="px-3 py-6 text-center text-sm text-muted-foreground dark:text-muted-foreground">
+        <p className="px-3 py-6 text-center text-label text-secondary">
           {emptyText}
         </p>
       ) : (
@@ -183,20 +183,20 @@ const RepoPickerPanel: React.FC<{
               role="option"
               aria-selected={checked}
               onClick={() => onToggle(fullName)}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-accent dark:hover:bg-accent transition-colors"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-fill-hover"
             >
               <span
                 aria-hidden="true"
                 className={cn(
-                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border shadow-sm transition-colors',
+                  'flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors',
                   checked
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border dark:border-border bg-card'
+                    ? 'border-primary bg-accent-solid text-on-accent'
+                    : 'border-control bg-transparent'
                 )}
               >
-                {checked && <Check className="h-3 w-3" />}
+                {checked && <Check className="size-3" strokeWidth={2.5} />}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-foreground dark:text-foreground" title={fullName}>
+              <span className="min-w-0 flex-1 truncate text-label text-foreground" title={fullName}>
                 {fullName}
               </span>
             </button>
@@ -349,7 +349,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     onClose();
   };
 
-  const keywordInputClass = 'flex-1 px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground';
+  const keywordInputClass = 'h-control-lg flex-1 text-label';
 
   const assetRuleCount = keywords.length + excludeKeywords.length;
   const repoRuleCount = includeRepos.length + alwaysExcludeRepos.length;
@@ -364,36 +364,39 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       <section
         aria-label={isInclude ? tModal('include-repos-label') : tModal('exclude-repos-label')}
         className={cn(
-          'rounded-lg border p-3 transition-colors',
+          'rounded-lg bg-raised p-3.5 transition-shadow',
           pickerOpen
             ? isInclude
-              ? 'border-primary/50 dark:border-primary/50'
-              : 'border-destructive/50 dark:border-destructive/50'
-            : 'border-border dark:border-border',
+              ? 'shadow-[0_0_0_1px_var(--focus-ring)]'
+              : 'shadow-[0_0_0_1px_var(--destructive-text)]'
+            : 'shadow-elev-0',
         )}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
             {isInclude
-              ? <PlusCircle className="h-4 w-4 shrink-0 text-primary dark:text-primary" aria-hidden="true" />
-              : <MinusCircle className="h-4 w-4 shrink-0 text-destructive dark:text-destructive" aria-hidden="true" />}
-            <span className="block text-sm font-medium text-foreground dark:text-foreground">
+              ? <PlusCircle className="size-4 shrink-0 text-accent-text" aria-hidden="true" />
+              : <MinusCircle className="size-4 shrink-0 text-destructive" aria-hidden="true" />}
+            <span className="block text-label font-medium text-foreground">
               {isInclude ? tModal('include-repos-label') : tModal('exclude-repos-label')}
             </span>
             <FieldHint text={isInclude ? tModal('include-repos-note') : tModal('exclude-repos-note')} />
           </div>
           <Button
+            type="button"
+            variant={pickerOpen ? 'outline' : 'ghost'}
+            size="sm"
             onClick={() => setRepoPickerTarget(pickerOpen ? null : target)}
             disabled={releaseRepos.length === 0}
             title={releaseRepos.length === 0 ? tModal('repo-picker-no-release-repos') : undefined}
             aria-pressed={pickerOpen}
             className={cn(
-              'flex items-center space-x-1 px-3 py-1.5 text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+              'h-control-sm rounded-sm px-2.5 text-label-sm',
               pickerOpen
-                ? 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
+                ? 'text-secondary hover:text-foreground'
                 : isInclude
-                  ? 'bg-primary/10 text-primary hover:bg-primary/20 dark:bg-primary/15 dark:text-primary dark:hover:bg-primary/25'
-                  : 'bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/15 dark:text-destructive dark:hover:bg-destructive/25',
+                  ? 'bg-accent-tint text-accent-text hover:bg-accent-tint-strong'
+                  : 'bg-destructive-tint text-destructive hover:bg-destructive-tint',
             )}
           >
             <span>{pickerOpen ? tModal('repo-picker-done') : (isInclude ? tModal('add-include-repos') : tModal('add-exclude-repos'))}</span>
@@ -401,7 +404,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         </div>
 
         {items.length > 0 ? (
-          <div className="mt-2">
+          <div className="mt-2.5">
             <KeywordChips
               items={items}
               removeLabel={(repo) => isInclude
@@ -413,7 +416,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             />
           </div>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
+          <p className="mt-2 text-label-sm text-tertiary">
             {isInclude ? tModal('include-repos-empty') : tModal('exclude-repos-empty')}
           </p>
         )}
@@ -447,17 +450,21 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       maxWidth="max-w-2xl"
       scrollable
       footer={
-        <div className="flex justify-end space-x-3">
+        <div className="flex justify-end gap-2">
           <Button
+            type="button"
+            variant="outline"
+            size="md"
             onClick={onClose}
-            className="px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 dark:border dark:border-border rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors"
           >
             {tModal('cancel')}
           </Button>
           <Button
+            type="button"
+            variant="primary"
+            size="md"
             onClick={handleSave}
             disabled={!canSave}
-            className={`px-4 py-2 rounded-lg transition-colors ${canSave ? 'bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary/80 dark:hover:bg-primary' : 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed'}`}
           >
             {filter ? tModal('save') : tModal('create')}
           </Button>
@@ -467,7 +474,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       <div className="space-y-4">
         {/* Filter Name */}
         <div>
-          <label htmlFor="filter-name" className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+          <label htmlFor="filter-name" className="mb-1.5 block text-label font-medium text-foreground">
             {tModal('name-label')}
           </label>
           <Input
@@ -476,25 +483,25 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={tModal('name-placeholder')}
-            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
+            className="h-control-lg w-full text-label"
           />
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as FilterTab)}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="assets" className="gap-1.5">
-              <Package className="h-3.5 w-3.5" aria-hidden="true" />
+            <TabsTrigger value="assets" className="gap-1.5 tabular-nums">
+              <Package className="size-3.5" aria-hidden="true" />
               <span>{tModal('tab-assets')} · {assetRuleCount}</span>
             </TabsTrigger>
-            <TabsTrigger value="repos" className="gap-1.5">
-              <FolderGit2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <TabsTrigger value="repos" className="gap-1.5 tabular-nums">
+              <FolderGit2 className="size-3.5" aria-hidden="true" />
               <span>{tModal('tab-repos')} · {repoRuleCount}</span>
             </TabsTrigger>
           </TabsList>
 
           {!canSave && (
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-500">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <p className="mt-2 flex items-center gap-1.5 text-label-sm text-warning">
+              <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
               {tModal('save-no-rules-hint')}
             </p>
           )}
@@ -503,14 +510,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           <TabsContent value="assets" className="space-y-4">
             {/* Include keywords（白名单） */}
             <div>
-              <div className="mb-2 flex items-center gap-1.5">
-                <label htmlFor="filter-keywords" className="block text-sm font-medium text-foreground dark:text-foreground">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label htmlFor="filter-keywords" className="block text-label font-medium text-foreground">
                   {tModal('include-keywords-label')}
                 </label>
                 <FieldHint text={tModal('tip-body')} />
               </div>
 
-              <div className="flex space-x-2 mb-3">
+              <div className="mb-2.5 flex items-center gap-2">
                 <Input
                   id="filter-keywords"
                   type="text"
@@ -521,11 +528,13 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   className={keywordInputClass}
                 />
                 <Button
+                  type="button"
+                  variant="primary"
+                  size="lg"
                   onClick={addKeyword}
                   disabled={!newKeyword.trim()}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary/80 dark:hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1 transition-colors"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="size-3.5" />
                   <span>{tModal('add')}</span>
                 </Button>
               </div>
@@ -537,7 +546,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               />
 
               {keywords.length === 0 && (
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                <p className="text-label-sm text-tertiary">
                   {tModal('include-keywords-hint')}
                 </p>
               )}
@@ -545,14 +554,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
 
             {/* Exclude keywords（黑名单） */}
             <div>
-              <div className="mb-2 flex items-center gap-1.5">
-                <label htmlFor="filter-exclude-keywords" className="block text-sm font-medium text-foreground dark:text-foreground">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label htmlFor="filter-exclude-keywords" className="block text-label font-medium text-foreground">
                   {tModal('exclude-keywords-label')}
                 </label>
                 <FieldHint text={tModal('exclude-keywords-hint')} />
               </div>
 
-              <div className="flex space-x-2 mb-3">
+              <div className="mb-2.5 flex items-center gap-2">
                 <Input
                   id="filter-exclude-keywords"
                   type="text"
@@ -563,11 +572,13 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   className={keywordInputClass}
                 />
                 <Button
+                  type="button"
+                  variant="primary"
+                  size="lg"
                   onClick={addExcludeKeyword}
                   disabled={!newExcludeKeyword.trim()}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary/80 dark:hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1 transition-colors"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="size-3.5" />
                   <span>{tModal('add')}</span>
                 </Button>
               </div>
@@ -581,7 +592,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           </TabsContent>
 
           {/* 仓库过滤 */}
-          <TabsContent value="repos" className="space-y-4">
+          <TabsContent value="repos" className="space-y-3">
             {renderRepoSection('include')}
             {renderRepoSection('exclude')}
           </TabsContent>

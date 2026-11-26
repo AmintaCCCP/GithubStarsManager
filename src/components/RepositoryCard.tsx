@@ -117,15 +117,15 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
   onClick,
   ...props
 }) => {
-  const baseClasses = 'h-8 w-8 p-0 rounded-md transition-colors disabled:opacity-50';
+  const baseClasses = 'size-control p-0 rounded-sm transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant disabled:opacity-50';
   const selectionClasses = selectionMode ? 'pointer-events-none' : '';
 
   const variantClasses = {
     default: '',
     ai: '', // AI variant uses dynamic classes based on state
     subscribe: '', // Subscribe variant uses dynamic classes based on state
-    edit: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
-    unstar: 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed',
+    edit: 'bg-transparent text-tertiary hover:bg-fill-hover hover:text-foreground',
+    unstar: 'bg-transparent text-tertiary hover:bg-fill-hover hover:text-foreground disabled:cursor-not-allowed',
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -137,6 +137,7 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
   return (
     <Button
       {...props}
+      variant="ghost"
       size="icon"
       onClick={handleClick}
       disabled={disabled || selectionMode}
@@ -207,7 +208,7 @@ const countVisibleOverflowActions = (
 };
 
 const mutedIconButtonClass =
-  'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground';
+  'bg-transparent text-tertiary transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant hover:bg-fill-hover hover:text-foreground';
 
 interface OverflowActionRowProps {
   actionRowRef: React.Ref<HTMLDivElement>;
@@ -378,39 +379,39 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
     ),
     subscribe: (
       <SelectionAwareButton onClick={onToggleReleaseSubscription} selectionMode={selectionMode}
-        className={isSubscribed ? 'bg-primary text-primary-foreground shadow-sm' : mutedIconButtonClass}
+        className={isSubscribed ? 'bg-accent-tint text-accent-text hover:bg-accent-tint-strong' : mutedIconButtonClass}
         title={isSubscribed ? t('repositoryCard.unsubscribe-from-releases-2') : t('repositoryCard.subscribe-to-releases-2')}
         aria-label={isSubscribed ? t('repositoryCard.unsubscribe-from-releases-2') : t('repositoryCard.subscribe-to-releases-2')}
         aria-pressed={isSubscribed}>
-        {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+        {isSubscribed ? <Bell className="size-3.5" /> : <BellOff className="size-3.5" />}
       </SelectionAwareButton>
     ),
     edit: (
       <SelectionAwareButton onClick={onEdit} selectionMode={selectionMode} variant="edit"
         title={editButtonTitle} aria-label={t('repositoryCard.edit-repository-info')}>
-        <Edit3 className="w-4 h-4" />
+        <Edit3 className="size-3.5" />
       </SelectionAwareButton>
     ),
     releases: (
       <SelectionAwareButton onClick={onViewReleases} selectionMode={selectionMode} className={mutedIconButtonClass}
         title={t('repositoryCard.view-releases')} aria-label={t('repositoryCard.view-releases')}>
-        <PackageOpen className="w-4 h-4" />
+        <PackageOpen className="size-3.5" />
       </SelectionAwareButton>
     ),
     docs: (
       <a href={docsUrl} target="_blank" rel="noopener noreferrer"
         onClick={(event) => selectionMode && event.preventDefault()}
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${mutedIconButtonClass} ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+        className={`flex size-control shrink-0 items-center justify-center rounded-sm ${mutedIconButtonClass} ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
         title={t('repositoryCard.view-on-deepwiki-2')}>
-        <BookOpen className="w-4 h-4" />
+        <BookOpen className="size-3.5" />
       </a>
     ),
     github: (
       <a href={githubUrl} target="_blank" rel="noopener noreferrer"
         onClick={(event) => selectionMode && event.preventDefault()}
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${mutedIconButtonClass} ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+        className={`flex size-control shrink-0 items-center justify-center rounded-sm ${mutedIconButtonClass} ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
         title={t('repositoryCard.view-on-github-2')}>
-        <ExternalLink className="w-4 h-4" />
+        <ExternalLink className="size-3.5" />
       </a>
     ),
   };
@@ -519,12 +520,12 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
               variant="ghost"
               size="icon"
               disabled={selectionMode}
-              className={`h-8 w-8 shrink-0 rounded-md ${mutedIconButtonClass}`}
+              className={`size-control shrink-0 rounded-sm ${mutedIconButtonClass}`}
               aria-label={t('repositoryCard.more-repository-actions')}
               title={t('repositoryCard.more-repository-actions')}
               onClick={(event) => event.stopPropagation()}
             >
-              <MoreHorizontal className="h-4 w-4" />
+              <MoreHorizontal className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -1131,10 +1132,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
     const baseClasses = viewMode === 'list'
-      ? 'repository-card repository-card--list ui-card group relative px-6 pt-5 pb-0 transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer'
-      : 'repository-card ui-card group p-5 transition-[color,background-color,border-color,box-shadow] duration-200 flex flex-col h-full cursor-pointer';
+      ? 'repository-card repository-card--list ui-card group relative px-4 py-3 transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant cursor-pointer'
+      : 'repository-card group flex h-full flex-col rounded-lg bg-raised p-3.5 shadow-elev-0 transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant hover:shadow-elev-1 cursor-pointer';
     const selectedClasses = isSelected
-      ? 'linear-card-selected'
+      ? (viewMode === 'list' ? 'bg-fill-selected' : 'bg-fill-selected shadow-[0_0_0_1px_var(--focus-ring)]')
       : '';
     const exitingClasses = isExitingSelection && isSelected ? 'animate-selection-exit' : '';
     return `${baseClasses} ${selectedClasses} ${exitingClasses}`.trim();
@@ -1161,17 +1162,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       aria-disabled={isModalOpen}
     >
       {/* Header - Repository Info */}
-      <div className="app-repository-card-header flex items-start space-x-3 mb-3">
+      <div className="app-repository-card-header flex items-start gap-2.5">
         <img
           src={repository.owner.avatar_url}
           alt={repository.owner.login}
-          className={`app-repository-card-avatar ${viewMode === 'list' ? 'w-10 h-10' : 'w-8 h-8'} rounded-full flex-shrink-0`}
+          className="size-7 shrink-0 rounded-sm object-cover shadow-elev-0"
         />
         <div className="app-repository-card-identity min-w-0 flex-1">
-          <h3 className={`app-repository-card-title ${viewMode === 'list' ? 'text-base' : ''} font-semibold text-foreground dark:text-foreground truncate`}>
+          <h3 className="text-label-lg font-medium text-foreground truncate">
             {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
-          <p className="app-repository-card-owner text-sm text-muted-foreground dark:text-muted-foreground truncate">
+          <p className="app-repository-card-owner font-mono text-label-sm text-tertiary truncate">
             {repository.owner.login}
           </p>
         </div>
@@ -1180,24 +1181,24 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         {viewMode === 'list' && (
           <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1.5">
             {displayContent.isCustomized && (
-              <span className="inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
-                <Edit3 className="w-3 h-3" />
+              <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
+                <Edit3 className="size-3" />
                 {t('repositoryCard.customized')}
               </span>
             )}
             {displayContent.isAnalysisFailed ? (
-                <span className="inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
-                  <Bot className="w-3 h-3" />
-                  {t('repositoryCard.analysis-failed')}
-                </span>
+              <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-xs bg-destructive-tint px-1.5 text-label-sm font-medium text-destructive">
+                <Bot className="size-3" />
+                {t('repositoryCard.analysis-failed')}
+              </span>
             ) : displayContent.isAnalyzed ? (
-              <span className="inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary">
-                <Sparkles className="w-3 h-3" />
+              <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-xs bg-accent-tint px-1.5 text-label-sm font-medium text-accent-text">
+                <Sparkles className="size-3" />
                 {t('repositoryCard.analyzed')}
               </span>
             ) : (
-              <span className="inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
-                <Bot className="w-3 h-3" />
+              <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm text-tertiary">
+                <Bot className="size-3" />
                 {t('repositoryCard.not-analyzed')}
               </span>
             )}
@@ -1205,7 +1206,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <OverflowActionRow
                 actionRowRef={overflowActionRowRef}
                 testId="list-action-row"
-                className="app-repository-actions flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-hidden"
+                className={`app-repository-actions flex min-w-0 flex-1 items-center justify-end gap-0.5 overflow-hidden transition-opacity duration-micro ease-out-subtle ${
+                  isActionsMenuOpen || isAnalyzing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+                }`}
                 visibleActionCount={visibleOverflowActionCount}
                 primaryActionCount={primaryOverflowActionCount}
                 actionPreferences={actionPreferences}
@@ -1249,7 +1252,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         )}
 
         {viewMode === 'grid' && !selectionMode && (
-          <div className="hidden lg:block relative flex-shrink-0 mt-[-4px] opacity-0 hover:opacity-100 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="hidden lg:block relative shrink-0 -mt-0.5 opacity-0 transition-opacity duration-micro group-hover:opacity-100 group-focus-within:opacity-100">
             <div
               ref={dragHandleRef}
               draggable
@@ -1282,17 +1285,15 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               tabIndex={0}
               role="button"
               aria-label={t('repositoryCard.edit-repository-category')}
-              className="linear-icon-button flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing touch-manipulation"
+              className="inline-grid size-control-sm place-items-center rounded-sm text-tertiary hover:bg-fill-hover hover:text-foreground cursor-grab active:cursor-grabbing touch-manipulation"
               title={t('repositoryCard.drag-me-to-sidebar-to-categorize')}
             >
-              <GripVertical className="w-4 h-4" />
+              <GripVertical className="size-3.5" />
             </div>
             {/* 弱气泡提示 */}
             {showDragHint && (
-              <div className="absolute top-full right-0 z-50 mt-2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-dialog animate-fade-in">
+              <div className="popover-styled motion-popover absolute top-full right-0 z-50 mt-1.5 whitespace-nowrap px-2.5 py-1.5 text-label-sm text-foreground">
                 {t('repositoryCard.drag-me-to-left-sidebar')}
-                {/* 气泡箭头 */}
-                <div className="absolute bottom-full right-3 h-0 w-0 border-x-4 border-b-4 border-l-transparent border-r-transparent border-b-popover"></div>
               </div>
             )}
           </div>
@@ -1303,7 +1304,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <OverflowActionRow
           actionRowRef={overflowActionRowRef}
           testId="grid-action-row"
-          className="app-repository-actions flex w-full items-center justify-start gap-1.5 overflow-hidden"
+          className={`app-repository-actions flex w-full items-center justify-start gap-0.5 overflow-hidden transition-opacity duration-micro ease-out-subtle ${
+            isActionsMenuOpen || isAnalyzing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+          }`}
           visibleActionCount={visibleOverflowActionCount}
           primaryActionCount={primaryOverflowActionCount}
           actionPreferences={actionPreferences}
@@ -1345,15 +1348,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         viewMode === 'grid'
         && (displayContent.isCustomized || displayContent.isAnalysisFailed || displayContent.isAnalyzed)
       )) && (
-      <div className={viewMode === 'list' ? 'mb-3' : 'app-repository-card-copy'}>
+      <div className={viewMode === 'list' ? 'mb-2' : 'mt-2 mb-2'}>
         {showDescription && (
         <Tooltip>
           <TooltipTrigger asChild>
             <p
               tabIndex={0}
-              className={`app-repository-card-description ${viewMode === 'list'
-                ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground'
-                : 'text-foreground dark:text-muted-foreground line-clamp-2 mb-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}`}
+              className="app-repository-card-description text-label-sm leading-4.5 text-secondary line-clamp-2 [text-wrap:pretty] transition-colors duration-micro hover:text-foreground"
             >
               {highlightSearchTerm(displayContent.content, searchQuery)}
             </p>
@@ -1364,39 +1365,36 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </Tooltip>
         )}
 
-        {/* 方案一：同时显示多个状态标签 */}
-        {viewMode === 'grid' && (
-        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-          {/* 已自定义标签 - 与筛选器逻辑一致 */}
+        {/* Restrained Status Indicators */}
+        {viewMode === 'grid' && (displayContent.isCustomized || displayContent.isAnalysisFailed || displayContent.isAnalyzed) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {displayContent.isCustomized && (
-            <div className="flex items-center space-x-1 text-xs text-muted-foreground dark:text-muted-foreground" title={t('repositoryCard.this-repository-has-been-customized-description')}>
-              <Edit3 className="w-3 h-3" />
+            <span className="inline-flex h-5 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm text-secondary" title={t('repositoryCard.this-repository-has-been-customized-description')}>
+              <Edit3 className="size-3" />
               <span>{t('repositoryCard.customized')}</span>
-            </div>
+            </span>
           )}
-          {/* AI 分析状态标签 (合并展示) */}
           {displayContent.isAnalysisFailed ? (
-            <div className="flex items-center space-x-1 text-xs text-destructive dark:text-destructive" title={t('repositoryCard.ai-analysis-failed-click-ai-button-to-retry')}>
-              <Bot className="w-3 h-3" />
+            <div className="inline-flex h-5 items-center gap-1 rounded-xs bg-destructive-tint px-1.5 text-label-sm text-destructive" title={t('repositoryCard.ai-analysis-failed-click-ai-button-to-retry')}>
+              <Bot className="size-3" />
               <span>{t('repositoryCard.failed')}</span>
-              <div className="group relative">
-                <HelpCircle className="w-3 h-3 text-destructive/70 dark:text-destructive/70 cursor-help" />
-                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-[opacity,visibility] whitespace-normal break-words shadow-lg">
-                  <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
+              <div className="group/err relative">
+                <HelpCircle className="size-3 text-destructive/80 cursor-help" />
+                <div className="popover-styled invisible absolute left-0 top-full z-[9999] mt-1.5 w-72 max-w-xs p-2.5 text-label-sm text-secondary opacity-0 transition-[opacity,visibility] whitespace-normal break-words group-hover/err:visible group-hover/err:opacity-100">
+                  <p className="leading-relaxed">
                     {repository.analysis_error || (t('repositoryCard.ai-analysis-failed-please-check-ai-configuration'))}
                   </p>
-                  <div className="absolute top-[-4px] left-3 h-2 w-2 rotate-45 transform border-l border-t border-border bg-popover"></div>
                 </div>
               </div>
             </div>
           ) : displayContent.isAnalyzed ? (
-            <div
-              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary border border-primary/20 dark:border-primary/20"
+            <span
+              className="inline-flex h-5 items-center gap-1 rounded-xs bg-accent-tint px-1.5 text-label-sm font-medium text-accent-text"
               title={displayContent.analyzedAt ? t('repositoryCard.analyzed-on-date', { date: new Date(displayContent.analyzedAt).toLocaleString(getIntlLocale(language)) }) : ''}
             >
-              <Sparkles className="w-3 h-3" />
+              <Sparkles className="size-3" />
               <span>{t('repositoryCard.ai-analyzed')}</span>
-            </div>
+            </span>
           ) : null}
         </div>
         )}
@@ -1404,14 +1402,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* List mode keeps tags and repository metadata on one wrapping information row. */}
-      <div className={viewMode === 'list' ? 'flex flex-wrap items-center gap-x-3 gap-y-2' : 'contents'}>
+      <div className={viewMode === 'list' ? 'flex flex-wrap items-center gap-x-3 gap-y-1.5' : 'contents'}>
       {/* Tags - 未AI分析时显示Topics，AI分析后显示AI标签 */}
       {isRepositoryCardFieldVisible(cardFields, 'tags') && displayTags.tags.length > 0 && (
-        <div className={`app-repository-card-tags flex flex-wrap ${viewMode === 'list' ? 'gap-1' : 'gap-2'}`}>
+        <div className={`app-repository-card-tags flex flex-wrap ${viewMode === 'list' ? 'gap-1' : 'gap-1.5'}`}>
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
-              className={`linear-card-tag app-repository-card-tag font-normal ${viewMode === 'list' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5 text-xs'}`}
+              className="inline-flex h-5 items-center rounded-xs bg-fill-hover px-1.5 text-label-sm font-normal text-secondary"
             >
               {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
@@ -1419,53 +1417,49 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
       )}
 
-      {/* Platform Icons */}
+      {/* Platform Chips */}
       {viewMode === 'grid' && displayPlatforms.length > 0 && (
-        <div className="app-repository-card-platforms flex items-center space-x-2">
-          <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {t('repositoryCard.platforms')}
-          </span>
-          <div className="flex space-x-1">
-            {displayPlatforms.slice(0, 6).map((platform, index) => {
-              const IconComponent = getPlatformIcon(platform);
-              const displayName = getPlatformDisplayName(platform);
+        <div className="mt-2 flex flex-wrap items-center gap-1" aria-label={t('repositoryCard.platforms')}>
+          {displayPlatforms.slice(0, 6).map((platform, index) => {
+            const IconComponent = getPlatformIcon(platform);
+            const displayName = getPlatformDisplayName(platform);
 
-              return (
-                <div
-                  key={index}
-                  className="linear-platform-icon w-6 h-6 flex items-center justify-center cursor-default"
-                  title={displayName}
-                >
-                  <IconComponent className="w-3 h-3" />
-                </div>
-              );
-            })}
-          </div>
+            return (
+              <span
+                key={index}
+                className="inline-flex h-5 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm text-secondary cursor-default"
+                title={displayName}
+              >
+                <IconComponent className="size-3 text-tertiary" />
+                <span className="text-caption">{displayName}</span>
+              </span>
+            );
+          })}
         </div>
       )}
 
       {/* Stats */}
-      <div className={viewMode === 'list' ? 'app-repository-list-stats' : 'app-repository-card-stats space-y-3'}>
+      <div className={viewMode === 'list' ? 'app-repository-list-stats' : 'app-repository-card-stats mt-auto pt-2.5'}>
         {/* Language and Stars */}
-        <div className={`app-repository-card-meta flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-muted-foreground dark:text-muted-foreground`}>
+        <div className={`app-repository-card-meta flex items-center ${viewMode === 'list' ? 'flex-wrap gap-x-3 gap-y-1' : 'gap-3'} text-label-sm text-tertiary tabular-nums`}>
           {isRepositoryCardFieldVisible(cardFields, 'language') && repository.language && (
-            <div className="flex items-center space-x-1 min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5">
               <div
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                className="size-2 shrink-0 rounded-full"
                 style={{ backgroundColor: getLanguageColor(repository.language) }}
               />
               <span className="truncate max-w-20">{repository.language}</span>
             </div>
           )}
           {isRepositoryCardFieldVisible(cardFields, 'stars') && (
-          <div className="flex items-center space-x-1 flex-shrink-0">
-            <Star className="w-3.5 h-3.5" />
+          <div className="flex shrink-0 items-center gap-1">
+            <Star className="size-3.5" />
             <span className="truncate max-w-16">{formatNumber(repository.stargazers_count)}</span>
           </div>
           )}
           {viewMode === 'list' && displayPlatforms.length > 0 && (
-            <div className="flex items-center space-x-1 min-w-0">
-              <Terminal className="w-3.5 h-3.5 flex-shrink-0" />
+            <div className="flex min-w-0 items-center gap-1">
+              <Terminal className="size-3.5 shrink-0" />
               <span className="truncate max-w-40">{displayPlatforms.slice(0, 3).map(getPlatformDisplayName).join(' · ')}</span>
             </div>
           )}
@@ -1474,8 +1468,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             const lic = normalizeLicense(repository.license);
             if (lic === NO_LICENSE_SENTINEL) return null;
             return (
-              <div className="flex items-center space-x-1 min-w-0">
-                <Scale className="w-3.5 h-3.5 flex-shrink-0" />
+              <div className="flex min-w-0 items-center gap-1">
+                <Scale className="size-3.5 shrink-0" />
                 <span className="truncate max-w-24">{lic}</span>
               </div>
             );
@@ -1484,11 +1478,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
         {/* Update time is a compact footer in list mode and stays centered between divider and card edge. */}
         <div className={viewMode === 'list' ? 'app-repository-list-time flex-none' : 'mt-4'}>
-        <div className={`app-repository-card-footer flex items-center justify-between text-muted-foreground dark:text-muted-foreground border-t ui-divider ${viewMode === 'list' ? 'w-full text-xs' : 'pt-2 text-sm'}`}>
+        <div className={`app-repository-card-footer flex items-center justify-between border-t border-subtle text-tertiary tabular-nums ${viewMode === 'list' ? 'w-full text-label-sm' : 'pt-2 text-label-sm'}`}>
           <div className="group/footer relative flex min-w-0 items-center gap-1.5 leading-none">
             {isRepositoryCardFieldVisible(cardFields, 'lastUpdated') && (
             <>
-            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? `group-hover:opacity-0 group-hover:invisible group-focus-within/footer:opacity-0 group-focus-within/footer:invisible ${isFindingSimilar ? 'invisible' : ''}` : ''}`} />
+            <Calendar className={`size-3.5 shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? `group-hover:opacity-0 group-hover:invisible group-focus-within/footer:opacity-0 group-focus-within/footer:invisible ${isFindingSimilar ? 'invisible' : ''}` : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? `group-hover:opacity-0 group-hover:invisible group-focus-within/footer:opacity-0 group-focus-within/footer:invisible ${isFindingSimilar ? 'invisible' : ''}` : ''}`}>
               {t('repositoryCard.last-pushed-time', { time: formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
             </span>
@@ -1503,10 +1497,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   handleFindSimilar();
                 }}
                 disabled={isFindingSimilar}
-                className={`app-repository-similar-action absolute -inset-y-1 left-0 flex h-auto items-center space-x-1.5 px-0! py-0! text-xs font-normal text-primary dark:text-primary transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline ${isFindingSimilar ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover:opacity-100 group-focus-within/footer:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within/footer:pointer-events-auto focus-visible:pointer-events-auto'}`}
+                className={`app-repository-similar-action absolute -inset-y-1 left-0 flex h-auto items-center gap-1.5 px-0! py-0! text-label-sm font-normal text-accent-text transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline ${isFindingSimilar ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover:opacity-100 group-focus-within/footer:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within/footer:pointer-events-auto focus-visible:pointer-events-auto'}`}
                 title={t('repositoryCard.find-similar-repositories-2')}
               >
-                {isFindingSimilar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                {isFindingSimilar ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
                 <span>{t('repositoryCard.find-similar')}</span>
               </Button>
             )}
@@ -1517,21 +1511,22 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           {onSelect && (
             <Button
               variant="ghost"
+              size="icon-sm"
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              className={`app-repository-select-toggle flex items-center justify-center w-7 h-7 rounded-md p-0 transition-colors ${
+              className={`app-repository-select-toggle size-control-sm rounded-sm p-0 transition-colors ${
                 isSelected
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  ? 'bg-accent-tint text-accent-text'
+                  : 'text-tertiary hover:bg-fill-hover hover:text-foreground'
               }`}
               title={isSelected ? (t('repositoryCard.deselect')) : (t('repositoryCard.select'))}
               aria-label={isSelected ? (t('repositoryCard.deselect')) : (t('repositoryCard.select'))}
               aria-pressed={isSelected}
             >
-              {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+              {isSelected ? <CheckSquare className="size-4" /> : <Square className="size-4" />}
             </Button>
           )}
         </div>

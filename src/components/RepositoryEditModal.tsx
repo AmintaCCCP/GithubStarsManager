@@ -688,15 +688,15 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
   if (!repository) return null;
 
-  // Unified card styles with enhanced light mode optimization
-  const sectionClass = "p-5 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-sm";
-  const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
-  const inputClass = "h-auto w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-(--ui-focus-ring/55) focus:border-ring dark:focus:ring-(--ui-focus-ring/60) dark:focus:border-ring transition-[color,background-color,border-color] duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-border-strong text-[13px] leading-[1.625]";
-  const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
-  const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-[background-color,border-color,color] duration-200";
-  const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
-  const infoBoxClass = "mt-3 p-3.5 border border-border dark:border-border rounded-xl text-[12px] leading-[1.5]";
-  const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex items-start";
+  // Unified card styles
+  const sectionClass = "rounded-lg bg-raised p-4 shadow-elev-0";
+  const labelClass = "mb-2.5 flex items-center gap-2 text-label font-medium text-foreground";
+  const inputClass = "h-control-lg w-full text-label";
+  const textareaClass = "min-h-[120px] max-h-[400px] resize-y overflow-y-auto scrollbar-auto text-label leading-[1.6]";
+  const buttonSecondaryClass = "h-control-sm gap-1.5 rounded-sm px-2.5 text-label-sm font-medium transition-[background-color,color,box-shadow]";
+  const tagClass = "inline-flex h-6 items-center gap-1 rounded-xs bg-fill-hover px-2 text-label-sm text-secondary";
+  const infoBoxClass = "mt-2.5 rounded-md bg-sunken px-3 py-2 text-label-sm leading-4.5";
+  const infoTextClass = "flex items-start text-secondary";
 
   return (
     <Modal
@@ -713,43 +713,47 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         deferOutsideDismiss(event, handleClose);
       }}
       footer={(
-        <div className="flex justify-end space-x-3">
+        <div className="flex justify-end gap-2">
           <Button
+            type="button"
+            variant="outline"
+            size="md"
             onClick={handleCloseWithConfirm}
-            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent dark:hover:text-foreground border border-border dark:border-border transition-[background-color,color] duration-150 shadow-sm"
           >
-            <X className="w-4 h-4" />
-            <span className="font-medium">{t('repositoryEditModal.cancel')}</span>
+            <X className="size-3.5" />
+            <span>{t('repositoryEditModal.cancel')}</span>
           </Button>
           <Button
+            type="button"
+            variant="primary"
+            size="md"
             onClick={() => void handleSave()}
             disabled={!hasChanges}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color] duration-150 shadow-sm font-medium"
           >
-            <Save className="w-4 h-4" />
+            <Save className="size-3.5" />
             <span>{t('repositoryEditModal.save')}</span>
           </Button>
         </div>
       )}
     >
-      <div className="space-y-5">
+      <div className="space-y-4">
         {/* Repository Info Header */}
-        <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-accent/60 to-background dark:bg-primary/10 dark:from-transparent dark:to-transparent rounded-xl border border-border dark:border-primary/20">
+        <div className="flex items-center gap-3 rounded-lg bg-raised p-3.5 shadow-elev-0">
           <img
             src={repository.owner.avatar_url}
             alt={repository.owner.login}
-            className="w-10 h-10 rounded-full border-2 border-card dark:border-card shadow-sm"
+            className="size-9 shrink-0 rounded-sm object-cover shadow-elev-0"
           />
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-foreground dark:text-foreground truncate">
+          <div className="min-w-0 flex-1">
+            <h4 className="truncate text-label-lg font-medium text-foreground">
               {repository.name}
             </h4>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+            <p className="truncate font-mono text-label-sm text-tertiary">
               {repository.owner.login}
             </p>
           </div>
           {repository.description && (
-            <div className="hidden sm:block text-xs text-muted-foreground dark:text-muted-foreground max-w-xs truncate">
+            <div className="hidden max-w-xs truncate text-label-sm text-secondary sm:block">
               {repository.description}
             </div>
           )}
@@ -758,49 +762,49 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         {/* Description Section */}
         <div className={sectionClass}>
           <div className={labelClass}>
-            <Edit3 className="w-4 h-4 text-primary dark:text-primary" />
+            <Edit3 className="size-3.5 text-accent-text" />
             <span>{t('repositoryEditModal.description')}</span>
             {customStatus.description && (
-              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex h-5 items-center rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
                 {t('repositoryEditModal.custom')}
               </span>
             )}
-            <span className="ml-auto text-xs text-muted-foreground dark:text-muted-foreground">
+            <span className="ml-auto text-label-sm font-normal text-tertiary tabular-nums">
               {formData.description.length > 0 ? t('app:repositoryEditModal.char-count', { count: formData.description.length }) : t('repositoryEditModal.empty')}
             </span>
           </div>
 
           {/* Source Indicator */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs text-muted-foreground dark:text-muted-foreground">{t('repositoryEditModal.source')}</span>
+          <div className="mb-2.5 flex items-center gap-2">
+            <span className="text-label-sm text-tertiary">{t('repositoryEditModal.source')}</span>
             {editIntent.description === 'follow' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
-                <ListFilter className="w-3 h-3 mr-1" />
+              <span className="inline-flex h-5 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
+                <ListFilter className="size-3" />
                 {t('repositoryEditModal.follow-list-setting')}
               </span>
             ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() !== '' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
-                <Edit3 className="w-3 h-3 mr-1" />
+              <span className="inline-flex h-5 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
+                <Edit3 className="size-3" />
                 {t('repositoryEditModal.custom')}
               </span>
             ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
-                <AlertTriangle className="w-3 h-3 mr-1" />
+              <span className="inline-flex h-5 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
+                <AlertTriangle className="size-3" />
                 {t('repositoryEditModal.will-fallback')}
               </span>
             ) : editIntent.description === 'reset-to-ai' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
-                <Bot className="w-3 h-3 mr-1" />
+              <span className="inline-flex h-5 items-center gap-1 rounded-xs bg-accent-tint px-1.5 text-label-sm font-medium text-accent-text">
+                <Bot className="size-3" />
                 {t('repositoryEditModal.ai-summary')}
               </span>
             ) : editIntent.description === 'reset-to-original' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
-                <FileText className="w-3 h-3 mr-1" />
+              <span className="inline-flex h-5 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-foreground">
+                <FileText className="size-3" />
                 {t('repositoryEditModal.original')}
               </span>
             ) : editIntent.description === 'clear' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
-                <X className="w-3 h-3 mr-1" />
+              <span className="inline-flex h-5 items-center gap-1 rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
+                <X className="size-3" />
                 {t('repositoryEditModal.cleared')}
               </span>
             ) : null}
@@ -818,20 +822,20 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             placeholder={t('repositoryEditModal.enter-custom-description')}
           />
 
-          {/* Save Effect Info - Enhanced for Light Mode */}
+          {/* Save Effect Info */}
           {editIntent.description === 'follow' ? (
             <div className={infoBoxClass}>
               <p className={infoTextClass}>
-                <ListFilter className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                <ListFilter className="mr-2 mt-0.5 size-3.5 shrink-0 text-tertiary" />
                 <span>
                   {t('repositoryEditModal.follow-list-description-will-follow')}
                 </span>
               </p>
             </div>
           ) : editIntent.description === 'clear' ? (
-            <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-destructive`}>
-                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+            <div className={`${infoBoxClass} bg-destructive-tint`}>
+              <p className="flex items-start text-destructive">
+                <AlertTriangle className="mr-2 mt-0.5 size-3.5 shrink-0" />
                 <span>
                   {t('repositoryEditModal.description-cleared-no-description-will-be-shown')}
                 </span>
@@ -839,8 +843,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           ) : editIntent.description === 'reset-to-ai' ? (
             <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-primary`}>
-                <Bot className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <p className="flex items-start text-accent-text">
+                <Bot className="mr-2 mt-0.5 size-3.5 shrink-0" />
                 <span>
                   {t('repositoryEditModal.custom-description-will-be-cleared-after-saving')}
                 </span>
@@ -849,16 +853,16 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           ) : editIntent.description === 'reset-to-original' ? (
             <div className={infoBoxClass}>
               <p className={infoTextClass}>
-                <FileText className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                <FileText className="mr-2 mt-0.5 size-3.5 shrink-0 text-tertiary" />
                 <span>
                   {t('repositoryEditModal.custom-description-will-be-cleared-after-saving-2')}
                 </span>
               </p>
             </div>
           ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
-            <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-warning`}>
-                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+            <div className={`${infoBoxClass} bg-warning-tint`}>
+              <p className="flex items-start text-warning">
+                <AlertTriangle className="mr-2 mt-0.5 size-3.5 shrink-0" />
                 <span>
                   {repository?.ai_summary
                     ? t('repositoryEditModal.currently-empty-ai-summary-will-be-shown-after-s')
@@ -870,8 +874,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           ) : editIntent.description === 'keep-custom' && customStatus.description ? (
             <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-primary`}>
-                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <p className="flex items-start text-accent-text">
+                <Info className="mr-2 mt-0.5 size-3.5 shrink-0" />
                 <span>
                   {t('repositoryEditModal.this-custom-description-will-be-used-after-savin')}
                 </span>
@@ -880,7 +884,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           ) : editIntent.description === 'keep-custom' && formData.description.trim() !== '' && !customStatus.description ? (
             <div className={infoBoxClass}>
               <p className={infoTextClass}>
-                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                <Info className="mr-2 mt-0.5 size-3.5 shrink-0 text-tertiary" />
                 <span>
                   {t('repositoryEditModal.current-content-matches-ai-summary-or-original-d')}
                 </span>
@@ -889,73 +893,85 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           ) : null}
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 followListSetting();
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.description === 'follow'
-                  ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
               }`}
             >
-              <ListFilter className="w-3.5 h-3.5 mr-1.5" />
+              <ListFilter className="size-3.5" />
               <span>{t('repositoryEditModal.follow-list-setting')}</span>
             </Button>
             {repository.ai_summary && (
               <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   resetToAI();
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-ai'
-                    ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                    ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                    : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
                 }`}
               >
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                <RotateCcw className="size-3.5" />
                 <span>{t('repositoryEditModal.show-ai-summary')}</span>
               </Button>
             )}
             {repository.description && (
               <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   resetToOriginal();
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-original'
-                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-border'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
+                    ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                    : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
                 }`}
               >
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                <RotateCcw className="size-3.5" />
                 <span>{t('repositoryEditModal.show-original-description')}</span>
               </Button>
             )}
             <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 clearDescription();
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.description === 'clear'
-                  ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  ? 'bg-destructive-tint text-destructive'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
               }`}
             >
-              <X className="w-3.5 h-3.5 mr-1.5" />
+              <X className="size-3.5" />
               <span>{t('repositoryEditModal.clear')}</span>
             </Button>
           </div>
 
-          {/* Feature Tip - Enhanced */}
-          <div className={`${infoBoxClass} bg-gradient-to-br from-accent/30 to-background/60 dark:from-transparent dark:to-transparent`}>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground flex items-start">
-              <Info className="w-3.5 h-3.5 mr-2 mt-0.5 flex-shrink-0 text-muted-foreground dark:text-muted-foreground" />
+          {/* Feature Tip */}
+          <div className={infoBoxClass}>
+            <p className="flex items-start text-label-sm text-tertiary">
+              <Info className="mr-2 mt-0.5 size-3.5 shrink-0" />
               <span>
                 {t('repositoryEditModal.description-priority-custom-ai-summary-original')}
               </span>
@@ -966,10 +982,10 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         {/* Category Section */}
         <div className={sectionClass}>
           <div className={labelClass}>
-            <FolderOpen className="w-4 h-4 text-success " />
+            <FolderOpen className="size-3.5 text-status-green" />
             <span>{t('repositoryEditModal.category')}</span>
             {customStatus.category && (
-              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex h-5 items-center rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
                 {t('repositoryEditModal.custom')}
               </span>
             )}
@@ -1000,60 +1016,69 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           </Select>
 
           {/* Category Action Buttons */}
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {repository && getAICategory(repository, allCategories) && (
               <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   resetCategoryToAI();
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-ai'
-                    ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                    ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                    : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
                 }`}
               >
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                <RotateCcw className="size-3.5" />
                 <span>{t('repositoryEditModal.reset-to-ai-category')}</span>
               </Button>
             )}
             {repository && getDefaultCategory(repository, allCategories) && (
               <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   resetCategoryToDefault();
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-original'
-                    ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-border'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
+                    ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                    : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
                 }`}
               >
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                <RotateCcw className="size-3.5" />
                 <span>{t('repositoryEditModal.reset-to-default')}</span>
               </Button>
             )}
             <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 clearCategory();
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.category === 'clear'
-                  ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  ? 'bg-destructive-tint text-destructive'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
               }`}
             >
-              <X className="w-3.5 h-3.5 mr-1.5" />
+              <X className="size-3.5" />
               <span>{t('repositoryEditModal.clear-category')}</span>
             </Button>
           </div>
 
-          {/* Custom Category Selection Info - Enhanced */}
+          {/* Custom Category Selection Info */}
           {editIntent.category === 'keep-custom' && formData.category && (
             <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-primary`}>
-                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <p className="flex items-start text-accent-text">
+                <Info className="mr-2 mt-0.5 size-3.5 shrink-0" />
                 <span>
                   {t('repositoryEditModal.custom-category-selected-the-repository-will-be')}
                 </span>
@@ -1061,11 +1086,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           )}
 
-          {/* Reset Category Info - Enhanced */}
+          {/* Reset Category Info */}
           {editIntent.category === 'reset-to-ai' && (
             <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-primary`}>
-                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <p className="flex items-start text-accent-text">
+                <Info className="mr-2 mt-0.5 size-3.5 shrink-0" />
                 <span>
                   {t('repositoryEditModal.resetting-to-ai-category-will-clear-custom-categ')}
                 </span>
@@ -1076,7 +1101,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           {editIntent.category === 'reset-to-original' && (
             <div className={infoBoxClass}>
               <p className={infoTextClass}>
-                <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                <Info className="mr-2 mt-0.5 size-3.5 shrink-0 text-tertiary" />
                 <span>
                   {t('repositoryEditModal.resetting-to-default-category-will-clear-custom')}
                 </span>
@@ -1084,11 +1109,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           )}
 
-          {/* Clear Category Warning - Enhanced */}
+          {/* Clear Category Warning */}
           {editIntent.category === 'clear' && (
-            <div className={infoBoxClass}>
-              <p className={`${infoTextClass} text-destructive`}>
-                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+            <div className={`${infoBoxClass} bg-destructive-tint`}>
+              <p className="flex items-start text-destructive">
+                <AlertTriangle className="mr-2 mt-0.5 size-3.5 shrink-0" />
                 <span>
                   {t('repositoryEditModal.after-clearing-the-category-the-repository-will')}
                 </span>
@@ -1096,19 +1121,19 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             </div>
           )}
 
-          {/* Category Lock - Enhanced */}
-          <div className="mt-4 p-4 bg-gradient-to-br from-muted to-muted/60 dark:from-foreground/[0.04] dark:to-warning/10 rounded-xl border border-border dark:border-warning/20 shadow-sm">
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 mt-0.5">
+          {/* Category Lock */}
+          <div className="mt-3 rounded-md bg-sunken p-3">
+            <div className="flex items-start gap-2.5">
+              <div className="mt-0.5 shrink-0">
                 {formData.categoryLocked && formData.category ? (
-                  <Lock className="w-4 h-4 text-muted-foreground dark:text-warning" />
+                  <Lock className="size-4 text-warning" />
                 ) : (
-                  <Unlock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                  <Unlock className="size-4 text-tertiary" />
                 )}
               </div>
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground dark:text-foreground">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-label font-medium text-foreground">
                     {t('repositoryEditModal.category-lock')}
                   </span>
                   <Checkbox
@@ -1121,7 +1146,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                     aria-label={t('repositoryEditModal.category-lock')}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                <p className="text-label-sm text-secondary">
                   {!formData.category
                     ? t('repositoryEditModal.select-a-category-first-to-enable-locking')
                     : formData.categoryLocked
@@ -1137,112 +1162,126 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         {/* Tags Section */}
         <div className={sectionClass}>
           <div className={labelClass}>
-            <Tag className="w-4 h-4 text-muted-foreground dark:text-muted-foreground " />
+            <Tag className="size-3.5 text-tertiary" />
             <span>{t('repositoryEditModal.tags')}</span>
             {customStatus.tags && (
-              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex h-5 items-center rounded-xs bg-fill-hover px-1.5 text-label-sm font-medium text-secondary">
                 {t('repositoryEditModal.custom')}
               </span>
             )}
-            <span className="ml-auto text-xs text-muted-foreground dark:text-muted-foreground">
+            <span className="ml-auto text-label-sm font-normal text-tertiary tabular-nums">
               {formData.tags.length > 0 ? `${formData.tags.length} ${t('repositoryEditModal.tags-2')}` : t('repositoryEditModal.no-tags')}
             </span>
           </div>
 
           {/* Tags Display */}
           {formData.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="mb-3 flex flex-wrap gap-1.5">
               {formData.tags.map((tag, index) => (
                 <span key={index} className={tagClass}>
-                  {tag}
+                  <span>{tag}</span>
                   <Button
+                    type="button"
                     variant="ghost"
+                    size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemoveTag(tag);
                     }}
-                    className="ml-1.5 h-7 w-7 p-0 hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:text-foreground dark:hover:text-foreground rounded transition-colors"
+                    className="size-4 rounded-xs p-0 text-tertiary hover:text-foreground"
                     title={t('repositoryEditModal.remove')}
                     aria-label={t('repositoryEditModal.remove-tag-tag', { tag: tag })}
                   >
-                    <X className="w-3 h-3" />
+                    <X className="size-3" />
                   </Button>
                 </span>
               ))}
             </div>
           ) : (
-            <div className="mb-4">
-              <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('repositoryEditModal.no-tags-2')}</span>
+            <div className="mb-3">
+              <span className="text-label-sm text-tertiary">{t('repositoryEditModal.no-tags-2')}</span>
             </div>
           )}
 
           {/* Quick Actions */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 resetTagsToTopics();
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.tags === 'reset-to-original'
-                  ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
               }`}
             >
-              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              <FileText className="size-3.5" />
               <span>{t('repositoryEditModal.show-topics')}</span>
             </Button>
             {repository.ai_tags && repository.ai_tags.length > 0
               && !!repository.analyzed_at && !repository.analysis_failed && (
               <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   resetTagsToAI();
                 }}
                 className={`${buttonSecondaryClass} ${
                   editIntent.tags === 'reset-to-ai'
-                    ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                    ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                    : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
                 }`}
               >
-                <Bot className="w-3.5 h-3.5 mr-1.5" />
+                <Bot className="size-3.5" />
                 <span>{t('repositoryEditModal.show-ai-tags')}</span>
               </Button>
             )}
             <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 followTagsListSetting();
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.tags === 'follow'
-                  ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  ? 'bg-accent-tint text-accent-text shadow-[0_0_0_1px_var(--accent-tint-strong)]'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
               }`}
             >
-              <ListFilter className="w-3.5 h-3.5 mr-1.5" />
+              <ListFilter className="size-3.5" />
               <span>{t('repositoryEditModal.follow-list-setting')}</span>
             </Button>
             <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 clearTags();
               }}
               className={`${buttonSecondaryClass} ${
                 editIntent.tags === 'clear'
-                  ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  ? 'bg-destructive-tint text-destructive'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
               }`}
             >
-              <X className="w-3.5 h-3.5 mr-1.5" />
+              <X className="size-3.5" />
               <span>{t('repositoryEditModal.clear-2')}</span>
             </Button>
           </div>
 
-          {/* Status Alert - Enhanced */}
+          {/* Status Alert */}
           {formData.tags.length === 0 && (
-            <div className={`${infoBoxClass} mb-4`}>
-              <p className={`${infoTextClass} flex items-center`}>
+            <div className={`${infoBoxClass} mb-3`}>
+              <p className={`${infoTextClass} items-center`}>
                 {editIntent.tags === 'follow' ? (
                   <>
                     <span className="mr-2">✓</span>
@@ -1255,12 +1294,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                   </>
                 ) : editIntent.tags === 'reset-to-ai' ? (
                   <>
-                    <span className="mr-2 text-success">✓</span>
+                    <span className="mr-2 text-status-green">✓</span>
                     {t('repositoryEditModal.ai-tags-will-be-shown')}
                   </>
                 ) : editIntent.tags === 'reset-to-original' ? (
                   <>
-                    <span className="mr-2 text-success">✓</span>
+                    <span className="mr-2 text-status-green">✓</span>
                     {t('repositoryEditModal.github-topics-will-be-shown')}
                   </>
                 ) : repository?.ai_tags && repository.ai_tags.length > 0 ? (
@@ -1284,7 +1323,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {/* Add New Tag */}
-          <div className="flex space-x-2">
+          <div className="flex items-center gap-2">
             <Input
               aria-label={t('repositoryEditModal.add-custom-tag')}
               type="text"
@@ -1295,15 +1334,17 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               placeholder={t('repositoryEditModal.add-custom-tag-2')}
             />
             <Button
+              type="button"
+              variant="primary"
+              size="lg"
               aria-label={t('repositoryEditModal.add-tag')}
               onClick={(e) => {
                 e.stopPropagation();
                 handleAddTag();
               }}
               disabled={!newTag.trim()}
-              className="flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="size-4" />
             </Button>
           </div>
 

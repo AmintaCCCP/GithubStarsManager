@@ -67,39 +67,36 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
       title={t('bulkCategorizeModal.bulk-categorize')}
     >
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+        <p className="text-label text-secondary tabular-nums">
           {t('bulkCategorizeModal.will-set-category-for-v1-repositories', { v1: repositories.length })}
         </p>
 
         <div className="space-y-2">
-          <h3 id={categorySelectionLabelId} className="mb-2 block text-sm font-medium text-foreground dark:text-foreground">
+          <h3 id={categorySelectionLabelId} className="block text-label-sm font-medium text-tertiary">
             {t('bulkCategorizeModal.select-category')}
           </h3>
 
           <div
             role="group"
             aria-labelledby={categorySelectionLabelId}
-            className="max-h-64 overflow-y-auto space-y-2"
+            className="max-h-64 space-y-1 overflow-y-auto rounded-lg bg-sunken p-1.5"
           >
             {allCategories.filter(cat => cat.id !== 'all').map(category => (
               <Button
                 key={category.id}
+                type="button"
                 variant="ghost"
                 aria-pressed={selectedCategory === category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`h-auto w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors ${
+                className={`h-control-lg w-full justify-between rounded-md px-3 text-label font-medium ${
                   selectedCategory === category.id
-                    ? 'border-primary bg-muted dark:bg-primary/10'
-                    : 'border-border dark:hover:border-border-strong'
+                    ? 'bg-fill-selected text-foreground shadow-[inset_0_0_0_1px_var(--focus-ring)]'
+                    : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-foreground dark:text-foreground">
-                    {category.name}
-                  </span>
-                </div>
+                <span className="truncate">{category.name}</span>
                 {selectedCategory === category.id && (
-                  <Check className="w-5 h-5 text-primary" />
+                  <Check className="size-4 shrink-0 text-accent-text" />
                 )}
               </Button>
             ))}
@@ -107,31 +104,33 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
         </div>
 
         {error && (
-          <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-destructive dark:bg-destructive/10">
-            <p className="text-sm text-destructive">
-              {error}
-            </p>
+          <div role="alert" className="rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive">
+            {error}
           </div>
         )}
 
-        <div className="bg-muted dark:bg-warning/10 border border-border dark:border-warning/20 rounded-lg p-3">
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
+        <div className="rounded-md bg-warning-tint px-3 py-2">
+          <p className="text-label-sm text-secondary">
             {t('bulkCategorizeModal.note-this-operation-will-overwrite-the-existing')}
           </p>
         </div>
 
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end gap-2 border-t border-subtle pt-3">
           <Button
+            type="button"
+            variant="outline"
+            size="md"
             onClick={onClose}
             disabled={isProcessing}
-            className="px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-50"
           >
             {t('bulkCategorizeModal.cancel')}
           </Button>
           <Button
+            type="button"
+            variant="primary"
+            size="md"
             onClick={handleCategorize}
             disabled={!selectedCategory || isProcessing}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? t('bulkCategorizeModal.processing') : t('bulkCategorizeModal.confirm-categorize')}
           </Button>

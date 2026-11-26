@@ -127,7 +127,7 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
     }
   };
 
-  const sectionClass = "p-4 bg-card dark:bg-card rounded-xl border border-border dark:border-border";
+  const sectionClass = "rounded-lg bg-sunken p-3.5";
 
   return (
     <Modal
@@ -136,15 +136,15 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
       title={t('bulkRestoreModal.bulk-restore')}
       maxWidth="max-w-lg"
     >
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+      <div className="space-y-3.5">
+        <p className="text-label text-secondary tabular-nums">
           {t('bulkRestoreModal.will-restore-the-following-fields-for-v1-reposit', { v1: repositories.length })}
         </p>
 
         {!hasAnyCustom && (
-          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-            <p className="text-sm text-warning flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
+          <div className="rounded-md bg-warning-tint px-3 py-2">
+            <p className="flex items-center text-label-sm text-warning">
+              <AlertTriangle className="mr-2 size-4 shrink-0" />
               {t('bulkRestoreModal.no-custom-content-found-in-selected-repositories')}
             </p>
           </div>
@@ -152,15 +152,15 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
 
         {/* Description Section */}
         <div className={sectionClass}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Checkbox aria-labelledby="bulk-restore-description-heading" checked={config.description.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, description: { ...prev.description, enabled: checked === true } }))} />
-              <FileText className="w-4 h-4 text-primary" />
-                <span id="bulk-restore-description-heading" className="text-sm font-medium text-foreground dark:text-foreground">
-                  {t('bulkRestoreModal.description')}
-                </span>
+              <FileText className="size-4 text-accent-text" />
+              <span id="bulk-restore-description-heading" className="text-label font-medium text-foreground">
+                {t('bulkRestoreModal.description')}
+              </span>
               {stats.hasCustomDesc > 0 && (
-                <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                <span className="text-label-sm text-tertiary tabular-nums">
                   ({t('bulkRestoreModal.v1-custom', { v1: stats.hasCustomDesc })})
                 </span>
               )}
@@ -168,17 +168,17 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           </div>
 
           {config.description.enabled && (
-            <RadioGroup aria-labelledby="bulk-restore-description-heading" value={config.description.target} onValueChange={(value) => setConfig(prev => ({ ...prev, description: { ...prev.description, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
-              <label onClick={() => setConfig(prev => ({ ...prev, description: { ...prev.description, target: 'original' } }))} className="flex cursor-pointer items-center space-x-2">
+            <RadioGroup aria-labelledby="bulk-restore-description-heading" value={config.description.target} onValueChange={(value) => setConfig(prev => ({ ...prev, description: { ...prev.description, target: value as RestoreTarget } }))} className="ml-6 flex items-center gap-4">
+              <label onClick={() => setConfig(prev => ({ ...prev, description: { ...prev.description, target: 'original' } }))} className="flex cursor-pointer items-center gap-2">
                 <RadioGroupItem value="original" id="desc-target-original" aria-labelledby="desc-target-original-label" />
-                <span id="desc-target-original-label" className="text-sm text-muted-foreground dark:text-muted-foreground">
+                <span id="desc-target-original-label" className="text-label-sm text-secondary">
                   {t('bulkRestoreModal.default-github-original')}
                 </span>
               </label>
-              <label onClick={() => setConfig(prev => ({ ...prev, description: { ...prev.description, target: 'ai' } }))} className="flex cursor-pointer items-center space-x-2">
+              <label onClick={() => setConfig(prev => ({ ...prev, description: { ...prev.description, target: 'ai' } }))} className="flex cursor-pointer items-center gap-2">
                 <RadioGroupItem value="ai" id="desc-target-ai" aria-labelledby="desc-target-ai-label" />
-                <span id="desc-target-ai-label" className="text-sm text-muted-foreground dark:text-muted-foreground flex items-center space-x-1">
-                  <Bot className="w-3.5 h-3.5" />
+                <span id="desc-target-ai-label" className="flex items-center gap-1 text-label-sm text-secondary">
+                  <Bot className="size-3.5 text-tertiary" />
                   <span>{t('bulkRestoreModal.ai-summary')}</span>
                 </span>
               </label>
@@ -188,15 +188,15 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
 
         {/* Tags Section */}
         <div className={sectionClass}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Checkbox aria-labelledby="bulk-restore-tags-heading" checked={config.tags.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, enabled: checked === true } }))} />
-              <Tag className="w-4 h-4 text-primary" />
-                <span id="bulk-restore-tags-heading" className="text-sm font-medium text-foreground dark:text-foreground">
-                  {t('bulkRestoreModal.tags')}
-                </span>
+              <Tag className="size-4 text-accent-text" />
+              <span id="bulk-restore-tags-heading" className="text-label font-medium text-foreground">
+                {t('bulkRestoreModal.tags')}
+              </span>
               {stats.hasCustomTags > 0 && (
-                <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                <span className="text-label-sm text-tertiary tabular-nums">
                   ({t('bulkRestoreModal.v1-custom', { v1: stats.hasCustomTags })})
                 </span>
               )}
@@ -204,17 +204,17 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           </div>
 
           {config.tags.enabled && (
-            <RadioGroup aria-labelledby="bulk-restore-tags-heading" value={config.tags.target} onValueChange={(value) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
-              <label onClick={() => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: 'original' } }))} className="flex cursor-pointer items-center space-x-2">
+            <RadioGroup aria-labelledby="bulk-restore-tags-heading" value={config.tags.target} onValueChange={(value) => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: value as RestoreTarget } }))} className="ml-6 flex items-center gap-4">
+              <label onClick={() => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: 'original' } }))} className="flex cursor-pointer items-center gap-2">
                 <RadioGroupItem value="original" id="tags-target-original" aria-labelledby="tags-target-original-label" />
-                <span id="tags-target-original-label" className="text-sm text-muted-foreground dark:text-muted-foreground">
+                <span id="tags-target-original-label" className="text-label-sm text-secondary">
                   {t('bulkRestoreModal.default-topics')}
                 </span>
               </label>
-              <label onClick={() => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: 'ai' } }))} className="flex cursor-pointer items-center space-x-2">
+              <label onClick={() => setConfig(prev => ({ ...prev, tags: { ...prev.tags, target: 'ai' } }))} className="flex cursor-pointer items-center gap-2">
                 <RadioGroupItem value="ai" id="tags-target-ai" aria-labelledby="tags-target-ai-label" />
-                <span id="tags-target-ai-label" className="text-sm text-muted-foreground dark:text-muted-foreground flex items-center space-x-1">
-                  <Bot className="w-3.5 h-3.5" />
+                <span id="tags-target-ai-label" className="flex items-center gap-1 text-label-sm text-secondary">
+                  <Bot className="size-3.5 text-tertiary" />
                   <span>{t('bulkRestoreModal.ai-tags')}</span>
                 </span>
               </label>
@@ -224,15 +224,15 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
 
         {/* Category Section */}
         <div className={sectionClass}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Checkbox aria-labelledby="bulk-restore-category-heading" checked={config.category.enabled} onCheckedChange={(checked) => setConfig(prev => ({ ...prev, category: { ...prev.category, enabled: checked === true } }))} />
-              <FolderOpen className="w-4 h-4 text-success" />
-                <span id="bulk-restore-category-heading" className="text-sm font-medium text-foreground dark:text-foreground">
-                  {t('bulkRestoreModal.category')}
-                </span>
+              <FolderOpen className="size-4 text-status-green" />
+              <span id="bulk-restore-category-heading" className="text-label font-medium text-foreground">
+                {t('bulkRestoreModal.category')}
+              </span>
               {stats.hasCustomCategory > 0 && (
-                <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                <span className="text-label-sm text-tertiary tabular-nums">
                   ({t('bulkRestoreModal.v1-custom', { v1: stats.hasCustomCategory })})
                 </span>
               )}
@@ -240,17 +240,17 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
           </div>
 
           {config.category.enabled && (
-            <RadioGroup aria-labelledby="bulk-restore-category-heading" value={config.category.target} onValueChange={(value) => setConfig(prev => ({ ...prev, category: { ...prev.category, target: value as RestoreTarget } }))} className="ml-6 flex items-center space-x-4">
-              <label onClick={() => setConfig(prev => ({ ...prev, category: { ...prev.category, target: 'original' } }))} className="flex cursor-pointer items-center space-x-2">
+            <RadioGroup aria-labelledby="bulk-restore-category-heading" value={config.category.target} onValueChange={(value) => setConfig(prev => ({ ...prev, category: { ...prev.category, target: value as RestoreTarget } }))} className="ml-6 flex items-center gap-4">
+              <label onClick={() => setConfig(prev => ({ ...prev, category: { ...prev.category, target: 'original' } }))} className="flex cursor-pointer items-center gap-2">
                 <RadioGroupItem value="original" id="cat-target-original" aria-labelledby="cat-target-original-label" />
-                <span id="cat-target-original-label" className="text-sm text-muted-foreground dark:text-muted-foreground">
+                <span id="cat-target-original-label" className="text-label-sm text-secondary">
                   {t('bulkRestoreModal.default-category')}
                 </span>
               </label>
-              <label onClick={() => setConfig(prev => ({ ...prev, category: { ...prev.category, target: 'ai' } }))} className="flex cursor-pointer items-center space-x-2">
+              <label onClick={() => setConfig(prev => ({ ...prev, category: { ...prev.category, target: 'ai' } }))} className="flex cursor-pointer items-center gap-2">
                 <RadioGroupItem value="ai" id="cat-target-ai" aria-labelledby="cat-target-ai-label" />
-                <span id="cat-target-ai-label" className="text-sm text-muted-foreground dark:text-muted-foreground flex items-center space-x-1">
-                  <Bot className="w-3.5 h-3.5" />
+                <span id="cat-target-ai-label" className="flex items-center gap-1 text-label-sm text-secondary">
+                  <Bot className="size-3.5 text-tertiary" />
                   <span>{t('bulkRestoreModal.ai-category')}</span>
                 </span>
               </label>
@@ -260,9 +260,9 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
 
         {/* AI Warning */}
         {hasAiWarning && (
-          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-            <p className="text-sm text-warning flex items-start">
-              <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="rounded-md bg-warning-tint px-3 py-2">
+            <p className="flex items-start text-label-sm text-warning">
+              <AlertTriangle className="mr-2 mt-0.5 size-4 shrink-0" />
               <span>
                 {t('bulkRestoreModal.some-selected-repositories-have-not-been-ai-anal')}
               </span>
@@ -272,9 +272,9 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
 
         {/* AI Data Loss Warning */}
         {hasOriginalTargetAiLoss && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-            <p className="text-sm text-destructive flex items-start">
-              <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="rounded-md bg-destructive-tint px-3 py-2">
+            <p className="flex items-start text-label-sm text-destructive">
+              <AlertTriangle className="mr-2 mt-0.5 size-4 shrink-0" />
               <span>
                 {t('bulkRestoreModal.restoring-to-default-will-clear-ai-analysis-data', { v1: stats.hasAnyAiData })}
               </span>
@@ -283,9 +283,9 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         )}
 
         {/* Info */}
-        <div className="bg-accent/50 dark:bg-muted/30 border border-border dark:border-border rounded-lg p-3">
-          <p className="text-xs text-muted-foreground dark:text-muted-foreground flex items-start">
-            <Info className="w-3.5 h-3.5 mr-1.5 mt-0.5 flex-shrink-0" />
+        <div className="rounded-md bg-fill-hover px-3 py-2">
+          <p className="flex items-start text-label-sm text-secondary">
+            <Info className="mr-1.5 mt-0.5 size-3.5 shrink-0 text-tertiary" />
             <span>
               {t('bulkRestoreModal.restoring-to-default-will-also-clear-ai-analysis')}
             </span>
@@ -293,25 +293,29 @@ export const BulkRestoreModal: React.FC<BulkRestoreModalProps> = ({
         </div>
 
         {error && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-            <p className="text-sm text-destructive">{error}</p>
+          <div className="rounded-md bg-destructive-tint px-3 py-2">
+            <p className="text-label-sm text-destructive">{error}</p>
           </div>
         )}
 
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end gap-2 border-t border-subtle pt-3">
           <Button
+            type="button"
+            variant="outline"
+            size="md"
             onClick={onClose}
             disabled={isProcessing}
-            className="px-4 py-2 text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-50"
           >
             {t('bulkRestoreModal.cancel')}
           </Button>
           <Button
+            type="button"
+            variant="primary"
+            size="md"
             onClick={handleRestore}
             disabled={!hasEnabledField || isProcessing}
-            className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="size-3.5" />
             <span>{isProcessing ? t('bulkRestoreModal.restoring') : t('bulkRestoreModal.confirm-restore')}</span>
           </Button>
         </div>

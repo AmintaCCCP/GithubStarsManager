@@ -25,23 +25,23 @@ export const SimilarViewBanner: React.FC<SimilarViewBannerProps> = ({
   const t = useT('app');
 
   return (
-    <div className="flex items-center justify-between gap-3 bg-primary/5 dark:bg-primary/10 border border-primary/20 dark:border-primary/30 rounded-xl px-4 py-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <Search className="w-4 h-4 flex-shrink-0 text-primary dark:text-primary" />
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate">
-          <span className="text-muted-foreground dark:text-muted-foreground">
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-accent-tint px-3.5 py-2.5 shadow-[inset_0_0_0_1px_var(--accent-tint-strong)]">
+      <div className="flex min-w-0 items-center gap-2">
+        <Search className="size-3.5 shrink-0 text-accent-text" />
+        <p className="truncate text-label text-secondary">
+          <span>
             {t('similarViewBanner.viewing-similar-repositories-of')}
           </span>
-          <span className="font-semibold text-foreground dark:text-foreground">
+          <span className="font-medium text-foreground">
             {anchorRepoName}
           </span>
-          <span className="text-muted-foreground dark:text-muted-foreground">
+          <span>
             {t('similarViewBanner.text')}
           </span>
         </p>
       </div>
-      <Button type="button" onClick={onReset} className="h-8 shrink-0 gap-1.5 px-3 text-sm">
-        <RotateCcw className="w-4 h-4" />
+      <Button type="button" variant="outline" size="md" onClick={onReset} className="h-control shrink-0 gap-1.5 rounded-md">
+        <RotateCcw className="size-3.5" />
         {t('similarViewBanner.reset')}
       </Button>
     </div>
