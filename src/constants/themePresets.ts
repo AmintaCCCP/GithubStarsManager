@@ -2,28 +2,32 @@ import { GENERATED_THEME_PRESETS } from './themePresets.generated';
 import type { GeneratedThemePalette } from './themePresets.generated';
 
 /**
- * Curated theme registry.
+ * Curated desktop theme registry.
  *
- * Palettes for non-default presets come from the generated tweakcn subset
+ * Palettes for non-default presets come from the generated palette registry
  * (see scripts/generate-theme-presets.mjs). The default preset mirrors the
- * shadcn variables in src/index.css so it always matches the stylesheet.
+ * base CSS variables in src/index.css so it always matches the stylesheet.
  */
 
 export const DEFAULT_THEME_PRESET_ID = 'default' as const;
 
 export const THEME_PRESET_IDS = [
   DEFAULT_THEME_PRESET_ID,
-  'enterprise-mod-2',
-  'light-green',
-  'claude',
-  'vercel',
-  't3-chat',
-  'deep-purple',
-  'openprofile',
-  'autoblog',
-  'zen-inspired',
-  'logistic-one',
-  'whatsapp',
+  'catppuccin',
+  'dracula',
+  'ghostty',
+  'github',
+  'gruvbox',
+  'haze',
+  'night-owl',
+  'nord',
+  'one-dark-pro',
+  'paper',
+  'pierre',
+  'rose-pine',
+  'solarized',
+  'tokyo-night',
+  'vitesse',
 ] as const;
 
 export type ThemePresetId = (typeof THEME_PRESET_IDS)[number];
@@ -46,55 +50,55 @@ export interface ThemePreset {
 }
 
 const DEFAULT_LIGHT_COLORS: GeneratedThemePalette = {
-  background: '210 40% 98%',
-  foreground: '222.2 84% 4.9%',
-  card: '0 0% 100%',
-  'card-foreground': '222.2 84% 4.9%',
-  popover: '0 0% 100%',
-  'popover-foreground': '222.2 84% 4.9%',
-  primary: '222.2 47.4% 11.2%',
-  'primary-foreground': '210 40% 98%',
-  secondary: '210 40% 96.1%',
-  'secondary-foreground': '222.2 47.4% 11.2%',
-  muted: '210 40% 96.1%',
-  'muted-foreground': '215.4 16.3% 46.9%',
-  accent: '210 40% 92%',
-  'accent-foreground': '222.2 47.4% 11.2%',
+  background: '210 10% 95.3%',
+  foreground: '210 7.1% 11%',
+  card: '210 33.3% 99.2%',
+  'card-foreground': '210 7.1% 11%',
+  popover: '210 33.3% 99.2%',
+  'popover-foreground': '210 7.1% 11%',
+  primary: '257.6 55.1% 54.1%',
+  'primary-foreground': '0 0% 100%',
+  secondary: '210 10% 96.1%',
+  'secondary-foreground': '210 7.1% 11%',
+  muted: '210 10% 96.1%',
+  'muted-foreground': '200 1.6% 37.1%',
+  accent: '210 11.1% 92.9%',
+  'accent-foreground': '210 7.1% 11%',
   destructive: '0 72% 51%',
-  'destructive-foreground': '210 40% 98%',
-  border: '214.3 31.8% 91.4%',
-  'border-strong': '214.3 25% 80%',
-  input: '214.3 31.8% 91.4%',
-  ring: '222.2 84% 4.9%',
-  selection: '222.2 47.4% 55.5%',
-  'selection-foreground': '222.2 84% 4.9%',
-  'search-highlight': '222.2 28.4% 72.8%',
+  'destructive-foreground': '0 0% 100%',
+  border: '210 9% 89%',
+  'border-strong': '210 8% 80%',
+  input: '210 9% 89%',
+  ring: '257.6 55.1% 54.1%',
+  selection: '257.6 46% 65%',
+  'selection-foreground': '210 7.1% 11%',
+  'search-highlight': '257.6 32% 79%',
 };
 
 const DEFAULT_DARK_COLORS: GeneratedThemePalette = {
-  background: '222.2 84% 4.9%',
-  foreground: '210 40% 98%',
-  card: '222.2 47.4% 11.2%',
-  'card-foreground': '210 40% 98%',
-  popover: '222.2 47.4% 11.2%',
-  'popover-foreground': '210 40% 98%',
-  primary: '210 40% 98%',
-  'primary-foreground': '222.2 47.4% 11.2%',
-  secondary: '217.2 32.6% 17.5%',
-  'secondary-foreground': '210 40% 98%',
-  muted: '217.2 32.6% 17.5%',
-  'muted-foreground': '215 20.2% 65.1%',
-  accent: '217.2 32.6% 21%',
-  'accent-foreground': '210 40% 98%',
-  destructive: '0 62.8% 30.6%',
-  'destructive-foreground': '210 40% 98%',
-  border: '217.2 32.6% 17.5%',
-  'border-strong': '217.2 32.6% 28%',
-  input: '217.2 32.6% 17.5%',
-  ring: '212.7 26.8% 83.9%',
-  selection: '210 40% 40%',
-  'selection-foreground': '210 40% 98%',
-  'search-highlight': '210 24% 29.6%',
+  background: '220 10.7% 5.5%',
+  foreground: '220 9.1% 93.1%',
+  card: '220 6.7% 8.8%',
+  'card-foreground': '220 9.1% 93.1%',
+  popover: '220 4.5% 12.6%',
+  'popover-foreground': '220 9.1% 93.1%',
+  primary: '255.4 47.1% 56.3%',
+  'primary-foreground': '0 0% 100%',
+  secondary: '220 5.5% 10.8%',
+  'secondary-foreground': '220 9.1% 93.1%',
+  muted: '220 8.1% 7.3%',
+  'muted-foreground': '220 2.5% 62.2%',
+  accent: '220 5.3% 14.9%',
+  'accent-foreground': '220 9.1% 93.1%',
+  destructive: '0 63% 44%',
+  'destructive-foreground': '220 9.1% 93.1%',
+  border: '220 5.3% 15.7%',
+  'border-strong': '220 5% 24.5%',
+  input: '220 5.3% 15.7%',
+  ring: '254 62% 72%',
+  selection: '255.4 36% 36%',
+  'selection-foreground': '220 9.1% 93.1%',
+  'search-highlight': '255.4 26% 27%',
 };
 
 const DEFAULT_PRESET: ThemePreset = {
@@ -107,17 +111,21 @@ const DEFAULT_PRESET: ThemePreset = {
 
 /** Labels for generated presets, keyed by id. */
 const GENERATED_LABELS_ZH: Record<string, string> = {
-  'enterprise-mod-2': 'Enterprise 靛蓝',
-  'light-green': '清新绿',
-  claude: 'Claude 暖橘',
-  vercel: 'Vercel 极简',
-  't3-chat': 'T3 Chat',
-  'deep-purple': '深邃紫',
-  openprofile: 'openprofile 杏黄',
-  autoblog: 'autoblog 暖橙',
-  'zen-inspired': 'Zen 素雅',
-  'logistic-one': 'LogisticOne 藏蓝',
-  whatsapp: 'WhatsApp 青绿',
+  catppuccin: 'Catppuccin',
+  dracula: 'Dracula',
+  ghostty: 'Ghostty',
+  github: 'GitHub',
+  gruvbox: 'Gruvbox',
+  haze: 'Haze 雾霭',
+  'night-owl': 'Night Owl',
+  nord: 'Nord 极光蓝',
+  'one-dark-pro': 'One Dark Pro',
+  paper: 'Paper 纸墨',
+  pierre: 'Pierre',
+  'rose-pine': 'Rosé Pine',
+  solarized: 'Solarized',
+  'tokyo-night': 'Tokyo Night',
+  vitesse: 'Vitesse',
 };
 
 /**

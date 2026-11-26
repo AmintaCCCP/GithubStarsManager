@@ -53,11 +53,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <div className="flex items-start gap-4">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isDanger ? 'bg-destructive/10' : 'bg-primary/10'}`}>
-              <AlertTriangle className={`h-5 w-5 ${isDanger ? 'text-destructive' : 'text-primary'}`} />
+          <div className="flex items-start gap-3.5">
+            <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${isDanger ? 'bg-destructive-tint' : 'bg-accent-tint'}`}>
+              <AlertTriangle className={`size-4 ${isDanger ? 'text-destructive' : 'text-primary'}`} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <AlertDialogTitle>{title}</AlertDialogTitle>
               <AlertDialogDescription className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-all">{message}</AlertDialogDescription>
             </div>
@@ -67,7 +67,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            className={isDanger ? 'bg-destructive hover:bg-destructive/90' : undefined}
+            className={isDanger ? 'bg-destructive text-destructive-foreground' : undefined}
           >
             {confirmText}
           </AlertDialogAction>

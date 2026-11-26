@@ -13,17 +13,17 @@ interface ToastProps {
   closeLabel?: string;
 }
 
-const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: string }>; className: string }> = {
-  success: { icon: CheckCircle2, className: 'border-status-green/30 bg-card text-status-green' },
-  error: { icon: AlertTriangle, className: 'border-destructive/30 bg-card text-destructive' },
-  warning: { icon: AlertTriangle, className: 'border-status-amber/40 bg-card text-status-amber' },
-  info: { icon: Info, className: 'border-border bg-card text-muted-foreground' },
+const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: string }>; iconClassName: string }> = {
+  success: { icon: CheckCircle2, iconClassName: 'text-status-green' },
+  error: { icon: AlertTriangle, iconClassName: 'text-destructive' },
+  warning: { icon: AlertTriangle, iconClassName: 'text-status-amber' },
+  info: { icon: Info, iconClassName: 'text-secondary' },
 };
 
 const TOAST_EXIT_DURATION_MS = 150;
 
 export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 3000, closeLabel = 'Close' }) => {
-  const { icon: Icon, className } = TOAST_META[type];
+  const { icon: Icon, iconClassName } = TOAST_META[type];
   const [open, setOpen] = React.useState(true);
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -42,24 +42,24 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration =
 
   return (
     <ToastPrimitive.Root
-        open={open}
-        duration={duration}
-        onOpenChange={handleOpenChange}
-        className={cn('pointer-events-auto flex w-[min(420px,calc(100vw_-_2rem))] items-center gap-3 rounded-lg border px-4 py-3 shadow-dialog outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in', className)}
-      >
-        <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-        <ToastPrimitive.Description className="flex-1 whitespace-pre-line text-sm text-foreground dark:text-foreground">
-          {message}
-        </ToastPrimitive.Description>
-        <ToastPrimitive.Close asChild>
-          <button
-            type="button"
-            aria-label={closeLabel}
-            className="rounded p-1 opacity-70 transition-opacity hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-(--ui-focus-ring/60) dark:hover:bg-accent"
-          >
-            <X className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
-          </button>
-        </ToastPrimitive.Close>
-      </ToastPrimitive.Root>
+      open={open}
+      duration={duration}
+      onOpenChange={handleOpenChange}
+      className="pointer-events-auto flex min-h-[44px] w-[min(420px,calc(100vw_-_2rem))] items-center gap-2.5 rounded-lg bg-floating px-3 py-2.5 text-foreground shadow-elev-2 outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
+    >
+      <Icon className={cn('size-4 shrink-0', iconClassName)} aria-hidden="true" />
+      <ToastPrimitive.Description className="flex-1 whitespace-pre-line text-label text-foreground">
+        {message}
+      </ToastPrimitive.Description>
+      <ToastPrimitive.Close asChild>
+        <button
+          type="button"
+          aria-label={closeLabel}
+          className="motion-press inline-grid size-control-sm shrink-0 place-items-center rounded-sm text-tertiary hover:bg-fill-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      </ToastPrimitive.Close>
+    </ToastPrimitive.Root>
   );
 };

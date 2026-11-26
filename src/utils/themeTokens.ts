@@ -227,7 +227,7 @@ export const applyThemeTokens = (tokens: ThemeTokens, root: HTMLElement = docume
   const computedSurface = typeof getComputedStyle === 'function'
     ? getComputedStyle(root).getPropertyValue('--background').trim()
     : '';
-  const fallbackSurface = root.classList.contains('dark') ? '222.2 84% 4.9%' : '0 0% 100%';
+  const fallbackSurface = root.classList.contains('dark') ? '220 10.7% 5.5%' : '210 33.3% 99.2%';
   const style = themeTokenStyle(tokens, computedSurface || fallbackSurface);
 
   for (const [name, value] of Object.entries(style.variables)) {

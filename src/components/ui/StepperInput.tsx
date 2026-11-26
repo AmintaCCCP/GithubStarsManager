@@ -87,11 +87,11 @@ export const StepperInput: React.FC<StepperInputProps> = ({
         onPointerCancel={stopRepeat}
         disabled={!canDecrement}
         aria-label={decreaseLabel}
-        className="h-8 w-8 rounded-r-none"
+        className="size-control rounded-r-none"
       >
-        <Minus className="h-3.5 w-3.5" />
+        <Minus className="size-3.5" />
       </Button>
-      <span className="flex h-8 min-w-[2.5rem] select-none items-center justify-center border-y border-input bg-card px-2 text-sm font-medium tabular-nums text-card-foreground">
+      <span className="flex h-control min-w-[2.5rem] select-none items-center justify-center border-y border-default bg-sunken px-2 text-label font-medium tabular-nums text-foreground">
         {value}
       </span>
       <Button
@@ -107,9 +107,9 @@ export const StepperInput: React.FC<StepperInputProps> = ({
         onPointerCancel={stopRepeat}
         disabled={!canIncrement}
         aria-label={increaseLabel}
-        className="h-8 w-8 rounded-l-none"
+        className="size-control rounded-l-none"
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus className="size-3.5" />
       </Button>
     </div>
   );

@@ -93,16 +93,15 @@ describe('themePresets registry', () => {
   });
 
   it('validates ids through isThemePresetId', () => {
-    expect(isThemePresetId('deep-purple')).toBe(true);
+    expect(isThemePresetId('tokyo-night')).toBe(true);
     expect(isThemePresetId(DEFAULT_THEME_PRESET_ID)).toBe(true);
     expect(isThemePresetId('does-not-exist')).toBe(false);
     expect(isThemePresetId(42)).toBe(false);
   });
 
   it('derives selection fills visible on every text surface with readable text on top', () => {
-    // Guards issue #348: zen-inspired light shipped accent ≈ card, rendering
-    // ::selection invisible. The generated fills must keep clearing these
-    // invariants for every preset and mode.
+    // Guards issue #348: derived selection fills must stay visible on every
+    // text surface across every preset and mode.
     const surfaces = ['background', 'card', 'popover', 'secondary', 'muted'] as const;
     for (const preset of THEME_PRESETS) {
       for (const [mode, palette] of [
