@@ -378,21 +378,6 @@ const writeShardedSnapshot = async (
     return;
   }
 
-  if (hydratedIncomplete) {
-    // 最近一次水合存在读取失败：水合结果不完整，写盘会用默认值覆盖磁盘上
-    // 仍然完好的真实分片。拒绝写入直到下一次完整读取成功。
-    const refusal = new Error('hydrated incomplete');
-    logger.errorFromError(
-      'store.persist',
-      'Skipping persist write: last hydration was incomplete; refusing to overwrite',
-      refusal,
-      { source },
-    );
-    // Keep refusing to overwrite the disk snapshot, but let strict flushes see
-    // the refusal instead of reporting a successful reload barrier.
-    throw refusal;
-  }
-
   // 载荷中的 version 必须是 persist 版本号（水合时驱动 migrate），
   // writeVersion 仅用于丢弃过期的写入调度。
   const persistVersion = typeof value.version === 'number' ? value.version : 0;
@@ -417,6 +402,20 @@ const writeShardedSnapshot = async (
       return remaining === 0;
     });
     if (stillCoolingMs > 0) armDeferredLargeShardWrite(stillCoolingMs);
+  }
+  if (hydratedIncomplete) {
+    // 最近一次水合存在读取失败：水合结果不完整，写盘会用默认值覆盖磁盘上
+    // 仍然完好的真实分片。没有脏数据时本来就不会写盘，可正常返回；有脏数据
+    // 则拒绝写入，并让严格 flush 看到失败而不是以为 reload 屏障已满足。
+    if (dirty.length === 0) return;
+    const refusal = new Error('hydrated incomplete');
+    logger.errorFromError(
+      'store.persist',
+      'Skipping persist write: last hydration was incomplete; refusing to overwrite',
+      refusal,
+      { source },
+    );
+    throw refusal;
   }
   if (dirty.length === 0) return;
 
