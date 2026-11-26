@@ -7,6 +7,7 @@
  */
 
 import type { GitHubRepoDetailRead } from './githubApi';
+import { scopedKey } from './profileStorage';
 
 /** 关注博主的推文（正文缓存供"查看原贴"离线渲染） */
 export interface XStoredTweet {
@@ -92,7 +93,8 @@ const normalizeMeta = (meta: XTweetSyncMeta | null | undefined): XTweetSyncMeta 
   queryIds: normalizeStringRecord(meta?.queryIds),
 });
 
-const DB_NAME = 'github-stars-x-tweet';
+// Same name as before for the default profile; suffixed per profile otherwise.
+const DB_NAME = scopedKey('github-stars-x-tweet');
 const DB_VERSION = 1;
 const TWEETS_STORE = 'tweets';
 const REPOS_STORE = 'repos';

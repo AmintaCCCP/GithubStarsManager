@@ -76,6 +76,9 @@ export const deleteProfileIndexedDbs = async (profileId: string): Promise<void> 
   await Promise.all([
     deleteIndexedDbByName(scopedKey('github-stars-manager-db', profileId)),
     deleteIndexedDbByName(scopedKey('gsm-repository-chat-db', profileId)),
+    deleteIndexedDbByName(scopedKey('github-stars-weekly', profileId)),
+    deleteIndexedDbByName(scopedKey('github-stars-x-tweet', profileId)),
+    deleteIndexedDbByName(scopedKey('github-stars-telegram', profileId)),
   ]);
 };
 
