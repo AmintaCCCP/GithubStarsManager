@@ -66,13 +66,13 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   };
 
   const rankBadgeClass = useMemo(() => {
-    return 'bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground';
+    return 'bg-fill-hover text-secondary';
   }, []);
 
   // 平台图标统一由 platformMeta 模块提供
   const getPlatformIcon = (platform: string) => {
     const Icon = getSharedPlatformIcon(platform);
-    return <Icon className="w-3 h-3" />;
+    return <Icon className="size-3" />;
   };
 
   // 执行取消Star操作：确认 UI（自定义 Modal）留 View，动作本体在 hook。
@@ -149,43 +149,44 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     <>
     <div
       onClick={handleCardClick}
-      className="app-list-row app-discovery-card ui-card transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer"
+      className="app-list-row app-discovery-card ui-card transition-[color,background-color,border-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant cursor-pointer"
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
       onCut={(e) => e.preventDefault()}
       onSelect={(e) => e.preventDefault()}
     >
-      <div className="flex items-start gap-3 sm:gap-4">
+      <div className="flex items-start gap-3">
         {/* Rank badge */}
-        <div className={`app-discovery-rank flex-shrink-0 rounded-full flex items-center justify-center font-bold ${rankBadgeClass}`}>
+        <div className={`app-discovery-rank shrink-0 rounded-full flex items-center justify-center font-semibold tabular-nums ${rankBadgeClass}`}>
           {repo.rank}
         </div>
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
           {/* Header */}
-          <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-start justify-between gap-3 mb-1.5">
             <div className="flex items-center gap-2 min-w-0">
               {!desktopSafeMode && repo.owner?.avatar_url && (
                 <img
                   src={repo.owner.avatar_url}
                   alt={repo.owner.login}
-                  className="w-6 h-6 rounded-full flex-shrink-0"
+                  className="size-5 rounded-sm shrink-0"
                 />
               )}
-              <span className="font-semibold text-foreground dark:text-foreground truncate">
+              <span className="font-semibold text-label-lg text-foreground truncate">
                 {cardTitle}
               </span>
             </div>
 
             {/* Action buttons */}
-            <div className="app-row-actions flex items-center flex-shrink-0">
+            <div className="app-row-actions flex items-center shrink-0">
               {/* AI Analyze button */}
               <Button
+                variant="ghost"
                 size="icon"
                 onClick={handleAnalyze}
                 disabled={!githubToken || isAnalyzing}
-                className="app-row-action disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-row-action"
                 title={
                   isAnalyzed 
                     ? t('subscriptionRepoCard.re-analyze') 
@@ -195,52 +196,56 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 }
               >
                 {isAnalyzing ? (
-                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : isAnalyzed ? (
-                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <Sparkles className="size-3.5" />
                 ) : (
-                  <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <Bot className="size-3.5" />
                 )}
               </Button>
 
               {/* ZRead button - hidden on small screens */}
               <Button
+                variant="ghost"
                 size="icon"
                 onClick={handleOpenInZRead}
-                className="app-row-action !hidden sm:!inline-flex"
+                className="app-row-action hidden! sm:inline-flex!"
                 title={t('subscriptionRepoCard.open-in-zread')}
               >
-                <BookOpen className="w-4 h-4" />
+                <BookOpen className="size-3.5" />
               </Button>
 
               {/* 周刊/推文/频道消息：查看原贴按钮 */}
               {(repo.weeklyIssue || repo.xTweet || repo.telegram) && (
                 repo.telegram ? (
                   <Button
+                    variant="ghost"
                     size="icon"
                     onClick={handleOpenTelegramMessage}
                     className="app-row-action"
                     title={t('subscriptionRepoCard.view-original-channel-message')}
                   >
-                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <FileText className="size-3.5" />
                   </Button>
                 ) : repo.xTweet ? (
                   <Button
+                    variant="ghost"
                     size="icon"
                     onClick={handleOpenTweet}
                     className="app-row-action"
                     title={t('subscriptionRepoCard.view-original-post')}
                   >
-                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <FileText className="size-3.5" />
                   </Button>
                 ) : (
                   <Button
+                    variant="ghost"
                     size="icon"
                     onClick={handleOpenIssue}
                     className="app-row-action"
                     title={t('subscriptionRepoCard.view-original-post')}
                   >
-                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <FileText className="size-3.5" />
                   </Button>
                 )
               )}
@@ -251,30 +256,31 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(event) => event.stopPropagation()}
-                className="app-row-action !hidden sm:!inline-flex"
+                className="app-row-action hidden! sm:inline-flex!"
                 title={t('subscriptionRepoCard.open-on-github')}
               >
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="size-3.5" />
               </a>
 
               {/* Star button */}
               <Button
+                variant="ghost"
                 size="icon"
                 onClick={handleStar}
                 disabled={!githubToken || isStarring}
-                className={`app-row-action disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`app-row-action ${
                   isStarred
-                    ? 'text-primary'
+                    ? 'text-accent-text'
                     : ''
                 }`}
                 title={isStarred ? t('subscriptionRepoCard.unstar') : t('subscriptionRepoCard.add-star')}
               >
                 {isStarring ? (
-                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : isStarred ? (
-                  <StarOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <StarOff className="size-3.5" />
                 ) : (
-                  <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <Star className="size-3.5" />
                 )}
               </Button>
             </div>
@@ -289,9 +295,9 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                     <button
                       type="button"
                       onClick={(event) => event.stopPropagation()}
-                      className="relative mb-3 block w-full cursor-text text-left"
+                      className="relative mb-2.5 block w-full cursor-text text-left"
                     >
-                      <span className="block text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                      <span className="block text-label text-secondary line-clamp-2 rounded-xs px-1 -mx-1 hover:bg-fill-hover transition-[background-color] duration-micro ease-out-subtle hover:duration-instant">
                         {displayDescription}
                       </span>
                     </button>
@@ -306,7 +312,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               </PopoverContent>
             </Popover>
           ) : (
-            <p className="mb-3 text-sm text-muted-foreground/70 dark:text-muted-foreground/70">
+            <p className="mb-2.5 text-label text-tertiary">
               {t('subscriptionRepoCard.no-description')}
             </p>
           )}
@@ -320,10 +326,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                     <button
                       type="button"
                       onClick={(event) => event.stopPropagation()}
-                      className="relative mb-3 flex w-full cursor-text items-start gap-1.5 text-left"
+                      className="relative mb-2.5 flex w-full cursor-text items-start gap-1.5 text-left"
                     >
-                      <Bot className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
-                      <span className="block text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
+                      <Bot className="mt-0.5 size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
+                      <span className="block text-label text-secondary line-clamp-2 rounded-xs px-1 -mx-1 hover:bg-fill-hover transition-[background-color] duration-micro ease-out-subtle hover:duration-instant">
                         {repo.ai_summary}
                       </span>
                     </button>
@@ -341,26 +347,26 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
           {/* Tags */}
           {((repo.ai_tags && repo.ai_tags.length > 0) || (repo.topics && repo.topics.length > 0) || repo.weeklyIssue || repo.xTweet || repo.telegram) && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
               {repo.telegram && (
-                <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
+                <span className="rounded-xs bg-accent-tint px-1.5 py-0.5 text-caption font-medium text-accent-text">
                   @{repo.telegram.channel}
                 </span>
               )}
               {repo.xTweet && (
-                <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
+                <span className="rounded-xs bg-accent-tint px-1.5 py-0.5 text-caption font-medium text-accent-text">
                   @{repo.xTweet.handle}
                 </span>
               )}
               {repo.weeklyIssue && (
                 <>
                   {isWeeklyCollected && (
-                    <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
+                    <span className="rounded-xs bg-accent-tint px-1.5 py-0.5 text-caption font-medium text-accent-text">
                       {t('subscriptionRepoCard.in-weekly')}
                     </span>
                   )}
                   {weeklyIssueNumber != null && (
-                    <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground dark:text-muted-foreground">
+                    <span className="rounded-xs bg-fill-hover px-1.5 py-0.5 text-caption font-medium text-secondary tabular-nums">
                       {t('subscriptionRepoCard.issue-weeklyissuenumber', { weeklyIssueNumber: weeklyIssueNumber })}
                     </span>
                   )}
@@ -369,7 +375,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground dark:text-muted-foreground dark:bg-primary/20"
+                  className="rounded-xs bg-fill-hover px-1.5 py-0.5 text-caption font-medium text-secondary"
                 >
                   {tag}
                 </span>
@@ -379,13 +385,13 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
           {/* Platform icons */}
           {repo.ai_platforms && repo.ai_platforms.length > 0 && (
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-label-sm text-tertiary">
                 {t('subscriptionRepoCard.platforms')}
               </span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 {repo.ai_platforms.slice(0, 5).map((platform) => (
-                  <span key={platform} className="text-muted-foreground dark:text-muted-foreground" title={platform}>
+                  <span key={platform} className="text-secondary" title={platform}>
                     {getPlatformIcon(platform)}
                   </span>
                 ))}
@@ -394,27 +400,27 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Stats */}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-muted-foreground">
+          <div className="flex items-center gap-3.5 text-label-sm text-tertiary tabular-nums">
             {repo.language && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="size-2.5 rounded-full"
                   style={{ backgroundColor: getLanguageColor(repo.language) }}
                 />
-                <span className="truncate max-w-20">{repo.language}</span>
+                <span className="truncate max-w-24">{repo.language}</span>
               </div>
             )}
             <div className="flex items-center gap-1">
-              <Star className="w-4 h-4" />
+              <Star className="size-3.5" />
               <span>{formatNumber(repo.stargazers_count)}</span>
             </div>
             <div className="flex items-center gap-1">
-              <GitFork className="w-4 h-4" />
+              <GitFork className="size-3.5" />
               <span>{formatNumber(repo.forks_count ?? repo.forks ?? 0)}</span>
             </div>
             {(weeklySubmittedDate || tweetDate) && (
               <div className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" />
+                <Calendar className="size-3.5" />
                 <span>{weeklySubmittedDate || tweetDate}</span>
               </div>
             )}
@@ -433,27 +439,25 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       maxWidth="max-w-sm"
     >
       <div className="space-y-4">
-        <div className="flex items-center gap-3 text-muted-foreground dark:text-muted-foreground ">
-          <AlertTriangle className="w-8 h-8 flex-shrink-0" />
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+          <p className="text-label text-secondary">
             {t('subscriptionRepoCard.are-you-sure-you-want-to-unstar-v1-this-will-rem', { v1: repo.full_name })}
           </p>
         </div>
-        <div className="flex gap-3 justify-end">
+        <div className="flex justify-end gap-2 border-t border-subtle pt-3">
           <Button
             onClick={() => {
               setUnstarConfirmOpen(false);
             }}
             variant="ghost"
-            className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
           >
             {t('subscriptionRepoCard.cancel')}
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant="danger-solid"
             onClick={confirmUnstar}
-            className="rounded-lg px-4 py-2 text-sm font-medium"
           >
             {t('subscriptionRepoCard.confirm-unstar-2')}
           </Button>

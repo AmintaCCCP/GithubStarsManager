@@ -178,11 +178,11 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 <span className="flex min-w-0 flex-col items-start">
                   <span className="flex w-full min-w-0 items-center gap-1.5">
                     <span className="truncate">{t('assetFilterManager.builtin-current-system')}</span>
-                    <Badge variant="secondary" className="h-4 shrink-0 whitespace-nowrap px-1.5 text-[9px] font-medium leading-none">
+                    <Badge variant="secondary" className="h-4 shrink-0 whitespace-nowrap rounded-xs border-0 px-1.5 text-caption font-medium leading-none">
                       {t('assetFilterManager.builtin-badge')}
                     </Badge>
                   </span>
-                  <span className={`w-full truncate text-[11px] ${currentSystemUnsupported ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <span className={`w-full truncate text-label-sm ${currentSystemUnsupported ? 'text-destructive' : 'text-tertiary'}`}>
                     {currentSystemUnsupported
                       ? currentSystemSelected
                         ? t('assetFilterManager.builtin-ignored')
@@ -194,7 +194,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             </Button>
             <div className="app-side-row-actions">
               <span title={t('assetFilterManager.builtin-locked')}>
-                <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                <Lock className="size-3.5 text-tertiary" aria-hidden="true" />
               </span>
             </div>
           </div>

@@ -49,21 +49,21 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`ui-card cursor-pointer ${
-        isWorkflowsExpanded ? 'border-primary/20 ring-1 ring-ring/30' : ''
+      className={`ui-card cursor-pointer transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant ${
+        isWorkflowsExpanded ? 'bg-raised shadow-elev-1' : ''
       }`}
     >
       {/* Header */}
-      <div className="p-3 sm:p-4">
+      <div className="px-3.5 py-3 sm:px-4">
         <div className="flex items-stretch justify-between gap-3">
           <div className="flex items-center min-w-0 flex-1">
             <span className="app-unread-marker-slot" aria-hidden="true">
               {isUnread && <span className="app-unread-marker" />}
             </span>
-            <div className="app-list-row-icon flex items-center justify-center flex-shrink-0">
+            <div className="app-list-row-icon flex items-center justify-center shrink-0">
               <GitFork aria-hidden="true" />
             </div>
-            <div className="min-w-0 flex-1 ml-3">
+            <div className="min-w-0 flex-1 ml-2.5">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <h4 className="app-list-row-title truncate">
                   {fork.name}
@@ -74,7 +74,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   </span>
                 )}
               </div>
-              <p className="app-list-row-meta truncate mt-1">
+              <p className="app-list-row-meta font-mono truncate mt-0.5">
                 {fork.full_name}
               </p>
               {sourceFullName && (
@@ -85,7 +85,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                       href={fork.parent?.html_url || fork.source?.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline truncate"
+                      className="text-accent-text hover:underline font-mono truncate"
                       onClick={(e) => {
                         e.stopPropagation();
                         onMarkAsRead();
@@ -94,17 +94,17 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                       {sourceFullName}
                     </a>
                   ) : (
-                    <span className="text-primary truncate">{sourceFullName}</span>
+                    <span className="text-accent-text font-mono truncate">{sourceFullName}</span>
                   )}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-4 flex-shrink-0 self-stretch">
-            <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
+          <div className="flex items-center gap-4 shrink-0 self-stretch">
+            <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-1.5 text-label-sm text-tertiary tabular-nums">
               <div className="flex items-center gap-1.5">
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className="size-3.5 shrink-0" />
                 <span>
                   {fork.updated_at
                     ? formatDistanceToNow(new Date(fork.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) })
@@ -113,14 +113,14 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
               </div>
               {fork.source?.updated_at && (
                 <div className="flex items-center gap-1.5">
-                  <GitFork className="w-3.5 h-3.5" />
+                  <GitFork className="size-3.5 shrink-0" />
                   <span>
                     {formatDistanceToNow(new Date(fork.source.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) })}
                   </span>
                 </div>
               )}
             </div>
-            <div className="app-row-actions flex items-center flex-shrink-0">
+            <div className="app-row-actions flex items-center shrink-0">
               {/* Workflows dropdown */}
               <Button
                 variant={isWorkflowsExpanded ? 'secondary' : 'ghost'}
@@ -134,9 +134,9 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 aria-label={isWorkflowsExpanded ? t('forkCard.hide-workflows') : t('forkCard.show-workflows')}
                 aria-expanded={isWorkflowsExpanded}
               >
-                {isWorkflowsExpanded ? <FolderOpen className="w-3.5 h-3.5" /> : <Folder className="w-3.5 h-3.5" />}
-                <span className="text-xs font-medium">{isWorkflowsExpanded ? t('forkCard.hide') : t('forkCard.workflows')}</span>
-                {isWorkflowsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {isWorkflowsExpanded ? <FolderOpen className="size-3.5" /> : <Folder className="size-3.5" />}
+                <span className="text-label-sm font-medium">{isWorkflowsExpanded ? t('forkCard.hide') : t('forkCard.workflows')}</span>
+                {isWorkflowsExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
               </Button>
 
               {/* Sync Upstream button — enabled only when fork needs sync (out-of-date) */}
@@ -163,9 +163,9 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                     : t('forkTimeline.check-pending')}
               >
                 {isSyncing ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="size-3.5 animate-spin" />
                 ) : (
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className="size-3.5" />
                 )}
               </Button>
 
@@ -182,7 +182,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onMarkAsRead();
                 }}
               >
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="size-3.5" />
               </a>
             </div>
           </div>
@@ -195,48 +195,48 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
         style={{ gridTemplateRows: isWorkflowsExpanded ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden min-h-0">
-          <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-3 sm:pt-4 border-t border-border dark:border-border">
+          <div className="px-3.5 sm:px-4 pb-3.5 pt-3 border-t border-subtle">
             {isLoadingWorkflows ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
-                <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
+              <div className="flex items-center justify-center py-5">
+                <Loader2 className="size-4 animate-spin text-tertiary" />
+                <span className="ml-2 text-label text-secondary">
                   {t('forkCard.loading-workflows')}
                 </span>
               </div>
             ) : workflows.length === 0 ? (
-              <div className="py-4 text-center text-sm text-muted-foreground dark:text-muted-foreground">
+              <div className="py-4 text-center text-label text-tertiary">
                 {t('forkCard.no-workflows')}
               </div>
             ) : (
-              <div className="py-2">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Folder className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground dark:text-muted-foreground">
+              <div className="py-1.5">
+                <div className="flex items-center gap-1.5 mb-2.5">
+                  <Folder className="size-3.5 text-tertiary" />
+                  <span className="text-label-sm font-medium text-secondary">
                     {t('forkCard.workflows')}
                   </span>
-                  <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                  <span className="text-label-sm text-tertiary tabular-nums">
                     ({workflows.length})
                   </span>
                 </div>
 
-                <div className="bg-accent/50 rounded border border-border dark:border-border max-h-72 overflow-y-auto">
+                <div className="ui-inset-surface max-h-72 overflow-y-auto divide-y divide-subtle">
                   {workflows.map((workflow) => (
                     <div
                       key={workflow.id}
-                      className="flex items-center justify-between px-4 py-3 hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border/60 dark:border-border last:border-b-0"
+                      className="flex items-center justify-between px-3.5 py-2.5 hover:bg-fill-hover transition-[background-color] duration-micro ease-out-subtle hover:duration-instant"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex items-center space-x-2 min-w-0 flex-1">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          workflow.state === 'active' ? 'bg-success' :
-                          workflow.state === 'disabled' ? 'bg-muted-foreground/40' :
-                          'bg-warning'
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className={`size-2 rounded-full shrink-0 ${
+                          workflow.state === 'active' ? 'bg-status-green' :
+                          workflow.state === 'disabled' ? 'bg-fill-pressed' :
+                          'bg-status-amber'
                         }`} />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm truncate text-foreground dark:text-muted-foreground">
+                          <p className="text-label truncate text-foreground">
                             {workflow.name}
                           </p>
-                          <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 truncate">
+                          <p className="text-label-sm text-tertiary font-mono truncate">
                             {workflow.path}
                           </p>
                         </div>
@@ -249,7 +249,8 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                         }}
                         disabled={workflow.state === 'disabled' || isRunningWorkflow}
                         variant="secondary"
-                        className="ml-2 h-8 w-8 shrink-0 p-0"
+                        size="icon-sm"
+                        className="ml-2 shrink-0"
                         aria-label={workflow.state === 'disabled'
                           ? (t('forkCard.workflow-disabled'))
                           : t('app:forkCard.run-workflow-named', { name: workflow.name })
@@ -260,9 +261,9 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                         }
                       >
                         {isRunningWorkflow ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="size-3.5 animate-spin" />
                         ) : (
-                          <Play className="w-3.5 h-3.5" />
+                          <Play className="size-3.5" />
                         )}
                       </Button>
                     </div>

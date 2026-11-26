@@ -154,15 +154,14 @@ export const GistView: React.FC = () => {
             <div className="flex items-center gap-1">
               <h2 className="app-side-title">{t('gistView.sidebar-title')}</h2>
               <div className="group relative">
-                <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground dark:text-muted-foreground/70" />
-                <div className="gist-access-help-popover absolute left-0 top-full mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg opacity-0 invisible transition-[opacity,visibility] duration-150 break-words group-hover:visible group-hover:opacity-100 dark:border-border dark:bg-card dark:text-muted-foreground">
-                  <p className="mb-1 font-medium text-foreground dark:text-foreground">
+                <HelpCircle className="size-3.5 cursor-help text-tertiary" />
+                <div className="gist-access-help-popover popover-styled absolute left-0 top-full mt-2 w-72 max-w-xs whitespace-normal p-3 text-label-sm text-secondary opacity-0 invisible transition-[opacity,visibility] duration-fast break-words group-hover:visible group-hover:opacity-100">
+                  <p className="mb-1 font-medium text-foreground">
                     {t('gistView.gist-access-requires-the-gist-scope')}
                   </p>
                   <p className="leading-relaxed">
                     {t('gistView.if-your-private-gists-are-missing-or-you-cannot')}
                   </p>
-                  <div className="absolute bottom-full left-3 -mb-px h-2 w-2 rotate-45 border-l border-t border-border bg-card dark:border-border dark:bg-card"></div>
                 </div>
               </div>
             </div>
@@ -254,7 +253,7 @@ export const GistView: React.FC = () => {
         </div>
       </aside>
 
-      <section className="workspace-content app-workspace-content w-full min-w-0 flex-1 space-y-5 lg:self-start">
+      <section className="workspace-content app-workspace-content w-full min-w-0 flex-1 space-y-4 lg:self-start">
         <WorkspacePageHeader
           eyebrow={t('gistView.library-label')}
           title={t('app:header.menu-gists')}
@@ -264,11 +263,11 @@ export const GistView: React.FC = () => {
             </span>
           )}
         />
-        <div className="ui-toolbar app-page-toolbar app-gist-toolbar p-4">
-          <div className="flex flex-col gap-3">
+        <div className="ui-toolbar app-page-toolbar app-gist-toolbar">
+          <div className="flex flex-col gap-2.5">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
@@ -276,33 +275,35 @@ export const GistView: React.FC = () => {
                     if (event.key === 'Enter' && !event.nativeEvent.isComposing) basicSearch();
                   }}
                   aria-label={t('gistView.search-gists-filenames-or-summaries')}
-                  className="ui-field w-full py-2 pl-9 pr-9 text-sm text-foreground dark:text-foreground"
+                  className="w-full pl-8 pr-8"
                   placeholder={t('gistView.search-gists-filenames-summaries')}
                 />
                 {query && (
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
+                    size="icon-sm"
                     onClick={() => {
                       setQuery('');
                       setGistSearchFilters({ query: '' });
                     }}
                     aria-label={t('gistView.clear-search')}
                     title={t('gistView.clear-search')}
-                    className="absolute right-2 top-1/2 h-7 w-7 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-tertiary hover:text-foreground"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="size-3.5" />
                   </Button>
                 )}
               </div>
               <Button
                 type="button"
+                variant="secondary"
+                size="lg"
                 onClick={aiSearch}
                 disabled={isSearching || !query.trim()}
-                className="ui-button-primary inline-flex items-center gap-2 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                className="gap-1.5"
               >
-                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                {isSearching ? <Loader2 className="size-3.5 animate-spin" /> : <Bot className="size-3.5" />}
                 {t('gistView.ai-search')}
               </Button>
             </div>
@@ -314,19 +315,19 @@ export const GistView: React.FC = () => {
                   variant="outline"
                   onClick={analyzeVisibleGists}
                   disabled={isAnalyzingAll || gistSearchResults.length === 0}
-                  className="ui-button inline-flex items-center gap-2 px-3 py-2 text-sm disabled:opacity-50"
+                  className="gap-1.5"
                 >
-                  {isAnalyzingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                  {isAnalyzingAll ? <Loader2 className="size-3.5 animate-spin" /> : <Bot className="size-3.5" />}
                   {t('gistView.ai-analyze')}
                 </Button>
                 <Button
                   type="button"
-                  variant="default"
+                  variant="outline"
                   onClick={refreshGists}
                   disabled={isRefreshing}
-                  className="ui-button-primary inline-flex items-center gap-2 px-3 py-2 text-sm disabled:opacity-50"
+                  className="gap-1.5"
                 >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`size-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                   {t('gistView.sync')}
                 </Button>
               </div>
@@ -340,7 +341,7 @@ export const GistView: React.FC = () => {
                     }
                   }}
                 >
-                  <SelectTrigger aria-label={t('gistView.gist-sort-order')} className="ui-field h-9 w-40 px-3 py-1 text-sm">
+                  <SelectTrigger aria-label={t('gistView.gist-sort-order')} className="h-control w-40 px-2.5 text-label">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -355,19 +356,19 @@ export const GistView: React.FC = () => {
                   type="button"
                   variant="outline"
                   onClick={() => setGistSearchFilters({ sortOrder: gistSearchFilters.sortOrder === 'desc' ? 'asc' : 'desc' })}
-                  className="ui-button px-3 py-2 text-sm"
                 >
                   {gistSearchFilters.sortOrder === 'desc' ? t('gistView.desc') : t('gistView.asc')}
                 </Button>
                 <Button
                   type="button"
+                  variant="primary"
                   onClick={() => {
                     setEditingGist(null);
                     setIsEditorOpen(true);
                   }}
-                  className="ui-button-primary inline-flex items-center gap-2 px-3 py-2 text-sm font-medium"
+                  className="gap-1.5"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="size-3.5" />
                   {t('gistView.new')}
                 </Button>
               </div>
@@ -375,9 +376,9 @@ export const GistView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground dark:text-muted-foreground">
+        <div className="flex items-center justify-between text-label-sm text-tertiary tabular-nums">
           <span>{t('gistView.v1-gists', { v1: gistSearchResults.length })}</span>
-          {gistSearchFilters.query && <span>{t('gistView.search-applied')}</span>}
+          {gistSearchFilters.query && <span className="text-accent-text">{t('gistView.search-applied')}</span>}
         </div>
 
         {gistSearchResults.length > 0 ? (
@@ -400,10 +401,13 @@ export const GistView: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="ui-empty-state p-12 text-center">
-            {currentCategoryItems.length > 0
-              ? t('gistView.no-gists-match-the-current-filters')
-              : t('gistView.no-gists-yet-sync-to-fetch-data-or-create-a-new')}
+          <div className="ui-empty-state app-empty-state border-0">
+            <FileCode2 className="size-10 stroke-[1.5] text-tertiary" aria-hidden="true" />
+            <p className="app-empty-description">
+              {currentCategoryItems.length > 0
+                ? t('gistView.no-gists-match-the-current-filters')
+                : t('gistView.no-gists-yet-sync-to-fetch-data-or-create-a-new')}
+            </p>
           </div>
         )}
       </section>

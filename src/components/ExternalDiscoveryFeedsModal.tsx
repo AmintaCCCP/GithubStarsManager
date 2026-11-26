@@ -54,37 +54,37 @@ export function ExternalDiscoveryFeedsModal({ isOpen, onClose, channels, mode }:
     <Modal isOpen={isOpen} onClose={onClose} title={mode === 'rss' ? t('externalFeeds.manageRss') : t('externalFeeds.manage')} maxWidth="max-w-lg">
       <div className="space-y-4">
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">{mode === 'rss' ? t('externalFeeds.rssFormat') : t('externalFeeds.format')}</p>
+          <p className="text-label text-secondary">{mode === 'rss' ? t('externalFeeds.rssFormat') : t('externalFeeds.format')}</p>
           {mode === 'json' && (
-            <div className="relative rounded-md border border-border bg-muted/40 dark:bg-muted/20">
-              <pre className="overflow-x-auto p-3 pr-11 text-xs leading-relaxed text-foreground dark:text-foreground"><code dangerouslySetInnerHTML={{ __html: highlightedExample }} /></pre>
+            <div className="relative rounded-md border border-subtle bg-sunken">
+              <pre className="overflow-x-auto p-3 pr-11 font-mono text-mono-ui leading-relaxed text-foreground"><code dangerouslySetInnerHTML={{ __html: highlightedExample }} /></pre>
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                className="absolute right-1.5 top-1.5 h-7 w-7"
+                size="icon-sm"
+                className="absolute right-1.5 top-1.5 text-tertiary hover:text-foreground"
                 aria-label={t('externalFeeds.copy')}
                 title={t('externalFeeds.copy')}
                 onClick={() => { void handleCopyExample(); }}
               >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? <Check className="size-3.5 text-status-green" /> : <Copy className="size-3.5" />}
               </Button>
             </div>
           )}
-          <p className="text-xs text-muted-foreground">{t('externalFeeds.cors-note')}</p>
+          <p className="text-label-sm text-tertiary">{t('externalFeeds.cors-note')}</p>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <Input aria-label={t('externalFeeds.name')} value={name} onChange={event => { setName(event.target.value); clearError(); }} placeholder={t('externalFeeds.name')} maxLength={60} />
           <Input aria-label={t('externalFeeds.url')} value={url} onChange={event => { setUrl(event.target.value); clearError(); }} placeholder={mode === 'rss' ? 'https://example.com/feed.xml' : 'https://example.com/github-repos.json'} type="url" />
-          <Button type="button" onClick={() => { void handleAdd(); }} disabled={isChecking || !name.trim() || !url.trim()}>
+          <Button type="button" variant="primary" onClick={() => { void handleAdd(); }} disabled={isChecking || !name.trim() || !url.trim()}>
             {isChecking ? t('externalFeeds.checking') : t('externalFeeds.add')}
           </Button>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-label-sm text-destructive">{error}</p>}
         </div>
-        {feeds.length > 0 && <ul className="space-y-2 border-t border-border pt-3">
-          {feeds.map(feed => <li key={feed.id} className="flex items-center justify-between gap-2">
-            <div className="min-w-0 text-sm"><p className="truncate font-medium">{feed.name}</p><p className="truncate text-xs text-muted-foreground">{feed.sourceUrl}</p></div>
-            <Button type="button" variant="ghost" size="icon" aria-label={t('externalFeeds.remove', { name: feed.name })} onClick={() => remove(feed.id)}><Trash2 className="h-4 w-4" /></Button>
+        {feeds.length > 0 && <ul className="border-t border-subtle pt-3 divide-y divide-subtle">
+          {feeds.map(feed => <li key={feed.id} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
+            <div className="min-w-0 text-label"><p className="truncate font-medium text-foreground">{feed.name}</p><p className="truncate text-label-sm text-tertiary font-mono">{feed.sourceUrl}</p></div>
+            <Button type="button" variant="ghost" size="icon-sm" className="text-tertiary hover:bg-destructive-tint hover:text-destructive" aria-label={t('externalFeeds.remove', { name: feed.name })} onClick={() => remove(feed.id)}><Trash2 className="size-4" /></Button>
           </li>)}
         </ul>}
       </div>

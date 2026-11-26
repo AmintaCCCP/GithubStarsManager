@@ -36,12 +36,12 @@ export const TelegramMessageModal: React.FC<TelegramMessageModalProps> = ({ isOp
       footer={
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
+            <span className="rounded-xs bg-accent-tint px-1.5 py-0.5 text-caption font-medium text-accent-text">
               @{message.channel}
             </span>
             {messageDate && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                <Calendar className="w-3 h-3" />
+              <span className="flex items-center gap-1 text-label-sm text-tertiary tabular-nums">
+                <Calendar className="size-3" />
                 {messageDate}
               </span>
             )}
@@ -50,9 +50,9 @@ export const TelegramMessageModal: React.FC<TelegramMessageModalProps> = ({ isOp
             href={message.html_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-label font-medium text-secondary hover:text-foreground transition-colors"
           >
-            <ExternalLink className="w-4 h-4" />
+            <ExternalLink className="size-3.5" />
             {t('telegramMessageModal.open-in-telegram')}
           </a>
         </div>
@@ -65,7 +65,7 @@ export const TelegramMessageModal: React.FC<TelegramMessageModalProps> = ({ isOp
           baseUrl={message.html_url}
         />
       ) : (
-        <div className="py-10 text-center text-sm text-muted-foreground dark:text-muted-foreground">
+        <div className="py-10 text-center text-label text-tertiary">
           {t('telegramMessageModal.this-message-is-media-only-and-has-no-text-conte')}
         </div>
       )}

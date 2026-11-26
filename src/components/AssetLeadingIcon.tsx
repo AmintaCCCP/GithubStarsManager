@@ -12,12 +12,12 @@ import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 const AssetLeadingIcon = ({ name, contentType }: { name: string; contentType?: string }) => {
   const platform = detectAssetPlatform(name, contentType);
   if (!platform) {
-    return <Download className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground/70 flex-shrink-0" aria-hidden="true" />;
+    return <Download className="size-3.5 text-tertiary shrink-0" aria-hidden="true" />;
   }
   const Icon = getPlatformIcon(platform);
   return (
-    <span className="asset-platform-badge flex-shrink-0" title={getPlatformDisplayName(platform)}>
-      <Icon className="h-[11px] w-[11px]" aria-hidden="true" />
+    <span className="asset-platform-badge shrink-0" title={getPlatformDisplayName(platform)}>
+      <Icon className="size-2.5" aria-hidden="true" />
     </span>
   );
 };
