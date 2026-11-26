@@ -1424,6 +1424,7 @@
     "accounts-label": "アカウント一覧",
     "active-badge": "使用中",
     "add-account": "アカウントを追加",
+    "switch-account": "アカウントを切り替え",
     "remove-account": "アカウントを削除",
     "remove-account-confirm-title": "アカウントを削除",
     "remove-account-confirm-desc": "{{account}} のローカルデータとプロファイルを削除しますか？このプロファイルの保存済みリポジトリ、AI 要約、AI タグ、カスタムタグ、リポジトリチャット履歴が削除され、GitHub から復元することはできません。接続中のバックエンドにこのプロファイルが保存されている場合、サーバー側のデータも削除される可能性があります。GitHub アカウント自体には影響しません。",

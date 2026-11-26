@@ -1424,6 +1424,7 @@
     "accounts-label": "账号列表",
     "active-badge": "当前",
     "add-account": "添加账号",
+    "switch-account": "切换账号",
     "remove-account": "移除账号",
     "remove-account-confirm-title": "移除账号",
     "remove-account-confirm-desc": "确定移除账号 {{account}} 的本地配置、已保存的仓库数据、AI 摘要、AI 标签、自定义标签与聊天记录吗？这些数据无法从 GitHub 还原。若已连接后端保存了该配置，服务端数据也可能被删除。不会影响你的 GitHub 账号本身。",

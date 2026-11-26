@@ -1424,6 +1424,7 @@
     "accounts-label": "Comptes",
     "active-badge": "Actif",
     "add-account": "Ajouter un compte",
+    "switch-account": "Changer de compte",
     "remove-account": "Supprimer le compte",
     "remove-account-confirm-title": "Supprimer le compte",
     "remove-account-confirm-desc": "Supprimer les données locales et le profil de {{account}} ? Cela supprime les dépôts enregistrés, les résumés IA, les étiquettes IA, les étiquettes personnalisées et l'historique des discussions de ce profil ; ces données ne peuvent pas être restaurées depuis GitHub. Si un serveur connecté stocke ce profil, ses données serveur peuvent également être supprimées. Cela n'affectera pas votre compte GitHub.",

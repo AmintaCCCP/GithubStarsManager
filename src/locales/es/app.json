@@ -1424,6 +1424,7 @@
     "accounts-label": "Cuentas",
     "active-badge": "Activa",
     "add-account": "Añadir cuenta",
+    "switch-account": "Cambiar de cuenta",
     "remove-account": "Eliminar cuenta",
     "remove-account-confirm-title": "Eliminar cuenta",
     "remove-account-confirm-desc": "¿Eliminar los datos locales y el perfil de {{account}}? Se eliminarán los repositorios guardados, los resúmenes de IA, las etiquetas de IA, las etiquetas personalizadas y el historial de chat de repositorios de este perfil; no se pueden recuperar desde GitHub. Si un backend conectado almacena este perfil, sus datos en el servidor también podrían eliminarse. Esto no afectará a tu cuenta de GitHub.",

@@ -20,14 +20,17 @@ import {
   ChevronDown,
   Trash2,
   UserPlus,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -97,6 +100,17 @@ export const Header: React.FC = () => {
   );
 
   const t = useT('app');
+
+  const requestLogout = async () => {
+    const confirmed = await confirm(
+      t('header.logout-confirmation'),
+      t('header.logout-only-clears-credentials-repositories-ai-a'),
+      { type: 'warning' },
+    );
+    if (confirmed) {
+      logout();
+    }
+  };
 
   return (
     <header className="linear-header sticky top-0 z-(--app-z-header) hd-drag lg:hd-drag relative">
@@ -209,34 +223,41 @@ export const Header: React.FC = () => {
             {/* User Profile */}
             {user && (
               <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="flex items-center space-x-2 py-0.5 pl-0.5 pr-1.5">
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name || user.login}
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <div className="min-w-0 hidden sm:block text-left">
+                    <p className="app-header-user-name truncate">
+                      {user.name || user.login}
+                    </p>
+                  </div>
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button
                       type="button"
-                      className="flex items-center space-x-2 rounded-full py-0.5 pl-0.5 pr-1.5 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
                       aria-label={t('accountSwitcher.account-menu')}
                     >
-                      <img
-                        src={user.avatar_url}
-                        alt={user.name || user.login}
-                        className="w-8 h-8 rounded-full"
-                      />
-                      <div className="min-w-0 hidden sm:block text-left">
-                        <p className="app-header-user-name truncate">
-                          {user.name || user.login}
-                        </p>
-                      </div>
-                      {(profiles.length >= 2 || profiles.some((p) => p.id !== activeProfileId)) && (
-                        <ChevronDown className="hidden sm:block h-3.5 w-3.5 text-muted-foreground" />
-                      )}
-                    </button>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-60">
-                    {(profiles.length >= 2 || profiles.some((p) => p.id !== activeProfileId)) && (
-                      <>
-                        <DropdownMenuLabel>
-                          {t('accountSwitcher.accounts-label')}
-                        </DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => setAddAccountOpen(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      {t('accountSwitcher.add-account')}
+                    </DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger disabled={isSwitching}>
+                        <ArrowLeftRight className="mr-2 h-4 w-4" />
+                        {t('accountSwitcher.switch-account')}
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-60">
                         {profiles.map((profile) => {
                           const isCurrent = profile.id === activeProfileId;
                           const displayName = profile.login || profile.name || profile.id;
@@ -306,39 +327,17 @@ export const Header: React.FC = () => {
                             </DropdownMenuItem>
                           );
                         })}
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
-                    <DropdownMenuItem onSelect={() => setAddAccountOpen(true)}>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      {t('accountSwitcher.add-account')}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => { void requestLogout(); }}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t('header.logout')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={async () => {
-                        const confirmed = await confirm(
-                          t('header.logout-confirmation'),
-                          t('header.logout-only-clears-credentials-repositories-ai-a'),
-                          { type: 'warning' }
-                        );
-                        if (confirmed) {
-                          logout();
-                        }
-                      }}
-                      aria-label={t('header.logout')}
-                    >
-                      <LogOut className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('header.logout')}</TooltipContent>
-                </Tooltip>
               </div>
+
             )}
           </div>
         </div>

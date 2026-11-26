@@ -1424,6 +1424,7 @@
     "accounts-label": "Konten",
     "active-badge": "Aktiv",
     "add-account": "Konto hinzufügen",
+    "switch-account": "Konto wechseln",
     "remove-account": "Konto entfernen",
     "remove-account-confirm-title": "Konto entfernen",
     "remove-account-confirm-desc": "Lokale Daten und Profil für {{account}} entfernen? Dabei werden gespeicherte Repositories, KI-Zusammenfassungen, KI-Tags, eigene Tags und der Repository-Chatverlauf dieses Profils gelöscht; diese lassen sich nicht aus GitHub wiederherstellen. Wenn ein verbundenes Backend dieses Profil speichert, können auch dessen Serverdaten gelöscht werden. Ihr GitHub-Konto bleibt unverändert.",

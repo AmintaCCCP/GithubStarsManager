@@ -1424,6 +1424,7 @@
     "accounts-label": "Accounts",
     "active-badge": "Active",
     "add-account": "Add Account",
+    "switch-account": "Switch Account",
     "remove-account": "Remove account",
     "remove-account-confirm-title": "Remove Account",
     "remove-account-confirm-desc": "Remove local data and profile for {{account}}? This deletes the saved repositories, AI summaries, AI tags, custom tags and repository chat history for this profile; these cannot be restored from GitHub. If a connected backend stores this profile, its server data may also be deleted. This will not affect your GitHub account.",

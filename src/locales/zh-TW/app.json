@@ -1424,6 +1424,7 @@
     "accounts-label": "帳號清單",
     "active-badge": "目前",
     "add-account": "新增帳號",
+    "switch-account": "切換帳號",
     "remove-account": "移除帳號",
     "remove-account-confirm-title": "移除帳號",
     "remove-account-confirm-desc": "確定要移除帳號 {{account}} 的本機設定、已儲存的倉庫資料、AI 摘要、AI 標籤、自訂標籤與聊天紀錄嗎？這些資料無法從 GitHub 還原。若已連線的後端儲存了此設定檔，伺服器端資料也可能一併刪除。這不會影響你的 GitHub 帳號。",
