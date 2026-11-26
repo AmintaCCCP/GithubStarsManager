@@ -739,17 +739,16 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     {tocItems.map((item) => {
                       const displayText = translatedHeadingMap.get(item.id) || item.text;
                       return (
-                        <Button
+                        <button
                           key={item.id}
                           type="button"
-                          variant="ghost"
                           onClick={() => {
                             scrollToHeading(item.id, item.text);
                             if (window.matchMedia?.('(max-width: 767px)').matches) {
                               setShowToc(false);
                             }
                           }}
-                          className={`h-auto min-h-row-sidebar block w-full truncate rounded-sm px-2 py-1 text-left text-label-sm ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
+                          className={`motion-press block h-auto min-h-row-sidebar w-full truncate rounded-sm px-2 py-1 text-left text-label-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
                             activeHeadingId === item.id
                               ? 'bg-fill-selected font-medium text-foreground'
                               : 'hover:bg-fill-hover hover:text-foreground'
@@ -757,7 +756,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                           title={displayText}
                         >
                           {displayText}
-                        </Button>
+                        </button>
                       );
                     })}
                   </nav>

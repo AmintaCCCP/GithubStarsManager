@@ -83,9 +83,9 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, emptyText,
               {visibleRepos.map(repo => (
                 <div
                   key={normalizeRepoKey(repo.full_name)}
-                  className={`flex items-center justify-between gap-3 px-3 py-2 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant ${repo.release_hidden ? 'opacity-60' : ''}`}
+                  className={`flex min-h-[52px] items-center justify-between gap-3 px-3 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant ${repo.release_hidden ? 'opacity-60' : ''}`}
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="truncate text-label font-medium text-foreground">{repo.full_name}</div>
                     <div className="truncate text-label-sm text-tertiary font-mono">{repo.html_url}</div>
                   </div>
@@ -324,29 +324,28 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
           {t('releaseSourceSettingsModal.choose-the-sources-checked-when-refreshing-relea')}
         </div>
 
-        <div className="overflow-hidden rounded-lg bg-raised shadow-elev-1 divide-y divide-subtle">
+        <div className="overflow-hidden rounded-lg border border-subtle bg-raised shadow-elev-1 divide-y divide-subtle">
           {sourceRows.map(source => {
             const checked = enabledSources.has(source.id);
             return (
-              <Button
+              <button
                 key={source.id}
                 type="button"
-                variant="ghost"
                 onClick={() => handleToggle(source.id)}
                 aria-pressed={checked}
-                className={`app-release-source-row h-auto flex w-full gap-4 rounded-none px-3.5 py-3 text-left font-normal ${
+                className={`app-release-source-row motion-press flex h-auto min-h-[60px] w-full !items-center justify-between gap-3 rounded-none px-3.5 py-3 text-left font-normal transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset ${
                   checked
                     ? 'bg-fill-selected hover:bg-fill-selected'
                     : 'bg-transparent hover:bg-fill-hover'
                 }`}
               >
-                <span className="app-release-source-main flex items-start gap-3">
+                <span className="app-release-source-main flex min-w-0 flex-1 items-start gap-3">
                   <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-md ${checked ? 'bg-accent-solid text-on-accent' : 'bg-fill-hover text-tertiary'}`}>
                     <Bell className="size-4" />
                   </span>
-                  <span className="whitespace-normal">
+                  <span className="min-w-0 flex-1 space-y-0.5 whitespace-normal">
                     <span className="block text-label font-medium text-foreground">{source.title}</span>
-                    <span className="mt-0.5 block text-label-sm leading-snug text-secondary">{source.description}</span>
+                    <span className="block text-label-sm leading-snug text-secondary">{source.description}</span>
                   </span>
                 </span>
                 <span className="app-release-source-control flex shrink-0 items-center gap-3">
@@ -365,7 +364,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                     />
                   </span>
                 </span>
-              </Button>
+              </button>
             );
           })}
         </div>

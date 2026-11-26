@@ -30,7 +30,7 @@ export const SyncModeChoiceModal: React.FC = () => {
   const t = useT('app');
   const isOpen = !syncModeConfigured;
   const firstActionRef = useRef<HTMLButtonElement>(null);
-  const optionClassName = 'h-auto w-full justify-start gap-3 whitespace-normal rounded-lg border-0 bg-raised p-3.5 text-left text-foreground shadow-elev-1 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:text-foreground hover:duration-instant';
+  const optionClassName = '!h-auto min-h-[68px] w-full items-start justify-start gap-3 whitespace-normal rounded-lg border-0 bg-raised p-3.5 text-left text-foreground shadow-elev-1 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:text-foreground hover:duration-instant';
 
   const handleChooseSyncMode = (mode: 'stars' | 'stars-and-lists') => {
     setSyncMode(mode);
