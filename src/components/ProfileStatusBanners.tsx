@@ -25,6 +25,16 @@ export const ProfileStatusBanners: React.FC = () => {
   } = useAccountProfiles();
   const [conflictWarning, setConflictWarning] = useState<ProfileConflictEventDetail | null>(null);
   const [reloadError, setReloadError] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
+  const handleSwitch = async (profileId: string) => {
+    setSwitchError(null);
+    try {
+      await switchAccount(profileId);
+    } catch (err) {
+      setSwitchError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   useEffect(() => {
     const handleConflict = (event: Event) => {
@@ -80,7 +90,7 @@ export const ProfileStatusBanners: React.FC = () => {
                   size="sm"
                   variant="outline"
                   disabled={isSwitching}
-                  onClick={() => void switchAccount(DEFAULT_PROFILE_ID)}
+                  onClick={() => void handleSwitch(DEFAULT_PROFILE_ID)}
                 >
                   {t('accountSwitcher.return-to-default')}
                 </Button>
@@ -94,7 +104,7 @@ export const ProfileStatusBanners: React.FC = () => {
                     size="sm"
                     variant="ghost"
                     disabled={isSwitching}
-                    onClick={() => void switchAccount(profile.id)}
+                    onClick={() => void handleSwitch(profile.id)}
                   >
                     {t('accountSwitcher.switch-to-profile', { profile: label })}
                   </Button>
@@ -102,6 +112,11 @@ export const ProfileStatusBanners: React.FC = () => {
               })}
             </div>
           </div>
+          {switchError && (
+            <p className="mx-auto mt-1 max-w-7xl text-destructive" role="alert">
+              {switchError}
+            </p>
+          )}
         </div>
       )}
 

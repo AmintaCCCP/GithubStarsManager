@@ -425,6 +425,9 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
     const state = useAppStore.getState();
 
     const reposFetched = reposResult.status === 'fulfilled';
+    // WebDAV ids dropped by the profile-conflict filter. An active selection that
+    // points at one must be cleared instead of dangling on a missing config.
+    const rejectedWebdavIds = new Set<string>();
 
     // Update store then commit hash — hash only changes if setter succeeds
     if (changed.repos && reposResult.status === 'fulfilled') {
@@ -502,16 +505,23 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         }
         return bc;
       });
+      // Never persist a target another profile already uses: keep this profile's
+      // own config for the same id, otherwise drop the conflicting item entirely.
+      const acceptedConfigs: typeof mergedConfigs = [];
       for (const cfg of mergedConfigs) {
         const conflict = findConflictingWebdavProfile(cfg.url, cfg.path);
         if (conflict) {
           const conflictingProfile = conflict.login || conflict.id;
           logger.warn('sync.profileConflict', `Pulled WebDAV config "${cfg.name}" conflicts with profile ${conflictingProfile}`);
           notifyProfileConflict({ kind: 'webdav', conflictingProfile });
-          break;
+          const local = localConfigs.find(lc => lc.id === cfg.id);
+          if (local) acceptedConfigs.push(local);
+          else rejectedWebdavIds.add(cfg.id);
+          continue;
         }
+        acceptedConfigs.push(cfg);
       }
-      state.setWebDAVConfigs(mergedConfigs);
+      state.setWebDAVConfigs(acceptedConfigs);
       // Store raw backend hash for consistent change detection
       _lastHash.webdav = hashes.webdav;
     }
@@ -561,19 +571,26 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
             _hasPendingPush = true;
           }
         }
-        if (backendConfig.workerUrl) {
-          const conflict = findConflictingVectorProfile(backendConfig.workerUrl);
-          if (conflict) {
-            const conflictingProfile = conflict.login || conflict.id;
-            logger.warn('sync.profileConflict', `Pulled Vector Search Worker URL conflicts with profile ${conflictingProfile}`);
-            notifyProfileConflict({ kind: 'vector', conflictingProfile });
+        const vectorConflict = backendConfig.workerUrl
+          ? findConflictingVectorProfile(backendConfig.workerUrl)
+          : null;
+        if (vectorConflict) {
+          const conflictingProfile = vectorConflict.login || vectorConflict.id;
+          logger.warn('sync.profileConflict', `Pulled Vector Search Worker URL conflicts with profile ${conflictingProfile}`);
+          notifyProfileConflict({ kind: 'vector', conflictingProfile });
+          // Keep the local config: applying a Worker URL another profile owns would
+          // route this profile's searches and index writes into a shared index.
+          // Queue a repair push so the backend is corrected with the local value.
+          if (reposFetched) {
+            _hasPendingPush = true;
           }
+        } else {
+          state.setVectorSearchConfig(backendConfig);
+          // Fingerprint the effective store config (after merge/normalization) so it
+          // matches the push fingerprint in syncToBackend(); hashing the raw backend
+          // payload instead would leave the two sides forever unequal.
+          _lastHash.vectorSearch = vectorSearchFingerprint(useAppStore.getState().vectorSearchConfig);
         }
-        state.setVectorSearchConfig(backendConfig);
-        // Fingerprint the effective store config (after merge/normalization) so it
-        // matches the push fingerprint in syncToBackend(); hashing the raw backend
-        // payload instead would leave the two sides forever unequal.
-        _lastHash.vectorSearch = vectorSearchFingerprint(useAppStore.getState().vectorSearchConfig);
       }
     }
     // Sync active selections from settings
@@ -583,7 +600,8 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         state.setActiveAIConfig(settings.activeAIConfig as string | null);
       }
       if (typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null) {
-        state.setActiveWebDAVConfig(settings.activeWebDAVConfig as string | null);
+        const nextActive = settings.activeWebDAVConfig as string | null;
+        state.setActiveWebDAVConfig(nextActive && rejectedWebdavIds.has(nextActive) ? null : nextActive);
       }
       if (typeof settings.activeEmbeddingConfig === 'string' || settings.activeEmbeddingConfig === null) {
         state.setActiveEmbeddingConfig(settings.activeEmbeddingConfig as string | null);

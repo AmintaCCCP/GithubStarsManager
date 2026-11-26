@@ -246,7 +246,9 @@ export const Header: React.FC = () => {
                               disabled={isSwitching}
                               onSelect={() => {
                                 if (!isCurrent) {
-                                  void switchAccount(profile.id);
+                                  void switchAccount(profile.id).catch((err) => {
+                                    toast(err instanceof Error ? err.message : String(err), 'error');
+                                  });
                                 }
                               }}
                               className="flex items-center justify-between gap-2"

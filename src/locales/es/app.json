@@ -1427,6 +1427,7 @@
     "remove-account": "Eliminar cuenta",
     "remove-account-confirm-title": "Eliminar cuenta",
     "remove-account-confirm-desc": "¿Eliminar los datos locales y el perfil de {{account}}? Si un backend conectado almacena este perfil, sus datos en el servidor también podrían eliminarse. Esto no afectará a tu cuenta de GitHub.",
+    "remove-account-server-failed": "No se pudo eliminar la cuenta en el servidor. Se conservaron los datos locales; inténtalo de nuevo.",
     "add-account-title": "Añadir cuenta de GitHub",
     "add-account-description": "Introduce un token de acceso personal de GitHub para crear un perfil de cuenta aislado.",
     "github-pat-label": "Token de acceso personal de GitHub",

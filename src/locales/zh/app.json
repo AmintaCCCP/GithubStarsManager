@@ -1427,6 +1427,7 @@
     "remove-account": "移除账号",
     "remove-account-confirm-title": "移除账号",
     "remove-account-confirm-desc": "确定移除账号 {{account}} 的本地配置与缓存数据吗？若已连接后端保存了该配置，服务端数据也可能被删除。不会影响你的 GitHub 账号本身。",
+    "remove-account-server-failed": "无法在服务端删除该账号，本地数据已保留，请重试。",
     "add-account-title": "添加 GitHub 账号",
     "add-account-description": "输入 GitHub Personal Access Token 以创建一个隔离的账号配置。",
     "github-pat-label": "GitHub 个人访问令牌（PAT）",

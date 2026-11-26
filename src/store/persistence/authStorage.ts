@@ -61,6 +61,7 @@ export const writeSessionBackendSecret = (secret: string | null, profileId?: str
   try {
     const key = scopedKey(BACKEND_SECRET_SESSION_BASE_KEY, profileId);
     if (secret) {
+      // codeql[js/clear-text-storage-of-sensitive-data] Session-scoped and per-tab by design: the secret must survive a profile-switch reload, is never written to disk, and is cleared when the tab closes.
       window.sessionStorage.setItem(key, secret);
     } else {
       window.sessionStorage.removeItem(key);

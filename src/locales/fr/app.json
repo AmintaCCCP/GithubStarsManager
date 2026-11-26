@@ -1427,6 +1427,7 @@
     "remove-account": "Supprimer le compte",
     "remove-account-confirm-title": "Supprimer le compte",
     "remove-account-confirm-desc": "Supprimer les données locales et le profil de {{account}} ? Si un serveur connecté stocke ce profil, ses données serveur peuvent également être supprimées. Cela n'affectera pas votre compte GitHub.",
+    "remove-account-server-failed": "Impossible de supprimer le compte sur le serveur. Les données locales ont été conservées ; veuillez réessayer.",
     "add-account-title": "Ajouter un compte GitHub",
     "add-account-description": "Saisissez un jeton d'accès personnel GitHub pour créer un profil de compte isolé.",
     "github-pat-label": "Jeton d'accès personnel GitHub",

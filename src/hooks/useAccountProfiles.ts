@@ -21,6 +21,7 @@ import {
   writePendingSeed,
   type ProfileEntry,
 } from '../services/profileStorage';
+import { useT } from '../i18n/useT';
 import { writeSessionBackendSecret } from '../store/persistence/authStorage';
 import { flushPendingPersistSnapshot } from '../store/persistence/storage';
 import { useAppStore } from '../store/useAppStore';
@@ -57,6 +58,7 @@ const setGlobalIsSwitching = (next: boolean): void => {
 };
 
 export const useAccountProfiles = (): AccountProfilesController => {
+  const t = useT('app');
   const [profiles, setProfiles] = useState<ProfileEntry[]>(() => readProfiles());
   const [isSwitching, setIsSwitching] = useState(() => globalIsSwitching);
   const [otherTabSwitched, setOtherTabSwitched] = useState(false);
@@ -191,7 +193,22 @@ export const useAccountProfiles = (): AccountProfilesController => {
 
   const removeProfile = useCallback(async (targetProfileId: string) => {
     if (targetProfileId === ACTIVE_PROFILE_ID) return;
-    // Delete IndexedDB first; if deletion fails or is blocked by another open tab,
+    // Delete the server-side profile first. If the backend refuses (409 in use,
+    // 500, network error) keep local data and the registry entry untouched so the
+    // user can retry — otherwise the surviving server DB reappears on the next
+    // multi-device discovery and the account looks undeletable.
+    if (backend.isAvailable && backend.profilesSupported && targetProfileId !== DEFAULT_PROFILE_ID) {
+      let deleted = false;
+      try {
+        deleted = await backend.deleteServerProfile(targetProfileId);
+      } catch {
+        deleted = false;
+      }
+      if (!deleted) {
+        throw new Error(t('accountSwitcher.remove-account-server-failed'));
+      }
+    }
+    // Delete IndexedDB next; if deletion fails or is blocked by another open tab,
     // abort before modifying localStorage or removing the profile from the registry
     // so the user can see the error and retry without leaving orphaned data.
     await deleteProfileIndexedDbs(targetProfileId);
@@ -203,16 +220,9 @@ export const useAccountProfiles = (): AccountProfilesController => {
         // Best-effort desktop X auth cleanup.
       }
     }
-    if (backend.isAvailable && backend.profilesSupported && targetProfileId !== DEFAULT_PROFILE_ID) {
-      try {
-        await backend.deleteServerProfile(targetProfileId);
-      } catch {
-        // Best-effort server cleanup; local profile removal still completes.
-      }
-    }
     const next = removeProfileFromRegistry(targetProfileId);
     setProfiles(next);
-  }, []);
+  }, [t]);
 
   const reloadPage = useCallback(async () => {
     if (globalIsSwitching) return;

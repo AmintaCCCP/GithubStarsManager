@@ -1427,6 +1427,7 @@
     "remove-account": "アカウントを削除",
     "remove-account-confirm-title": "アカウントを削除",
     "remove-account-confirm-desc": "{{account}} のローカルデータとプロファイルを削除しますか？接続中のバックエンドにこのプロファイルが保存されている場合、サーバー側のデータも削除される可能性があります。GitHub アカウント自体には影響しません。",
+    "remove-account-server-failed": "サーバー上でアカウントを削除できませんでした。ローカルデータは保持されています。もう一度お試しください。",
     "add-account-title": "GitHub アカウントを追加",
     "add-account-description": "独立したアカウントプロファイルを作成するには GitHub パーソナルアクセストークンを入力してください。",
     "github-pat-label": "GitHub パーソナルアクセストークン",

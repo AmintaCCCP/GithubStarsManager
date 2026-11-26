@@ -1427,6 +1427,7 @@
     "remove-account": "Remove account",
     "remove-account-confirm-title": "Remove Account",
     "remove-account-confirm-desc": "Remove local data and profile for {{account}}? If a connected backend stores this profile, its server data may also be deleted. This will not affect your GitHub account.",
+    "remove-account-server-failed": "Could not delete the account on the server. Local data was kept; please try again.",
     "add-account-title": "Add GitHub Account",
     "add-account-description": "Enter a GitHub Personal Access Token to add an isolated account profile.",
     "github-pat-label": "GitHub Personal Access Token",

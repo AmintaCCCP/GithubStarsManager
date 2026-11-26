@@ -182,19 +182,20 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       state.setRepositories(repoData.repositories, { allowEmpty: true });
       state.setReleases(releaseData.releases, { allowEmpty: true });
       state.setAIConfigs(aiConfigData);
-      state.setWebDAVConfigs(webdavConfigData);
-      for (const cfg of webdavConfigData) {
+      // A target another profile already uses must not be written into this
+      // profile's store, or backups from both accounts would overwrite each other.
+      const acceptedWebdavConfigs = webdavConfigData.filter((cfg) => {
         const conflict = findConflictingWebdavProfile(cfg.url, cfg.path);
-        if (conflict) {
-          toast(
-            t('useBackendSettingsActions.webdav-sync-conflict-warning', {
-              account: conflict.login || conflict.id,
-            }),
-            'warning',
-          );
-          break;
-        }
-      }
+        if (!conflict) return true;
+        toast(
+          t('useBackendSettingsActions.webdav-sync-conflict-warning', {
+            account: conflict.login || conflict.id,
+          }),
+          'warning',
+        );
+        return false;
+      });
+      state.setWebDAVConfigs(acceptedWebdavConfigs);
       const serverHidden = Array.isArray(settingsData.hiddenDefaultCategoryIds) ? settingsData.hiddenDefaultCategoryIds : [];
       for (const categoryId of serverHidden) if (typeof categoryId === 'string') state.hideDefaultCategory(categoryId);
       for (const categoryId of state.hiddenDefaultCategoryIds) {
