@@ -492,6 +492,16 @@ if (error) {
   logger.errorFromError('store.hydrate', 'Store hydration failed', error, { elapsedMs });
 } else {
   logger.info('store.hydrate', 'Store hydration complete', { elapsedMs });
+  if (rehydratedState) {
+    // Config changes update the profile registry synchronously while the
+    // snapshot write is debounced. If the app exited before that write, the
+    // restored configs may differ from the registry, hiding shared targets
+    // from conflict detection — re-sync once after hydration.
+    syncActiveProfileMetadata({
+      webdavConfigs: rehydratedState.webdavConfigs,
+      vectorSearchConfig: rehydratedState.vectorSearchConfig,
+    });
+  }
 }
 if (pendingSeedAppliedOnBoot && rehydratedState) {
   pendingSeedAppliedOnBoot = false;

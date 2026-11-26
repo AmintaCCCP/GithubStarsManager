@@ -503,6 +503,24 @@ describe('backend pushes requested during another sync', () => {
     expect(vi.mocked(backend.syncRepositories).mock.calls[1][0]).toEqual(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
   });
 
+  it('keeps edits made during an active pull when auto-sync is stopped mid-pull', async () => {
+    const gate = deferred<{ repositories: Repository[]; total: number }>();
+    vi.mocked(backend.fetchRepositories).mockReturnValueOnce(gate.promise);
+    const stop = startAutoSync();
+    const pull = syncFromBackend();
+    await vi.waitFor(() => expect(backend.fetchRepositories).toHaveBeenCalled());
+
+    // Edit while the pull is still fetching, then stop auto-sync (profile switch).
+    useAppStore.getState().addRepository(createRepository(2, { ai_summary: 'local-edit' }));
+    stopAutoSync(stop);
+
+    gate.resolve({ repositories: [createRepository(1, { ai_summary: 'remote' })], total: 1 });
+    await pull;
+
+    // The active pull must still honour the pending-edit guard after the stop.
+    expect(useAppStore.getState().repositories.map((repo) => repo.full_name)).toContain('owner/repo-2');
+  });
+
   it('keeps remotely arrived repositories when local edits queue a push after the pull', async () => {
     const fetch = deferred<{ repositories: Repository[]; total: number }>();
     vi.mocked(backend.fetchRepositories).mockReturnValueOnce(fetch.promise);

@@ -20,10 +20,20 @@ const trackIdbWrite = <T>(promise: Promise<T>): Promise<T> => {
   return promise;
 };
 
-/** Wait for any in-flight IndexedDB write operations to settle. */
+/**
+ * Wait for in-flight IndexedDB writes and reject if any failed, so a
+ * switch/reload flow does not discard unsaved state silently. Re-checks after
+ * each wait because producers can enqueue a write while the barrier is pending
+ * (bounded, to avoid spinning under continuous bursts).
+ */
 export const flushPendingIdbWrites = async (): Promise<void> => {
-  if (pendingIdbWrites.size === 0) return;
-  await Promise.allSettled(Array.from(pendingIdbWrites));
+  for (let round = 0; round < 4; round++) {
+    if (pendingIdbWrites.size === 0) return;
+    const results = await Promise.allSettled(Array.from(pendingIdbWrites));
+    const failed = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (failed) throw failed.reason;
+    if (pendingIdbWrites.size === 0) return;
+  }
 };
 
 const deleteIndexedDbByName = (dbName: string, blockedTimeoutMs = 3000): Promise<void> => {

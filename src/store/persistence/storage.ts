@@ -469,7 +469,7 @@ const writeShardedSnapshot = async (
     entries.push([metaKeyFor(name), JSON.stringify(meta)]);
   } catch (e) {
     logger.errorFromError('store.persist', 'Failed to stringify state for persistence', e);
-    return;
+    throw e instanceof Error ? e : new Error(String(e));
   }
 
   const writeStartedAt = performance.now();
@@ -477,11 +477,12 @@ const writeShardedSnapshot = async (
     await setStorageEntries(name, entries);
   } catch (error) {
     // 提交失败（原子回滚）：旧快照原样保留，无数据丢失，等待下次变更重试。
+    // 向上抛出，让切换账号/重载前的 flush 知道落盘失败，不能继续 reload。
     logger.errorFromError('store.persist', 'Sharded persist write failed; previous snapshot kept', error, {
       source,
       shards: dirty,
     });
-    return;
+    throw error;
   }
   const writeMs = Math.round(performance.now() - writeStartedAt);
   if (writeMs > 50) {
@@ -528,16 +529,18 @@ const enqueueShardedWrite = (
   writeVersion: number,
   source: 'idle' | 'flush',
   shardFilter?: ReadonlyArray<PersistenceShardName>,
+  reportFailure = false,
 ): Promise<void> => {
-  // 链尾兜底 catch：writeChain 永不 reject，调用方（idle 的 void 调度、
-  // pagehide 的同步事件处理器）不会产生 unhandled rejection。
-  writeChain = writeChain
+  const write = writeChain
     .catch(() => undefined)
-    .then(() => writeShardedSnapshot(name, value, writeVersion, source, shardFilter))
-    .catch((error: unknown) => {
-      logger.errorFromError('store.persist', 'Persist write chain failed', error, { source });
-    });
-  return writeChain;
+    .then(() => writeShardedSnapshot(name, value, writeVersion, source, shardFilter));
+  // 链尾兜底 catch：writeChain 永不 reject，调用方（idle 的 void 调度、
+  // pagehide 的同步事件处理器）不会产生 unhandled rejection。需要知道落盘
+  // 是否成功的调用方（切换账号/重载前的 flush）传 reportFailure 拿如实 reject 的 Promise。
+  writeChain = write.catch((error: unknown) => {
+    logger.errorFromError('store.persist', 'Persist write chain failed', error, { source });
+  });
+  return reportFailure ? write : writeChain;
 };
 
 /**
@@ -607,22 +610,30 @@ const dispatchIdleShardedWrite = (): void => {
   }
 };
 
-const flushPendingPersistSnapshot = (): Promise<void> => {
+/**
+ * Flush the pending snapshot. With `requireSuccess` the returned Promise rejects
+ * when the write could not be committed, so switch/reload flows can abort
+ * instead of discarding unsaved state.
+ */
+const flushPendingPersistSnapshot = (requireSuccess = false): Promise<void> => {
   if (latestPersistName === null || latestPersistValue === null) return Promise.resolve();
 
   cancelPendingPersistTasks();
   const name = latestPersistName;
   const value = latestPersistValue;
   const scheduledVersion = persistWriteVersion;
-  return enqueueShardedWrite(name, value, scheduledVersion, 'flush');
+  return enqueueShardedWrite(name, value, scheduledVersion, 'flush', undefined, requireSuccess);
 };
 
 const registerPersistFlushListeners = (): void => {
   if (persistFlushListenersRegistered || typeof window === 'undefined') return;
   persistFlushListenersRegistered = true;
 
-  window.addEventListener('pagehide', flushPendingPersistSnapshot);
-  window.addEventListener('beforeunload', flushPendingPersistSnapshot);
+  const flushOnPageExit = () => {
+    void flushPendingPersistSnapshot();
+  };
+  window.addEventListener('pagehide', flushOnPageExit);
+  window.addEventListener('beforeunload', flushOnPageExit);
 
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {

@@ -33,8 +33,9 @@ let _storeUnsubscribe: (() => void) | null = null;
 // Prevent overlapping pushes to backend
 let _isPushingToBackend = false;
 let _pushPromise: Promise<boolean> | null = null;
-// In-flight single-slice Vector repair, awaited by full pushes for ordering.
-let _vectorRepairPromise: Promise<void> | null = null;
+// Serialized single-slice config repairs, awaited by full pushes for ordering.
+let _configRepairQueue: Promise<void> = Promise.resolve();
+let _configRepairsPending = 0;
 // Queue a push if one is requested while a pull is in-flight
 let _hasPendingPush = false;
 // Track unsynced local edits so backend polling does not overwrite them.
@@ -49,34 +50,41 @@ let _pollTimer: ReturnType<typeof setInterval> | null = null;
 // Polling interval in milliseconds
 const POLL_INTERVAL = 5000;
 
+type ConfigSlice = 'ai' | 'embedding' | 'vectorSearch';
+
 /**
- * Persist only the Vector Search config. A full push would also send slices whose
- * reads failed in this cycle (e.g. an empty AI list), deleting them remotely.
+ * Persist only one config slice. A full push would also send slices whose reads
+ * failed in this cycle (e.g. an empty AI list), deleting them remotely.
  *
- * Ordered against full pushes: waits for an in-flight push, and `syncToBackend`
- * waits for an in-flight repair, so an older repair can never land after a newer
- * full push. The config is read after that wait, and the fingerprint is only
- * adopted when the store still holds what was sent.
+ * Ordered against full pushes: repairs are queued, each waits for an in-flight
+ * push, and `syncToBackend` waits for the queue, so an older repair can never
+ * land after a newer full push. The config is read after that wait, and the
+ * Vector fingerprint is only adopted when the store still holds what was sent.
  */
-function repairVectorSearchConfig(): void {
+function repairConfigSlice(slice: ConfigSlice): void {
   const run = async (): Promise<void> => {
     if (_pushPromise) await _pushPromise;
-    const config = useAppStore.getState().vectorSearchConfig;
+    const state = useAppStore.getState();
     try {
-      await backend.syncVectorSearchConfig(config);
-      const fingerprint = vectorSearchFingerprint(config);
-      if (vectorSearchFingerprint(useAppStore.getState().vectorSearchConfig) === fingerprint) {
-        _lastHash.vectorSearch = fingerprint;
+      if (slice === 'ai') {
+        await backend.syncAIConfigs(state.aiConfigs);
+      } else if (slice === 'embedding') {
+        await backend.syncEmbeddingConfigs(state.embeddingConfigs);
+      } else {
+        await backend.syncVectorSearchConfig(state.vectorSearchConfig);
+        const fingerprint = vectorSearchFingerprint(state.vectorSearchConfig);
+        if (vectorSearchFingerprint(useAppStore.getState().vectorSearchConfig) === fingerprint) {
+          _lastHash.vectorSearch = fingerprint;
+        }
       }
     } catch (err) {
-      logger.warn('sync.pushToBackend', 'Vector config repair push failed', err);
+      logger.warn('sync.pushToBackend', `Config repair push failed (${slice})`, err);
+    } finally {
+      _configRepairsPending--;
     }
   };
-  const current = run();
-  _vectorRepairPromise = current;
-  void current.finally(() => {
-    if (_vectorRepairPromise === current) _vectorRepairPromise = null;
-  });
+  _configRepairsPending++;
+  _configRepairQueue = _configRepairQueue.then(run, run);
 }
 
 // Last known backend data fingerprints — skip store update if unchanged
@@ -499,8 +507,10 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         logger.info('sync.pullFromBackend', 'Preserving local AI configs on empty backend bootstrap', {
           localCount: localConfigs.length,
         });
+        // Push only this slice: a full push would also send slices whose reads
+        // failed in this cycle (e.g. an empty embedding list), deleting them remotely.
         if (reposFetched) {
-          _hasPendingPush = true;
+          repairConfigSlice('ai');
         }
       } else {
         const mergedConfigs = backendConfigs.map(bc => {
@@ -560,8 +570,10 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         logger.info('sync.pullFromBackend', 'Preserving local embedding configs on empty backend bootstrap', {
           localCount: localConfigs.length,
         });
+        // Push only this slice: a full push would also send slices whose reads
+        // failed in this cycle (e.g. an empty AI list), deleting them remotely.
         if (reposFetched) {
-          _hasPendingPush = true;
+          repairConfigSlice('embedding');
         }
       } else {
         const mergedConfigs = backendConfigs.map(bc => {
@@ -585,7 +597,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       // wipe a locally-configured vector search — keep local and push it up.
       if (shouldPreserveLocalVectorSearch(backendConfig, localConfig, _lastHash.vectorSearch === '')) {
         if (reposFetched) {
-          repairVectorSearchConfig();
+          repairConfigSlice('vectorSearch');
         }
       } else {
         let needsRepairPush = false;
@@ -618,7 +630,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         // Repair only after the merged config is in the store, so we push what the
         // profile actually accepted (e.g. backend workerUrl + preserved token).
         if (needsRepairPush && reposFetched) {
-          repairVectorSearchConfig();
+          repairConfigSlice('vectorSearch');
         }
       }
     }
@@ -713,9 +725,11 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
  */
 export async function syncToBackend(): Promise<boolean> {
   if (!backend.isAvailable) return true;
-  // Let an in-flight single-slice repair land first; a full push that overtook it
-  // could otherwise be overwritten by the older repair.
-  if (_vectorRepairPromise) await _vectorRepairPromise;
+  // Let in-flight single-slice repairs land first; a full push that overtook one
+  // could otherwise be overwritten by the older repair. The count check keeps
+  // the no-repair path synchronous decidable (a bare await would defer the push
+  // start and swallow edits made right after the call).
+  if (_configRepairsPending > 0) await _configRepairQueue;
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
     await waitForInFlightSync();
@@ -945,7 +959,12 @@ export function stopAutoSync(unsubscribe?: () => void): void {
     _isSyncingFromBackend = false;
   }
   _hasPendingPush = false;
-  _hasPendingLocalChanges = false;
+  // Keep _hasPendingLocalChanges while a pull is still running: that pull checks
+  // it after the fetch and must not overwrite edits made during the wait.
+  // Without an active pull there is nothing left to honour it.
+  if (!_syncPromise) {
+    _hasPendingLocalChanges = false;
+  }
   logger.info('sync.stop', 'Auto-sync stopped');
 }
 

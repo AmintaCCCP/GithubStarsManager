@@ -1141,7 +1141,9 @@ class BackendAdapter {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
-    return res.ok;
+    // 404 means the server profile is already gone (e.g. a retry after a local
+    // cleanup failure), so treat it as success instead of blocking removal.
+    return res.ok || res.status === 404;
   }
 }
 

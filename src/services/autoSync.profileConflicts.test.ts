@@ -126,6 +126,27 @@ describe('syncFromBackend profile conflict isolation', () => {
     expect(useAppStore.getState().activeWebDAVConfig).toBeNull();
   });
 
+  it('repairs only the AI slice on an empty backend bootstrap instead of a full push', async () => {
+    // The embedding read failed: a full push would send the local (empty)
+    // embedding list and delete the remote configs.
+    vi.mocked(backend.fetchEmbeddingConfigs).mockRejectedValue(new Error('embedding read failed'));
+    useAppStore.setState({
+      aiConfigs: [
+        { id: 'ai_local', name: 'local', baseUrl: 'https://api.example.com', apiKey: LOCAL_TOKEN, model: 'm', isActive: true },
+      ],
+    });
+
+    await syncFromBackend();
+
+    await vi.waitFor(() => {
+      expect(backend.syncAIConfigs).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'ai_local' })]),
+      );
+    });
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncEmbeddingConfigs).not.toHaveBeenCalled();
+  });
+
   it('repairs only the Vector slice when another slice failed to load', async () => {
     vi.mocked(backend.fetchAIConfigs).mockRejectedValue(new Error('ai read failed'));
     useAppStore.setState({

@@ -145,8 +145,9 @@ describe('multi-account audit regression fixes (#611)', () => {
     vi.spyOn(backend, 'fetchVectorSearchConfig').mockResolvedValue({ enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000 });
     vi.spyOn(backend, 'fetchSettings').mockResolvedValue({});
 
-    // Stub push methods triggered by _hasPendingPush drain
-    vi.spyOn(backend, 'syncRepositories').mockResolvedValue(undefined as never);
+    // Stub push methods; the bootstrap preserve branches must repair only the
+    // preserved slices, never queue a full push.
+    const syncReposSpy = vi.spyOn(backend, 'syncRepositories').mockResolvedValue(undefined as never);
     vi.spyOn(backend, 'syncReleases').mockResolvedValue(undefined as never);
     const syncAISpy = vi.spyOn(backend, 'syncAIConfigs').mockResolvedValue(undefined as never);
     vi.spyOn(backend, 'syncWebDAVConfigs').mockResolvedValue(undefined as never);
@@ -158,17 +159,16 @@ describe('multi-account audit regression fixes (#611)', () => {
 
     expect(useAppStore.getState().aiConfigs).toHaveLength(1);
     expect(useAppStore.getState().embeddingConfigs).toHaveLength(1);
-    expect(syncAISpy).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'ai-1' })]));
-    expect(syncEmbSpy).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'emb-1' })]));
-    expect(syncSettingsSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        profile_meta: {
-          login: 'work-user',
-          name: 'Work User',
-          avatarUrl: 'https://avatars.githubusercontent.com/u/9001',
-        },
-      }),
-    );
+    await vi.waitFor(() => {
+      expect(syncAISpy).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'ai-1' })]));
+    });
+    await vi.waitFor(() => {
+      expect(syncEmbSpy).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'emb-1' })]));
+    });
+    // A full push would also send repositories/settings, including slices whose
+    // reads failed in this cycle. The bootstrap preserve must not do that.
+    expect(syncReposSpy).not.toHaveBeenCalled();
+    expect(syncSettingsSpy).not.toHaveBeenCalled();
   });
 
   it('syncFromBackend applies empty AI/embedding list on subsequent syncs after initial sync', async () => {

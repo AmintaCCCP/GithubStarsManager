@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { backend } from '../services/backendAdapter';
-import { flushAutoSyncBeforeSwitch } from '../services/autoSync';
+import { flushAutoSyncBeforeSwitch, startAutoSync } from '../services/autoSync';
 import { createGitHubApiService } from '../services/githubApiFactory';
 import { clearEncryptedXAuthViaDesktop, isElectron } from '../services/electronProxy';
 import { deleteProfileIndexedDbs, flushPendingIdbWrites } from '../services/indexedDbStorage';
@@ -22,6 +22,7 @@ import {
   type ProfileEntry,
 } from '../services/profileStorage';
 import { useT } from '../i18n/useT';
+import { logger } from '../services/logger';
 import { writeSessionBackendSecret } from '../store/persistence/authStorage';
 import { flushPendingPersistSnapshot } from '../store/persistence/storage';
 import { useAppStore } from '../store/useAppStore';
@@ -41,7 +42,11 @@ export interface AccountProfilesController {
 }
 
 const flushCurrentProfileBeforeReload = async (): Promise<void> => {
-  await flushPendingPersistSnapshot();
+  // Abort the switch/reload if a write cannot be committed; reloading would
+  // discard the in-memory state that never reached disk. Two passes: a store
+  // change while the first flush is in flight queues a write behind it.
+  await flushPendingPersistSnapshot(true);
+  await flushPendingPersistSnapshot(true);
   await flushPendingIdbWrites();
   await flushAutoSyncBeforeSwitch(3000);
 };
@@ -114,6 +119,7 @@ export const useAccountProfiles = (): AccountProfilesController => {
   const switchAccount = useCallback(async (targetProfileId: string) => {
     if (targetProfileId === ACTIVE_PROFILE_ID || globalIsSwitching) return;
     setGlobalIsSwitching(true);
+    let autoSyncStopped = false;
     try {
       snapshotCurrentProfile();
       const currentBackendSecret = useAppStore.getState().backendApiSecret;
@@ -121,9 +127,13 @@ export const useAccountProfiles = (): AccountProfilesController => {
         writeSessionBackendSecret(currentBackendSecret);
       }
       await flushCurrentProfileBeforeReload();
+      autoSyncStopped = true;
       setActiveProfileId(targetProfileId);
       window.location.reload();
     } catch (error) {
+      // The flush stops auto-sync; if the switch itself failed the page stays
+      // open, so resume it or local edits stop reaching the backend.
+      if (autoSyncStopped) startAutoSync();
       setGlobalIsSwitching(false);
       throw error;
     }
@@ -157,8 +167,10 @@ export const useAccountProfiles = (): AccountProfilesController => {
     snapshotCurrentProfile();
 
     setGlobalIsSwitching(true);
+    let autoSyncStopped = false;
     try {
       await flushCurrentProfileBeforeReload();
+      autoSyncStopped = true;
 
       const copiedSettings = copySettings
         ? pickCopyableSettings(currentState as unknown as Record<string, unknown>)
@@ -186,6 +198,8 @@ export const useAccountProfiles = (): AccountProfilesController => {
       setActiveProfileId(newProfileId);
       window.location.reload();
     } catch (error) {
+      // The flush stops auto-sync; adding the account failed, so resume it.
+      if (autoSyncStopped) startAutoSync();
       setGlobalIsSwitching(false);
       throw error;
     }
@@ -208,18 +222,22 @@ export const useAccountProfiles = (): AccountProfilesController => {
         throw new Error(t('accountSwitcher.remove-account-server-failed'));
       }
     }
+    // Clear the desktop credential file before destroying local data. A failure
+    // (e.g. permissions) must abort the removal and keep the registry entry so
+    // the user can retry instead of leaving an orphaned credential behind.
+    if (isElectron()) {
+      try {
+        await clearEncryptedXAuthViaDesktop(targetProfileId);
+      } catch (error) {
+        logger.errorFromError('accountProfiles', 'Failed to clear desktop X credentials before removal', error);
+        throw new Error(t('accountSwitcher.remove-account-credentials-failed'));
+      }
+    }
     // Delete IndexedDB next; if deletion fails or is blocked by another open tab,
     // abort before modifying localStorage or removing the profile from the registry
     // so the user can see the error and retry without leaving orphaned data.
     await deleteProfileIndexedDbs(targetProfileId);
     clearProfileLocalStorage(targetProfileId);
-    if (isElectron()) {
-      try {
-        await clearEncryptedXAuthViaDesktop(targetProfileId);
-      } catch {
-        // Best-effort desktop X auth cleanup.
-      }
-    }
     const next = removeProfileFromRegistry(targetProfileId);
     setProfiles(next);
   }, [t]);
