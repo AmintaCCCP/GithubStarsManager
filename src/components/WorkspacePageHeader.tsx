@@ -10,8 +10,6 @@ interface WorkspacePageHeaderProps {
 }
 
 export const WorkspacePageHeader: React.FC<WorkspacePageHeaderProps> = ({
-  eyebrow: _eyebrow,
-  section: _section,
   title,
   description,
   meta,
