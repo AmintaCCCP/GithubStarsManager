@@ -32,6 +32,24 @@ export const THEME_PRESET_IDS = [
 
 export type ThemePresetId = (typeof THEME_PRESET_IDS)[number];
 
+/**
+ * Maps removed legacy preset IDs to their closest curated replacement so
+ * persisted user selections migrate seamlessly instead of dropping to default.
+ */
+export const LEGACY_THEME_PRESET_ALIASES: Record<string, ThemePresetId> = {
+  'enterprise-mod-2': 'github',
+  'light-green': 'vitesse',
+  claude: 'paper',
+  vercel: 'default',
+  't3-chat': 'rose-pine',
+  'deep-purple': 'haze',
+  openprofile: 'paper',
+  autoblog: 'gruvbox',
+  'zen-inspired': 'solarized',
+  'logistic-one': 'nord',
+  whatsapp: 'vitesse',
+};
+
 export interface ThemePreset {
   id: ThemePresetId;
   labelZh: string;
@@ -56,8 +74,8 @@ const DEFAULT_LIGHT_COLORS: GeneratedThemePalette = {
   'card-foreground': '210 7.1% 11%',
   popover: '210 33.3% 99.2%',
   'popover-foreground': '210 7.1% 11%',
-  primary: '257.6 55.1% 54.1%',
-  'primary-foreground': '0 0% 100%',
+  primary: '222.2 47.4% 11.2%',
+  'primary-foreground': '210 40% 98%',
   secondary: '210 10% 96.1%',
   'secondary-foreground': '210 7.1% 11%',
   muted: '210 10% 96.1%',
@@ -69,10 +87,10 @@ const DEFAULT_LIGHT_COLORS: GeneratedThemePalette = {
   border: '210 9% 89%',
   'border-strong': '210 8% 80%',
   input: '210 9% 89%',
-  ring: '257.6 55.1% 54.1%',
-  selection: '257.6 46% 65%',
+  ring: '222.2 84% 4.9%',
+  selection: '222.2 42% 64%',
   'selection-foreground': '210 7.1% 11%',
-  'search-highlight': '257.6 32% 79%',
+  'search-highlight': '222.2 28.4% 72.8%',
 };
 
 const DEFAULT_DARK_COLORS: GeneratedThemePalette = {
@@ -82,8 +100,8 @@ const DEFAULT_DARK_COLORS: GeneratedThemePalette = {
   'card-foreground': '220 9.1% 93.1%',
   popover: '220 4.5% 12.6%',
   'popover-foreground': '220 9.1% 93.1%',
-  primary: '255.4 47.1% 56.3%',
-  'primary-foreground': '0 0% 100%',
+  primary: '210 40% 98%',
+  'primary-foreground': '222.2 47.4% 11.2%',
   secondary: '220 5.5% 10.8%',
   'secondary-foreground': '220 9.1% 93.1%',
   muted: '220 8.1% 7.3%',
@@ -95,10 +113,10 @@ const DEFAULT_DARK_COLORS: GeneratedThemePalette = {
   border: '220 5.3% 15.7%',
   'border-strong': '220 5% 24.5%',
   input: '220 5.3% 15.7%',
-  ring: '254 62% 72%',
-  selection: '255.4 36% 36%',
+  ring: '212.7 26.8% 83.9%',
+  selection: '210 40% 40%',
   'selection-foreground': '220 9.1% 93.1%',
-  'search-highlight': '255.4 26% 27%',
+  'search-highlight': '210 24% 29.6%',
 };
 
 const DEFAULT_PRESET: ThemePreset = {
@@ -192,4 +210,19 @@ export function getThemePreset(id: ThemePresetId): ThemePreset {
 /** Runtime guard based on the live registry (covers forward-added presets). */
 export function isThemePresetId(value: unknown): value is ThemePresetId {
   return typeof value === 'string' && THEME_PRESETS.some((p) => p.id === value);
+}
+
+/**
+ * Resolve a persisted theme preset identifier (including legacy removed IDs)
+ * to a valid current ThemePresetId, falling back when unknown.
+ */
+export function resolveThemePresetId(
+  value: unknown,
+  fallback: ThemePresetId = DEFAULT_THEME_PRESET_ID,
+): ThemePresetId {
+  if (isThemePresetId(value)) return value;
+  if (typeof value === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_THEME_PRESET_ALIASES, value)) {
+    return LEGACY_THEME_PRESET_ALIASES[value];
+  }
+  return fallback;
 }

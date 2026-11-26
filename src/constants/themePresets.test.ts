@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_THEME_PRESET_ID,
+  LEGACY_THEME_PRESET_ALIASES,
   THEME_PRESETS,
   getThemePreset,
   isThemePresetId,
+  resolveThemePresetId,
 } from './themePresets';
 import { GENERATED_THEME_PRESETS } from './themePresets.generated';
 import { buildThemePresetCss } from '../lib/themePresets';
@@ -97,6 +99,47 @@ describe('themePresets registry', () => {
     expect(isThemePresetId(DEFAULT_THEME_PRESET_ID)).toBe(true);
     expect(isThemePresetId('does-not-exist')).toBe(false);
     expect(isThemePresetId(42)).toBe(false);
+  });
+
+  it('migrates all 11 legacy removed preset IDs to valid curated presets', () => {
+    const legacyIds = [
+      'enterprise-mod-2',
+      'light-green',
+      'claude',
+      'vercel',
+      't3-chat',
+      'deep-purple',
+      'openprofile',
+      'autoblog',
+      'zen-inspired',
+      'logistic-one',
+      'whatsapp',
+    ];
+    expect(Object.keys(LEGACY_THEME_PRESET_ALIASES).sort()).toEqual([...legacyIds].sort());
+    for (const legacyId of legacyIds) {
+      const resolved = resolveThemePresetId(legacyId);
+      expect(isThemePresetId(resolved), `${legacyId} -> ${resolved}`).toBe(true);
+    }
+    expect(resolveThemePresetId('tokyo-night')).toBe('tokyo-night');
+    expect(resolveThemePresetId('unknown-id')).toBe(DEFAULT_THEME_PRESET_ID);
+    expect(resolveThemePresetId(undefined, 'nord')).toBe('nord');
+  });
+
+  it('enforces >= 4.55:1 contrast for muted-foreground on background, card, popover, and muted', () => {
+    const surfaces = ['background', 'card', 'popover', 'muted'] as const;
+    for (const preset of THEME_PRESETS) {
+      for (const [mode, palette] of [
+        ['light', preset.lightColors],
+        ['dark', preset.darkColors],
+      ] as const) {
+        for (const surface of surfaces) {
+          expect(
+            contrast(palette['muted-foreground'], palette[surface]),
+            `${preset.id}/${mode}: muted-foreground vs ${surface}`,
+          ).toBeGreaterThanOrEqual(4.55);
+        }
+      }
+    }
   });
 
   it('derives selection fills visible on every text surface with readable text on top', () => {

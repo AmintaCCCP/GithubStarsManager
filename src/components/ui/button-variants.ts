@@ -6,10 +6,14 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'state-overlay bg-primary text-primary-foreground',
-        primary: 'state-overlay bg-accent-solid text-on-accent',
-        destructive: 'state-overlay bg-destructive text-destructive-foreground focus-visible:ring-destructive/40',
-        'danger-solid': 'state-overlay bg-destructive-solid text-on-destructive focus-visible:ring-destructive/40',
+        default:
+          'state-overlay bg-primary text-primary-foreground disabled:opacity-100 disabled:bg-fill-selected disabled:text-tertiary disabled:shadow-elev-0',
+        primary:
+          'state-overlay bg-accent-solid text-on-accent disabled:opacity-100 disabled:bg-fill-selected disabled:text-tertiary disabled:shadow-elev-0',
+        destructive:
+          'state-overlay bg-destructive text-destructive-foreground focus-visible:ring-destructive/40 disabled:opacity-100 disabled:bg-fill-selected disabled:text-tertiary disabled:shadow-elev-0',
+        'danger-solid':
+          'state-overlay bg-destructive-solid text-on-destructive focus-visible:ring-destructive/40 disabled:opacity-100 disabled:bg-fill-selected disabled:text-tertiary disabled:shadow-elev-0',
         danger: 'text-destructive hover:bg-destructive-tint active:bg-destructive-tint focus-visible:ring-destructive/40',
         outline: 'bg-raised text-foreground shadow-elev-1 hover:bg-fill-hover active:bg-fill-pressed',
         secondary: 'bg-secondary text-secondary-foreground shadow-elev-0 hover:bg-fill-hover active:bg-fill-pressed',

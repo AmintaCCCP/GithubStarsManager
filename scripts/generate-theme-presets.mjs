@@ -389,8 +389,8 @@ function buildModePalette(spec, isLight) {
 
   t['muted-foreground'] = ensureTextOnSurfaces(
     t['muted-foreground'],
-    [t.background, t.card, t.muted],
-    4.55,
+    [t.background, t.card, t.popover, t.muted],
+    4.6,
   );
   t.ring = ensureTextOnSurfaces(
     t.ring,

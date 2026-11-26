@@ -7,6 +7,7 @@ import {
   getThemeSwatch,
 } from './themePresets';
 import { DEFAULT_THEME_PRESET_ID, THEME_PRESETS } from '../constants/themePresets';
+import { cn } from './utils';
 
 describe('themePresets injector', () => {
   beforeEach(() => {
@@ -67,5 +68,15 @@ describe('themePresets injector', () => {
     expect(light.background).toMatch(/^hsl\(/);
     expect(dark.background).toMatch(/^hsl\(/);
     expect(light.background).not.toBe(dark.background);
+  });
+
+  it('preserves custom typography classes alongside text color classes in cn()', () => {
+    expect(cn('text-label-sm', 'text-secondary')).toBe('text-label-sm text-secondary');
+    expect(cn('text-label bg-accent-solid text-on-accent', 'h-control-sm text-label-sm')).toBe(
+      'bg-accent-solid text-on-accent h-control-sm text-label-sm',
+    );
+    expect(cn('h-control px-2.5', 'h-auto min-h-row-sidebar')).toBe('px-2.5 h-auto min-h-row-sidebar');
+    expect(cn('size-control', 'size-9')).toBe('size-9');
+    expect(cn('h-control', 'h-9')).toBe('h-9');
   });
 });

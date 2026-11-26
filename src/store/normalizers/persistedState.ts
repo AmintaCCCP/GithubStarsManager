@@ -7,7 +7,7 @@ import type {
   TrendingTimeRange,
 } from '../../types';
 import { defaultHeaderMenuConfig, defaultSubscriptionChannels } from '../../types';
-import { DEFAULT_THEME_PRESET_ID, isThemePresetId } from '../../constants/themePresets';
+import { resolveThemePresetId } from '../../constants/themePresets';
 import { isAppLanguage } from '../../i18n/languages';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
 import { normalizeAssetFilters } from '../../utils/assetFilters';
@@ -62,13 +62,9 @@ export const normalizePersistedState = (
     safePersisted.themeMode === 'light' || safePersisted.themeMode === 'dark' || safePersisted.themeMode === 'system'
       ? safePersisted.themeMode
       : (resolvedLegacyTheme ?? 'dark');
-  const legacyPreset = isThemePresetId(legacyThemePreset) ? legacyThemePreset : DEFAULT_THEME_PRESET_ID;
-  const themePresetLight = isThemePresetId(safePersisted.themePresetLight)
-    ? safePersisted.themePresetLight
-    : legacyPreset;
-  const themePresetDark = isThemePresetId(safePersisted.themePresetDark)
-    ? safePersisted.themePresetDark
-    : legacyPreset;
+  const legacyPreset = resolveThemePresetId(legacyThemePreset);
+  const themePresetLight = resolveThemePresetId(safePersisted.themePresetLight, legacyPreset);
+  const themePresetDark = resolveThemePresetId(safePersisted.themePresetDark, legacyPreset);
   const persistedDiscoveryChannels = (safePersisted as Record<string, unknown>).discoveryChannels;
   const normalizedDiscoveryChannels = [...defaultDiscoveryChannels.map((defaultChannel) => {
     const persistedChannel = Array.isArray(persistedDiscoveryChannels)
