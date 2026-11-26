@@ -209,9 +209,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 variant="ghost"
                 onClick={() => onFilterToggle(filter.id)}
                 className={`app-side-item w-full min-w-0 justify-between rounded-sm px-2 ${
-                  filter.isPreset
-                    ? 'group-hover/filter-row:pr-9 group-focus-within/filter-row:pr-9'
-                    : 'group-hover/filter-row:pr-14 group-focus-within/filter-row:pr-14'
+                  filter.isPreset ? 'app-side-filter-row-preset' : 'app-side-filter-row-custom'
                 }`}
                 title={filter.keywords.join(', ')}
                 type="button"

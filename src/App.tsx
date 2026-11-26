@@ -159,6 +159,9 @@ const RepositoriesView = React.memo(({
   }, []);
 
   const commitSidebarWidth = useCallback((nextWidth: number) => {
+    // End any in-flight drag first so its deferred persist (stopResizing) cannot
+    // overwrite the value we are about to commit.
+    resizeCleanupRef.current?.();
     const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(nextWidth)));
     setSidebarWidth(clamped);
     persistSidebarWidth(clamped);

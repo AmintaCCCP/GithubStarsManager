@@ -1767,6 +1767,13 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
   padding-inline-end: 2.75rem;
 }
 
+/* Custom filter rows carry two action buttons (edit + delete); reserve enough
+   trailing space so long names never run underneath the action cluster. */
+.app-side-filter-row:hover > .app-side-item.app-side-filter-row-custom:not(:disabled),
+.app-side-filter-row:focus-within > .app-side-item.app-side-filter-row-custom:not(:disabled) {
+  padding-inline-end: 3.75rem;
+}
+
 .app-side-filter-row > .app-side-item.app-side-multiline-label {
   height: auto;
   min-height: var(--row-sidebar);
