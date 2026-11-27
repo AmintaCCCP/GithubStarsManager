@@ -3,7 +3,14 @@ import { TranslateFn } from '../../i18n/useT';
 import type { AppLanguage } from '../../i18n/languages';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Card, CardContent } from '../ui/card';
+import { Badge } from '../ui/badge';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsSection,
+} from './SettingsPrimitives';
 import { weeklyIssuesStorage } from '../../services/weeklyIssuesStorage';
 import { xTweetStorage } from '../../services/xTweetStorage';
 import { telegramStorage } from '../../services/telegramStorage';
@@ -34,7 +41,6 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   Trash2,
   AlertTriangle,
-  Database,
   Tag,
   Bot,
   Cloud,
@@ -49,8 +55,6 @@ import {
   Filter,
   Search,
   Eye,
-  HardDrive,
-  RefreshCw,
   Rss,
 } from 'lucide-react';
 import { Github } from '../ui/brand-icons';
@@ -64,7 +68,7 @@ import {
 } from '../../services/profileStorage';
 import { normalizePluginCustomIcons } from '../../store/normalizers/persistedState';
 import { useShallow } from 'zustand/react/shallow';
-import { isThemePresetId } from '../../constants/themePresets';
+import { resolveKnownThemePresetId } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import type { 
@@ -851,12 +855,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           if (importedMode) {
             useAppStore.getState().setThemeMode(importedMode);
           }
-          const importedPresetLight = isThemePresetId(importedData.themePresetLight)
-            ? importedData.themePresetLight
-            : (isThemePresetId(importedData.themePreset) ? importedData.themePreset : null);
-          const importedPresetDark = isThemePresetId(importedData.themePresetDark)
-            ? importedData.themePresetDark
-            : (isThemePresetId(importedData.themePreset) ? importedData.themePreset : null);
+          const importedPresetLight = resolveKnownThemePresetId(importedData.themePresetLight)
+            ?? resolveKnownThemePresetId(importedData.themePreset);
+          const importedPresetDark = resolveKnownThemePresetId(importedData.themePresetDark)
+            ?? resolveKnownThemePresetId(importedData.themePreset);
           if (importedPresetLight) {
             useAppStore.getState().setThemePresetLight(importedPresetLight);
           }
@@ -1079,12 +1081,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           const importedMode = importedUiSettings.themeMode === 'light' || importedUiSettings.themeMode === 'dark' || importedUiSettings.themeMode === 'system'
             ? importedUiSettings.themeMode
             : (importedUiSettings.theme === 'light' || importedUiSettings.theme === 'dark' ? importedUiSettings.theme : null);
-          const importedPresetLight = isThemePresetId(importedUiSettings.themePresetLight)
-            ? importedUiSettings.themePresetLight
-            : (isThemePresetId(importedUiSettings.themePreset) ? importedUiSettings.themePreset : null);
-          const importedPresetDark = isThemePresetId(importedUiSettings.themePresetDark)
-            ? importedUiSettings.themePresetDark
-            : (isThemePresetId(importedUiSettings.themePreset) ? importedUiSettings.themePreset : null);
+          const importedPresetLight = resolveKnownThemePresetId(importedUiSettings.themePresetLight)
+            ?? resolveKnownThemePresetId(importedUiSettings.themePreset);
+          const importedPresetDark = resolveKnownThemePresetId(importedUiSettings.themePresetDark)
+            ?? resolveKnownThemePresetId(importedUiSettings.themePreset);
           useAppStore.setState({
             ...(importedMode
               ? { themeMode: importedMode }
@@ -1647,80 +1647,57 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Success Message */}
+    <SettingsPageStack>
       {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg animate-in slide-in-from-top-2">
-          <CheckCircle className="w-5 h-5" />
+        <div className="fixed right-4 top-4 z-dropdown flex items-center gap-2 rounded-lg bg-floating px-3.5 py-2.5 text-label text-foreground shadow-elev-2 animate-in slide-in-from-top-2">
+          <CheckCircle className="size-4 text-status-green" />
           <span>{showSuccessMessage}</span>
         </div>
       )}
 
-      {/* Error Message */}
       {showErrorMessage && (
-        <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 bg-destructive/10 dark:bg-destructive/20 text-destructive dark:text-destructive rounded-lg shadow-lg animate-in slide-in-from-top-2">
-          <XCircle className="w-5 h-5" />
+        <div className="fixed right-4 top-4 z-dropdown flex items-center gap-2 rounded-lg bg-floating px-3.5 py-2.5 text-label text-destructive shadow-elev-2 animate-in slide-in-from-top-2">
+          <XCircle className="size-4 text-destructive" />
           <span>{showErrorMessage}</span>
         </div>
       )}
 
-      {/* Data Statistics */}
-      <section>
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
-          <Database className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
-          {t('dataManagementPanel.data-overview')}
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <SettingsSection title={t('dataManagementPanel.data-overview')}>
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {dataStats.map((stat) => (
-            <div
-              key={stat.key}
-              className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
-                    {stat.icon}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">{stat.label}</p>
-                    <p className="text-2xl font-bold text-foreground dark:text-foreground">
-                      {stat.count}
-                    </p>
-                  </div>
-                </div>
+            <SettingsCard key={stat.key} className="flex items-center gap-3 px-3.5 py-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sunken text-tertiary [&_svg]:size-4">
+                {stat.icon}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-label-sm text-secondary">{stat.label}</p>
+                <p className="text-title font-semibold text-foreground tabular-nums">
+                  {stat.count}
+                </p>
               </div>
-            </div>
+            </SettingsCard>
           ))}
         </div>
-      </section>
+      </SettingsSection>
 
-      {/* Data Export/Import */}
-      <section>
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
-          <HardDrive className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
-          {t('dataManagementPanel.data-export-import')}
-        </h3>
+      <SettingsSection title={t('dataManagementPanel.data-export-import')}>
+        <IncludeKeysToggle t={t} />
 
-        <div className="mb-4">
-          <IncludeKeysToggle t={t} />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Export */}
-          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
-                <Download className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-medium text-foreground dark:text-foreground">{t('dataManagementPanel.export-data-2')}</h4>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('dataManagementPanel.export-data-to-json-file')}</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <SettingsCard className="flex flex-col p-3.5">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sunken text-tertiary">
+                <Download className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <h4 className="text-label font-medium text-foreground">{t('dataManagementPanel.export-data-2')}</h4>
+                <p className="text-label-sm text-secondary">{t('dataManagementPanel.export-data-to-json-file')}</p>
               </div>
             </div>
 
-            <div className="space-y-2 mb-4">
+            <div className="mb-4 flex-1 space-y-1.5">
               {exportItems.map((item) => (
-                <div key={item.key} className="flex items-center space-x-2 text-sm text-foreground dark:text-muted-foreground">
+                <div key={item.key} className="flex items-center gap-2 text-label text-foreground">
                   <Checkbox
                     id={`export-type-${item.key}`}
                     checked={selectedExportTypes.includes(item.key)}
@@ -1732,11 +1709,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       ));
                     }}
                   />
-                  <label htmlFor={`export-type-${item.key}`}>{item.label}</label>
+                  <label htmlFor={`export-type-${item.key}`} className="cursor-pointer select-none">
+                    {item.label}
+                  </label>
                 </div>
               ))}
             </div>
             <Button
+              type="button"
+              variant="primary"
+              size="md"
               onClick={() => {
                 if (selectedExportTypes.length === 0) {
                   showError(t('dataManagementPanel.please-select-at-least-one-data-type'));
@@ -1745,212 +1727,203 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 exportData(selectedExportTypes);
               }}
               disabled={isExporting}
-              className="w-full gap-2"
+              className="w-full"
             >
               {isExporting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   <span>{t('dataManagementPanel.exporting')}</span>
                 </>
               ) : (
                 <>
-                  <Download className="w-4 h-4" />
+                  <Download className="size-4" />
                   <span>{t('dataManagementPanel.export-selected')}</span>
                 </>
               )}
             </Button>
-          </div>
+          </SettingsCard>
 
-          {/* Import */}
-          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
-                <Upload className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-medium text-foreground dark:text-foreground">{t('dataManagementPanel.import-data-2')}</h4>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('dataManagementPanel.import-data-from-json-file')}</p>
+          <SettingsCard className="flex flex-col p-3.5">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sunken text-tertiary">
+                <Upload className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <h4 className="text-label font-medium text-foreground">{t('dataManagementPanel.import-data-2')}</h4>
+                <p className="text-label-sm text-secondary">{t('dataManagementPanel.import-data-from-json-file')}</p>
               </div>
             </div>
-            <div className="border-2 border-dashed border-border dark:border-border rounded-lg p-6 text-center">
-              <Upload className="w-8 h-8 text-muted-foreground dark:text-muted-foreground/70 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-2">
+            <div className="flex flex-1 flex-col items-center justify-center rounded-md border border-dashed border-default bg-sunken/50 p-6 text-center">
+              <Upload className="mx-auto mb-2 size-7 text-tertiary stroke-[1.5]" />
+              <p className="mb-3 text-label-sm text-secondary">
                 {t('dataManagementPanel.click-to-select-or-drag-file-here')}
               </p>
               <Input type="file" accept=".json" onChange={handleImportFile} className="peer sr-only" id="import-file-input" />
               <label
                 htmlFor="import-file-input"
-                className="cursor-pointer px-4 py-2 bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-muted-foreground rounded-lg transition-colors inline-block peer-focus-visible:ring-2 peer-focus-visible:ring-(--ui-focus-ring) peer-focus-visible:ring-offset-2"
+                className="motion-press inline-flex h-control cursor-pointer items-center justify-center rounded-md bg-raised px-3 text-label font-medium text-foreground shadow-elev-1 hover:bg-fill-hover peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50"
               >
                 {t('dataManagementPanel.select-file')}
               </label>
             </div>
-          </div>
+          </SettingsCard>
         </div>
-      </section>
+      </SettingsSection>
 
-      {/* Data Cleanup Suggestions */}
       {cleanupSuggestions.length > 0 && (
-        <section>
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
-            <RefreshCw className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground " />
-            {t('dataManagementPanel.data-cleanup-suggestions')}
-          </h3>
-          <div className="bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg p-4 mb-4">
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-              {t('dataManagementPanel.the-following-data-can-be-safely-cleaned-to-free')}
-            </p>
-          </div>
-          <div className="space-y-3">
-            {cleanupSuggestions.map((suggestion) => (
-              <div
-                key={suggestion.key}
-                className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 flex items-center justify-between hover:bg-background dark:hover:bg-accent transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${suggestion.bgColor} ${suggestion.color}`}>
-                    {suggestion.icon}
+        <SettingsSection
+          title={t('dataManagementPanel.data-cleanup-suggestions')}
+          description={t('dataManagementPanel.the-following-data-can-be-safely-cleaned-to-free')}
+        >
+          <SettingsCard>
+            {cleanupSuggestions.map((suggestion, index) => (
+              <React.Fragment key={suggestion.key}>
+                {index > 0 && <SettingsDivider />}
+                <div className="flex min-h-14 items-center justify-between gap-4 px-3.5 py-2.5">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span className="flex size-4 shrink-0 items-center justify-center text-tertiary [&_svg]:size-4">
+                      {suggestion.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-label font-medium text-foreground">
+                        {language === 'zh' ? suggestion.label : suggestion.labelEn}
+                      </p>
+                      <p className="mt-px text-label-sm text-secondary">
+                        {language === 'zh' ? suggestion.description : suggestion.descriptionEn}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground dark:text-foreground">
-                      {language === 'zh' ? suggestion.label : suggestion.labelEn}
-                    </p>
-                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                      {language === 'zh' ? suggestion.description : suggestion.descriptionEn}
-                    </p>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-label-sm text-tertiary tabular-nums">
+                      {suggestion.count} {t('dataManagementPanel.items')}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCleanup(suggestion.key)}
+                    >
+                      {t('dataManagementPanel.clean')}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
-                    {suggestion.count} {t('dataManagementPanel.items')}
-                  </span>
-                  <Button
-                    onClick={() => handleCleanup(suggestion.key)}
-                    className="px-3 py-1.5 text-sm font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors"
-                  >
-                    {t('dataManagementPanel.clean')}
-                  </Button>
-                </div>
-              </div>
+              </React.Fragment>
             ))}
-          </div>
-        </section>
+          </SettingsCard>
+        </SettingsSection>
       )}
 
-      {/* Selective Data Deletion */}
-      <section>
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
-          <Trash2 className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground " />
-          {t('dataManagementPanel.selective-data-deletion')}
-        </h3>
-        <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
-          <div className="divide-y divide-border/60 dark:divide-border">
-            {dataStats.map((stat) => (
-              <div
-                key={stat.key}
-                className="flex items-center justify-between px-4 py-4 hover:bg-background dark:hover:bg-accent transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
+      <SettingsSection title={t('dataManagementPanel.selective-data-deletion')}>
+        <SettingsCard>
+          {dataStats.map((stat, index) => (
+            <React.Fragment key={stat.key}>
+              {index > 0 && <SettingsDivider />}
+              <div className="flex min-h-14 items-center justify-between gap-4 px-3.5 py-2.5 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-tertiary [&_svg]:size-4">
                     {stat.icon}
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground dark:text-foreground">{stat.label}</p>
-                    <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-0.5">
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-label font-medium text-foreground">{stat.label}</p>
+                      <span className="text-label-sm text-tertiary tabular-nums">
+                        {stat.count} {t('dataManagementPanel.records')}
+                      </span>
+                    </div>
+                    <p className="mt-px text-label-sm leading-[18px] text-secondary">
                       {stat.description}
-                    </p>
-                    <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 mt-1">
-                      {stat.count} {t('dataManagementPanel.records')}
                     </p>
                   </div>
                 </div>
                 <Button
-                  variant="ghost"
+                  type="button"
+                  variant="danger"
+                  size="sm"
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
                   disabled={stat.key !== 'discoveryData' && stat.count === 0}
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="size-3.5" />
                   <span>{t('dataManagementPanel.delete')}</span>
                 </Button>
               </div>
-            ))}
+            </React.Fragment>
+          ))}
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection
+        title={(
+          <span className="inline-flex items-center gap-1.5 text-destructive">
+            <AlertTriangle className="size-3.5" />
+            <span>{t('dataManagementPanel.danger-zone')}</span>
+          </span>
+        )}
+      >
+        <SettingsCard className="ring-1 ring-destructive/25">
+          <div className="flex flex-col gap-3 px-3.5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-destructive-tint text-destructive">
+                <FileWarning className="size-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <h4 className="text-label font-medium text-foreground">
+                  {t('dataManagementPanel.delete-all-data-2')}
+                </h4>
+                <p className="mt-px text-label-sm leading-[18px] text-secondary">
+                  {t('dataManagementPanel.this-will-permanently-delete-all-application-dat')}
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="danger-solid"
+              size="sm"
+              onClick={() => openConfirmation('all')}
+              className="shrink-0 self-start sm:self-center"
+            >
+              <Trash2 className="size-3.5" />
+              <span>{t('dataManagementPanel.delete-all-data-2')}</span>
+            </Button>
           </div>
-        </div>
-      </section>
+        </SettingsCard>
+      </SettingsSection>
 
-      {/* Delete All Data */}
-      <section>
-        <h3 className="text-lg font-semibold text-destructive mb-4 flex items-center">
-          <AlertTriangle className="w-5 h-5 mr-2" />
-          {t('dataManagementPanel.danger-zone')}
-        </h3>
-        <Card className="border-destructive/40 py-5">
-          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
-              <FileWarning className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="text-base font-semibold text-foreground dark:text-foreground">
-                {t('dataManagementPanel.delete-all-data-2')}
-              </h4>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
-                {t('dataManagementPanel.this-will-permanently-delete-all-application-dat')}
-              </p>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => openConfirmation('all')}
-                className="mt-4"
-              >
-                <Trash2 />
-                <span>{t('dataManagementPanel.delete-all-data-2')}</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Operation Logs */}
       {operationLogs.length > 0 && (
-        <section>
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4">
-            {t('dataManagementPanel.operation-logs')}
-          </h3>
-          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
+        <SettingsSection title={t('dataManagementPanel.operation-logs')}>
+          <SettingsCard>
             <div className="max-h-64 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-background dark:bg-muted/40 sticky top-0">
+              <table className="w-full text-label-sm">
+                <thead className="sticky top-0 border-b border-subtle bg-sunken">
                   <tr>
-                    <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
+                    <th className="px-3.5 py-2 text-left font-medium text-tertiary">
                       {t('dataManagementPanel.time')}
                     </th>
-                    <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
+                    <th className="px-3.5 py-2 text-left font-medium text-tertiary">
                       {t('dataManagementPanel.operation')}
                     </th>
-                    <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
+                    <th className="px-3.5 py-2 text-left font-medium text-tertiary">
                       {t('dataManagementPanel.status')}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60 dark:divide-border">
+                <tbody className="divide-y divide-subtle">
                   {operationLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-background dark:hover:bg-accent">
-                      <td className="px-4 py-2 text-muted-foreground dark:text-muted-foreground">
+                    <tr key={log.id} className="hover:bg-fill-hover">
+                      <td className="px-3.5 py-2 text-tertiary tabular-nums">
                         {log.timestamp}
                       </td>
-                      <td className="px-4 py-2 text-foreground dark:text-foreground">{log.operation}</td>
-                      <td className="px-4 py-2">
+                      <td className="px-3.5 py-2 text-foreground">{log.operation}</td>
+                      <td className="px-3.5 py-2">
                         {log.success ? (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 rounded-full">
-                            <CheckCircle className="w-3 h-3 mr-1" />
+                          <Badge variant="success">
+                            <CheckCircle className="mr-1 size-3" />
                             {t('dataManagementPanel.success')}
-                          </span>
+                          </Badge>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-muted-foreground dark:text-muted-foreground bg-destructive/10 dark:bg-destructive/20 rounded-full">
-                            <XCircle className="w-3 h-3 mr-1" />
+                          <Badge variant="destructive">
+                            <XCircle className="mr-1 size-3" />
                             {t('dataManagementPanel.failed')}
-                          </span>
+                          </Badge>
                         )}
                       </td>
                     </tr>
@@ -1958,11 +1931,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </tbody>
               </table>
             </div>
-          </div>
-        </section>
+          </SettingsCard>
+        </SettingsSection>
       )}
 
-      {/* Confirmation Modal */}
       <AlertDialog
         open={confirmation.isOpen}
         onOpenChange={(open) => {
@@ -1971,28 +1943,27 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       >
         {confirmation.type && (
           <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="size-4 shrink-0" />
+                <span>{getDeleteTitle(confirmation.type)}</span>
+              </AlertDialogTitle>
+            </AlertDialogHeader>
 
-          <AlertDialogHeader className="rounded-lg bg-muted p-4 dark:bg-muted/40">
-            <AlertDialogTitle className="flex items-center gap-3 text-muted-foreground">
-              <AlertTriangle className="h-6 w-6" />
-              {getDeleteTitle(confirmation.type)}
-            </AlertDialogTitle>
-          </AlertDialogHeader>
+            <div className="space-y-4">
+              <AlertDialogDescription asChild>
+                <div>
+                  <SettingsNotice tone="destructive" icon={<AlertTriangle />}>
+                    {getDeleteDescription(confirmation.type)}
+                  </SettingsNotice>
+                </div>
+              </AlertDialogDescription>
 
-          <div className="space-y-4">
-            <AlertDialogDescription asChild>
-              <div className="flex items-start space-x-3 rounded-lg bg-muted p-4 text-muted-foreground dark:bg-muted/40">
-                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-                <p className="text-sm">{getDeleteDescription(confirmation.type)}</p>
-              </div>
-            </AlertDialogDescription>
-
-              {/* GitHub Username Verification for "Delete All" */}
               {confirmation.type === 'all' && user && (
-                <div className="space-y-2">
-                  <label htmlFor="delete-all-github-username" className="block text-sm font-medium text-foreground dark:text-muted-foreground">
+                <div className="space-y-1.5">
+                  <label htmlFor="delete-all-github-username" className="block text-label font-medium text-foreground">
                     {t('dataManagementPanel.please-enter-your-github-username-to-confirm-thi')}
-                    <span className="ml-2 font-mono text-muted-foreground dark:text-muted-foreground">
+                    <span className="ml-2 font-mono text-secondary">
                       {user.login}
                     </span>
                   </label>
@@ -2007,50 +1978,48 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       }))
                     }
                     placeholder={t('dataManagementPanel.enter-github-username')}
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) dark:bg-muted/40 dark:text-foreground"
                   />
                 </div>
               )}
 
-            <AlertDialogFooter className="pt-4">
-              <AlertDialogCancel
-                onClick={closeConfirmation}
-                disabled={isDeleting}
-                className="flex-1 bg-muted text-foreground hover:bg-accent dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
-              >
-                {t('dataManagementPanel.cancel')}
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(event) => {
-                  event.preventDefault();
-                  void handleDelete();
-                }}
-                disabled={
-                  isDeleting ||
-                  (confirmation.type === 'all' &&
-                    confirmation.githubUsernameInput !== user?.login)
-                }
-                className="flex-1 bg-destructive font-medium text-destructive-foreground hover:bg-destructive/90"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{t('dataManagementPanel.deleting')}</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4" />
-                    <span>{t('dataManagementPanel.confirm-delete')}</span>
-                  </>
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </div>
+              <AlertDialogFooter className="pt-2">
+                <AlertDialogCancel
+                  onClick={closeConfirmation}
+                  disabled={isDeleting}
+                  className="flex-1"
+                >
+                  {t('dataManagementPanel.cancel')}
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDelete();
+                  }}
+                  disabled={
+                    isDeleting ||
+                    (confirmation.type === 'all' &&
+                      confirmation.githubUsernameInput !== user?.login)
+                  }
+                  className="flex-1 bg-destructive-solid text-on-destructive hover:opacity-95"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      <span>{t('dataManagementPanel.deleting')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="size-4" />
+                      <span>{t('dataManagementPanel.confirm-delete')}</span>
+                    </>
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
           </AlertDialogContent>
         )}
       </AlertDialog>
 
-      {/* Import Preview Modal */}
       {importPreview.isOpen && importPreview.data && (
         <Dialog
           open={importPreview.isOpen}
@@ -2061,10 +2030,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }}
         >
           <DialogContent className="max-w-lg" closeLabel={t('dataManagementPanel.close')}>
-            <DialogHeader className="rounded-lg bg-background dark:bg-card">
-              <DialogTitle className="flex items-center gap-3 text-muted-foreground">
-                <Upload className="h-6 w-6" />
-                {t('dataManagementPanel.import-data-preview')}
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Upload className="size-4 text-tertiary" />
+                <span>{t('dataManagementPanel.import-data-preview')}</span>
               </DialogTitle>
               <DialogDescription>
                 {t('dataManagementPanel.review-the-backup-contents-before-choosing-an-im')}
@@ -2072,77 +2041,64 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             </DialogHeader>
 
             <div className="space-y-4">
-              <div className="text-sm text-muted-foreground dark:text-muted-foreground">
-                <p><strong>{t('dataManagementPanel.file')}</strong> {importPreview.fileName}</p>
-                <p><strong>{t('dataManagementPanel.export-date')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
-                <p><strong>{t('dataManagementPanel.version')}</strong> {importPreview.data.appVersion}</p>
+              <div className="space-y-1 rounded-md bg-sunken px-3 py-2.5 text-label-sm text-secondary shadow-elev-0">
+                <p><strong className="font-medium text-foreground">{t('dataManagementPanel.file')}</strong> {importPreview.fileName}</p>
+                <p><strong className="font-medium text-foreground">{t('dataManagementPanel.export-date')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
+                <p><strong className="font-medium text-foreground">{t('dataManagementPanel.version')}</strong> {importPreview.data.appVersion}</p>
               </div>
 
-              <div className="border-t border-border dark:border-border pt-4">
-                <p className="text-sm font-medium text-foreground dark:text-muted-foreground mb-2">{t('dataManagementPanel.included-data')}</p>
-                <div className="space-y-1 text-sm">
+              <div className="border-t border-subtle pt-3">
+                <p className="mb-1.5 text-label font-medium text-foreground">{t('dataManagementPanel.included-data')}</p>
+                <div className="space-y-1 text-label-sm text-secondary tabular-nums">
                   {importPreview.data.data.repositories && (
-                    <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('dataManagementPanel.repositories')}: {importPreview.data.data.repositories.length} {t('dataManagementPanel.items')}
-                    </p>
+                    <p>• {t('dataManagementPanel.repositories')}: {importPreview.data.data.repositories.length} {t('dataManagementPanel.items')}</p>
                   )}
                   {importPreview.data.data.releases && (
-                    <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('dataManagementPanel.releases')}: {importPreview.data.data.releases.length} {t('dataManagementPanel.items')}
-                    </p>
+                    <p>• {t('dataManagementPanel.releases')}: {importPreview.data.data.releases.length} {t('dataManagementPanel.items')}</p>
                   )}
                   {importPreview.data.data.aiConfigs && (
-                    <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('dataManagementPanel.ai-configs')}: {importPreview.data.data.aiConfigs.length} {t('dataManagementPanel.items')}
-                    </p>
+                    <p>• {t('dataManagementPanel.ai-configs')}: {importPreview.data.data.aiConfigs.length} {t('dataManagementPanel.items')}</p>
                   )}
                   {importPreview.data.data.webdavConfigs && (
-                    <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('dataManagementPanel.webdav-configs')}: {importPreview.data.data.webdavConfigs.length} {t('dataManagementPanel.items')}
-                    </p>
+                    <p>• {t('dataManagementPanel.webdav-configs')}: {importPreview.data.data.webdavConfigs.length} {t('dataManagementPanel.items')}</p>
                   )}
                   {importPreview.data.data.customCategories && (
-                    <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('dataManagementPanel.categories')}: {importPreview.data.data.customCategories.length} {t('dataManagementPanel.items')}
-                    </p>
+                    <p>• {t('dataManagementPanel.categories')}: {importPreview.data.data.customCategories.length} {t('dataManagementPanel.items')}</p>
                   )}
                   {importPreview.data.data.assetFilters && (
-                    <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('dataManagementPanel.asset-filters')}: {importPreview.data.data.assetFilters.length} {t('dataManagementPanel.items')}
-                    </p>
+                    <p>• {t('dataManagementPanel.asset-filters')}: {importPreview.data.data.assetFilters.length} {t('dataManagementPanel.items')}</p>
                   )}
                 </div>
               </div>
 
-              {/* Warning for masked secrets */}
               {hasMaskedSecrets(importPreview.data.data) && (
-                <div className="flex items-start space-x-3 text-warning bg-warning/10 p-4 rounded-lg border border-warning/30">
-                  <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm">
-                    {t('dataManagementPanel.warning-some-secrets-in-this-backup-are-masked-p')}
-                  </p>
-                </div>
+                <SettingsNotice tone="warning" icon={<AlertTriangle />}>
+                  {t('dataManagementPanel.warning-some-secrets-in-this-backup-are-masked-p')}
+                </SettingsNotice>
               )}
 
-              <DialogFooter className="pt-4">
+              <DialogFooter className="pt-2">
                 <Button
+                  type="button"
                   variant="outline"
                   onClick={() => setImportPreview({ data: null, isOpen: false, fileName: '' })}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex-1"
                 >
                   {t('dataManagementPanel.cancel')}
                 </Button>
                 <Button
+                  type="button"
+                  variant="primary"
                   onClick={() => {
                     importData(resolveImportTypes(importPreview.data!.data), 'merge');
                   }}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex-1"
                 >
                   {isImporting ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="size-4 animate-spin" />
                       <span>{t('dataManagementPanel.importing')}</span>
                     </>
                   ) : (
@@ -2150,16 +2106,17 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   )}
                 </Button>
                 <Button
-                  variant="destructive"
+                  type="button"
+                  variant="danger-solid"
                   onClick={() => {
                     importData(resolveImportTypes(importPreview.data!.data), 'replace');
                   }}
                   disabled={isImporting}
-                  className="flex-1 px-4 py-2 font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex-1"
                 >
                   {isImporting ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="size-4 animate-spin" />
                       <span>{t('dataManagementPanel.importing')}</span>
                     </>
                   ) : (
@@ -2171,6 +2128,6 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           </DialogContent>
         </Dialog>
       )}
-    </div>
+    </SettingsPageStack>
   );
 };

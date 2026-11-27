@@ -50,18 +50,18 @@ export const Modal: React.FC<ModalProps> = ({
 
   const content = scrollable ? (
     <>
-      <DialogHeader className="shrink-0 border-b border-border px-6 py-5 pr-12">
+      <DialogHeader className="shrink-0 border-b border-subtle px-5 py-4 pr-12">
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
       <div
         data-testid="modal-scroll-area"
-        className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-on-scroll', isScrolling && 'scrolling', contentClassName)}
+        className={cn('min-h-0 flex-1 overflow-y-auto px-5 py-4 scrollbar-on-scroll', isScrolling && 'scrolling', contentClassName)}
         onScroll={handleScroll}
       >
         {children}
       </div>
       {footer && (
-        <div data-testid="modal-footer" className="shrink-0 border-t border-border px-6 py-4">
+        <div data-testid="modal-footer" className="shrink-0 border-t border-subtle px-5 py-3.5">
           {footer}
         </div>
       )}

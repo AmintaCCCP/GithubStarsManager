@@ -30,6 +30,15 @@ import { getNetworkEntries } from '../../services/fetchCapture';
 import { version as appVersion } from '../../../package.json';
 import { useAppStore } from '../../store/useAppStore';
 import { useDiagnosticBackendActions, DiagnosticScope } from '../../features/settings/hooks/useDiagnosticBackendActions';
+import { cn } from '../../lib/utils';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsRow,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface DiagnosticLogsPanelProps {
   t: TranslateFn;
@@ -206,13 +215,12 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
       <DialogContent
         aria-describedby={undefined}
         showClose={false}
-        className="app-diagnostic-detail-dialog grid-rows-[auto_auto_minmax(0,1fr)] max-w-3xl max-h-[80vh] overflow-hidden p-0 pr-12"
+        className="app-diagnostic-detail-dialog grid-rows-[auto_auto_minmax(0,1fr)] max-h-[80vh] max-w-3xl overflow-hidden p-0 pr-12"
       >
-        {/* Header */}
-        <DialogHeader className="app-diagnostic-dialog-header items-center justify-between space-y-0 border-b border-border px-5 py-4">
-          <div className="flex min-w-0 items-center space-x-3">
+        <DialogHeader className="app-diagnostic-dialog-header items-center justify-between space-y-0 border-b border-subtle px-5 py-3.5">
+          <div className="flex min-w-0 items-center gap-2.5">
             <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]} className="shrink-0">{entry.level}</Badge>
-            <DialogTitle className="truncate text-sm font-medium leading-normal tracking-normal">{entry.message}</DialogTitle>
+            <DialogTitle className="truncate text-label font-medium tracking-normal">{entry.message}</DialogTitle>
           </div>
         </DialogHeader>
         <DialogClose asChild>
@@ -222,30 +230,32 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
             aria-label={t('diagnosticLogsPanel.close-log-details')}
             className="app-dialog-close"
           >
-            <X className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+            <X className="size-4 text-secondary" />
           </Button>
         </DialogClose>
 
-        {/* Tabs */}
-        <div className="flex min-w-0 overflow-x-auto border-b border-border px-5">
-          {MODAL_TABS.map(tab => (
-            <Button
-              key={tab.id}
-              variant="ghost"
-              onClick={() => setActiveTab(tab.id)}
-              aria-pressed={activeTab === tab.id}
-              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-primary text-primary dark:text-primary'
-                  : 'border-transparent text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground'
-              }`}
-            >
-              {language === 'zh' ? tab.zh : tab.en}
-            </Button>
-          ))}
+        <div className="flex min-w-0 gap-1 overflow-x-auto border-b border-subtle px-5 py-1.5">
+          {MODAL_TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                aria-pressed={isActive}
+                className={cn(
+                  'h-control-sm shrink-0 rounded-sm px-2.5 text-label-sm font-medium whitespace-nowrap transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant',
+                  isActive
+                    ? 'bg-fill-selected text-foreground'
+                    : 'text-secondary hover:bg-fill-hover hover:text-foreground',
+                )}
+              >
+                {language === 'zh' ? tab.zh : tab.en}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Content */}
         <div className="min-h-0 overflow-y-auto p-5">
           {renderTabContent()}
         </div>
@@ -255,19 +265,19 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
 };
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="flex items-start space-x-3">
-    <span className="text-muted-foreground dark:text-muted-foreground w-24 shrink-0 pt-0.5">{label}</span>
-    <div className="flex-1">{children}</div>
+  <div className="flex items-start gap-3">
+    <span className="w-24 shrink-0 pt-0.5 text-label-sm font-medium text-tertiary">{label}</span>
+    <div className="min-w-0 flex-1 text-label text-foreground">{children}</div>
   </div>
 );
 
 const DataBlock: React.FC<{ data: unknown; emptyText: string }> = ({ data, emptyText }) => {
   if (data == null) {
-    return <p className="text-muted-foreground dark:text-muted-foreground/70 text-sm italic">{emptyText}</p>;
+    return <p className="text-label-sm italic text-tertiary">{emptyText}</p>;
   }
   const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
   return (
-    <pre className="text-xs bg-accent/50 dark:bg-muted/20 rounded-lg p-3 overflow-auto max-h-[400px] font-mono text-muted-foreground dark:text-muted-foreground whitespace-pre-wrap break-all">
+    <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap break-all rounded-md bg-sunken p-3 font-mono text-mono-ui text-secondary shadow-elev-0">
       {text}
     </pre>
   );
@@ -531,301 +541,346 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
 
   return (
     <>
-      {/* Detail modal */}
       {detailEntry && <LogDetailModal entry={detailEntry} language={language} t={t} onClose={() => setDetailEntry(null)} />}
 
-      <div className="app-diagnostic-panel space-y-4">
-        {/* Debug Mode Section */}
-        <section className="app-diagnostic-section">
-          <h3 className="app-diagnostic-section-title text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
-            <ScrollText className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
-            {t('diagnosticLogsPanel.debug-mode')}
-          </h3>
-          <div className="app-diagnostic-card bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-4">
-            <div className="app-diagnostic-row flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium text-foreground dark:text-foreground">{t('diagnosticLogsPanel.frontend-debug')}</span>
-                  <Badge variant={frontendDebug ? 'default' : 'secondary'}>
-                    {frontendDebug ? t('diagnosticLogsPanel.on') : t('diagnosticLogsPanel.off')}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
-                  {t('diagnosticLogsPanel.records-all-frontend-http-request-details-method')}
-                </p>
-              </div>
+      <SettingsPageStack className="app-diagnostic-panel">
+        <SettingsSection title={t('diagnosticLogsPanel.debug-mode')} className="app-diagnostic-section">
+          <SettingsCard className="app-diagnostic-card">
+            <SettingsRow
+              className="app-diagnostic-row"
+              title={t('diagnosticLogsPanel.frontend-debug')}
+              badge={(
+                <Badge variant={frontendDebug ? 'default' : 'secondary'}>
+                  {frontendDebug ? t('diagnosticLogsPanel.on') : t('diagnosticLogsPanel.off')}
+                </Badge>
+              )}
+              description={t('diagnosticLogsPanel.records-all-frontend-http-request-details-method')}
+            >
               <Switch
                 checked={frontendDebug}
                 onCheckedChange={() => toggleFrontendDebug()}
                 aria-label={t('diagnosticLogsPanel.toggle-frontend-debug')}
               />
-            </div>
-            <div className="app-diagnostic-row flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  <span className={`font-medium ${backendAvailable ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground/70'}`}>{t('diagnosticLogsPanel.backend-debug')}</span>
-                  <Badge variant={backendAvailable && backendDebug ? 'default' : 'secondary'}>
-                    {backendAvailable ? (backendDebug ? t('diagnosticLogsPanel.on') : t('diagnosticLogsPanel.off')) : t('diagnosticLogsPanel.not-connected')}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">{t('diagnosticLogsPanel.records-all-backend-http-request-details')}</p>
-              </div>
+            </SettingsRow>
+            <SettingsDivider />
+            <SettingsRow
+              className="app-diagnostic-row"
+              title={t('diagnosticLogsPanel.backend-debug')}
+              badge={(
+                <Badge variant={backendAvailable && backendDebug ? 'default' : 'secondary'}>
+                  {backendAvailable ? (backendDebug ? t('diagnosticLogsPanel.on') : t('diagnosticLogsPanel.off')) : t('diagnosticLogsPanel.not-connected')}
+                </Badge>
+              )}
+              description={t('diagnosticLogsPanel.records-all-backend-http-request-details')}
+            >
               <Switch
                 checked={backendDebug}
                 onCheckedChange={() => toggleBackendDebug()}
                 disabled={!backendAvailable}
                 aria-label={t('diagnosticLogsPanel.toggle-backend-debug')}
               />
-            </div>
-            <p className="flex items-center gap-2 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            </SettingsRow>
+            <SettingsDivider />
+            <div className="flex items-center gap-2.5 bg-warning-tint px-3.5 py-2.5 text-label-sm text-foreground">
+              <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden="true" />
               <span>{t('diagnosticLogsPanel.debug-mode-produces-many-logs-enable-briefly-onl')}</span>
-            </p>
-          </div>
-        </section>
+            </div>
+          </SettingsCard>
+        </SettingsSection>
 
-        {/* Privacy Notice */}
-        <p className="flex items-center gap-2 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{t('diagnosticLogsPanel.logs-store-only-endpoints-models-status-duration')}</span>
-        </p>
+        <SettingsNotice tone="neutral" icon={<ShieldCheck />}>
+          {t('diagnosticLogsPanel.logs-store-only-endpoints-models-status-duration')}
+        </SettingsNotice>
 
-        {/* Toolbar */}
-        <section className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-            <Input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              aria-label={t('diagnosticLogsPanel.search-log-modules-or-messages')}
-              placeholder={t('diagnosticLogsPanel.search-module-or-message')}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-(--ui-focus-ring)" />
-          </div>
+        <SettingsSection>
+          <SettingsCard className="space-y-3 p-3.5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label={t('diagnosticLogsPanel.search-log-modules-or-messages')}
+                placeholder={t('diagnosticLogsPanel.search-module-or-message')}
+                className="pl-8"
+              />
+            </div>
 
-          {/* Level pills — debug pill always clickable */}
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-foreground dark:text-foreground">{t('diagnosticLogsPanel.level')}:</span>
-            {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map(level => (
-              <Button
-                key={level}
-                type="button"
-                variant={selectedLevels.has(level) ? LEVEL_FILTER_VARIANTS[level] : 'outline'}
-                size="sm"
-                onClick={() => toggleLevel(level)}
-                aria-pressed={selectedLevels.has(level)}
-                className="h-8 gap-1 rounded-md px-3 text-sm"
-              >
-                {selectedLevels.has(level) && <Check className="h-3 w-3" />}
-                <span>{level}</span>
-              </Button>
-            ))}
-          </div>
-
-          {/* Scope + Event type + Actions */}
-          <div className="flex items-center space-x-3 flex-wrap gap-y-2">
-            <div className="flex items-center rounded-lg border border-border dark:border-border overflow-hidden">
-              {(['all', 'frontend', 'main', 'plugins', 'backend'] as const).map(scope => (
-                <Button key={scope} onClick={() => setSelectedScope(scope)}
-                  disabled={(scope === 'backend' && !backendAvailable) || ((scope === 'main' || scope === 'plugins') && !isDesktopJournal)}
-                  aria-pressed={selectedScope === scope}
-                  variant={selectedScope === scope ? 'default' : 'outline'}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-label-sm font-medium text-tertiary">{t('diagnosticLogsPanel.level')}:</span>
+              {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map((level) => (
+                <Button
+                  key={level}
+                  type="button"
+                  variant={selectedLevels.has(level) ? LEVEL_FILTER_VARIANTS[level] : 'outline'}
                   size="sm"
-                  className={`h-8 rounded-none border-0 px-3 text-sm first:rounded-l-md last:rounded-r-md ${((scope === 'backend' && !backendAvailable) || ((scope === 'main' || scope === 'plugins') && !isDesktopJournal)) ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                  {scope === 'all' ? t('diagnosticLogsPanel.all')
-                    : scope === 'frontend' ? t('diagnosticLogsPanel.frontend')
-                    : scope === 'backend' ? t('diagnosticLogsPanel.backend')
-                    : scope === 'main' ? t('diagnosticLogsPanel.source-main')
-                    : t('diagnosticLogsPanel.source-plugins')}
+                  onClick={() => toggleLevel(level)}
+                  aria-pressed={selectedLevels.has(level)}
+                >
+                  {selectedLevels.has(level) && <Check className="size-3" />}
+                  <span>{level}</span>
                 </Button>
               ))}
             </div>
-            <DropdownMenu open={showEventTypeDropdown} onOpenChange={setShowEventTypeDropdown}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" type="button" className="h-8 gap-1 px-3 text-sm">
-                  <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('diagnosticLogsPanel.types')}` : t('diagnosticLogsPanel.event-type')}</span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="max-h-48 min-w-[180px] overflow-y-auto">
-                <DropdownMenuLabel>{t('diagnosticLogsPanel.event-type-filters')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {availableEventTypes.map(et => (
-                  <DropdownMenuCheckboxItem
-                    key={et}
-                    checked={selectedEventTypes.has(et)}
-                    onCheckedChange={() => toggleEventType(et)}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="flex items-center space-x-2 ml-auto">
-                <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
-                aria-label={t('diagnosticLogsPanel.refresh')} className="size-9" title={t('diagnosticLogsPanel.refresh')}>
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </Button>
-              <Button variant="secondary" onClick={handleClear} className="h-9 gap-1 px-3 text-sm font-medium">
-                <Trash2 className="w-4 h-4" /><span>{t('diagnosticLogsPanel.clear')}</span>
-              </Button>
-              {isDesktopJournal && (
-                <div className="flex items-center rounded-lg border border-border dark:border-border overflow-hidden" role="group" aria-label={t('diagnosticLogsPanel.export-bundle')}>
-                  {([1, 24, null] as const).map(windowOption => (
-                    <Button key={String(windowOption)} onClick={() => setExportWindow(windowOption)}
-                      aria-pressed={exportWindow === windowOption}
-                      variant={exportWindow === windowOption ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-9 rounded-none border-0 px-2 text-xs first:rounded-l-md last:rounded-r-md">
-                      {windowOption === 1 ? t('diagnosticLogsPanel.export-window-hour')
-                        : windowOption === 24 ? t('diagnosticLogsPanel.export-window-day')
-                        : t('diagnosticLogsPanel.export-window-all')}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              {isDesktopJournal && (
-                <Button variant="secondary" onClick={handleExportBundle} disabled={isExportingBundle}
-                  className="h-9 gap-1 px-3 text-sm font-medium" title={t('diagnosticLogsPanel.export-bundle')}>
-                  {isExportingBundle ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
-                  <span>{isExportingBundle ? t('diagnosticLogsPanel.exporting') : t('diagnosticLogsPanel.export-bundle')}</span>
-                </Button>
-              )}
-              <Button onClick={handleExport} disabled={isExporting}
-                className="h-9 gap-1 px-3 text-sm font-medium">
-                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                <span>{isExporting ? t('diagnosticLogsPanel.exporting') : t('diagnosticLogsPanel.export')}</span>
-              </Button>
-            </div>
-          </div>
 
-          <div className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {t('diagnosticLogsPanel.showing-v1-totalcount-entries', { v1: filteredEntries.length, totalCount: totalCount })}
-            {(frontendDebug || backendDebug) && <Badge variant="secondary" className="ml-2">{t('diagnosticLogsPanel.debug-mode-on')}</Badge>}
-            {selectedScope !== 'backend' && <span className="ml-1">· {t('diagnosticLogsPanel.frontend-v1', { v1: frontendCounts.total })}</span>}
-            {selectedScope !== 'frontend' && backendAvailable && <span className="ml-1">· {t('diagnosticLogsPanel.backend-backendlogcount', { backendLogCount: backendLogCount })}</span>}
-            {(selectedScope === 'main' || selectedScope === 'all') && isDesktopJournal && <span className="ml-1">· {t('diagnosticLogsPanel.source-main')} {mainEntries.length}</span>}
-            {(selectedScope === 'plugins' || selectedScope === 'all') && isDesktopJournal && <span className="ml-1">· {t('diagnosticLogsPanel.source-plugins')} {pluginEntries.length}</span>}
-          </div>
-        </section>
-
-        {/* Network ledger (debug mode only) */}
-        {frontendDebug && (
-          <section className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4">
-            <button
-              type="button"
-              onClick={() => setShowNetworkLedger(prev => !prev)}
-              aria-expanded={showNetworkLedger}
-              className="flex items-center space-x-2 text-sm font-medium text-foreground dark:text-foreground"
-            >
-              <Globe className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-              <span>{t('diagnosticLogsPanel.network-ledger')}</span>
-              <Badge variant="outline">{networkEntries.length}</Badge>
-              {showNetworkLedger ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            </button>
-            {showNetworkLedger && (
-              <div className="mt-3 max-h-[300px] overflow-y-auto divide-y divide-border">
-                {networkEntries.length === 0 ? (
-                  <p className="py-3 text-sm text-muted-foreground dark:text-muted-foreground/70">{t('diagnosticLogsPanel.no-logs-yet')}</p>
-                ) : (
-                  [...networkEntries].reverse().slice(0, 100).map(entry => {
-                    const entryData = entry.data as Record<string, unknown> | undefined;
-                    return (
-                      <div key={entry.id} className="py-2">
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
-                          <span className="text-xs text-muted-foreground dark:text-muted-foreground" title={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</span>
-                          <span className="text-xs font-mono break-all text-foreground dark:text-foreground">{entry.message}</span>
-                        </div>
-                        {entryData?.durationMs != null && (
-                          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 font-mono">
-                            {String(entryData.durationMs)}ms{entryData.responseContentType != null ? ` · ${String(entryData.responseContentType)}` : ''}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Log Entry List */}
-        <section className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
-          {filteredEntries.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground dark:text-muted-foreground/70">
-              <ScrollText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              {totalCount === 0 ? t('diagnosticLogsPanel.no-logs-yet') : t('diagnosticLogsPanel.no-matching-logs')}
-            </div>
-          ) : (
-            <>
-              <div className="max-h-[520px] overflow-y-auto divide-y divide-border">
-                {visibleEntries.map(entry => {
-                  const eventType = inferEventType(entry.module, entry.message, entry.data);
-                  const entryData = entry.data as Record<string, unknown> | undefined;
-                  const statusColor = entryData?.status ? getStatusColor(entryData.status) : '';
-                  const hasHttpDetail =
-                    entryData?.method != null ||
-                    entryData?.status != null ||
-                    entryData?.durationMs != null ||
-                    entryData?.url != null ||
-                    entryData?.endpoint != null ||
-                    entryData?.path != null ||
-                    entryData?.requestHeaders != null ||
-                    entryData?.requestBody != null ||
-                    entryData?.responseHeaders != null ||
-                    entryData?.responseBody != null;
-
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex h-control items-center gap-0.5 rounded-md bg-fill-hover p-0.5">
+                {(['all', 'frontend', 'main', 'plugins', 'backend'] as const).map((scope) => {
+                  const isDisabled = (scope === 'backend' && !backendAvailable) || ((scope === 'main' || scope === 'plugins') && !isDesktopJournal);
+                  const isActive = selectedScope === scope;
                   return (
-                    <div
-                      key={entry.id}
-                      role={hasHttpDetail ? 'button' : undefined}
-                      tabIndex={hasHttpDetail ? 0 : undefined}
-                      aria-label={hasHttpDetail ? t('diagnosticLogsPanel.view-http-details-v1-v2', { v1: entry.module, v2: entry.message }) : undefined}
-                      className={`px-4 py-3 transition-colors ${hasHttpDetail ? 'cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-inset' : ''}`}
-                      onClick={hasHttpDetail ? () => setDetailEntry(entry) : undefined}
-                      onKeyDown={hasHttpDetail ? (event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          setDetailEntry(entry);
-                        }
-                      } : undefined}
-                    >
-                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
-                        <Badge variant="secondary">{sourceBadgeLabel(entry.source, t)}</Badge>
-                        <Badge variant="outline">
-                          {language === 'zh' ? EVENT_TYPE_LABELS[eventType].zh : EVENT_TYPE_LABELS[eventType].en}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground dark:text-muted-foreground" title={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</span>
-                        <Badge variant="outline" className="font-mono">{entry.module}</Badge>
-                        {hasHttpDetail && <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
-                      </div>
-                      <p className="text-sm text-foreground dark:text-foreground mt-1 break-words">{entry.message}</p>
-                      {hasHttpDetail && (
-                        <div className="text-xs mt-1 font-mono flex items-center space-x-1 text-muted-foreground dark:text-muted-foreground">
-                          {entryData?.method != null && <span className="font-bold">{String(entryData.method)}</span>}
-                          {(entryData?.endpoint != null || entryData?.path != null) && <span>{String(entryData.endpoint ?? entryData.path)}</span>}
-                          {entryData?.status != null && <span className={`font-bold ${statusColor}`}>→ {String(entryData.status)}</span>}
-                          {entryData?.durationMs != null && <span className="text-muted-foreground">{String(entryData.durationMs)}ms</span>}
-                        </div>
+                    <button
+                      key={scope}
+                      type="button"
+                      onClick={() => setSelectedScope(scope)}
+                      disabled={isDisabled}
+                      aria-pressed={isActive}
+                      className={cn(
+                        'h-control-sm rounded-sm px-2.5 text-label-sm font-medium transition-[background-color,color,box-shadow] duration-micro ease-out-subtle hover:duration-instant disabled:pointer-events-none disabled:opacity-40',
+                        isActive
+                          ? 'bg-floating text-foreground shadow-elev-1'
+                          : 'text-secondary hover:text-foreground',
                       )}
-                    </div>
+                    >
+                      {scope === 'all' ? t('diagnosticLogsPanel.all')
+                        : scope === 'frontend' ? t('diagnosticLogsPanel.frontend')
+                        : scope === 'backend' ? t('diagnosticLogsPanel.backend')
+                        : scope === 'main' ? t('diagnosticLogsPanel.source-main')
+                        : t('diagnosticLogsPanel.source-plugins')}
+                    </button>
                   );
                 })}
               </div>
-              {/* Load more */}
-              {visibleCount < filteredEntries.length && (
-                <div className="border-t border-border p-3 text-center">
-                  <Button variant="ghost" onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
-                    className="text-sm text-primary hover:text-primary/90 transition-colors">
-                    {t('diagnosticLogsPanel.load-more-v1-remaining', { v1: filteredEntries.length - visibleCount })}
+
+              <DropdownMenu open={showEventTypeDropdown} onOpenChange={setShowEventTypeDropdown}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" type="button" size="md">
+                    <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('diagnosticLogsPanel.types')}` : t('diagnosticLogsPanel.event-type')}</span>
+                    <ChevronDown className="size-3.5 text-tertiary" />
                   </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="max-h-48 min-w-[180px] overflow-y-auto">
+                  <DropdownMenuLabel>{t('diagnosticLogsPanel.event-type-filters')}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {availableEventTypes.map((et) => (
+                    <DropdownMenuCheckboxItem
+                      key={et}
+                      checked={selectedEventTypes.has(et)}
+                      onCheckedChange={() => toggleEventType(et)}
+                      onSelect={(event) => event.preventDefault()}
+                    >
+                      {language === 'zh' ? EVENT_TYPE_LABELS[et].zh : EVENT_TYPE_LABELS[et].en}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || !backendAvailable}
+                  aria-label={t('diagnosticLogsPanel.refresh')}
+                  title={t('diagnosticLogsPanel.refresh')}
+                >
+                  <RefreshCw className={`size-4 text-secondary ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+                <Button type="button" variant="outline" size="md" onClick={handleClear}>
+                  <Trash2 className="size-3.5" />
+                  <span>{t('diagnosticLogsPanel.clear')}</span>
+                </Button>
+                {isDesktopJournal && (
+                  <div className="inline-flex h-control items-center gap-0.5 rounded-md bg-fill-hover p-0.5" role="group" aria-label={t('diagnosticLogsPanel.export-bundle')}>
+                    {([1, 24, null] as const).map((windowOption) => {
+                      const isActive = exportWindow === windowOption;
+                      return (
+                        <button
+                          key={String(windowOption)}
+                          type="button"
+                          onClick={() => setExportWindow(windowOption)}
+                          aria-pressed={isActive}
+                          className={cn(
+                            'h-control-sm rounded-sm px-2 text-label-sm font-medium transition-[background-color,color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                            isActive
+                              ? 'bg-floating text-foreground shadow-elev-1'
+                              : 'text-secondary hover:text-foreground',
+                          )}
+                        >
+                          {windowOption === 1 ? t('diagnosticLogsPanel.export-window-hour')
+                            : windowOption === 24 ? t('diagnosticLogsPanel.export-window-day')
+                            : t('diagnosticLogsPanel.export-window-all')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {isDesktopJournal && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="md"
+                    onClick={handleExportBundle}
+                    disabled={isExportingBundle}
+                    title={t('diagnosticLogsPanel.export-bundle')}
+                  >
+                    {isExportingBundle ? <Loader2 className="size-3.5 animate-spin" /> : <Package className="size-3.5" />}
+                    <span>{isExportingBundle ? t('diagnosticLogsPanel.exporting') : t('diagnosticLogsPanel.export-bundle')}</span>
+                  </Button>
+                )}
+                <Button type="button" variant="primary" size="md" onClick={handleExport} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+                  <span>{isExporting ? t('diagnosticLogsPanel.exporting') : t('diagnosticLogsPanel.export')}</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-label-sm text-secondary tabular-nums">
+              <span>{t('diagnosticLogsPanel.showing-v1-totalcount-entries', { v1: filteredEntries.length, totalCount })}</span>
+              {(frontendDebug || backendDebug) && <Badge variant="secondary">{t('diagnosticLogsPanel.debug-mode-on')}</Badge>}
+              {selectedScope !== 'backend' && <span>· {t('diagnosticLogsPanel.frontend-v1', { v1: frontendCounts.total })}</span>}
+              {selectedScope !== 'frontend' && backendAvailable && <span>· {t('diagnosticLogsPanel.backend-backendlogcount', { backendLogCount })}</span>}
+              {(selectedScope === 'main' || selectedScope === 'all') && isDesktopJournal && <span>· {t('diagnosticLogsPanel.source-main')} {mainEntries.length}</span>}
+              {(selectedScope === 'plugins' || selectedScope === 'all') && isDesktopJournal && <span>· {t('diagnosticLogsPanel.source-plugins')} {pluginEntries.length}</span>}
+            </div>
+          </SettingsCard>
+        </SettingsSection>
+
+        {frontendDebug && (
+          <SettingsSection>
+            <SettingsCard className="p-3.5">
+              <button
+                type="button"
+                onClick={() => setShowNetworkLedger((prev) => !prev)}
+                aria-expanded={showNetworkLedger}
+                className="flex items-center gap-2 text-label font-medium text-foreground"
+              >
+                <Globe className="size-4 text-tertiary" />
+                <span>{t('diagnosticLogsPanel.network-ledger')}</span>
+                <Badge variant="outline" className="tabular-nums">{networkEntries.length}</Badge>
+                {showNetworkLedger ? <ChevronDown className="size-3.5 text-tertiary" /> : <ChevronRight className="size-3.5 text-tertiary" />}
+              </button>
+              {showNetworkLedger && (
+                <div className="mt-3 max-h-[300px] divide-y divide-subtle overflow-y-auto">
+                  {networkEntries.length === 0 ? (
+                    <p className="py-3 text-label-sm text-tertiary">{t('diagnosticLogsPanel.no-logs-yet')}</p>
+                  ) : (
+                    [...networkEntries].reverse().slice(0, 100).map((entry) => {
+                      const entryData = entry.data as Record<string, unknown> | undefined;
+                      return (
+                        <div key={entry.id} className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
+                            <span className="text-label-sm text-tertiary tabular-nums" title={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</span>
+                            <span className="break-all font-mono text-mono-ui text-foreground">{entry.message}</span>
+                          </div>
+                          {entryData?.durationMs != null && (
+                            <p className="mt-0.5 font-mono text-mono-ui text-secondary">
+                              {String(entryData.durationMs)}ms{entryData.responseContentType != null ? ` · ${String(entryData.responseContentType)}` : ''}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
-            </>
-          )}
-        </section>
-      </div>
+            </SettingsCard>
+          </SettingsSection>
+        )}
+
+        <SettingsSection>
+          <SettingsCard>
+            {filteredEntries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center text-secondary">
+                <ScrollText className="size-9 text-tertiary stroke-[1.5]" />
+                <p className="text-label">
+                  {totalCount === 0 ? t('diagnosticLogsPanel.no-logs-yet') : t('diagnosticLogsPanel.no-matching-logs')}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="max-h-[520px] overflow-y-auto">
+                  {visibleEntries.map((entry, index) => {
+                    const eventType = inferEventType(entry.module, entry.message, entry.data);
+                    const entryData = entry.data as Record<string, unknown> | undefined;
+                    const statusColor = entryData?.status ? getStatusColor(entryData.status) : '';
+                    const hasHttpDetail =
+                      entryData?.method != null ||
+                      entryData?.status != null ||
+                      entryData?.durationMs != null ||
+                      entryData?.url != null ||
+                      entryData?.endpoint != null ||
+                      entryData?.path != null ||
+                      entryData?.requestHeaders != null ||
+                      entryData?.requestBody != null ||
+                      entryData?.responseHeaders != null ||
+                      entryData?.responseBody != null;
+
+                    return (
+                      <React.Fragment key={entry.id}>
+                        {index > 0 && <SettingsDivider />}
+                        <div
+                          role={hasHttpDetail ? 'button' : undefined}
+                          tabIndex={hasHttpDetail ? 0 : undefined}
+                          aria-label={hasHttpDetail ? t('diagnosticLogsPanel.view-http-details-v1-v2', { v1: entry.module, v2: entry.message }) : undefined}
+                          className={cn(
+                            'px-3.5 py-2.5 transition-[background-color] duration-micro ease-out-subtle',
+                            hasHttpDetail && 'cursor-pointer hover:bg-fill-hover hover:duration-instant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset',
+                          )}
+                          onClick={hasHttpDetail ? () => setDetailEntry(entry) : undefined}
+                          onKeyDown={hasHttpDetail ? (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setDetailEntry(entry);
+                            }
+                          } : undefined}
+                        >
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
+                            <Badge variant="secondary">{sourceBadgeLabel(entry.source, t)}</Badge>
+                            <Badge variant="outline">
+                              {language === 'zh' ? EVENT_TYPE_LABELS[eventType].zh : EVENT_TYPE_LABELS[eventType].en}
+                            </Badge>
+                            <span className="text-label-sm text-tertiary tabular-nums" title={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</span>
+                            <Badge variant="outline" className="font-mono">{entry.module}</Badge>
+                            {hasHttpDetail && <ChevronRight className="ml-auto size-3.5 shrink-0 text-tertiary" />}
+                          </div>
+                          <p className="mt-1 break-words text-label text-foreground">{entry.message}</p>
+                          {hasHttpDetail && (
+                            <div className="mt-1 flex items-center gap-1.5 font-mono text-mono-ui text-secondary">
+                              {entryData?.method != null && <span className="font-medium text-foreground">{String(entryData.method)}</span>}
+                              {(entryData?.endpoint != null || entryData?.path != null) && <span>{String(entryData.endpoint ?? entryData.path)}</span>}
+                              {entryData?.status != null && <span className={`font-medium ${statusColor}`}>→ {String(entryData.status)}</span>}
+                              {entryData?.durationMs != null && <span className="text-tertiary tabular-nums">{String(entryData.durationMs)}ms</span>}
+                            </div>
+                          )}
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+                {visibleCount < filteredEntries.length && (
+                  <>
+                    <SettingsDivider />
+                    <div className="px-3.5 py-2.5 text-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+                      >
+                        {t('diagnosticLogsPanel.load-more-v1-remaining', { v1: filteredEntries.length - visibleCount })}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </SettingsCard>
+        </SettingsSection>
+      </SettingsPageStack>
     </>
   );
 };

@@ -103,7 +103,7 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
 
   return (
     <section
-      className="mb-3 rounded-md border border-border bg-muted/20 px-3 py-3"
+      className="mb-3 rounded-lg bg-raised px-3.5 py-3 shadow-elev-1"
       data-testid="installable-asset-recommendation"
       aria-label={
         platformKnown
@@ -112,23 +112,23 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
       }
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h3 className="text-xs font-semibold">
+        <h3 className="text-label font-semibold text-foreground">
           {platformKnown
             ? t('installableAssetRecommendation.matches-this-device')
             : t('installableAssetRecommendation.installable-candidates')}
         </h3>
-        <span className="text-[11px] text-muted-foreground">{deviceSummary}</span>
-        <Badge variant="outline" className="text-[11px] font-normal">
+        <span className="text-label-sm text-tertiary tabular-nums">{deviceSummary}</span>
+        <Badge variant="secondary" className="h-5 rounded-xs border-0 px-1.5 text-caption font-medium">
           {t(`installableAssetRecommendation.confidence-${best.confidence}`)}
         </Badge>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex min-w-0 items-center gap-2">
-          <PlatformIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <PlatformIcon className="size-4 shrink-0 text-secondary" aria-hidden="true" />
           <div className="min-w-0">
-            <p className="truncate text-xs font-medium" title={best.fileName}>{best.fileName}</p>
-            <p className="truncate text-[11px] text-muted-foreground">
+            <p className="truncate text-label font-medium text-foreground" title={best.fileName}>{best.fileName}</p>
+            <p className="truncate text-label-sm text-secondary tabular-nums">
               {describe(best)} · {formatFileSize(best.size)}
             </p>
           </div>
@@ -140,14 +140,14 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
           disabled={!bestLink || !downloadEnabled || bestDownloadState !== 'idle'}
           onClick={() => bestLink && onDownload(bestLink)}
         >
-          <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+          <Download className="size-3.5" aria-hidden="true" />
           {t('installableAssetRecommendation.download-this-build')}
         </Button>
       </div>
 
       {alternatives.length > 0 && (
-        <div className="mt-2 border-t border-border pt-2">
-          <p className="mb-1 text-[11px] text-muted-foreground">
+        <div className="mt-2.5 border-t border-subtle pt-2.5">
+          <p className="mb-1.5 text-label-sm text-tertiary tabular-nums">
             {t('installableAssetRecommendation.other-candidates-v1', { v1: alternatives.length })}
           </p>
           <ul className="space-y-1">
@@ -158,9 +158,9 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
                 : 'idle';
               return (
                 <li key={match.assetId} className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="min-w-0 truncate text-[11px]" title={match.fileName}>
+                  <span className="min-w-0 truncate text-label-sm text-foreground" title={match.fileName}>
                     {match.fileName}
-                    <span className="ml-1 text-muted-foreground">
+                    <span className="ml-1.5 text-tertiary tabular-nums">
                       {describe(match)} · {formatFileSize(match.size)}
                     </span>
                   </span>
@@ -168,7 +168,6 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-[11px]"
                     disabled={!link || !downloadEnabled || downloadState !== 'idle'}
                     onClick={() => link && onDownload(link)}
                   >
@@ -181,16 +180,16 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
         </div>
       )}
 
-      <p className="mt-2 flex items-start gap-1 text-[11px] text-muted-foreground">
-        <ShieldQuestion className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+      <p className="mt-2.5 flex items-start gap-1.5 text-label-sm text-tertiary">
+        <ShieldQuestion className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
         <span>
           {t('installableAssetRecommendation.detected-from-filenames-and-release-metadata-no')}
         </span>
       </p>
 
       {detection.excluded.length > 0 && (
-        <p className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
-          <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+        <p className="mt-1 flex items-start gap-1.5 text-label-sm text-tertiary tabular-nums">
+          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
           <span>
             {t('installableAssetRecommendation.excluded-v1-asset-s-that-do-not-apply-to-this-de', { v1: detection.excluded.length })}
           </span>

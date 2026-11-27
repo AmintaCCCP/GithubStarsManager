@@ -116,13 +116,13 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-6 w-6 rounded-full text-muted-foreground dark:text-muted-foreground/70"
+          size="icon-sm"
+          className="size-control-sm rounded-sm text-tertiary hover:text-foreground"
           aria-label={info.title}
           onMouseEnter={() => { cancelClose(); setOpen(true); }}
           onMouseLeave={scheduleClose}
         >
-          <Info className="h-4 w-4" />
+          <Info className="size-3.5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -131,11 +131,11 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
         onMouseEnter={cancelClose}
         onMouseLeave={scheduleClose}
         onOpenAutoFocus={(event) => event.preventDefault()}
-        className="w-[calc(100vw_-_2rem)] max-w-sm whitespace-pre-line bg-popover p-4 text-left text-popover-foreground"
+        className="w-[calc(100vw_-_2rem)] max-w-sm whitespace-pre-line p-3.5 text-left"
       >
-        <h4 className="mb-2 text-sm font-semibold">{info.title}</h4>
-        {info.highlight && <p className="mb-2 text-sm font-medium text-primary">{info.highlight}</p>}
-        <p className="text-xs leading-relaxed">{info.description}</p>
+        <h4 className="mb-1 text-label font-semibold text-foreground">{info.title}</h4>
+        {info.highlight && <p className="mb-1.5 text-label-sm font-medium text-accent-text">{info.highlight}</p>}
+        <p className="text-label-sm leading-relaxed text-secondary">{info.description}</p>
       </PopoverContent>
     </Popover>
   );

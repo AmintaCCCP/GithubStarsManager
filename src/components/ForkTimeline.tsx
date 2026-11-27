@@ -178,17 +178,6 @@ export const ForkTimeline: React.FC = () => {
             {t('forkTimeline.fork-status')}
           </h3>
         </div>
-        <Button
-          onClick={handleRefresh}
-          disabled={forkIsRefreshing}
-          variant="ghost"
-          size="icon"
-          className="linear-icon-button"
-          title={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
-          aria-label={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
-        >
-          <RefreshCw className={`h-4 w-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
       </div>
       <ContextSidebarBody>
         <section className="app-side-section" aria-label={t('forkTimeline.status')}>
@@ -311,57 +300,71 @@ export const ForkTimeline: React.FC = () => {
       />
 
         {/* Search Bar */}
-        <div className="ui-toolbar app-page-toolbar app-fork-search mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
-            <Input
-              type="text"
-              aria-label={t('forkTimeline.search-forks')}
-              placeholder={t('forkTimeline.search-forks-2')}
-              value={searchQuery}
-              onChange={(e) => {
-                setForkSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="ui-field app-page-search w-full pl-10 pr-10 text-foreground dark:text-foreground"
-            />
-            {searchQuery && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setForkSearchQuery('');
+        <div className="ui-toolbar app-page-toolbar app-fork-search !mt-3 mb-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
+              <Input
+                type="text"
+                aria-label={t('forkTimeline.search-forks')}
+                placeholder={t('forkTimeline.search-forks-2')}
+                value={searchQuery}
+                onChange={(e) => {
+                  setForkSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                aria-label={t('forkTimeline.clear-search')}
-                className="absolute right-3 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
+                className="w-full pl-8 pr-8"
+              />
+              {searchQuery && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    setForkSearchQuery('');
+                    setCurrentPage(1);
+                  }}
+                  aria-label={t('forkTimeline.clear-search')}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-tertiary hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </Button>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleRefresh}
+              disabled={forkIsRefreshing}
+              className="shrink-0 gap-1.5"
+              title={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
+              aria-label={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
+            >
+              <RefreshCw className={`size-3.5 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
+              <span>{forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}</span>
+            </Button>
           </div>
         </div>
 
         {/* Results Info and Pagination Controls */}
-        <div className="app-context-row-copy flex w-full min-w-0 flex-col gap-2 mb-4 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
+        <div className="app-context-row-copy flex w-full min-w-0 flex-col gap-2 mb-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="text-label-sm text-tertiary tabular-nums">
               {t('forkTimeline.showing-displaystart-displayend-of-v3-forks', { displayStart: displayStart, displayEnd: displayEnd, v3: filteredForks.length })}
             </span>
             {hasActiveFilter && (
-              <span className="text-sm text-primary dark:text-primary">
+              <span className="text-label-sm text-accent-text">
                 ({t('forkTimeline.filtered')})
               </span>
             )}
           </div>
 
-          <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-3 sm:w-auto sm:gap-4 lg:w-auto lg:justify-self-end">
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto lg:w-auto lg:justify-self-end">
             {/* Items per page selector */}
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <span id="fork-page-size-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('forkTimeline.per-page')}</span>
+              <span id="fork-page-size-label" className="whitespace-nowrap text-label-sm text-tertiary">{t('forkTimeline.per-page')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger aria-labelledby="fork-page-size-label" className="ui-field h-9 w-20 max-w-20 min-w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="fork-page-size-label" className="h-control w-20 max-w-20 min-w-20 shrink-0 px-2.5 text-label tabular-nums"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
               </Select>
             </div>
@@ -372,10 +375,8 @@ export const ForkTimeline: React.FC = () => {
       {/* Fork List */}
       <div className="app-fork-list">
         {paginatedForks.length === 0 ? (
-          <div className="ui-empty-state app-empty-state">
-            <div className="app-empty-visual">
-              <Package className="h-6 w-6" aria-hidden="true" />
-            </div>
+          <div className="ui-empty-state app-empty-state border-0">
+            <Package className="size-10 stroke-[1.5] text-tertiary" aria-hidden="true" />
             <div className="app-empty-copy">
               <h3 className="app-empty-title">
                 {hasActiveFilter ? t('forkTimeline.no-matching-results') : t('forkTimeline.no-forked-repositories')}
@@ -390,8 +391,9 @@ export const ForkTimeline: React.FC = () => {
             </div>
             {hasActiveFilter && (
               <Button
+                variant="secondary"
                 onClick={clearForkFilters}
-                className="ui-button-primary mt-4 px-4 py-2 text-sm"
+                className="mt-2"
               >
                 {t('forkTimeline.clear-filters')}
               </Button>
@@ -429,27 +431,27 @@ export const ForkTimeline: React.FC = () => {
 
       {/* Bottom Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center mt-8">
-          <div className="flex items-center space-x-1">
+        <div className="flex items-center justify-center mt-6">
+          <div className="flex items-center gap-1 tabular-nums">
             <Button
               type="button"
               variant="ghost"
+              size="icon"
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
               aria-label={t('forkTimeline.first-page')}
-              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronsLeft className="w-4 h-4" />
+              <ChevronsLeft className="size-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
+              size="icon"
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
               aria-label={t('forkTimeline.previous-page')}
-              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="size-4" />
             </Button>
 
             {getPageNumbers().map((page, index) => (
@@ -457,19 +459,15 @@ export const ForkTimeline: React.FC = () => {
                 <Button
                   key={index}
                   type="button"
-                  variant="ghost"
+                  variant={page === clampedPage ? 'primary' : 'ghost'}
                   aria-current={page === clampedPage ? 'page' : undefined}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-2 rounded-lg text-sm ${
-                    page === clampedPage
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                  }`}
+                  className="min-w-control px-2.5 tabular-nums"
                 >
                   {page}
                 </Button>
               ) : (
-                <span key={index} className="px-3 py-2 text-sm text-muted-foreground">
+                <span key={index} className="px-2 text-label text-tertiary">
                   {page}
                 </span>
               )
@@ -478,22 +476,22 @@ export const ForkTimeline: React.FC = () => {
             <Button
               type="button"
               variant="ghost"
+              size="icon"
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
               aria-label={t('forkTimeline.next-page')}
-              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="size-4" />
             </Button>
             <Button
               type="button"
               variant="ghost"
+              size="icon"
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
               aria-label={t('forkTimeline.last-page')}
-              className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronsRight className="w-4 h-4" />
+              <ChevronsRight className="size-4" />
             </Button>
           </div>
         </div>
@@ -509,39 +507,38 @@ export const ForkTimeline: React.FC = () => {
         title={t('forkTimeline.sync-upstream')}
       >
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+          <p className="text-label text-secondary">
             {t('forkTimeline.select-the-branch-to-merge-upstream-changes-into', { v1: syncModal.full_name })}
           </p>
 
-          <div className="flex flex-col space-y-2">
-            <span id="fork-target-branch-label" className="text-sm font-medium text-foreground dark:text-muted-foreground">
+          <div className="flex flex-col gap-1.5">
+            <span id="fork-target-branch-label" className="text-label font-medium text-foreground">
               {t('forkTimeline.target-branch')}
             </span>
             {isFetchingBranches ? (
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-muted-foreground py-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
+              <div className="flex items-center gap-2 py-2 text-label text-secondary">
+                <Loader2 className="size-4 animate-spin" />
                 <span>{t('forkTimeline.loading-branches')}</span>
               </div>
             ) : (
               <Select value={syncModal.branch} onValueChange={(value) => setSyncModal(prev => ({ ...prev, branch: value }))}>
-                <SelectTrigger aria-labelledby="fork-target-branch-label" className="ui-field app-fork-branch-select h-10 w-full px-3 py-2 dark:text-foreground"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="fork-target-branch-label" className="app-fork-branch-select w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>{syncModalBranches.length > 0 ? syncModalBranches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>) : <SelectItem value={syncModal.branch}>{syncModal.branch}</SelectItem>}</SelectContent>
               </Select>
             )}
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end gap-2 border-t border-subtle pt-3">
             <Button
               variant="outline"
               onClick={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
-              className="px-4 py-2 text-sm font-medium"
             >
               {t('forkTimeline.cancel')}
             </Button>
             <Button
+              variant="primary"
               onClick={confirmSyncUpstream}
               disabled={isFetchingBranches || !syncModal.branch}
-              className="ui-button-primary px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t('forkTimeline.sync-branch')}
             </Button>

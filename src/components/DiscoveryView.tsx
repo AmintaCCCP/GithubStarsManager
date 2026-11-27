@@ -57,57 +57,25 @@ import type {
 } from '../types';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
-  trending: <TrendingUp className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  rocket: <Rocket className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  star: <Crown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  tag: <Tag className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  tweet: <SiX className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  telegram: <SiTelegram className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  weekly: <Newspaper className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
-  search: <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  trending: <TrendingUp className="size-4 text-tertiary" />,
+  rocket: <Rocket className="size-4 text-tertiary" />,
+  star: <Crown className="size-4 text-tertiary" />,
+  tag: <Tag className="size-4 text-tertiary" />,
+  tweet: <SiX className="size-4 text-tertiary" />,
+  telegram: <SiTelegram className="size-4 text-tertiary" />,
+  weekly: <Newspaper className="size-4 text-tertiary" />,
+  search: <Search className="size-4 text-tertiary" />,
 };
 
-const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string; shadow: string; largeIcon: React.ReactNode }> = {
-  trending: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <TrendingUp className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
-  rocket: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <Rocket className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
-  star: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <Crown className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
-  tag: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <Tag className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
-  tweet: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <SiX className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
-  telegram: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <SiTelegram className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
-  weekly: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <Newspaper className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
-  search: {
-    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
-    shadow: 'shadow-subtle',
-    largeIcon: <Search className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
-  },
+const discoveryChannelEmptyIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
+  trending: <TrendingUp className="size-10 stroke-[1.5] text-tertiary" />,
+  rocket: <Rocket className="size-10 stroke-[1.5] text-tertiary" />,
+  star: <Crown className="size-10 stroke-[1.5] text-tertiary" />,
+  tag: <Tag className="size-10 stroke-[1.5] text-tertiary" />,
+  tweet: <SiX className="size-9 text-tertiary" />,
+  telegram: <SiTelegram className="size-9 text-tertiary" />,
+  weekly: <Newspaper className="size-10 stroke-[1.5] text-tertiary" />,
+  search: <Search className="size-10 stroke-[1.5] text-tertiary" />,
 };
 
 interface MobileTabNavProps {
@@ -205,7 +173,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
 
   return (
     <div 
-      className="relative w-full border-b border-border dark:border-border bg-background/95 dark:bg-card/95 backdrop-blur-sm lg:hidden"
+      className="relative w-full border-b border-subtle bg-navigator/95 backdrop-blur-sm lg:hidden"
     >
       <div className="flex min-w-0 items-center">
         <div
@@ -234,12 +202,10 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               role="tab"
               aria-selected={selectedChannel === channel.id}
               className={`
-                relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
-                transition-[color,background-color] duration-200 ease-out
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-offset-2
+                relative shrink-0 px-3 snap-start
                 ${selectedChannel === channel.id
-                  ? 'text-foreground dark:text-foreground '
-                  : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
+                  ? 'text-foreground'
+                  : 'text-secondary hover:text-foreground hover:bg-fill-hover'
                 }
               `}
             >
@@ -254,13 +220,13 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
           channels={allChannels}
           language={language}
           onToggleChannel={onToggleChannel}
-          triggerClassName="h-11 w-11 shrink-0"
+          triggerClassName="size-9 shrink-0 mr-1"
         />
       </div>
       
       {/* Active indicator */}
       <div
-        className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-transform duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 h-0.5 bg-accent-solid rounded-full transition-transform duration-base ease-out will-change-transform"
         style={{
           width: indicatorStyle.width,
           transform: `translateX(${indicatorStyle.translateX}px)`,
@@ -279,11 +245,11 @@ interface PlatformFilterProps {
 const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformChange, language }) => {
     const t = useT('discovery');
   const platforms: { id: DiscoveryPlatform; name: string; nameEn: string; icon: React.ReactNode }[] = [
-    { id: 'All', name: '全部平台', nameEn: 'All Platforms', icon: <Globe className="w-4 h-4" /> },
-    { id: 'Android', name: 'Android', nameEn: 'Android', icon: <SiAndroid className="w-4 h-4" /> },
-    { id: 'Macos', name: 'macOS', nameEn: 'macOS', icon: <SiApple className="w-4 h-4" /> },
-    { id: 'Windows', name: 'Windows', nameEn: 'Windows', icon: <SiWindows className="w-4 h-4" /> },
-    { id: 'Linux', name: 'Linux', nameEn: 'Linux', icon: <SiLinux className="w-4 h-4" /> },
+    { id: 'All', name: '全部平台', nameEn: 'All Platforms', icon: <Globe className="size-3.5" /> },
+    { id: 'Android', name: 'Android', nameEn: 'Android', icon: <SiAndroid className="size-3.5" /> },
+    { id: 'Macos', name: 'macOS', nameEn: 'macOS', icon: <SiApple className="size-3.5" /> },
+    { id: 'Windows', name: 'Windows', nameEn: 'Windows', icon: <SiWindows className="size-3.5" /> },
+    { id: 'Linux', name: 'Linux', nameEn: 'Linux', icon: <SiLinux className="size-3.5" /> },
   ];
 
   const selectedPlatform = platforms.find(p => p.id === platform);
@@ -293,13 +259,13 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           aria-label={t('discoveryView.platform-filter-v1', { v1: discoveryPlatformName(selectedPlatform ?? { id: 'All', name: '全部平台', nameEn: 'All Platforms' }, language) })}
-          className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+          className="gap-1.5"
         >
-          <Filter className="h-4 w-4" />
+          <Filter className="size-3.5 text-tertiary" />
           <span className="hidden xl:inline">{selectedPlatform ? discoveryPlatformName(selectedPlatform, language) : ''}</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="size-3.5 text-tertiary" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
@@ -308,7 +274,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
             <DropdownMenuRadioItem
               key={p.id}
               value={p.id}
-              className={`app-platform-menu-item flex items-center gap-2 ${platform === p.id ? 'bg-accent text-accent-foreground' : ''}`}
+              className={`app-platform-menu-item flex items-center gap-2 ${platform === p.id ? 'bg-fill-selected text-foreground font-medium' : ''}`}
             >
               {p.icon}
               <span>{discoveryPlatformName(p, language)}</span>
@@ -356,11 +322,11 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           variant="outline"
           disabled={disabled}
           aria-label={ariaLabel ?? selectedOption?.label}
-          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+          className={`gap-1.5 ${className}`}
         >
-          {selectedOption?.icon && <span className="h-4 w-4">{selectedOption.icon}</span>}
+          {selectedOption?.icon && <span className="size-3.5 text-tertiary">{selectedOption.icon}</span>}
           <span>{selectedOption?.label}</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="size-3.5 text-tertiary" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={`w-48 ${dropdownClassName}`}>
@@ -369,9 +335,9 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             <DropdownMenuRadioItem
               key={option.value}
               value={option.value}
-              className={`gap-2 ${value === option.value ? 'bg-accent text-accent-foreground' : ''}`}
+              className={`gap-2 ${value === option.value ? 'bg-fill-selected text-foreground font-medium' : ''}`}
             >
-              {option.icon && <span className="h-4 w-4 shrink-0">{option.icon}</span>}
+              {option.icon && <span className="size-3.5 shrink-0 text-tertiary">{option.icon}</span>}
               <span>{option.label}</span>
             </DropdownMenuRadioItem>
           ))}
@@ -397,21 +363,21 @@ const SemanticSearchProgress: React.FC<{ phase: string; detail: string | null }>
   const t = useT('discovery');
   const currentIndex = SEMANTIC_PHASE_ORDER.indexOf(phase as typeof SEMANTIC_PHASE_ORDER[number]);
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground dark:text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-label-sm text-tertiary">
       {SEMANTIC_PHASE_ORDER.map((step, index) => {
         const done = currentIndex > index;
         const active = currentIndex === index;
         return (
           <span
             key={step}
-            className={`flex items-center gap-1.5 ${active ? 'text-foreground dark:text-foreground' : ''} ${!done && !active ? 'opacity-50' : ''}`}
+            className={`flex items-center gap-1.5 ${active ? 'font-medium text-accent-text' : ''} ${!done && !active ? 'opacity-50' : ''}`}
           >
             {done
-              ? <Check className="h-3 w-3" />
+              ? <Check className="size-3 text-status-green" />
               : active
-                ? <Loader2 className="h-3 w-3 animate-spin" />
-                : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-            <span className={active ? 'animate-pulse' : ''}>{t(`discoveryView.search-phase-${step}`)}</span>
+                ? <Loader2 className="size-3 animate-spin" />
+                : <span className="size-1.5 rounded-full bg-current" />}
+            <span>{t(`discoveryView.search-phase-${step}`)}</span>
             {active && detail && <span className="tabular-nums">({detail})</span>}
           </span>
         );
@@ -430,13 +396,13 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
 
   if (!hasMore) {
     return (
-      <div className="flex flex-col items-center gap-2 py-8">
-        <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
-          <div className="w-8 h-px bg-muted dark:bg-muted/40" />
-          <span className="text-sm">{t('discoveryView.all-loaded')}</span>
-          <div className="w-8 h-px bg-muted dark:bg-muted/40" />
+      <div className="flex flex-col items-center gap-1.5 py-6">
+        <div className="flex items-center gap-2 text-tertiary">
+          <div className="w-8 h-px bg-separator" />
+          <span className="text-label-sm">{t('discoveryView.all-loaded')}</span>
+          <div className="w-8 h-px bg-separator" />
         </div>
-        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+        <span className="text-label-sm text-tertiary tabular-nums">
           {t('discoveryView.total-totalcount-items', { totalCount: totalCount })}
         </span>
       </div>
@@ -446,18 +412,20 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
   return (
     <div className="flex flex-col items-stretch pt-2 pb-6">
       <Button
+        variant="secondary"
+        size="lg"
         onClick={onLoadMore}
         disabled={isLoading}
-        className="w-full py-3.5 rounded-xl font-medium bg-muted dark:bg-muted/20 border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center gap-2"
+        className="w-full gap-2"
       >
         {isLoading ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <Loader2 className="size-4 animate-spin text-accent-text" />
             <span>{t('discoveryView.loading')}</span>
           </>
         ) : (
           <>
-            <RefreshCw className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+            <RefreshCw className="size-3.5 text-tertiary" />
             <span>{t('discoveryView.load-more')}</span>
           </>
         )}
@@ -477,8 +445,8 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount }) => {
   const t = useT('discovery');
   
   return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
-      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+    <div className="flex items-center gap-1.5 text-label-sm text-tertiary tabular-nums">
+      <div className="size-1.5 rounded-full bg-accent-solid" />
       <span>
         {totalCount > 0 && currentCount < totalCount
           ? t('discoveryView.items-count-with-total', { currentCount, totalCount })
@@ -617,8 +585,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const currentLoadMoreError = discoveryLoadMoreError?.[selectedDiscoveryChannel] ?? null;
   const currentChannel = safeDiscoveryChannels.find(ch => ch.id === selectedDiscoveryChannel);
   const currentChannelIcon = currentChannel?.icon || 'trending';
-  const currentChannelStyle = discoveryChannelStyleMap[currentChannelIcon] || discoveryChannelStyleMap.trending;
-  const currentChannelIconNode = discoveryChannelIconMap[currentChannelIcon] || discoveryChannelIconMap.trending;
+  const currentChannelEmptyIcon = discoveryChannelEmptyIconMap[currentChannelIcon] || discoveryChannelEmptyIconMap.trending;
   // 周刊同步/补全进度文案（工具栏与空态加载两处共用）
   const weeklyStatusText = weeklySyncStatus
     ? (weeklySyncStatus.phase === 'syncing'
@@ -921,11 +888,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
                 </Button>
                 {selectedDiscoveryChannel === 'hot-release' && (
-                  <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-[opacity,translate] duration-200 pointer-events-none">
-                    <div className="bg-popover text-popover-foreground border border-border text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                  <div className="absolute top-full mt-2 right-0 z-tooltip opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-[opacity,translate] duration-fast pointer-events-none">
+                    <div className="popover-styled px-2.5 py-1.5 text-label-sm text-foreground whitespace-nowrap">
                       {t('discoveryView.each-refresh-shows-different-content')}
                     </div>
-                    <div className="absolute -top-1 right-3 w-2 h-2 bg-popover border-t border-l border-border rotate-45" />
                   </div>
                 )}
               </div>
@@ -933,20 +899,20 @@ export const DiscoveryView: React.FC = React.memo(() => {
           />
           {/* 顶部工具栏 - 随滚动显示/隐藏 */}
           <div 
-            className={`flex-shrink-0 pr-2 transition-transform duration-300 ease-in-out z-10 ${
+            className={`shrink-0 pr-2 transition-transform duration-base ease-out z-sticky ${
               isToolbarVisible ? 'translate-y-0' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
             {selectedDiscoveryChannel !== 'code-search' && (
-            <div className="ui-toolbar app-page-toolbar app-discovery-toolbar p-3.5 sm:p-4 mb-4">
+            <div className="ui-toolbar app-page-toolbar app-discovery-toolbar mb-3">
               {/* 第二行：筛选和操作按钮（代码搜索频道使用自有工具条，此处隐藏仓库维度控件） */}
               <div className="flex items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'trending' && (
             <div className="app-discovery-time-filter">
               <Select value={trendingTimeRange} onValueChange={(value) => setTrendingTimeRange(value as TrendingTimeRange)}>
-                <SelectTrigger aria-label={t('discoveryView.time-range')} className="ui-field app-discovery-time-select h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground">
+                <SelectTrigger aria-label={t('discoveryView.time-range')} className="app-discovery-time-select h-control w-auto min-w-28 px-2.5 text-label font-medium">
                   <span className="app-discovery-time-select-value">
-                    <Calendar className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
+                    <Calendar className="size-3.5 text-tertiary" />
                     <SelectValue />
                   </span>
                 </SelectTrigger>
@@ -960,7 +926,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           )}
         {selectedDiscoveryChannel === 'topic' && (
                   <Select value={discoverySelectedTopic || 'all'} onValueChange={(value) => setDiscoverySelectedTopic(value === 'all' ? null : value as TopicCategory)}>
-                    <SelectTrigger aria-label={t('discoveryView.topic-filter')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue placeholder={t('discoveryView.topic')} /></SelectTrigger>
+                    <SelectTrigger aria-label={t('discoveryView.topic-filter')} className="h-control w-auto min-w-28 px-2.5 text-label font-medium"><SelectValue placeholder={t('discoveryView.topic')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t('discoveryView.topic')}</SelectItem>
                       <SelectItem value="ai">{t('discoveryView.ai')}</SelectItem>
@@ -979,58 +945,60 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     type="button"
                     onClick={() => setWeeklyOnlyCollected(!weeklyOnlyCollected)}
                     aria-pressed={weeklyOnlyCollected}
-                    className={`flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                    className={`inline-flex h-control items-center gap-1.5 rounded-full border px-2.5 text-label font-medium transition-[background-color,color,border-color] duration-micro ease-out-subtle hover:duration-instant ${
                       weeklyOnlyCollected
-                        ? 'bg-primary/10 text-primary border-primary/30 dark:text-primary'
-                        : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground'
+                        ? 'border-[var(--accent-tint-strong)] bg-accent-tint text-accent-text'
+                        : 'border-default bg-transparent text-secondary hover:bg-fill-hover hover:text-foreground'
                     }`}
                     title={t('discoveryView.only-show-submissions-included-in-the-weekly-iss')}
                   >
-                    <Newspaper className="w-4 h-4" />
+                    <Newspaper className="size-3.5" />
                     {t('discoveryView.in-weekly')}
                   </button>
                 )}
                 {selectedDiscoveryChannel === 'weekly' && weeklyStatusText && (
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground" aria-live="polite">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span className="flex items-center gap-1.5 text-label-sm text-tertiary tabular-nums" aria-live="polite">
+                    <Loader2 className="size-3.5 animate-spin" />
                     {weeklyStatusText}
                   </span>
                 )}
                 {selectedDiscoveryChannel === 'x-tweet' && xTweetStatusText && (
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground" aria-live="polite">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span className="flex items-center gap-1.5 text-label-sm text-tertiary tabular-nums" aria-live="polite">
+                    <Loader2 className="size-3.5 animate-spin" />
                     {xTweetStatusText}
                   </span>
                 )}
                 {selectedDiscoveryChannel === 'x-tweet' && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setTweetSettingsOpen(true)}
-                    className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground"
+                    className="gap-1.5"
                     title={t('discoveryView.manage-the-follow-list')}
                   >
-                    <Users className="w-4 h-4" />
+                    <Users className="size-3.5 text-tertiary" />
                     {t('discoveryView.follow-list')}
-                  </button>
+                  </Button>
                 )}
                 {selectedDiscoveryChannel === 'telegram' && telegramStatusText && (
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground" aria-live="polite">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span className="flex items-center gap-1.5 text-label-sm text-tertiary tabular-nums" aria-live="polite">
+                    <Loader2 className="size-3.5 animate-spin" />
                     {telegramStatusText}
                   </span>
                 )}
                 {selectedDiscoveryChannel === 'telegram' && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setTelegramSettingsOpen(true)}
-                    className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground"
+                    className="gap-1.5"
                     title={t('discoveryView.manage-the-channel-list')}
                   >
-                    <Users className="w-4 h-4" />
+                    <Users className="size-3.5 text-tertiary" />
                     {t('discoveryView.channel-list')}
-                  </button>
+                  </Button>
                 )}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   {!currentChannel?.sourceUrl && selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram' && (
                     <PlatformFilter
                       platform={discoveryPlatform}
@@ -1045,18 +1013,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   {isAnalyzingThisChannel ? (
                     <div className="flex items-center gap-1">
                       <div className="relative">
-                        <div className="px-2 py-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground flex items-center gap-1.5 overflow-hidden">
+                        <div className="relative flex h-control items-center gap-1.5 overflow-hidden rounded-md bg-fill-hover px-2.5 text-secondary">
                           <div 
-                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-primary/50 via-primary/70 to-primary/50 transition-[width] duration-400 ease-out"
+                            className="absolute left-0 top-0 h-full bg-accent-tint-strong transition-[width] duration-slow ease-out"
                             style={{
                               width: analysisProgress.total > 0
                                 ? `${Math.min((analysisProgress.current / analysisProgress.total) * 100, 100)}%`
                                 : '0%',
                             }}
                           />
-                          <div className="relative flex items-center gap-1.5 z-10">
-                            <Bot className="w-4 h-4" />
-                            <span className="text-xs font-medium">
+                          <div className="relative flex items-center gap-1.5 z-10 tabular-nums">
+                            <Bot className="size-3.5 text-accent-text" />
+                            <span className="text-label-sm font-medium text-foreground">
                               {analysisProgress.current}/{analysisProgress.total}
                             </span>
                           </div>
@@ -1065,25 +1033,24 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       <Button
                         type="button"
                         variant="ghost"
-                        size="icon"
+                        size="icon-sm"
                         onClick={handleAbortAnalysis}
                         aria-label={t('discoveryView.stop-analysis')}
                         title={t('discoveryView.stop')}
-                        className="h-8 w-8"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="size-3.5" />
                       </Button>
                     </div>
                   ) : (
                     <Button
                       type="button"
-                      variant="default"
+                      variant="primary"
                       onClick={handleAnalyzePage}
                       disabled={isAnalyzing || currentIsLoading}
-                      className="h-9 shrink-0 gap-1.5 px-3 py-1.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="shrink-0 gap-1.5"
                       title={t('discoveryView.analyze-with-ai')}
                     >
-                      <Bot className="w-4 h-4" />
+                      <Bot className="size-3.5" />
                       <span className="hidden sm:inline">{t('discoveryView.ai-analyze')}</span>
                     </Button>
                   )}
@@ -1107,22 +1074,21 @@ export const DiscoveryView: React.FC = React.memo(() => {
             {selectedDiscoveryChannel !== 'code-search' && (
             <>
             {selectedDiscoveryChannel === 'search' && (
-              <div className={isDesktopSafeMode
-                ? 'ui-toolbar p-4 space-y-4'
-                : 'ui-toolbar p-5 space-y-4'}>
-                <div className="flex flex-col sm:flex-row gap-3">
+              <div className="ui-toolbar space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
                   {/* 搜索模式下拉：关键词（默认，行为不变）/ AI 语义（全网仓库） */}
                   <CustomSelect
                     value={discoverySearchMode}
                     onChange={handleSearchModeChange}
                     ariaLabel={t('discoveryView.search-mode')}
+                    className="h-control-lg"
                     options={[
-                      { value: 'keyword', label: t('discoveryView.search-mode-keyword'), icon: <Search className="w-4 h-4" /> },
-                      { value: 'semantic', label: t('discoveryView.search-mode-semantic'), icon: <Bot className="w-4 h-4" /> },
+                      { value: 'keyword', label: t('discoveryView.search-mode-keyword'), icon: <Search className="size-3.5" /> },
+                      { value: 'semantic', label: t('discoveryView.search-mode-semantic'), icon: <Bot className="size-3.5" /> },
                     ]}
                   />
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-tertiary" />
                     <Input
                       type="text"
                       aria-label={discoverySearchMode === 'semantic'
@@ -1134,32 +1100,36 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       placeholder={discoverySearchMode === 'semantic'
                         ? t('discoveryView.search-mode-semantic-placeholder')
                         : t('discoveryView.search-repositories-2')}
-                      className="ui-field h-auto w-full py-2.5 pl-10 pr-4 text-foreground dark:text-foreground" />
+                      className="w-full pl-8 pr-4" />
                   </div>
                   {currentIsLoading ? (
                     <Button
+                      variant="secondary"
+                      size="lg"
                       onClick={handleAbortSearch}
                       aria-label={t('discoveryView.stop')}
                       title={t('discoveryView.stop')}
-                      className="ui-button-secondary px-5 py-2.5 flex items-center gap-2 font-medium"
+                      className="gap-1.5"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="size-3.5" />
                       <span className="hidden sm:inline">{t('discoveryView.stop')}</span>
                     </Button>
                   ) : (
                     <Button
+                      variant="primary"
+                      size="lg"
                       onClick={handleSearch}
                       aria-label={t('discoveryView.search')}
                       disabled={!searchInput.trim()}
-                      className="ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                      className="gap-1.5"
                     >
-                      <Search className="w-4 h-4" />
+                      <Search className="size-3.5" />
                       <span className="hidden sm:inline">{t('discoveryView.search')}</span>
                     </Button>
                   )}
                 </div>
                 {discoverySearchMode === 'semantic' && (
-                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                  <p className="text-label-sm text-tertiary">
                     {t('discoveryView.search-mode-hint')}
                   </p>
                 )}
@@ -1167,9 +1137,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <SemanticSearchProgress phase={discoverySearchPhase} detail={discoverySearchPhaseDetail} />
                 )}
                 
-                <div className="flex flex-wrap gap-2.5">
+                <div className="flex flex-wrap gap-2">
                   <Select value={discoveryLanguage} onValueChange={(value) => setDiscoveryLanguage(value as ProgrammingLanguage)}>
-                    <SelectTrigger aria-label={t('discoveryView.programming-language')} className="ui-field h-9 w-auto min-w-32 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label={t('discoveryView.programming-language')} className="h-control w-auto min-w-32 px-2.5 text-label font-medium"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="All">{t('discoveryView.all-languages')}</SelectItem>
                       <SelectItem value="JavaScript">JavaScript</SelectItem>
@@ -1217,18 +1187,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
             )}
 
             {currentIsLoading && allRepos.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 gap-4">
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-background dark:from-accent/40 dark:to-transparent flex items-center justify-center">
-                    <Loader2 className="w-7 h-7 animate-spin text-primary" />
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-status-green rounded-full animate-ping opacity-75" />
-                </div>
-                <div className="text-center space-y-1.5">
-                  <p className="text-foreground dark:text-muted-foreground font-medium text-sm">
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 className="size-7 animate-spin text-accent-text" />
+                <div className="text-center space-y-1">
+                  <p className="text-label font-medium text-foreground">
                     {t('discoveryView.fetching-data')}
                   </p>
-                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                  <p className="text-label-sm text-tertiary tabular-nums">
                     {selectedDiscoveryChannel === 'weekly' && weeklyStatusText
                       ? weeklyStatusText
                       : selectedDiscoveryChannel === 'x-tweet' && xTweetStatusText
@@ -1242,177 +1207,123 @@ export const DiscoveryView: React.FC = React.memo(() => {
             )}
 
             {!currentIsLoading && allRepos.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
+              <div className="flex flex-col items-center justify-center py-14 px-6 gap-3 text-center">
+                {currentChannelEmptyIcon}
                 {selectedDiscoveryChannel === 'search' ? (
-                  <>
-                    {isDesktopSafeMode ? (
-                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
-                        {currentChannelIconNode}
-                      </div>
-                    ) : (
-                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                        {currentChannelStyle.largeIcon}
-                      </div>
-                    )}
-                    <div className="space-y-2 max-w-xs">
-                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('discoveryView.repo-search')}
-                      </p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {/* 仅当语义搜索真的给出了空态原因（召回为空/AI 判空）才显示语义空态文案：
-                            语义模式但回退到关键词搜索（如 AI 配置不完整）时 reason 为 null，
-                            此时显示通用关键词文案，不能宣称"语义召回为空" */}
-                        {discoverySearchMode === 'semantic' && discoverySearchQuery.trim() && discoverySearchEmptyReason
-                          ? (discoverySearchEmptyReason === 'ai_empty'
-                              ? t('discoveryView.semantic-empty-ai')
-                              : t('discoveryView.semantic-empty-recall'))
-                          : t('discoveryView.enter-keywords-to-search-github-repositories')}
-                      </p>
-                    </div>
-                  </>
+                  <div className="space-y-1.5 max-w-sm">
+                    <p className="text-label-lg font-medium text-foreground">
+                      {t('discoveryView.repo-search')}
+                    </p>
+                    <p className="text-label text-secondary">
+                      {/* 仅当语义搜索真的给出了空态原因（召回为空/AI 判空）才显示语义空态文案：
+                          语义模式但回退到关键词搜索（如 AI 配置不完整）时 reason 为 null，
+                          此时显示通用关键词文案，不能宣称"语义召回为空" */}
+                      {discoverySearchMode === 'semantic' && discoverySearchQuery.trim() && discoverySearchEmptyReason
+                        ? (discoverySearchEmptyReason === 'ai_empty'
+                            ? t('discoveryView.semantic-empty-ai')
+                            : t('discoveryView.semantic-empty-recall'))
+                        : t('discoveryView.enter-keywords-to-search-github-repositories')}
+                    </p>
+                  </div>
                 ) : selectedDiscoveryChannel === 'x-tweet' ? (
                   <>
-                    {isDesktopSafeMode ? (
-                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
-                        {currentChannelIconNode}
-                      </div>
-                    ) : (
-                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                        {currentChannelStyle.largeIcon}
-                      </div>
-                    )}
-                    <div className="space-y-2 max-w-xs">
-                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
+                    <div className="space-y-1.5 max-w-sm">
+                      <p className="text-label-lg font-medium text-foreground">
                         {t('discoveryView.x-tweets')}
                       </p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
+                      <p className="text-label text-secondary">
                         {t('discoveryView.fetches-github-projects-from-followed-accounts-l')}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
                       <Button
-                        variant="default"
+                        variant="secondary"
                         onClick={() => refreshChannel('x-tweet', 1, false)}
                         disabled={currentIsLoading}
-                        className={isDesktopSafeMode
-                          ? 'flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'
-                          : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
+                        className="gap-1.5"
                       >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="size-3.5" />
                         {t('discoveryView.start-sync')}
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => setTweetSettingsOpen(true)}
                         disabled={currentIsLoading}
-                        className="flex items-center gap-2 rounded-xl border border-border dark:border-border bg-card dark:bg-muted/40 px-6 py-2.5 text-sm font-medium text-foreground dark:text-foreground transition-colors hover:bg-accent dark:hover:bg-accent"
+                        className="gap-1.5"
                       >
-                        <Users className="w-4 h-4" />
+                        <Users className="size-3.5" />
                         {t('discoveryView.follow-list')}
                       </Button>
                     </div>
                   </>
                 ) : selectedDiscoveryChannel === 'telegram' ? (
                   <>
-                    {isDesktopSafeMode ? (
-                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
-                        {currentChannelIconNode}
-                      </div>
-                    ) : (
-                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                        {currentChannelStyle.largeIcon}
-                      </div>
-                    )}
-                    <div className="space-y-2 max-w-xs">
-                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
+                    <div className="space-y-1.5 max-w-sm">
+                      <p className="text-label-lg font-medium text-foreground">
                         {t('discoveryView.telegram-channels')}
                       </p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
+                      <p className="text-label text-secondary">
                         {t('discoveryView.fetches-github-projects-from-followed-channels-m')}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
                       <Button
-                        variant="default"
+                        variant="secondary"
                         onClick={() => refreshChannel('telegram', 1, false)}
                         disabled={currentIsLoading}
-                        className={isDesktopSafeMode
-                          ? 'flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'
-                          : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
+                        className="gap-1.5"
                       >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="size-3.5" />
                         {t('discoveryView.start-sync')}
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => setTelegramSettingsOpen(true)}
                         disabled={currentIsLoading}
-                        className="flex items-center gap-2 rounded-xl border border-border dark:border-border bg-card dark:bg-muted/40 px-6 py-2.5 text-sm font-medium text-foreground dark:text-foreground transition-colors hover:bg-accent dark:hover:bg-accent"
+                        className="gap-1.5"
                       >
-                        <Users className="w-4 h-4" />
+                        <Users className="size-3.5" />
                         {t('discoveryView.channel-list')}
                       </Button>
                     </div>
                   </>
                 ) : selectedDiscoveryChannel === 'weekly' ? (
                   <>
-                    {isDesktopSafeMode ? (
-                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
-                        {currentChannelIconNode}
-                      </div>
-                    ) : (
-                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                        {currentChannelStyle.largeIcon}
-                      </div>
-                    )}
-                    <div className="space-y-2 max-w-xs">
-                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
+                    <div className="space-y-1.5 max-w-sm">
+                      <p className="text-label-lg font-medium text-foreground">
                         {t('discoveryView.ruanyifeng-weekly')}
                       </p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
+                      <p className="text-label text-secondary">
                         {t('discoveryView.sync-open-source-submissions-from-the-weekly-ear')}
                       </p>
                     </div>
                     <Button
-                      variant="default"
+                      variant="secondary"
                       onClick={() => refreshChannel('weekly', 1, false)}
                       disabled={currentIsLoading}
-                      className={isDesktopSafeMode
-                        ? 'flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'
-                        : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
+                      className="mt-2 gap-1.5"
                     >
-                      <RefreshCw className="w-4 h-4" />
+                      <RefreshCw className="size-3.5" />
                       {t('discoveryView.start-sync')}
                     </Button>
                   </>
                 ) : (
                   <>
-                    {isDesktopSafeMode ? (
-                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
-                        {currentChannelIconNode}
-                      </div>
-                    ) : (
-                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                        {currentChannelStyle.largeIcon}
-                      </div>
-                    )}
-                    <div className="space-y-2 max-w-xs">
-                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
+                    <div className="space-y-1.5 max-w-sm">
+                      <p className="text-label-lg font-medium text-foreground">
                         {t('discoveryView.no-data-yet')}
                       </p>
-                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
+                      <p className="text-label text-secondary">
                         {t('discoveryView.click-refresh-to-fetch-latest-rankings')}
                       </p>
                     </div>
                     <Button
-                      variant="default"
+                      variant="secondary"
                       onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                       disabled={currentIsLoading}
-                      className={isDesktopSafeMode
-                        ? 'flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'
-                        : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
+                      className="mt-2 gap-1.5"
                     >
-                      <RefreshCw className="w-4 h-4" />
+                      <RefreshCw className="size-3.5" />
                       {t('discoveryView.refresh-now')}
                     </Button>
                   </>
@@ -1435,28 +1346,30 @@ export const DiscoveryView: React.FC = React.memo(() => {
             )}
 
             {currentIsLoadingMore && (
-              <div className="flex items-center justify-center py-6 gap-3">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('discoveryView.loading-more')}</span>
+              <div className="flex items-center justify-center py-6 gap-2.5">
+                <Loader2 className="size-4 animate-spin text-accent-text" />
+                <span className="text-label-sm text-secondary">{t('discoveryView.loading-more')}</span>
               </div>
             )}
 
             {currentLoadMoreError && (
-              <div className="flex flex-col items-center gap-3 py-4">
-                <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground ">
-                  <X className="w-4 h-4" />
-                  <span className="text-sm">{currentLoadMoreError}</span>
+              <div className="flex flex-col items-center gap-2.5 py-4">
+                <div className="flex items-center gap-1.5 text-destructive">
+                  <X className="size-4" />
+                  <span className="text-label-sm">{currentLoadMoreError}</span>
                 </div>
                 <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => {
                     const nextPage = discoveryNextPage[selectedDiscoveryChannel];
                     if (nextPage) {
                       refreshChannel(selectedDiscoveryChannel, nextPage, true);
                     }
                   }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors flex items-center gap-2"
+                  className="gap-1.5"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className="size-3.5" />
                   {t('discoveryView.retry')}
                 </Button>
               </div>
@@ -1464,16 +1377,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
             {/* Page Info */}
             {!currentIsLoading && allRepos.length > 0 && (
-              <div className={isDesktopSafeMode
-                ? 'flex items-center justify-between py-3.5 px-5 bg-background dark:bg-card rounded-lg border border-border dark:border-border text-sm'
-                : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-muted/60 to-muted/30 rounded-xl border border-border/60 dark:border-border/50 text-sm'}>
-                <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+              <div className="flex items-center justify-between rounded-lg bg-paper px-4 py-2.5 shadow-elev-0 text-label-sm tabular-nums">
+                <div className="flex items-center gap-2 text-tertiary">
+                  <div className="size-1.5 rounded-full bg-accent-solid" />
                   <span>
-                    {t('discoveryView.total')} <strong className="text-foreground dark:text-foreground">{allRepos.length}</strong> {t('discoveryView.items')}
+                    {t('discoveryView.total')} <strong className="font-medium text-foreground">{allRepos.length}</strong> {t('discoveryView.items')}
                   </span>
                 </div>
-
               </div>
             )}
 

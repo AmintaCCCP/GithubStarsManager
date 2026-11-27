@@ -1,4 +1,3 @@
-
 import { TranslateFn } from '../../i18n/useT';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { AlertTriangle, FolderPlus, Loader2, Palette, Plug, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
@@ -13,8 +12,17 @@ import { PluginMarketplaceDialog } from './PluginMarketplaceDialog';
 import { PluginRegistrySection } from './PluginRegistrySection';
 import { PluginUninstallDialog } from './PluginUninstallDialog';
 import type { InstalledPlugin } from '../../plugins/types';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Switch } from '../ui/switch';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface PluginSettingsPanelProps {
   t: TranslateFn;
@@ -24,7 +32,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   const snapshot = useSyncExternalStore(
     pluginRegistry.subscribe,
     pluginRegistry.getSnapshot,
-    pluginRegistry.getSnapshot
+    pluginRegistry.getSnapshot,
   );
   const { confirm, toast } = useDialog();
   const [loading, setLoading] = useState(true);
@@ -65,7 +73,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     } catch (error) {
       toast(
         error instanceof Error ? error.message : t('pluginSettingsPanel.failed-to-save-search-service-settings'),
-        'error'
+        'error',
       );
     }
   };
@@ -142,9 +150,9 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
 
   if (!pluginClient.isSupported()) {
     return (
-      <div className="rounded-lg border border-border bg-muted/30 p-5 text-sm text-muted-foreground">
+      <SettingsNotice tone="neutral">
         {t('pluginSettingsPanel.the-plugin-system-is-currently-available-only-in')}
-      </div>
+      </SettingsNotice>
     );
   }
 
@@ -152,177 +160,208 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
 
   const page = pagePlugin?.manifest.contributes.pages?.find((item) => item.id === selectedPage?.pageId);
   if (selectedPage && pagePlugin && page) {
-    return <PluginPageViewer
-      key={`${pagePlugin.manifest.id}:${page.id}`}
-      pluginId={pagePlugin.manifest.id}
-      pluginName={pagePlugin.manifest.name}
-      pageId={page.id}
-      pageTitle={page.title}
-      onClose={() => setSelectedPage(null)}
-      t={t}
-    />;
+    return (
+      <PluginPageViewer
+        key={`${pagePlugin.manifest.id}:${page.id}`}
+        pluginId={pagePlugin.manifest.id}
+        pluginName={pagePlugin.manifest.name}
+        pageId={page.id}
+        pageTitle={page.title}
+        onClose={() => setSelectedPage(null)}
+        t={t}
+      />
+    );
   }
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-lg border border-border p-4">
-        <label htmlFor="plugin-search-endpoint" className="block text-sm font-medium">
-          {t('pluginSettingsPanel.plugin-web-search-service-searxng')}
-        </label>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {t('pluginSettingsPanel.enter-a-trusted-https-instance-url-with-json-out')}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <input id="plugin-search-endpoint" type="url" value={searchEndpoint}
-            onChange={(event) => setSearchEndpoint(event.target.value)}
-            placeholder="https://search.example.com"
-            className="min-w-[240px] flex-1 rounded border border-border bg-background px-3 py-2 text-sm" />
-          <Button type="button" variant="outline" onClick={() => void saveSearchEndpoint()}>
-            {t('pluginSettingsPanel.save-search-service')}
-          </Button>
-        </div>
-      </div>
-      {/* 社区插件注册表：入口卡片，插件的浏览/安装与源的管理在市场弹窗里完成 */}
+    <SettingsPageStack>
+      <SettingsSection title={t('pluginSettingsPanel.plugin-web-search-service-searxng')}>
+        <SettingsCard className="space-y-3 p-3.5">
+          <div>
+            <label htmlFor="plugin-search-endpoint" className="block text-label font-medium text-foreground">
+              {t('pluginSettingsPanel.plugin-web-search-service-searxng')}
+            </label>
+            <p className="mt-px text-label-sm text-secondary">
+              {t('pluginSettingsPanel.enter-a-trusted-https-instance-url-with-json-out')}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              id="plugin-search-endpoint"
+              type="url"
+              value={searchEndpoint}
+              onChange={(event) => setSearchEndpoint(event.target.value)}
+              placeholder="https://search.example.com"
+              className="min-w-[240px] flex-1"
+            />
+            <Button type="button" variant="outline" size="lg" onClick={() => void saveSearchEndpoint()}>
+              {t('pluginSettingsPanel.save-search-service')}
+            </Button>
+          </div>
+        </SettingsCard>
+      </SettingsSection>
+
       <PluginRegistrySection
         t={t}
         onOpenMarketplace={() => setMarketplaceOpen(true)}
         reloadSignal={marketplaceReloadSignal}
       />
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <Plug className="h-5 w-5" />
-            {t('pluginSettingsPanel.local-plugins')}
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t('pluginSettingsPanel.plugins-load-from-the-app-data-plugins-folder-an')}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" size="sm" onClick={() => void install()} disabled={loading}>
-            <FolderPlus className="mr-2 h-4 w-4" />
-            {t('pluginSettingsPanel.install-local-plugin')}
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            {t('pluginSettingsPanel.refresh')}
-          </Button>
-        </div>
-      </div>
+      <SettingsSection
+        title={t('pluginSettingsPanel.local-plugins')}
+        description={t('pluginSettingsPanel.plugins-load-from-the-app-data-plugins-folder-an')}
+        actions={(
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="primary" size="sm" onClick={() => void install()} disabled={loading}>
+              <FolderPlus className="size-3.5" />
+              <span>{t('pluginSettingsPanel.install-local-plugin')}</span>
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>
+              <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>{t('pluginSettingsPanel.refresh')}</span>
+            </Button>
+          </div>
+        )}
+      >
+        <SettingsNotice tone="warning" icon={<ShieldAlert />}>
+          {t('pluginSettingsPanel.local-plugins-with-worker-js-are-trusted-code-pa')}
+        </SettingsNotice>
 
-      <div className="flex gap-3 rounded-lg border border-status-amber/40 bg-status-amber/5 p-4 text-sm">
-        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-amber" />
-        <p>{t('pluginSettingsPanel.local-plugins-with-worker-js-are-trusted-code-pa')}</p>
-      </div>
-
-      {loading && snapshot.plugins.length === 0 ? (
-        <div className="flex items-center justify-center py-12 text-muted-foreground">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          {t('pluginSettingsPanel.scanning-plugins')}
-        </div>
-      ) : snapshot.plugins.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          {t('pluginSettingsPanel.no-plugins-found')}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {snapshot.plugins.map((plugin) => {
-            const busy = busyPluginId === plugin.manifest.id;
-            return (
-              <div key={plugin.manifest.id} className="rounded-lg border border-border p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <PluginIcon pluginId={plugin.manifest.id} className="h-5 w-5 shrink-0 text-muted-foreground" />
-                      <h4 className="font-medium">{plugin.manifest.name}</h4>
-                      <span className="text-xs text-muted-foreground">v{plugin.manifest.version}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${
-                        plugin.status === 'active'
-                          ? 'bg-status-green/10 text-status-green'
-                          : plugin.status === 'error'
-                            ? 'bg-destructive/10 text-destructive'
-                            : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {plugin.status === 'active' ? t('pluginSettingsPanel.active') : plugin.status === 'error' ? t('pluginSettingsPanel.error') : t('pluginSettingsPanel.disabled')}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIconPickerTarget(plugin)}
-                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                        aria-label={t('pluginSettingsPanel.customize-icon')}
-                        title={t('pluginSettingsPanel.customize-icon')}
-                      >
-                        <Palette className="mr-1 h-3.5 w-3.5" />
-                        {t('pluginSettingsPanel.customize-icon')}
-                      </Button>
-                    </div>
-                    <p className="mt-1 break-all text-xs text-muted-foreground">{plugin.manifest.id}</p>
-                    {plugin.manifest.description && <p className="mt-2 text-sm text-muted-foreground">{plugin.manifest.description}</p>}
-                    {plugin.manifest.permissions.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {plugin.manifest.permissions.map((permission) => (
-                          <span key={permission} className="rounded bg-muted px-2 py-1 font-mono text-xs">{permission}</span>
-                        ))}
+        {loading && snapshot.plugins.length === 0 ? (
+          <SettingsCard className="flex items-center justify-center gap-2 py-12 text-label text-secondary">
+            <Loader2 className="size-4 animate-spin text-tertiary" />
+            <span>{t('pluginSettingsPanel.scanning-plugins')}</span>
+          </SettingsCard>
+        ) : snapshot.plugins.length === 0 ? (
+          <SettingsCard className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+            <Plug className="size-9 text-tertiary stroke-[1.5]" aria-hidden="true" />
+            <p className="text-label text-secondary">
+              {t('pluginSettingsPanel.no-plugins-found')}
+            </p>
+          </SettingsCard>
+        ) : (
+          <SettingsCard>
+            {snapshot.plugins.map((plugin, index) => {
+              const busy = busyPluginId === plugin.manifest.id;
+              return (
+                <React.Fragment key={plugin.manifest.id}>
+                  {index > 0 && <SettingsDivider />}
+                  <div className="px-3.5 py-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <PluginIcon pluginId={plugin.manifest.id} className="size-4 shrink-0 text-tertiary" />
+                          <h4 className="text-label font-medium text-foreground">{plugin.manifest.name}</h4>
+                          <span className="text-label-sm text-tertiary tabular-nums">v{plugin.manifest.version}</span>
+                          <Badge
+                            variant={
+                              plugin.status === 'active'
+                                ? 'success'
+                                : plugin.status === 'error'
+                                  ? 'destructive'
+                                  : 'secondary'
+                            }
+                          >
+                            {plugin.status === 'active'
+                              ? t('pluginSettingsPanel.active')
+                              : plugin.status === 'error'
+                                ? t('pluginSettingsPanel.error')
+                                : t('pluginSettingsPanel.disabled')}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIconPickerTarget(plugin)}
+                            className="text-secondary hover:text-foreground"
+                            aria-label={t('pluginSettingsPanel.customize-icon')}
+                            title={t('pluginSettingsPanel.customize-icon')}
+                          >
+                            <Palette className="size-3.5" />
+                            <span>{t('pluginSettingsPanel.customize-icon')}</span>
+                          </Button>
+                        </div>
+                        <p className="mt-1 break-all font-mono text-caption text-tertiary">{plugin.manifest.id}</p>
+                        {plugin.manifest.description && (
+                          <p className="mt-1.5 text-label-sm leading-[18px] text-secondary">{plugin.manifest.description}</p>
+                        )}
+                        {plugin.manifest.permissions.length > 0 && (
+                          <div className="mt-2.5 flex flex-wrap gap-1.5">
+                            {plugin.manifest.permissions.map((permission) => (
+                              <span
+                                key={permission}
+                                className="rounded-xs bg-fill-hover px-1.5 py-0.5 font-mono text-caption text-secondary"
+                              >
+                                {permission}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {plugin.status === 'active' && plugin.manifest.contributes.pages && plugin.manifest.contributes.pages.length > 0 && (
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {plugin.manifest.contributes.pages.map((pageContribution) => (
+                              <Button
+                                key={pageContribution.id}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedPage({ pluginId: plugin.manifest.id, pageId: pageContribution.id })}
+                              >
+                                {t('pluginSettingsPanel.open-page-named', { name: pageContribution.title })}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                        {plugin.lastError && (
+                          <p className="mt-2.5 flex items-start gap-2 text-label-sm text-destructive">
+                            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                            <span>{plugin.lastError.message}</span>
+                          </p>
+                        )}
                       </div>
-                    )}
-                    {plugin.status === 'active' && plugin.manifest.contributes.pages?.map((pageContribution) => (
-                      <Button
-                        key={pageContribution.id}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 mr-2"
-                        onClick={() => setSelectedPage({ pluginId: plugin.manifest.id, pageId: pageContribution.id })}
-                      >
-                        {t('pluginSettingsPanel.open-page-named', { name: pageContribution.title })}
-                      </Button>
-                    ))}
-                    {plugin.lastError && (
-                      <p className="mt-3 flex items-start gap-2 text-sm text-destructive">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                        {plugin.lastError.message}
-                      </p>
-                    )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {busy && <Loader2 className="size-4 animate-spin text-tertiary" />}
+                        <Switch
+                          checked={plugin.enabled}
+                          disabled={busy}
+                          aria-label={t('pluginSettingsPanel.enable-v1', { v1: plugin.manifest.name })}
+                          onCheckedChange={(checked) => void (checked ? enable(plugin) : disable(plugin))}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={busy}
+                          onClick={() => setUninstallTarget(plugin)}
+                          aria-label={t('pluginSettingsPanel.uninstall-v1', { v1: plugin.manifest.name })}
+                          className="text-destructive hover:bg-destructive-tint hover:text-destructive"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                    <Switch
-                      checked={plugin.enabled}
-                      disabled={busy}
-                      aria-label={t('pluginSettingsPanel.enable-v1', { v1: plugin.manifest.name })}
-                      onCheckedChange={(checked) => void (checked ? enable(plugin) : disable(plugin))}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={busy}
-                      onClick={() => setUninstallTarget(plugin)}
-                      aria-label={t('pluginSettingsPanel.uninstall-v1', { v1: plugin.manifest.name })}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                </React.Fragment>
+              );
+            })}
+          </SettingsCard>
+        )}
+      </SettingsSection>
 
       {snapshot.invalidPlugins.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="font-medium text-destructive">{t('pluginSettingsPanel.invalid-plugins')}</h4>
-          {snapshot.invalidPlugins.map((plugin) => (
-            <div key={`${plugin.directoryName}:${plugin.code}`} className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm">
-              <p className="font-medium">{plugin.directoryName}</p>
-              <p className="mt-1 text-destructive">{plugin.message} ({plugin.code})</p>
-            </div>
-          ))}
-        </div>
+        <SettingsSection title={<span className="text-destructive">{t('pluginSettingsPanel.invalid-plugins')}</span>}>
+          <SettingsCard className="ring-1 ring-destructive/25">
+            {snapshot.invalidPlugins.map((plugin, index) => (
+              <React.Fragment key={`${plugin.directoryName}:${plugin.code}`}>
+                {index > 0 && <SettingsDivider />}
+                <div className="bg-destructive-tint/50 px-3.5 py-2.5 text-label-sm">
+                  <p className="font-medium text-foreground">{plugin.directoryName}</p>
+                  <p className="mt-0.5 text-destructive">{plugin.message} ({plugin.code})</p>
+                </div>
+              </React.Fragment>
+            ))}
+          </SettingsCard>
+        </SettingsSection>
       )}
 
       <PluginUninstallDialog
@@ -344,11 +383,10 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
         isOpen={marketplaceOpen}
         onClose={() => {
           setMarketplaceOpen(false);
-          // 源数量/插件统计可能在弹窗里被改动，关闭时让入口卡片重读本地状态。
           setMarketplaceReloadSignal((signal) => signal + 1);
         }}
         t={t}
       />
-    </div>
+    </SettingsPageStack>
   );
 };

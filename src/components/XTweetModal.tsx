@@ -35,12 +35,12 @@ export const XTweetModal: React.FC<XTweetModalProps> = ({ isOpen, onClose, tweet
       footer={
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
+            <span className="rounded-xs bg-accent-tint px-1.5 py-0.5 text-caption font-medium text-accent-text">
               @{tweet.handle}
             </span>
             {tweetDate && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                <Calendar className="w-3 h-3" />
+              <span className="flex items-center gap-1 text-label-sm text-tertiary tabular-nums">
+                <Calendar className="size-3" />
                 {tweetDate}
               </span>
             )}
@@ -49,9 +49,9 @@ export const XTweetModal: React.FC<XTweetModalProps> = ({ isOpen, onClose, tweet
             href={tweet.html_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-label font-medium text-secondary hover:text-foreground transition-colors"
           >
-            <ExternalLink className="w-4 h-4" />
+            <ExternalLink className="size-3.5" />
             {t('xTweetModal.open-on-x')}
           </a>
         </div>
@@ -64,7 +64,7 @@ export const XTweetModal: React.FC<XTweetModalProps> = ({ isOpen, onClose, tweet
           baseUrl={tweet.html_url}
         />
       ) : (
-        <div className="py-10 text-center text-sm text-muted-foreground dark:text-muted-foreground">
+        <div className="py-10 text-center text-label text-tertiary">
           {t('xTweetModal.this-tweet-has-no-text-content')}
         </div>
       )}

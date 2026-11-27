@@ -18,7 +18,7 @@ export const ContextSidebarBody: React.FC<ContextSidebarBodyProps> = ({
   return (
     <Component
       className={cn(
-        'context-sidebar-body scrollbar-on-scroll',
+        'context-sidebar-body scrollbar-on-scroll mask-fade-bottom',
         isScrolling && 'scrolling',
         className,
       )}

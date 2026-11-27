@@ -1,11 +1,18 @@
-
 import { TranslateFn } from '../../i18n/useT';
 import { Button } from '../ui/button';
 import React from 'react';
-import { Download, Upload, RefreshCw, Cloud, AlertCircle } from 'lucide-react';
+import { Download, Upload, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import { useBackupActions } from '../../features/settings/hooks/useBackupActions';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsRow,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface BackupPanelProps {
   t: TranslateFn;
@@ -16,108 +23,85 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   const { activeConfig, isBackingUp, isRestoring, backup, restore } = useBackupActions();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-3">
-        <Cloud className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-          {t('backupPanel.backup-restore')}
-        </h3>
-      </div>
-
+    <SettingsPageStack>
       {!activeConfig && (
-        <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-          <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-muted-foreground dark:text-muted-foreground mt-0.5" />
-            <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-                {t('backupPanel.please-configure-and-activate-webdav-service-fir')}
-              </p>
-              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                {t('backupPanel.backup-and-restore-features-require-webdav-servi')}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {lastBackup && (
-        <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg">
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-            <span className="font-medium">{t('backupPanel.last-backup')}</span>{' '}
-            {new Date(lastBackup).toLocaleString()}
+        <SettingsNotice tone="warning" icon={<AlertCircle />}>
+          <p className="font-medium text-foreground">
+            {t('backupPanel.please-configure-and-activate-webdav-service-fir')}
           </p>
-        </div>
+          <p className="mt-0.5 text-secondary">
+            {t('backupPanel.backup-and-restore-features-require-webdav-servi')}
+          </p>
+        </SettingsNotice>
       )}
 
-      <IncludeKeysToggle t={t} />
+      <SettingsSection title={t('backupPanel.backup-restore')}>
+        <IncludeKeysToggle t={t} />
+      </SettingsSection>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-6 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-          <div className="flex items-center space-x-3 mb-4">
-            <Upload className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
-            <div>
-              <h4 className="font-medium text-foreground dark:text-foreground">
-                {t('backupPanel.backup-data')}
-              </h4>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('backupPanel.backup-data-to-webdav')}
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={backup}
-            disabled={isBackingUp || !activeConfig}
-            className="h-auto w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      <SettingsSection>
+        <SettingsCard>
+          {lastBackup && (
+            <>
+              <SettingsRow
+                icon={<Clock />}
+                title={t('backupPanel.last-backup')}
+              >
+                <span className="text-label-sm text-secondary tabular-nums">
+                  {new Date(lastBackup).toLocaleString()}
+                </span>
+              </SettingsRow>
+              <SettingsDivider />
+            </>
+          )}
+          <SettingsRow
+            icon={<Upload />}
+            title={t('backupPanel.backup-data')}
+            description={t('backupPanel.backup-data-to-webdav')}
           >
-            {isBackingUp ? (
-              <RefreshCw className="w-5 h-5 animate-spin" />
-            ) : (
-              <Upload className="w-5 h-5" />
-            )}
-            <span>{isBackingUp ? t('backupPanel.backing-up') : t('backupPanel.start-backup')}</span>
-          </Button>
-        </div>
-
-        <div className="p-6 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-          <div className="flex items-center space-x-3 mb-4">
-            <Download className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
-            <div>
-              <h4 className="font-medium text-foreground dark:text-foreground">
-                {t('backupPanel.restore-data')}
-              </h4>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('backupPanel.restore-data-from-webdav')}
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={restore}
-            disabled={isRestoring || !activeConfig}
-            className="h-auto w-full flex items-center justify-center space-x-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={backup}
+              disabled={isBackingUp || !activeConfig}
+            >
+              {isBackingUp ? <RefreshCw className="size-4 animate-spin" /> : <Upload className="size-4" />}
+              <span>{isBackingUp ? t('backupPanel.backing-up') : t('backupPanel.start-backup')}</span>
+            </Button>
+          </SettingsRow>
+          <SettingsDivider />
+          <SettingsRow
+            icon={<Download />}
+            title={t('backupPanel.restore-data')}
+            description={t('backupPanel.restore-data-from-webdav')}
           >
-            {isRestoring ? (
-              <RefreshCw className="w-5 h-5 animate-spin" />
-            ) : (
-              <Download className="w-5 h-5" />
-            )}
-            <span>{isRestoring ? t('backupPanel.restoring') : t('backupPanel.start-restore')}</span>
-          </Button>
-        </div>
-      </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={restore}
+              disabled={isRestoring || !activeConfig}
+            >
+              {isRestoring ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
+              <span>{isRestoring ? t('backupPanel.restoring') : t('backupPanel.start-restore')}</span>
+            </Button>
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
 
-      <div className="p-4 bg-background dark:bg-muted/40 rounded-lg">
-        <h4 className="font-medium text-foreground dark:text-foreground mb-2">
-          {t('backupPanel.backup-includes')}
-        </h4>
-        <ul className="text-sm text-muted-foreground dark:text-muted-foreground space-y-1">
-          <li>• {t('backupPanel.github-stars-repository-list')}</li>
-          <li>• {t('backupPanel.release-information')}</li>
-          <li>• {t('backupPanel.custom-categories')}</li>
-          <li>• {t('backupPanel.ai-service-configurations')}</li>
-          <li>• {t('backupPanel.webdav-configurations')}</li>
-          <li>• {t('backupPanel.release-subscriptions-sources-read-state')}</li>
-        </ul>
-      </div>
-    </div>
+      <SettingsSection title={t('backupPanel.backup-includes')}>
+        <SettingsCard className="px-3.5 py-3">
+          <ul className="space-y-1 text-label-sm text-secondary">
+            <li>• {t('backupPanel.github-stars-repository-list')}</li>
+            <li>• {t('backupPanel.release-information')}</li>
+            <li>• {t('backupPanel.custom-categories')}</li>
+            <li>• {t('backupPanel.ai-service-configurations')}</li>
+            <li>• {t('backupPanel.webdav-configurations')}</li>
+            <li>• {t('backupPanel.release-subscriptions-sources-read-state')}</li>
+          </ul>
+        </SettingsCard>
+      </SettingsSection>
+    </SettingsPageStack>
   );
 };

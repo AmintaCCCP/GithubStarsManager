@@ -281,7 +281,7 @@ export const CategoryGlyph: React.FC<CategoryGlyphProps> = ({
       <span
         aria-hidden={title ? undefined : true}
         aria-label={title}
-        className={`app-category-glyph app-category-glyph-text ${className}`.trim()}
+        className={`app-category-glyph app-category-glyph-text shrink-0 ${className}`.trim()}
         data-category-glyph
       >
         {glyph}
@@ -294,7 +294,8 @@ export const CategoryGlyph: React.FC<CategoryGlyphProps> = ({
     <Icon
       aria-hidden={title ? undefined : true}
       aria-label={title}
-      className={`app-category-glyph ${className}`.trim()}
+      strokeWidth={1.75}
+      className={`app-category-glyph shrink-0 ${className}`.trim()}
       data-category-glyph
     />
   );

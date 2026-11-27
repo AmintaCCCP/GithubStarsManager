@@ -113,17 +113,17 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('xTweetSettingsModal.x-tweets-channel-settings')} maxWidth="max-w-2xl">
-      <div className="space-y-5">
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground dark:text-muted-foreground">
+      <div className="space-y-4">
+        <div className="rounded-md border border-subtle bg-sunken px-3.5 py-2.5 text-label text-secondary">
           {t('xTweetSettingsModal.refreshing-incrementally-pulls-the-latest-tweets')}
         </div>
 
-        <div className="rounded-lg border border-border dark:border-border bg-muted/50 dark:bg-muted/20 p-4">
-          <div className="mb-3 flex items-start gap-2">
-            <Users className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        <div className="rounded-lg bg-raised p-4 shadow-elev-1">
+          <div className="mb-3 flex items-start gap-2.5">
+            <Users className="mt-0.5 size-4 shrink-0 text-tertiary" />
             <div className="flex-1">
-              <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{t('xTweetSettingsModal.follow-list')}</h4>
-              <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+              <h4 className="text-label font-semibold text-foreground">{t('xTweetSettingsModal.follow-list')}</h4>
+              <p className="mt-0.5 text-label-sm text-secondary">
                 {t('xTweetSettingsModal.accepts-handle-handle-or-an-x-com-profile-url-ti')}
               </p>
             </div>
@@ -144,19 +144,19 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
                 void probe(handle);
               }}
               disabled={isProbing || (!input.trim() && xTweetFollows.length === 0)}
-              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 gap-1.5"
               title={t('xTweetSettingsModal.fetch-a-profile-once-to-verify-the-pipeline')}
             >
-              <PlugZap className={`h-4 w-4 ${isProbing ? 'animate-pulse' : ''}`} />
+              <PlugZap className={`size-3.5 ${isProbing ? 'animate-pulse' : ''}`} />
               {isProbing ? t('xTweetSettingsModal.testing') : t('xTweetSettingsModal.test-connection')}
             </Button>
           </div>
           {message && (
             <p
-              className={`mb-3 rounded-lg px-3 py-2 text-xs break-all ${
+              className={`mb-3 rounded-md px-3 py-2 text-label-sm break-all ${
                 probeOk
-                  ? 'bg-primary/10 text-primary dark:text-primary'
-                  : 'bg-destructive/10 text-destructive'
+                  ? 'bg-success-tint text-status-green'
+                  : 'bg-destructive-tint text-destructive'
               }`}
               role="status"
             >
@@ -164,7 +164,7 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
             </p>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Input
               type="text"
               aria-label={t('xTweetSettingsModal.x-handle')}
@@ -174,63 +174,70 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
                 if (event.key === 'Enter' && !event.nativeEvent.isComposing) handleAdd();
               }}
               placeholder="@geekbb / geekbb / https://x.com/geekbb"
-              className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-(--ui-focus-ring)"
+              className="min-w-0 flex-1"
             />
             <Button
               type="button"
+              variant="primary"
+              size="lg"
               onClick={handleAdd}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="gap-1.5"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="size-4" />
               {t('xTweetSettingsModal.add')}
             </Button>
           </div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3">
             {xTweetFollows.length === 0 ? (
-              <p className="rounded-lg bg-card dark:bg-card/[0.03] px-3 py-2 text-xs text-muted-foreground dark:text-muted-foreground">
+              <p className="rounded-md border border-subtle bg-sunken px-3 py-2.5 text-label-sm text-tertiary">
                 {t('xTweetSettingsModal.no-followed-accounts-yet')}
               </p>
-            ) : xTweetFollows.map((follow) => (
-              <div
-                key={follow.handle.toLowerCase()}
-                className="flex items-center justify-between gap-3 rounded-lg bg-card dark:bg-muted/40 px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground dark:text-foreground">@{follow.handle}</div>
-                  <a
-                    href={`https://x.com/${follow.handle}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                    className="truncate text-xs text-muted-foreground dark:text-muted-foreground hover:text-foreground transition-colors"
+            ) : (
+              <div className="overflow-hidden rounded-md border border-subtle bg-sunken divide-y divide-subtle">
+                {xTweetFollows.map((follow) => (
+                  <div
+                    key={follow.handle.toLowerCase()}
+                    className="flex items-center justify-between gap-3 px-3 py-2 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant"
                   >
-                    https://x.com/{follow.handle}
-                  </a>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleRemove(follow)}
-                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
-                  title={t('xTweetSettingsModal.unfollow')}
-                  aria-label={t('xTweetSettingsModal.unfollow-v1', { v1: follow.handle })}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                    <div className="min-w-0">
+                      <div className="truncate text-label font-medium text-foreground">@{follow.handle}</div>
+                      <a
+                        href={`https://x.com/${follow.handle}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                        className="truncate text-label-sm text-tertiary font-mono hover:text-foreground transition-colors"
+                      >
+                        https://x.com/{follow.handle}
+                      </a>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleRemove(follow)}
+                      className="text-tertiary hover:bg-destructive-tint hover:text-destructive"
+                      title={t('xTweetSettingsModal.unfollow')}
+                      aria-label={t('xTweetSettingsModal.unfollow-v1', { v1: follow.handle })}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
 
-        <div className="rounded-lg border border-border dark:border-border bg-muted/50 dark:bg-muted/20 p-4">
-          <div className="mb-3 flex items-start gap-2">
-            <KeyRound className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        <div className="rounded-lg bg-raised p-4 shadow-elev-1">
+          <div className="mb-3 flex items-start gap-2.5">
+            <KeyRound className="mt-0.5 size-4 shrink-0 text-tertiary" />
             <div className="flex-1">
-              <h4 className="text-sm font-semibold text-foreground dark:text-foreground">
+              <h4 className="text-label font-semibold text-foreground">
                 {t('xTweetSettingsModal.auth-cookies-optional')}
               </h4>
-              <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+              <p className="mt-0.5 text-label-sm text-secondary">
                 {t('xTweetSettingsModal.once-set-fetching-switches-to-the-signed-in-grap')}
               </p>
             </div>
@@ -244,15 +251,15 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
                 onChange={(event) => setAuthTokenInput(event.target.value)}
                 placeholder="auth_token"
                 autoComplete="off"
-                className="w-full rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 pl-3 pr-9 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-(--ui-focus-ring) font-mono"
+                className="w-full pr-9 font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowAuthToken((prev) => !prev)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-grid size-control-sm place-items-center rounded-sm text-tertiary hover:bg-fill-hover hover:text-foreground transition-colors"
                 aria-label={showAuthToken ? t('xTweetSettingsModal.hide-auth-token') : t('xTweetSettingsModal.show-auth-token')}
               >
-                {showAuthToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showAuthToken ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
               </button>
             </div>
             <div className="relative">
@@ -263,55 +270,56 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
                 onChange={(event) => setCt0Input(event.target.value)}
                 placeholder="ct0"
                 autoComplete="off"
-                className="w-full rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 pl-3 pr-9 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-(--ui-focus-ring) font-mono"
+                className="w-full pr-9 font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowCt0((prev) => !prev)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-grid size-control-sm place-items-center rounded-sm text-tertiary hover:bg-fill-hover hover:text-foreground transition-colors"
                 aria-label={showCt0 ? t('xTweetSettingsModal.hide-ct0') : t('xTweetSettingsModal.show-ct0')}
               >
-                {showCt0 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showCt0 ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
               </button>
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground">
-              <Cookie className="h-3.5 w-3.5 flex-shrink-0" />
+          <div className="mt-2.5 flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5 text-label-sm text-tertiary">
+              <Cookie className="size-3.5 shrink-0" />
               {xTweetAuth
                 ? t('xTweetSettingsModal.authenticated-fetching-is-on')
                 : t('xTweetSettingsModal.signed-out-fetching-mode')}
             </span>
-            <div className="flex flex-shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {xTweetAuth && (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={handleClearAuth}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
+                  className="gap-1.5 text-tertiary hover:bg-destructive-tint hover:text-destructive"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="size-3.5" />
                   {t('xTweetSettingsModal.clear')}
                 </Button>
               )}
               <Button
                 type="button"
+                variant="secondary"
                 onClick={handleSaveAuth}
                 disabled={!authTokenInput.trim() || !ct0Input.trim() || (xTweetAuth !== null && !isAuthDirty)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="gap-1.5"
               >
-                <PlugZap className="h-4 w-4" />
+                <PlugZap className="size-3.5" />
                 {xTweetAuth ? (isAuthDirty ? t('xTweetSettingsModal.update-auth') : t('xTweetSettingsModal.saved')) : t('xTweetSettingsModal.save-auth')}
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end border-t border-subtle pt-3">
           <Button
             type="button"
+            variant="primary"
             onClick={onClose}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             {t('xTweetSettingsModal.done')}
           </Button>

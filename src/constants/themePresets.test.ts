@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_THEME_PRESET_ID,
+  LEGACY_THEME_PRESET_ALIASES,
   THEME_PRESETS,
   getThemePreset,
   isThemePresetId,
+  resolveKnownThemePresetId,
+  resolveThemePresetId,
 } from './themePresets';
 import { GENERATED_THEME_PRESETS } from './themePresets.generated';
 import { buildThemePresetCss } from '../lib/themePresets';
@@ -93,16 +96,88 @@ describe('themePresets registry', () => {
   });
 
   it('validates ids through isThemePresetId', () => {
-    expect(isThemePresetId('deep-purple')).toBe(true);
+    expect(isThemePresetId('tokyo-night')).toBe(true);
     expect(isThemePresetId(DEFAULT_THEME_PRESET_ID)).toBe(true);
     expect(isThemePresetId('does-not-exist')).toBe(false);
     expect(isThemePresetId(42)).toBe(false);
   });
 
+  it('migrates all 11 legacy removed preset IDs to valid curated presets', () => {
+    const legacyIds = [
+      'enterprise-mod-2',
+      'light-green',
+      'claude',
+      'vercel',
+      't3-chat',
+      'deep-purple',
+      'openprofile',
+      'autoblog',
+      'zen-inspired',
+      'logistic-one',
+      'whatsapp',
+    ];
+    expect(Object.keys(LEGACY_THEME_PRESET_ALIASES).sort()).toEqual([...legacyIds].sort());
+    for (const legacyId of legacyIds) {
+      const resolved = resolveThemePresetId(legacyId);
+      expect(isThemePresetId(resolved), `${legacyId} -> ${resolved}`).toBe(true);
+    }
+    expect(resolveThemePresetId('tokyo-night')).toBe('tokyo-night');
+    expect(resolveThemePresetId('unknown-id')).toBe(DEFAULT_THEME_PRESET_ID);
+    expect(resolveThemePresetId(undefined, 'nord')).toBe('nord');
+  });
+
+  it('resolves legacy aliases without inventing a value for unknown input', () => {
+    // Backup import must keep "absent" distinct from the default preset.
+    expect(resolveKnownThemePresetId('enterprise-mod-2')).toBe('github');
+    expect(resolveKnownThemePresetId('dracula')).toBe('dracula');
+    expect(resolveKnownThemePresetId('unknown-id')).toBeNull();
+    expect(resolveKnownThemePresetId(undefined)).toBeNull();
+  });
+
+  it('keeps every solid fill/foreground pair at >= 4.5:1 after rounding', () => {
+    // Guards the generator regression: contrast was checked on pre-round values,
+    // and rounding solarized dark primary to one decimal landed at 4.494:1.
+    const pairs = [
+      ['primary', 'primary-foreground'],
+      ['destructive', 'destructive-foreground'],
+      ['secondary', 'secondary-foreground'],
+      ['accent', 'accent-foreground'],
+    ] as const;
+    for (const preset of THEME_PRESETS) {
+      for (const [mode, palette] of [
+        ['light', preset.lightColors],
+        ['dark', preset.darkColors],
+      ] as const) {
+        for (const [fill, foreground] of pairs) {
+          expect(
+            contrast(palette[fill], palette[foreground]),
+            `${preset.id}/${mode}: ${foreground} on ${fill}`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+
+  it('enforces >= 4.55:1 contrast for muted-foreground on background, card, popover, and muted', () => {
+    const surfaces = ['background', 'card', 'popover', 'muted'] as const;
+    for (const preset of THEME_PRESETS) {
+      for (const [mode, palette] of [
+        ['light', preset.lightColors],
+        ['dark', preset.darkColors],
+      ] as const) {
+        for (const surface of surfaces) {
+          expect(
+            contrast(palette['muted-foreground'], palette[surface]),
+            `${preset.id}/${mode}: muted-foreground vs ${surface}`,
+          ).toBeGreaterThanOrEqual(4.55);
+        }
+      }
+    }
+  });
+
   it('derives selection fills visible on every text surface with readable text on top', () => {
-    // Guards issue #348: zen-inspired light shipped accent ≈ card, rendering
-    // ::selection invisible. The generated fills must keep clearing these
-    // invariants for every preset and mode.
+    // Guards issue #348: derived selection fills must stay visible on every
+    // text surface across every preset and mode.
     const surfaces = ['background', 'card', 'popover', 'secondary', 'muted'] as const;
     for (const preset of THEME_PRESETS) {
       for (const [mode, palette] of [

@@ -175,19 +175,19 @@ export const RepositoryHealthPanel: React.FC<RepositoryHealthPanelProps> = ({
 
   return (
     <section
-      className="mb-3 rounded-md border border-border bg-muted/20"
+      className="mb-3 rounded-lg bg-raised shadow-elev-0"
       aria-label={title}
     >
       <Accordion type="single" collapsible>
         <AccordionItem value="facts" className="border-0">
-          <AccordionTrigger className="px-3 py-2 text-xs hover:no-underline">
-            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <span className="font-semibold">{title}</span>
+          <AccordionTrigger className="px-3 py-2 text-label-sm hover:no-underline">
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <span className="font-medium text-foreground">{title}</span>
               {snapshot.signals.map((signal) => {
                 const Icon = SIGNAL_ICONS[signal.id];
                 return (
-                  <Badge key={signal.id} variant="outline" className="gap-1 text-[11px] font-normal">
-                    <Icon className="h-3 w-3" aria-hidden="true" />
+                  <Badge key={signal.id} variant="secondary" className="h-5 gap-1 rounded-xs bg-fill-hover px-1.5 text-caption font-normal text-secondary">
+                    <Icon className="size-3 text-tertiary" aria-hidden="true" />
                     {t(SIGNAL_KEYS[signal.id])}
                   </Badge>
                 );
@@ -198,17 +198,17 @@ export const RepositoryHealthPanel: React.FC<RepositoryHealthPanelProps> = ({
             <div className="grid gap-3 sm:grid-cols-2">
               {views.map(({ group, facts }) => (
                 <div key={group}>
-                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="mb-1 text-label-sm font-medium text-tertiary">
                     {t(GROUP_KEYS[group])}
                   </p>
                   <dl className="space-y-0.5">
                     {facts.map((fact) => {
                       const formatted = formatFactValue(fact, t, language);
                       return (
-                        <div key={fact.id} className="flex items-baseline justify-between gap-2 text-xs">
-                          <dt className="truncate text-muted-foreground">{t(FACT_KEYS[fact.id])}</dt>
+                        <div key={fact.id} className="flex items-baseline justify-between gap-2 text-label-sm">
+                          <dt className="truncate text-secondary">{t(FACT_KEYS[fact.id])}</dt>
                           <dd
-                            className={`shrink-0 text-right ${formatted.muted ? 'text-muted-foreground' : ''}`}
+                            className={`shrink-0 text-right tabular-nums ${formatted.muted ? 'text-tertiary' : 'text-foreground'}`}
                             title={formatted.title}
                           >
                             {formatted.text}
@@ -220,7 +220,7 @@ export const RepositoryHealthPanel: React.FC<RepositoryHealthPanelProps> = ({
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
+            <p className="mt-2.5 text-caption text-tertiary">
               {t('repositoryHealthPanel.these-are-objective-facts-with-no-overall-score')}
             </p>
           </AccordionContent>

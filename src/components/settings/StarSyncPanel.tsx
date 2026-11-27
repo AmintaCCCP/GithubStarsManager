@@ -1,15 +1,22 @@
-
 import { TranslateFn } from '../../i18n/useT';
-import { GitBranch, ListChecks, ListPlus, Loader2, Star } from 'lucide-react';
+import { GitBranch, ListChecks, ListPlus, Loader2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useAppStore, getAllCategories } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useStarSyncActions } from '../../features/settings/hooks/useStarSyncActions';
+import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { PushCategoriesModal } from './PushCategoriesModal';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsRow,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface StarSyncPanelProps {
   t: TranslateFn;
@@ -28,66 +35,146 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
   })));
   const { pushCategoriesToLists: handlePushCategoriesToLists } = useStarSyncActions();
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
-  const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides).filter(c => c.id !== 'all');
+  const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides).filter((c) => c.id !== 'all');
 
   const progressPercent = listsPush.total > 0 ? Math.min(100, Math.round((listsPush.done / listsPush.total) * 100)) : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-3">
-        <Star className="h-6 w-6 text-muted-foreground dark:text-muted-foreground" />
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">{t('starSyncPanel.star-sync')}</h3>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-3">
-            <Star className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-            <CardTitle id="star-sync-scope-heading">{t('starSyncPanel.sync-scope')}</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-4 text-sm text-muted-foreground dark:text-muted-foreground">{t('starSyncPanel.choose-what-the-sync-button-pulls-by-default-sta')}</p>
-          <RadioGroup value={syncMode} aria-labelledby="star-sync-scope-heading" onValueChange={(value) => { setSyncMode(value as 'stars' | 'stars-and-lists'); setSyncModeConfigured(true); }} className="grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
-            <Label htmlFor="sync-mode-stars" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]">
-              <RadioGroupItem value="stars" id="sync-mode-stars" />
-              <span><span className="block text-base font-medium text-foreground dark:text-foreground">{t('starSyncPanel.starred-repos-only')}</span><span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">{t('starSyncPanel.same-as-before')}</span></span>
+    <SettingsPageStack>
+      <SettingsSection
+        title={t('starSyncPanel.sync-scope')}
+        titleId="star-sync-scope-heading"
+        description={t('starSyncPanel.choose-what-the-sync-button-pulls-by-default-sta')}
+      >
+        <SettingsCard className="p-3.5">
+          <RadioGroup
+            value={syncMode}
+            aria-labelledby="star-sync-scope-heading"
+            onValueChange={(value) => {
+              setSyncMode(value as 'stars' | 'stars-and-lists');
+              setSyncModeConfigured(true);
+            }}
+            className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+          >
+            <Label
+              htmlFor="sync-mode-stars"
+              className={cn(
+                'flex cursor-pointer items-start gap-2.5 rounded-md p-3 transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                syncMode === 'stars'
+                  ? 'bg-fill-selected shadow-elev-0'
+                  : 'bg-sunken/60 shadow-elev-0 hover:bg-fill-hover',
+              )}
+            >
+              <RadioGroupItem value="stars" id="sync-mode-stars" className="mt-0.5" />
+              <span className="min-w-0">
+                <span className="block text-label font-medium text-foreground">
+                  {t('starSyncPanel.starred-repos-only')}
+                </span>
+                <span className="mt-0.5 block text-label-sm font-normal leading-[18px] text-secondary">
+                  {t('starSyncPanel.same-as-before')}
+                </span>
+              </span>
             </Label>
-            <Label htmlFor="sync-mode-lists" className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]">
-              <RadioGroupItem value="stars-and-lists" id="sync-mode-lists" />
-              <span><span className="block text-base font-medium text-foreground dark:text-foreground">{t('starSyncPanel.starred-repos-lists')}</span><span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground"><ListChecks className="mr-1 inline h-3 w-3" />{t('starSyncPanel.also-pull-github-lists-categorize-by-tags')}</span></span>
+            <Label
+              htmlFor="sync-mode-lists"
+              className={cn(
+                'flex cursor-pointer items-start gap-2.5 rounded-md p-3 transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                syncMode === 'stars-and-lists'
+                  ? 'bg-fill-selected shadow-elev-0'
+                  : 'bg-sunken/60 shadow-elev-0 hover:bg-fill-hover',
+              )}
+            >
+              <RadioGroupItem value="stars-and-lists" id="sync-mode-lists" className="mt-0.5" />
+              <span className="min-w-0">
+                <span className="block text-label font-medium text-foreground">
+                  {t('starSyncPanel.starred-repos-lists')}
+                </span>
+                <span className="mt-0.5 block text-label-sm font-normal leading-[18px] text-secondary">
+                  <ListChecks className="mr-1 inline size-3.5 text-tertiary" />
+                  {t('starSyncPanel.also-pull-github-lists-categorize-by-tags')}
+                </span>
+              </span>
             </Label>
           </RadioGroup>
-        </CardContent>
-      </Card>
+        </SettingsCard>
+      </SettingsSection>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-3">
-            <GitBranch className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-            <div><CardTitle>{t('starSyncPanel.push-categories-to-github-lists')}</CardTitle><p className="mt-1 text-sm font-normal text-muted-foreground dark:text-muted-foreground">{t('starSyncPanel.write-each-local-category-to-a-github-list-of-th')}</p></div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={() => void handlePushCategoriesToLists()} disabled={listsPush.isRunning} className="gap-2">
-              {listsPush.isRunning ? <><Loader2 className="h-4 w-4 animate-spin" /><span>{t('starSyncPanel.pushing')}</span></> : <><ListChecks className="h-4 w-4" /><span>{t('starSyncPanel.push-categories-to-lists')}</span></>}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setIsPushModalOpen(true)} disabled={listsPush.isRunning} className="gap-2">
-              <ListPlus className="h-4 w-4" /><span>{t('starSyncPanel.push-selected-categories')}</span>
-            </Button>
-          </div>
-          <PushCategoriesModal
-            isOpen={isPushModalOpen}
-            onClose={() => setIsPushModalOpen(false)}
-            categories={categories}
-            onConfirm={(ids) => { setIsPushModalOpen(false); void handlePushCategoriesToLists(ids); }}
+      <SettingsSection title={t('starSyncPanel.push-categories-to-github-lists')}>
+        <SettingsCard>
+          <SettingsRow
+            icon={<GitBranch />}
+            title={t('starSyncPanel.push-categories-to-github-lists')}
+            description={t('starSyncPanel.write-each-local-category-to-a-github-list-of-th')}
+            align="start"
           />
-          {listsPush.isRunning && <div className="mt-4 space-y-2"><div className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground dark:text-muted-foreground">{listsPush.currentLabel || t('starSyncPanel.preparing')}</span><span className="ml-2 shrink-0 text-muted-foreground dark:text-muted-foreground">{listsPush.done}/{listsPush.total}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted dark:bg-muted/40"><div className="h-full w-full bg-primary origin-left transition-transform duration-200" style={{ transform: `scaleX(${progressPercent / 100})` }} /></div></div>}
-          {!listsPush.isRunning && listsPush.error && <p role="alert" className="mt-4 whitespace-pre-line text-sm text-destructive">{listsPush.error}</p>}
-          {!listsPush.isRunning && listsPush.message && !listsPush.error && <p className="mt-4 text-sm text-success">{listsPush.message}</p>}
-        </CardContent>
-      </Card>
-    </div>
+          <SettingsDivider />
+          <div className="flex flex-wrap items-center gap-2 px-3.5 py-3">
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={() => void handlePushCategoriesToLists()}
+              disabled={listsPush.isRunning}
+            >
+              {listsPush.isRunning
+                ? <><Loader2 className="size-4 animate-spin" /><span>{t('starSyncPanel.pushing')}</span></>
+                : <><ListChecks className="size-4" /><span>{t('starSyncPanel.push-categories-to-lists')}</span></>}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={() => setIsPushModalOpen(true)}
+              disabled={listsPush.isRunning}
+            >
+              <ListPlus className="size-4" />
+              <span>{t('starSyncPanel.push-selected-categories')}</span>
+            </Button>
+          </div>
+          {listsPush.isRunning && (
+            <>
+              <SettingsDivider />
+              <div className="space-y-2 px-3.5 py-3">
+                <div className="flex items-center justify-between text-label-sm">
+                  <span className="truncate text-secondary">
+                    {listsPush.currentLabel || t('starSyncPanel.preparing')}
+                  </span>
+                  <span className="ml-2 shrink-0 text-tertiary tabular-nums">
+                    {listsPush.done}/{listsPush.total}
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-fill-hover">
+                  <div
+                    className="h-full w-full origin-left bg-accent-solid transition-transform duration-200"
+                    style={{ transform: `scaleX(${progressPercent / 100})` }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </SettingsCard>
+
+        {!listsPush.isRunning && listsPush.error && (
+          <SettingsNotice tone="destructive" role="alert" className="whitespace-pre-line">
+            {listsPush.error}
+          </SettingsNotice>
+        )}
+        {!listsPush.isRunning && listsPush.message && !listsPush.error && (
+          <SettingsNotice tone="success">
+            {listsPush.message}
+          </SettingsNotice>
+        )}
+
+        <PushCategoriesModal
+          isOpen={isPushModalOpen}
+          onClose={() => setIsPushModalOpen(false)}
+          categories={categories}
+          onConfirm={(ids) => {
+            setIsPushModalOpen(false);
+            void handlePushCategoriesToLists(ids);
+          }}
+        />
+      </SettingsSection>
+    </SettingsPageStack>
   );
 };

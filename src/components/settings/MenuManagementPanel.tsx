@@ -1,9 +1,7 @@
-
 import { TranslateFn } from '../../i18n/useT';
 import { Button } from '../ui/button';
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
-  Layout,
   Search,
   FileCode2,
   Calendar,
@@ -14,11 +12,20 @@ import {
   ChevronUp,
   ChevronDown,
   Info,
+  Lock,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Switch } from '../ui/switch';
 import { HeaderMenuId } from '../../types';
+import { cn } from '../../lib/utils';
+import {
+  SettingsCard,
+  SettingsDivider,
+  SettingsNotice,
+  SettingsPageStack,
+  SettingsSection,
+} from './SettingsPrimitives';
 
 interface MenuManagementPanelProps {
   t: TranslateFn;
@@ -49,14 +56,14 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
 
   const sortedConfig = useMemo(
     () => [...headerMenuConfig].sort((a, b) => a.order - b.order),
-    [headerMenuConfig]
+    [headerMenuConfig],
   );
 
   const handleToggle = useCallback((id: HeaderMenuId) => {
     const meta = MENU_META[id];
     if (!meta.canHide) return;
-    const newConfig = headerMenuConfig.map(item =>
-      item.id === id ? { ...item, visible: !item.visible } : item
+    const newConfig = headerMenuConfig.map((item) =>
+      item.id === id ? { ...item, visible: !item.visible } : item,
     );
     setHeaderMenuConfig(newConfig);
   }, [headerMenuConfig, setHeaderMenuConfig]);
@@ -82,7 +89,6 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
     setDragIndex(index);
     dragNodeRef.current = e.currentTarget as HTMLDivElement;
     e.dataTransfer.effectAllowed = 'move';
-    // Required for Firefox
     e.dataTransfer.setData('text/plain', String(index));
   }, []);
 
@@ -109,106 +115,86 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-3">
-        <Layout className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-          {t('menuManagementPanel.menu-management')}
-        </h3>
-      </div>
+    <SettingsPageStack>
+      <SettingsNotice tone="neutral" icon={<Info />}>
+        {t('menuManagementPanel.toggle-menu-visibility-and-drag-to-reorder-repos')}
+      </SettingsNotice>
 
-      {/* Info note */}
-      <div className="flex items-start gap-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <p>
-          {t('menuManagementPanel.toggle-menu-visibility-and-drag-to-reorder-repos')}
-        </p>
-      </div>
-
-      {/* Menu list */}
-      <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
-        <div className="space-y-2">
+      <SettingsSection title={t('menuManagementPanel.menu-management')}>
+        <SettingsCard>
           {sortedConfig.map((item, index) => {
-
             const meta = MENU_META[item.id];
             const Icon = meta.icon;
             const isDragging = dragIndex === index;
             const isDragOver = dragOverIndex === index;
 
             return (
-              <div
-                key={item.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-[background-color,border-color,transform,opacity] cursor-grab active:cursor-grabbing select-none ${
-                  isDragging
-                    ? 'opacity-50 border-primary/30 bg-primary/5'
-                    : isDragOver
-                      ? 'border-primary/50 bg-primary/5 scale-[1.01]'
-                      : 'border-border dark:border-border hover:bg-background dark:hover:bg-card/[0.03]'
-                }`}
-              >
-                {/* Drag handle */}
-                <GripVertical className="w-4 h-4 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
-
-                {/* Menu icon + label + lock */}
-                <Icon className="w-5 h-5 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
-                <span className="flex-1 flex items-center gap-1.5 text-sm font-medium text-foreground dark:text-foreground">
-                  <span>{t(`header.menu-${item.id}`)}</span>
-                  {!meta.canHide && (
-                    <span className="text-muted-foreground dark:text-muted-foreground flex-shrink-0" title={t('menuManagementPanel.always-visible')}>
-                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                      </svg>
-                    </span>
+              <React.Fragment key={item.id}>
+                {index > 0 && <SettingsDivider />}
+                <div
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                  className={cn(
+                    'flex min-h-12 cursor-grab items-center gap-3 px-3.5 py-2 select-none transition-[background-color,opacity] duration-micro ease-out-subtle hover:bg-fill-hover hover:duration-instant active:cursor-grabbing',
+                    isDragging && 'bg-fill-selected opacity-50',
+                    isDragOver && !isDragging && 'bg-accent-tint',
                   )}
-                </span>
+                >
+                  <GripVertical className="size-4 shrink-0 text-tertiary" />
+                  <Icon className="size-4 shrink-0 text-tertiary" />
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 text-label font-medium text-foreground">
+                    <span className="truncate">{t(`header.menu-${item.id}`)}</span>
+                    {!meta.canHide && (
+                      <span
+                        className="shrink-0 text-tertiary"
+                        title={t('menuManagementPanel.always-visible')}
+                      >
+                        <Lock className="size-3.5" aria-hidden="true" />
+                      </span>
+                    )}
+                  </span>
 
-                {/* Order arrows */}
-                <div className="flex flex-col flex-shrink-0">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleMoveUp(index)}
-                    disabled={index === 0}
-                    className="h-5 w-5 rounded p-0.5 hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                    title={t('menuManagementPanel.move-up')}
-                    aria-label={t('menuManagementPanel.move-v1-up', { v1: meta.labelZh })}
-                  >
-                    <ChevronUp className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleMoveDown(index)}
-                    disabled={index === sortedConfig.length - 1}
-                    className="h-5 w-5 rounded p-0.5 hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                    title={t('menuManagementPanel.move-down')}
-                    aria-label={t('menuManagementPanel.move-v1-down', { v1: meta.labelZh })}
-                  >
-                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                      title={t('menuManagementPanel.move-up')}
+                      aria-label={t('menuManagementPanel.move-v1-up', { v1: meta.labelZh })}
+                    >
+                      <ChevronUp className="size-3.5 text-secondary" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === sortedConfig.length - 1}
+                      title={t('menuManagementPanel.move-down')}
+                      aria-label={t('menuManagementPanel.move-v1-down', { v1: meta.labelZh })}
+                    >
+                      <ChevronDown className="size-3.5 text-secondary" />
+                    </Button>
+                  </div>
+
+                  <Switch
+                    checked={item.visible}
+                    onCheckedChange={() => handleToggle(item.id)}
+                    disabled={!meta.canHide}
+                    title={!meta.canHide ? t('menuManagementPanel.this-menu-cannot-be-hidden') : undefined}
+                    aria-label={t('menuManagementPanel.toggle-v1-visibility', { v1: meta.labelZh })}
+                  />
                 </div>
-
-                {/* Toggle switch */}
-                <Switch
-                  checked={item.visible}
-                  onCheckedChange={() => handleToggle(item.id)}
-                  disabled={!meta.canHide}
-                  title={!meta.canHide ? t('menuManagementPanel.this-menu-cannot-be-hidden') : undefined}
-                  aria-label={t('menuManagementPanel.toggle-v1-visibility', { v1: meta.labelZh })}
-                  className="shrink-0"
-                />
-              </div>
+              </React.Fragment>
             );
           })}
-        </div>
-      </div>
-    </div>
+        </SettingsCard>
+      </SettingsSection>
+    </SettingsPageStack>
   );
 };

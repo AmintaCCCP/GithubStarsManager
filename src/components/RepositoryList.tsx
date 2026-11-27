@@ -505,7 +505,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const chatPortal = activeChatRepository && createPortal(
     <ErrorBoundary>
-      <React.Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 text-sm text-muted-foreground" role="status">{t('repositoryList.opening-repository-chat')}</div>}>
+      <React.Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-xs text-label text-secondary" role="status">{t('repositoryList.opening-repository-chat')}</div>}>
         <LazyRepositoryChatSheet
           isOpen
           repository={activeChatRepository}
@@ -534,7 +534,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     return (
       <>
         {similarView?.active && (
-          <div className="mb-5">
+          <div className="mb-3">
             <SimilarViewBanner
               anchorRepoName={similarView.anchorRepoName}
               onReset={resetSimilarView}
@@ -542,11 +542,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             />
           </div>
         )}
-        <div className="ui-empty-state app-empty-state flex flex-col items-center px-6 py-14 text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <SearchX className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <p className="font-medium text-foreground">
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-2 rounded-lg bg-paper px-6 py-14 text-center text-balance shadow-elev-0">
+          <SearchX className="size-10 stroke-[1.5] text-tertiary" aria-hidden="true" />
+          <p className="mt-1 text-label-lg font-medium text-foreground">
           {similarView?.active ? (
             t('useRepositoryCardActions.no-similar-repositories-found')
           ) : searchFilters?.query ? (
@@ -556,9 +554,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             : (t('repositoryList.no-repositories-found-in-categoryname', { categoryName: categoryName })
               )
           }
-        </p>
+          </p>
         {!similarView?.active && (
-          <p className="mt-1.5 max-w-md text-sm text-muted-foreground dark:text-muted-foreground">
+          <p className="max-w-sm text-label text-secondary">
             {searchFilters?.query ? (
               t('repositoryList.try-different-keywords-use-ai-search-for-semanti')
             ) : selectedCategory === 'all'
@@ -572,11 +570,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="md"
             onClick={clearAllFilters}
-            className="mt-5"
+            className="mt-3"
           >
-            <X className="w-4 h-4" />
+            <X className="size-3.5" />
             {t('repositoryList.clear-all-filters')}
           </Button>
         )}
@@ -590,20 +588,22 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const { unanalyzedCount, analyzedCount, failedCount } = repositoryStats;
 
   return (
-    <div className="space-y-5">
+    <div className="mt-3 space-y-3">
 
       {/* Similar repositories view banner */}
       {similarView?.active && (
-        <SimilarViewBanner
-          anchorRepoName={similarView.anchorRepoName}
-          onReset={resetSimilarView}
-          language={language}
-        />
+        <div className="mb-3">
+          <SimilarViewBanner
+            anchorRepoName={similarView.anchorRepoName}
+            onReset={resetSimilarView}
+            language={language}
+          />
+        </div>
       )}
 
       {/* Controls Bar */}
-      <div className="ui-toolbar app-repository-controls flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 sm:gap-0">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+      <div className="ui-toolbar app-repository-controls flex flex-col gap-2.5 py-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2.5">
 
           {/* AI Analysis Select */}
           <DropdownMenu>
@@ -611,15 +611,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <Button
                 type="button"
                 variant="outline"
+                size="md"
                 disabled={isLoading}
                 aria-label={t('repositoryList.ai-analysis-actions')}
-                className="ui-field h-9 w-auto min-w-32 justify-between gap-2 px-3 py-1 text-sm font-medium"
+                className="h-control w-auto min-w-28 justify-between gap-1.5 rounded-md px-2.5 text-label font-medium"
               >
-                <Bot className="h-4 w-4 shrink-0" />
+                <Bot className="size-3.5 shrink-0 text-secondary" />
                 {isLoading
                   ? t('repositoryList.analyzing-v1-v2', { v1: analysisProgress.current, v2: analysisProgress.total })
                   : t('repositoryList.ai-analysis')}
-                <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
+                <ChevronDown className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
@@ -637,30 +638,31 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           {/* Progress Bar and Controls - 移动端优化 */}
           {isLoading && analysisProgress.total > 0 && (
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-20 sm:w-32 bg-accent dark:bg-accent rounded-full h-2">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-fill-hover sm:w-28">
                 <div
-                  className="bg-primary dark:bg-primary h-2 rounded-full transition-[width] duration-300"
+                  className="h-full rounded-full bg-accent-solid transition-[width] duration-300"
                   style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
-                ></div>
+                />
               </div>
-              <span className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
+              <span className="text-label-sm text-secondary tabular-nums">
                 {Math.round((analysisProgress.current / analysisProgress.total) * 100)}%
               </span>
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="icon-sm"
                 onClick={handlePauseResume}
-                className="h-7 w-7 p-0 rounded-lg bg-muted text-muted-foreground dark:bg-warning/20 dark:text-warning hover:bg-accent dark:hover:bg-warning/30 transition-colors"
+                className="size-control-sm rounded-sm text-secondary hover:text-foreground"
                 aria-label={isPaused ? t('repositoryList.resume') : t('repositoryList.pause')}
                 title={isPaused ? t('repositoryList.resume') : t('repositoryList.pause')}
               >
-                {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                {isPaused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
               </Button>
               <Button
-                variant="ghost"
+                variant="danger"
+                size="sm"
                 onClick={handleStop}
-                className="h-7 px-2 sm:px-3 py-1 rounded-lg bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive hover:bg-accent dark:hover:bg-destructive/30 transition-colors text-xs sm:text-sm"
+                className="h-control-sm rounded-sm px-2 text-label-sm"
               >
                 {t('repositoryList.stop')}
               </Button>
@@ -669,18 +671,18 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           {/* Description Toggle - Radio Style - 移动端优化 */}
           {!isLoading && (
-            <div className="app-repository-display-row flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
-              <span id="repository-display-content-label" className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
+            <div className="app-repository-display-row flex flex-wrap items-center gap-2.5">
+              <span id="repository-display-content-label" className="text-label-sm text-tertiary">
                 {t('repositoryList.display')}
               </span>
-              <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="app-compact-radio-group flex items-center space-x-3 sm:space-x-4">
-                <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('repositoryList.show-ai-generated-analysis-summary') : t('repositoryList.no-ai-analysis-content-available')}>
+              <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="app-compact-radio-group flex items-center gap-3">
+                <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex items-center gap-1.5 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('repositoryList.show-ai-generated-analysis-summary') : t('repositoryList.no-ai-analysis-content-available')}>
                   <RadioGroupItem value="ai" id="display-content-ai" aria-labelledby="display-content-ai-label" disabled={!hasAnalyzedRepos} />
-                  <span id="display-content-ai-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('repositoryList.ai-analysis-2')}</span>
+                  <span id="display-content-ai-label" className={`text-label font-medium ${showAISummary ? 'text-foreground' : 'text-secondary'}`}>{t('repositoryList.ai-analysis-2')}</span>
                 </label>
-                <label onClick={() => setShowAISummary(false)} className="flex cursor-pointer items-center space-x-1.5 sm:space-x-2" title={t('repositoryList.show-repository-original-description')}>
+                <label onClick={() => setShowAISummary(false)} className="flex cursor-pointer items-center gap-1.5" title={t('repositoryList.show-repository-original-description')}>
                   <RadioGroupItem value="original" id="display-content-original" aria-labelledby="display-content-original-label" />
-                  <span id="display-content-original-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('repositoryList.original')}</span>
+                  <span id="display-content-original-label" className={`text-label font-medium ${!showAISummary ? 'text-foreground' : 'text-secondary'}`}>{t('repositoryList.original')}</span>
                 </label>
               </RadioGroup>
             </div>
@@ -690,33 +692,35 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
         <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
-          <div className="app-context-row-copy text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right tabular-nums">
-            <div className="flex items-center justify-between">
-              <div>
+          <div className="app-context-row-copy text-label-sm text-tertiary tabular-nums sm:text-right">
+            <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
+              <span>
                 {t('repositoryList.showing-startindex-endindex-of-v3-repositories', { startIndex: startIndex, endIndex: endIndex, v3: filteredRepositories.length })}
                 {repositories.length !== filteredRepositories.length && (
-                  <span className="ml-2 text-primary dark:text-primary">
+                  <span className="ml-1.5 text-accent-text">
                     {t('repositoryList.filtered-from-v1', { v1: repositories.length })}
                   </span>
                 )}
-              </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {analyzedCount > 0 && (
-                  <span className="text-xs sm:text-sm">
-                    • {analyzedCount} {t('repositoryList.ai-analyzed')}
-                  </span>
-                )}
-                {failedCount > 0 && (
-                  <span className="text-xs sm:text-sm">
-                    • {failedCount} {t('repositoryList.analysis-failed')}
-                  </span>
-                )}
-                {unanalyzedCount > 0 && (
-                  <span className="text-xs sm:text-sm">
-                    • {unanalyzedCount} {t('repositoryList.unanalyzed')}
-                  </span>
-                )}
-              </div>
+              </span>
+              {(analyzedCount > 0 || failedCount > 0 || unanalyzedCount > 0) && (
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  {analyzedCount > 0 && (
+                    <span>
+                      · {analyzedCount} {t('repositoryList.ai-analyzed')}
+                    </span>
+                  )}
+                  {failedCount > 0 && (
+                    <span className="text-destructive">
+                      · {failedCount} {t('repositoryList.analysis-failed')}
+                    </span>
+                  )}
+                  {unanalyzedCount > 0 && (
+                    <span>
+                      · {unanalyzedCount} {t('repositoryList.unanalyzed')}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -732,7 +736,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 className="app-segmented-control-item"
                 title={t('repositoryList.grid-view')}
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="size-3.5" />
               </Button>
               <Button
                 type="button"
@@ -744,7 +748,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 className="app-segmented-control-item"
                 title={t('repositoryList.list-view')}
               >
-                <List className="w-4 h-4" />
+                <List className="size-3.5" />
               </Button>
             </div>
           )}

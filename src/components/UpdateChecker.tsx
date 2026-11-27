@@ -1,5 +1,5 @@
 import { getIntlLocale } from '../i18n/format';
-import { useT } from "../i18n/useT";
+import { useT } from '../i18n/useT';
 import React, { useState } from 'react';
 import { Calendar, Download, ExternalLink, Package, RefreshCw } from 'lucide-react';
 import { useUpdateActions, type VersionInfo } from '../features/settings/hooks/useUpdateActions';
@@ -50,11 +50,11 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
       } else if (!silent) {
         toast(t('updateChecker.you-are-already-using-the-latest-version'), 'info');
       }
-    } catch (error) {
+    } catch (err) {
       const errorMessage = t('updateChecker.failed-to-check-for-updates-please-check-your-ne');
       setError(errorMessage);
       if (!silent) toast(errorMessage, 'error');
-      console.error('Update check failed:', error);
+      console.error('Update check failed:', err);
     } finally {
       setIsChecking(false);
     }
@@ -67,12 +67,9 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
     }
   };
 
-  // 不再提示当前版本：记录版本号后，自动检查在该版本仍为最新时不再弹提示；
-  // 最新版再次变化（发布更新版本）后自动恢复提示。
   const handleDontRemind = () => {
     if (updateInfo) {
       setUpdatePromptDismissedVersion(updateInfo.number);
-      // 同步移除本次会话可能存在的顶部横幅，避免与"不再提示"自相矛盾
       setUpdateNotification(null);
     }
     setShowUpdateDialog(false);
@@ -88,23 +85,43 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
 
   return (
     <>
-      <div className="flex flex-col items-start">
-        <Button type="button" onClick={() => checkForUpdates(false)} disabled={isChecking} className="gap-2">
-          {isChecking ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+      <div className="flex flex-col items-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="md"
+          onClick={() => checkForUpdates(false)}
+          disabled={isChecking}
+        >
+          {isChecking ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
           <span>{isChecking ? t('updateChecker.checking') : t('updateChecker.check-for-updates')}</span>
         </Button>
 
-        {error && <div role="alert" className="mt-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-muted/40"><p className="text-sm text-muted-foreground dark:text-muted-foreground">{error}</p></div>}
+        {error && (
+          <div role="alert" className="rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive">
+            {error}
+          </div>
+        )}
       </div>
 
       <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
-        <DialogContent className="max-w-2xl flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0" closeLabel={t('updateChecker.close')}>
-          <DialogHeader className="shrink-0 space-y-3 border-b border-border px-6 py-5 pr-12">
+        <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col gap-0 overflow-hidden p-0" closeLabel={t('updateChecker.close')}>
+          <DialogHeader className="shrink-0 space-y-2.5 border-b border-subtle px-6 py-5 pr-12">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20"><Package className="h-6 w-6 text-primary" /></div>
-              <div><DialogTitle>{t('updateChecker.new-version-available')}</DialogTitle><DialogDescription>v{updateInfo?.number}</DialogDescription></div>
+              <div className="flex size-10 items-center justify-center rounded-lg bg-accent-tint text-accent-text">
+                <Package className="size-5" />
+              </div>
+              <div>
+                <DialogTitle>{t('updateChecker.new-version-available')}</DialogTitle>
+                <DialogDescription className="tabular-nums">v{updateInfo?.number}</DialogDescription>
+              </div>
             </div>
-            {updateInfo && <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground"><Calendar className="h-4 w-4" /><span>{t('updateChecker.release-date')} {formatDate(updateInfo.releaseDate)}</span></div>}
+            {updateInfo && (
+              <div className="flex items-center gap-2 text-label-sm text-secondary">
+                <Calendar className="size-3.5 text-tertiary" />
+                <span>{t('updateChecker.release-date')} {formatDate(updateInfo.releaseDate)}</span>
+              </div>
+            )}
           </DialogHeader>
           {updateInfo && (
             <div
@@ -114,14 +131,28 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
               role="region"
               aria-label={t('updateChecker.what-s-new')}
             >
-              <h4 className="mb-2 font-medium text-foreground dark:text-foreground">{t('updateChecker.what-s-new')}</h4>
-              <ul className="space-y-1">{updateInfo.changelog.map((item, index) => <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground dark:text-muted-foreground"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" /><span>{item}</span></li>)}</ul>
+              <h4 className="mb-2.5 text-label font-medium text-foreground">{t('updateChecker.what-s-new')}</h4>
+              <ul className="space-y-1.5">
+                {updateInfo.changelog.map((item, index) => (
+                  <li key={index} className="flex items-start gap-2.5 text-label text-secondary">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-accent-solid" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
-          <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
-            <Button type="button" variant="ghost" onClick={handleDontRemind}>{t('updateChecker.dont-remind-again')}</Button>
-            <Button type="button" onClick={handleDownload} className="gap-2"><ExternalLink className="h-4 w-4" /><span>{t('updateChecker.download-now')}</span></Button>
-            <Button type="button" variant="outline" onClick={() => setShowUpdateDialog(false)}>{t('updateChecker.later')}</Button>
+          <DialogFooter className="shrink-0 border-t border-subtle px-6 py-3.5">
+            <Button type="button" variant="ghost" onClick={handleDontRemind}>
+              {t('updateChecker.dont-remind-again')}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setShowUpdateDialog(false)}>
+              {t('updateChecker.later')}
+            </Button>
+            <Button type="button" variant="primary" onClick={handleDownload}>
+              <ExternalLink className="size-4" />
+              <span>{t('updateChecker.download-now')}</span>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

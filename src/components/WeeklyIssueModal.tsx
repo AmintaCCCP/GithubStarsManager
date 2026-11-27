@@ -42,18 +42,18 @@ export const WeeklyIssueModal: React.FC<WeeklyIssueModalProps> = ({ isOpen, onCl
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex flex-wrap items-center gap-1.5 min-w-0">
             {collectedLabel && (
-              <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
+              <span className="rounded-xs bg-accent-tint px-1.5 py-0.5 text-caption font-medium text-accent-text">
                 {t('weeklyIssueModal.in-weekly')}
               </span>
             )}
             {issueNumber != null && (
-              <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground dark:text-muted-foreground">
+              <span className="rounded-xs bg-fill-hover px-1.5 py-0.5 text-caption font-medium text-secondary tabular-nums">
                 {t('weeklyIssueModal.issue-issuenumber', { issueNumber: issueNumber })}
               </span>
             )}
             {submittedDate && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                <Calendar className="w-3 h-3" />
+              <span className="flex items-center gap-1 text-label-sm text-tertiary tabular-nums">
+                <Calendar className="size-3" />
                 {submittedDate}
               </span>
             )}
@@ -62,21 +62,21 @@ export const WeeklyIssueModal: React.FC<WeeklyIssueModalProps> = ({ isOpen, onCl
             href={issue.html_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-label font-medium text-secondary hover:text-foreground transition-colors"
           >
-            <ExternalLink className="w-4 h-4" />
+            <ExternalLink className="size-3.5" />
             {t('weeklyIssueModal.open-on-github')}
           </a>
         </div>
       }
     >
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('weeklyIssueModal.loading-original-post')}</p>
+        <div className="flex flex-col items-center justify-center py-14 gap-3">
+          <Loader2 className="size-6 animate-spin text-accent-text" />
+          <p className="text-label text-secondary">{t('weeklyIssueModal.loading-original-post')}</p>
         </div>
       ) : error ? (
-        <div className="py-10 text-center text-sm text-muted-foreground dark:text-muted-foreground">{error}</div>
+        <div className="py-10 text-center text-label text-tertiary">{error}</div>
       ) : (
         <MarkdownRenderer
           content={issueData?.body ?? ''}

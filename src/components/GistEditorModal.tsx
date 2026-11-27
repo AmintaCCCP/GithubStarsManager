@@ -126,22 +126,21 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
       title={gist ? t('gistEditorModal.edit-gist') : t('gistEditorModal.new-gist')}
       maxWidth="max-w-4xl"
     >
-      <div className="space-y-5">
-        <div className="space-y-2">
-          <label htmlFor="gist-description" className="text-sm font-medium text-foreground dark:text-foreground">
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="gist-description" className="text-label font-medium text-foreground">
             {t('gistEditorModal.description')}
           </label>
           <Input
             id="gist-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground outline-none transition-colors focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
             placeholder={t('gistEditorModal.what-is-this-gist-for')}
           />
         </div>
 
         {!gist && (
-          <div className="flex items-center gap-3 text-sm text-muted-foreground dark:text-muted-foreground">
+          <div className="flex items-center gap-2.5 text-label text-secondary">
             <Checkbox id="gist-public" aria-label={t('gistEditorModal.public-gist')} checked={isPublic} onCheckedChange={(checked) => setIsPublic(checked === true)} />
             <label htmlFor="gist-public" className="cursor-pointer text-left">
               {t('gistEditorModal.public-gist')}
@@ -150,43 +149,46 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
         )}
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-foreground dark:text-foreground">{t('gistEditorModal.files')}</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-label font-medium text-foreground">{t('gistEditorModal.files')}</div>
             {hasDuplicateFilenames && (
-              <div className="text-xs text-destructive">
+              <div className="text-label-sm text-destructive">
                 {t('gistEditorModal.filenames-must-be-unique')}
               </div>
             )}
             <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setFiles(prev => [...prev, createEmptyFile()])}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+              className="gap-1.5"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="size-3.5" />
               {t('gistEditorModal.add-file')}
             </Button>
           </div>
 
           {visibleFiles.map((file, index) => (
-            <div key={file.id} className="space-y-2 rounded-lg border border-border bg-muted p-3 dark:border-border dark:bg-card/[0.03]">
+            <div key={file.id} className="space-y-2 rounded-lg bg-raised p-3 shadow-elev-1">
               <div className="flex items-center gap-2">
                 <Input
                   id={`gist-file-name-${file.id}`}
                   aria-label={t('gistEditorModal.filename-v1', { v1: index + 1 })}
                   value={file.filename}
                   onChange={(event) => updateFile(file.id, { filename: event.target.value })}
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
+                  className="min-w-0 flex-1 font-mono"
                   placeholder={`file-${index + 1}.txt`}
                 />
                 <Button
                   type="button"
                   variant="ghost"
+                  size="icon-sm"
                   onClick={() => removeFile(file.id)}
                   disabled={visibleFiles.length === 1}
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40 dark:text-muted-foreground"
+                  className="text-tertiary hover:bg-destructive-tint hover:text-destructive"
                   title={t('gistEditorModal.delete-file')}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="size-4" />
                 </Button>
               </div>
               <Textarea
@@ -195,26 +197,26 @@ export const GistEditorModal: React.FC<GistEditorModalProps> = ({ gist, isOpen, 
                 value={file.content}
                 onChange={(event) => updateFile(file.id, { content: event.target.value })}
                 rows={8}
-                className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary dark:border-border dark:bg-muted/40 dark:text-foreground"
+                className="w-full resize-y font-mono text-mono-ui"
                 placeholder={t('gistEditorModal.enter-file-content')}
               />
             </div>
           ))}
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-2 border-t border-subtle pt-3">
           <Button
             type="button"
+            variant="outline"
             onClick={onClose}
-            className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
           >
             {t('gistEditorModal.cancel')}
           </Button>
           <Button
             type="button"
+            variant="primary"
             onClick={handleSubmit}
             disabled={!canSubmit || isSaving}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? t('gistEditorModal.saving') : t('gistEditorModal.save')}
           </Button>

@@ -15,11 +15,13 @@ import type {
   PluginError,
 } from '../../plugins/types';
 import { Modal } from '../Modal';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/switch';
 import { PluginSourcesDialog } from './PluginSourcesDialog';
 import { PluginUninstallDialog } from './PluginUninstallDialog';
+import { SettingsCard, SettingsDivider } from './SettingsPrimitives';
 
 interface PluginMarketplaceDialogProps {
   isOpen: boolean;
@@ -275,49 +277,49 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
     const extraPermissionCount = manifest.permissions.length - visiblePermissions.length;
 
     return (
-      <li key={key} className="flex items-start justify-between gap-4 px-3 py-3" data-testid={`marketplace-plugin-${manifest.id}`}>
+      <li key={key} className="flex items-start justify-between gap-4 px-3.5 py-3" data-testid={`marketplace-plugin-${manifest.id}`}>
         <div className="flex min-w-0 gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded bg-muted">
-            <Package className="h-4 w-4 text-muted-foreground" />
+          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-sunken text-tertiary shadow-elev-0">
+            <Package className="size-4" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-sm font-medium">{manifest.name}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">v{manifest.version}</span>
+              <span className="truncate text-label font-medium text-foreground">{manifest.name}</span>
+              <span className="shrink-0 text-label-sm text-tertiary tabular-nums">v{manifest.version}</span>
               {updateAvailable && (
-                <span className="rounded-full bg-status-amber/10 px-2 py-0.5 text-xs text-status-amber">
+                <Badge variant="outline" className="border-warning/30 bg-warning-tint text-warning">
                   {t('pluginSettingsPanel.update-available-v1', { v1: manifest.version })}
-                </span>
+                </Badge>
               )}
               {removal && (
-                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
+                <Badge variant="destructive">
                   {removal.action === 'revoke'
                     ? t('pluginSettingsPanel.revoked')
                     : t('pluginSettingsPanel.blocked')}
-                </span>
+                </Badge>
               )}
             </div>
             {manifest.description && (
-              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{manifest.description}</p>
+              <p className="mt-0.5 line-clamp-2 text-label-sm leading-[18px] text-secondary">{manifest.description}</p>
             )}
             {!apiSupported && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {t('pluginSettingsPanel.marketplace-unsupported-api-v1', { v1: manifest.apiVersion })}
+              <p className="mt-1 flex items-center gap-1 text-label-sm text-destructive">
+                <AlertTriangle className="size-3.5" />
+                <span>{t('pluginSettingsPanel.marketplace-unsupported-api-v1', { v1: manifest.apiVersion })}</span>
               </p>
             )}
             {(removal?.reason || (installedRemoval?.action === 'revoke' ? installedRemoval.reason : null)) && (
-              <p className="mt-1 text-xs text-destructive">
+              <p className="mt-1 text-label-sm text-destructive">
                 {removal?.reason ?? installedRemoval?.reason}
               </p>
             )}
             {manifest.permissions.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {visiblePermissions.map((permission) => (
-                  <span key={permission} className="rounded bg-muted px-2 py-0.5 font-mono text-[11px]">{permission}</span>
+                  <span key={permission} className="rounded-xs bg-fill-hover px-1.5 py-0.5 font-mono text-caption text-secondary">{permission}</span>
                 ))}
                 {extraPermissionCount > 0 && (
-                  <span className="rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <span className="rounded-xs bg-fill-hover px-1.5 py-0.5 text-caption text-tertiary">
                     {t('pluginSettingsPanel.marketplace-permissions-more-v1', { v1: extraPermissionCount })}
                   </span>
                 )}
@@ -326,7 +328,7 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {busyLifecycle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          {busyLifecycle && <Loader2 className="size-4 animate-spin text-tertiary" />}
           {installed ? (
             <>
               <Switch
@@ -338,7 +340,7 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
               {installedRemoval?.action === 'revoke' && installed.enabled && (
                 <Button
                   type="button"
-                  variant="destructive"
+                  variant="danger-solid"
                   size="sm"
                   onClick={() => void disable(manifest.id)}
                 >
@@ -353,8 +355,8 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
                   disabled={busyInstall || busyLifecycle}
                   onClick={() => void install(entry.source.id, plugin, true)}
                 >
-                  {busyInstall && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {t('pluginSettingsPanel.marketplace-update')}
+                  {busyInstall && <Loader2 className="size-3.5 animate-spin" />}
+                  <span>{t('pluginSettingsPanel.marketplace-update')}</span>
                 </Button>
               )}
               <Button
@@ -364,19 +366,21 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
                 disabled={busyLifecycle}
                 aria-label={t('pluginSettingsPanel.uninstall-v1', { v1: manifest.name })}
                 onClick={() => setUninstallTarget(installed)}
+                className="text-destructive hover:bg-destructive-tint hover:text-destructive"
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
+                <Trash2 className="size-4" />
               </Button>
             </>
           ) : (
             <Button
               type="button"
+              variant="primary"
               size="sm"
               disabled={!apiSupported || installBlocked || busyInstall}
               onClick={() => void install(entry.source.id, plugin, false)}
             >
-              {busyInstall && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t('pluginSettingsPanel.marketplace-install')}
+              {busyInstall && <Loader2 className="size-3.5 animate-spin" />}
+              <span>{t('pluginSettingsPanel.marketplace-install')}</span>
             </Button>
           )}
         </div>
@@ -388,28 +392,28 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
     const sourceLabel = entry.source.name ?? entry.source.url;
     const visiblePlugins = entry.plugins.filter(filterPlugin);
     return (
-      <section key={entry.source.id} className="rounded-lg border border-border" data-testid={`marketplace-source-${entry.source.id}`}>
-        <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+      <section key={entry.source.id} className="overflow-hidden rounded-lg bg-raised shadow-elev-1" data-testid={`marketplace-source-${entry.source.id}`}>
+        <header className="flex items-center justify-between gap-2 border-b border-subtle px-3.5 py-2">
           <div className="flex min-w-0 items-center gap-2">
-            <Store className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <h4 className="truncate text-sm font-medium">{sourceLabel}</h4>
-            <span className="shrink-0 text-xs text-muted-foreground">
+            <Store className="size-4 shrink-0 text-tertiary" />
+            <h4 className="truncate text-label font-medium text-foreground">{sourceLabel}</h4>
+            <span className="shrink-0 text-label-sm text-tertiary tabular-nums">
               {t('pluginSettingsPanel.marketplace-plugin-count-v1', { v1: entry.plugins.length })}
             </span>
           </div>
           <Button
             type="button"
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             disabled={loading}
             aria-label={t('pluginSettingsPanel.marketplace-refresh-source-v1', { v1: sourceLabel })}
             onClick={() => void refresh(entry.source.id)}
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-3.5 text-secondary ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </header>
         {entry.status === 'error' && entry.error && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-subtle bg-destructive-tint px-3.5 py-2 text-label-sm text-destructive">
             <span className="min-w-0 break-all">
               {t('pluginSettingsPanel.marketplace-source-error')}{describeMarketplaceError(t, entry.error)} ({entry.error.code})
             </span>
@@ -419,19 +423,19 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
           </div>
         )}
         {entry.warnings.length > 0 && (
-          <details className="border-b border-border px-3 py-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground">
+          <details className="border-b border-subtle px-3.5 py-2">
+            <summary className="cursor-pointer text-label-sm text-secondary">
               {t('pluginSettingsPanel.marketplace-warnings-v1', { v1: entry.warnings.length })}
             </summary>
             <ul className="mt-1 space-y-1">
               {entry.warnings.map((warning, index) => (
-                <li key={`${entry.source.id}-warning-${index}`} className="break-all text-xs text-muted-foreground">{warning}</li>
+                <li key={`${entry.source.id}-warning-${index}`} className="break-all text-label-sm text-secondary">{warning}</li>
               ))}
             </ul>
           </details>
         )}
         {visiblePlugins.length === 0 ? (
-          <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+          <p className="px-3.5 py-5 text-center text-label-sm text-secondary">
             {entry.status === 'pending'
               ? t('pluginSettingsPanel.marketplace-source-pending')
               : query
@@ -439,7 +443,7 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
                 : t('pluginSettingsPanel.marketplace-source-empty')}
           </p>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="divide-y divide-subtle">
             {visiblePlugins.map((plugin) => renderRow(entry, plugin))}
           </ul>
         )}
@@ -462,17 +466,17 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
         fullscreen
         scrollable
       >
-        <p className="text-sm text-muted-foreground">{t('pluginSettingsPanel.marketplace-description')}</p>
+        <p className="text-label text-secondary">{t('pluginSettingsPanel.marketplace-description')}</p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
             <Input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t('pluginSettingsPanel.marketplace-search-placeholder')}
-              className="pl-9"
+              className="pl-8"
               aria-label={t('pluginSettingsPanel.marketplace-search-placeholder')}
               data-testid="marketplace-search"
             />
@@ -480,80 +484,84 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="md"
             disabled={loading || !hasSources}
             onClick={() => void refresh()}
             data-testid="marketplace-refresh"
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            {t('pluginSettingsPanel.refresh')}
+            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>{t('pluginSettingsPanel.refresh')}</span>
           </Button>
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="md"
             onClick={() => setSourcesOpen(true)}
             data-testid="marketplace-manage-sources"
           >
-            <Settings2 className="mr-2 h-4 w-4" />
-            {t('pluginSettingsPanel.marketplace-manage-sources')}
+            <Settings2 className="size-3.5" />
+            <span>{t('pluginSettingsPanel.marketplace-manage-sources')}</span>
           </Button>
         </div>
 
         <div className="mt-4 space-y-4" data-testid="marketplace-plugin-list">
           {initializing ? (
-            <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              {t('pluginSettingsPanel.marketplace-loading')}
+            <div className="flex items-center justify-center gap-2 py-12 text-label text-secondary">
+              <Loader2 className="size-4 animate-spin text-tertiary" />
+              <span>{t('pluginSettingsPanel.marketplace-loading')}</span>
             </div>
           ) : !hasSources ? (
-            <div className="rounded-lg border border-dashed border-border p-8 text-center">
-              <p className="text-sm text-muted-foreground">{t('pluginSettingsPanel.marketplace-empty')}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('pluginSettingsPanel.marketplace-empty-hint')}</p>
-              <Button type="button" size="sm" className="mt-4" onClick={() => setSourcesOpen(true)}>
+            <SettingsCard className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+              <Store className="size-10 text-tertiary stroke-[1.5]" aria-hidden="true" />
+              <p className="text-label font-medium text-foreground">{t('pluginSettingsPanel.marketplace-empty')}</p>
+              <p className="max-w-sm text-label-sm text-secondary">{t('pluginSettingsPanel.marketplace-empty-hint')}</p>
+              <Button type="button" variant="primary" size="sm" className="mt-2" onClick={() => setSourcesOpen(true)}>
                 {t('pluginSettingsPanel.sources-add')}
               </Button>
-            </div>
+            </SettingsCard>
           ) : !anyVisible ? (
-            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            <SettingsCard className="px-6 py-10 text-center text-label-sm text-secondary">
               {query ? t('pluginSettingsPanel.marketplace-no-search-results') : t('pluginSettingsPanel.marketplace-empty')}
-            </div>
+            </SettingsCard>
           ) : (
             groups.map(renderGroup)
           )}
 
           {orphanRevoked.length > 0 && (
-            <section className="rounded-lg border border-destructive/40 bg-destructive/5" data-testid="marketplace-revoked-section">
-              <h4 className="border-b border-destructive/20 px-3 py-2 text-sm font-semibold text-destructive">
+            <section className="overflow-hidden rounded-lg bg-raised shadow-elev-1 ring-1 ring-destructive/30" data-testid="marketplace-revoked-section">
+              <h4 className="border-b border-destructive/20 bg-destructive-tint px-3.5 py-2 text-label font-semibold text-destructive">
                 {t('pluginSettingsPanel.marketplace-orphaned-revoked-title')}
               </h4>
-              <ul className="divide-y divide-destructive/10">
-                {orphanRevoked.map(({ installed, removal }) => (
-                  <li key={installed.manifest.id} className="flex items-start justify-between gap-3 px-3 py-3" data-testid={`marketplace-revoked-${installed.manifest.id}`}>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-medium">{installed.manifest.name}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">v{installed.manifest.version}</span>
-                        <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
-                          {t('pluginSettingsPanel.revoked')}
-                        </span>
+              <div>
+                {orphanRevoked.map(({ installed, removal }, index) => (
+                  <React.Fragment key={installed.manifest.id}>
+                    {index > 0 && <SettingsDivider />}
+                    <div className="flex items-start justify-between gap-3 px-3.5 py-3" data-testid={`marketplace-revoked-${installed.manifest.id}`}>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-label font-medium text-foreground">{installed.manifest.name}</span>
+                          <span className="shrink-0 text-label-sm text-tertiary tabular-nums">v{installed.manifest.version}</span>
+                          <Badge variant="destructive">
+                            {t('pluginSettingsPanel.revoked')}
+                          </Badge>
+                        </div>
+                        {removal?.reason && <p className="mt-1 text-label-sm text-destructive">{removal.reason}</p>}
                       </div>
-                      {removal?.reason && <p className="mt-1 text-xs text-destructive">{removal.reason}</p>}
+                      {installed.enabled && (
+                        <Button
+                          type="button"
+                          variant="danger-solid"
+                          size="sm"
+                          disabled={busyPluginId === installed.manifest.id}
+                          onClick={() => void disable(installed.manifest.id)}
+                        >
+                          {t('pluginSettingsPanel.disable-now')}
+                        </Button>
+                      )}
                     </div>
-                    {installed.enabled && (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        disabled={busyPluginId === installed.manifest.id}
-                        onClick={() => void disable(installed.manifest.id)}
-                      >
-                        {t('pluginSettingsPanel.disable-now')}
-                      </Button>
-                    )}
-                  </li>
+                  </React.Fragment>
                 ))}
-              </ul>
+              </div>
             </section>
           )}
         </div>

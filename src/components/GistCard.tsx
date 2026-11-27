@@ -71,21 +71,21 @@ export const GistCard: React.FC<GistCardProps> = ({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h3 className="app-list-row-title truncate">{title}</h3>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground dark:text-muted-foreground">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-label-sm text-tertiary tabular-nums">
             <span className="inline-flex items-center gap-1.5">
-              <User className="h-4 w-4" />
+              <User className="size-3.5 shrink-0" />
               {gist.owner?.login || t('gistCard.unknown')}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Clock className="h-4 w-4" />
+              <Clock className="size-3.5 shrink-0" />
               {new Date(gist.updated_at).toLocaleDateString()}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <FileCode2 className="h-4 w-4" />
+              <FileCode2 className="size-3.5 shrink-0" />
               {fileCount} {t('gistCard.files')}
             </span>
-            {primaryLanguage && <span>{primaryLanguage}</span>}
-            <span>{gist.public ? t('gistCard.public') : t('gistCard.secret')}</span>
+            {primaryLanguage && <span className="rounded-xs bg-fill-hover px-1.5 py-px text-caption font-medium text-secondary">{primaryLanguage}</span>}
+            <span className="rounded-xs bg-fill-hover px-1.5 py-px text-caption text-tertiary">{gist.public ? t('gistCard.public') : t('gistCard.secret')}</span>
           </div>
         </div>
 
@@ -98,7 +98,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             className="app-row-action"
             title={t('gistCard.ai-analyze')}
           >
-            {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+            {isAnalyzing ? <Loader2 className="size-3.5 animate-spin" /> : <Bot className="size-3.5" />}
           </Button>
           <Button
             type="button"
@@ -107,7 +107,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             className="app-row-action"
             title={t('gistCard.copy-link')}
           >
-            <Copy className="h-4 w-4" />
+            <Copy className="size-3.5" />
           </Button>
           <a
             href={gist.html_url}
@@ -117,7 +117,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             className="app-row-action"
             title={t('gistCard.open-link')}
           >
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink className="size-3.5" />
           </a>
           {gist.starred && (
             <Button
@@ -128,7 +128,7 @@ export const GistCard: React.FC<GistCardProps> = ({
               className="app-row-action text-warning"
               title={t('gistCard.unstar')}
             >
-              <StarOff className="h-4 w-4" />
+              <StarOff className="size-3.5" />
             </Button>
           )}
           {isMine && (
@@ -143,7 +143,7 @@ export const GistCard: React.FC<GistCardProps> = ({
                 className="app-row-action"
                 title={t('gistCard.edit')}
               >
-                <Edit3 className="h-4 w-4" />
+                <Edit3 className="size-3.5" />
               </Button>
               <Button
                 type="button"
@@ -153,19 +153,19 @@ export const GistCard: React.FC<GistCardProps> = ({
                 className="app-row-action text-destructive"
                 title={t('gistCard.delete')}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="size-3.5" />
               </Button>
             </>
           )}
         </div>
       </div>
 
-      <p className="app-list-row-description mt-4 line-clamp-2 text-muted-foreground dark:text-muted-foreground">
+      <p className="app-list-row-description mt-2.5 line-clamp-2">
         {gist.ai_summary || gist.description || fileNames || t('gistCard.no-description')}
       </p>
 
       {gist.analysis_failed && (
-        <div className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="mt-2.5 rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive">
           {gist.analysis_error || t('gistCard.ai-analysis-failed')}
         </div>
       )}

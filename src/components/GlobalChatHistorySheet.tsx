@@ -240,10 +240,10 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
         }}
       >
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2 text-base">
-            <History className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <SheetTitle className="flex items-center gap-2 text-label-lg font-semibold">
+            <History className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
             {t('globalChatHistorySheet.chat-history')}
-            {!isLoading && !loadError && <span className="text-sm font-normal text-muted-foreground">({sessions.length})</span>}
+            {!isLoading && !loadError && <span className="text-label font-normal text-tertiary tabular-nums">({sessions.length})</span>}
           </SheetTitle>
           <SheetDescription>
             {t('globalChatHistorySheet.conversations-across-repositories-select-one-to')}
@@ -251,11 +251,11 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
         </SheetHeader>
 
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-tertiary" aria-hidden="true" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-8 pl-8 text-xs"
+            className="h-control-lg pl-8 text-label"
             placeholder={t('globalChatHistorySheet.search-title-or-repository')}
             aria-label={t('globalChatHistorySheet.search-chat-history')}
           />
@@ -263,31 +263,31 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
 
         <section aria-label={t('globalChatHistorySheet.chat-history-list')} className="min-h-0 flex-1 overflow-y-auto pr-1">
           {isLoading ? (
-            <div className="space-y-2 py-2" role="status" aria-label={t('globalChatHistorySheet.loading-history')}>
+            <div className="space-y-1.5 py-2" role="status" aria-label={t('globalChatHistorySheet.loading-history')}>
               {Array.from({ length: 6 }).map((_, index) => (
                 <div key={index} className="flex items-center gap-2.5 px-2 py-2">
-                  <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-muted" />
+                  <div className="size-7 shrink-0 animate-pulse rounded-sm bg-fill-hover" />
                   <div className="flex-1 space-y-1.5">
-                    <div className="h-3.5 w-3/4 animate-pulse rounded bg-muted" />
-                    <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+                    <div className="h-3.5 w-3/4 animate-pulse rounded-xs bg-fill-hover" />
+                    <div className="h-3 w-1/2 animate-pulse rounded-xs bg-fill-hover" />
                   </div>
                 </div>
               ))}
             </div>
           ) : loadError && visibleSessions.length === 0 ? (
-            <div className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-md border border-destructive/40 px-4 text-center text-sm" role="alert">
+            <div className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-lg bg-destructive-tint px-4 text-center text-label" role="alert">
               <p className="text-destructive">{loadError}</p>
-              <Button type="button" variant="secondary" size="sm" onClick={() => void refresh()}>
+              <Button type="button" variant="outline" size="sm" onClick={() => void refresh()}>
                 {t('globalChatHistorySheet.retry')}
               </Button>
             </div>
           ) : visibleSessions.length === 0 && sessions.length > 0 && hasMore ? (
-            <div ref={sentinelRef} className="py-3 text-center text-xs text-muted-foreground" role="status">
+            <div ref={sentinelRef} className="py-3 text-center text-label-sm text-tertiary" role="status">
               {isLoadingMore ? t('globalChatHistorySheet.loading-history') : ''}
             </div>
           ) : visibleSessions.length === 0 ? (
-            <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 text-center text-xs text-muted-foreground">
-              <History className="h-5 w-5" aria-hidden="true" />
+            <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg bg-sunken px-4 text-center text-label-sm text-tertiary">
+              <History className="size-6 stroke-[1.5]" aria-hidden="true" />
               <p>{sessions.length === 0
                 ? t('globalChatHistorySheet.no-saved-conversations-yet')
                 : t('globalChatHistorySheet.no-matching-conversations-found')}</p>
@@ -295,18 +295,18 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
           ) : (
             <>
               {loadError && (
-                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 px-3 py-2 text-xs text-destructive" role="alert">
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive" role="alert">
                   <span>{loadError}</span>
-                  <Button type="button" variant="secondary" size="sm" className="h-7" onClick={() => void refresh()}>
+                  <Button type="button" variant="outline" size="sm" className="h-control-sm" onClick={() => void refresh()}>
                     {t('globalChatHistorySheet.retry')}
                   </Button>
                 </div>
               )}
-              <ul className="space-y-1">
+              <ul className="space-y-4">
               {groupedSessions.map((group) => (
                 <li key={group.key} className="list-none">
-                  <p className="px-2 pb-1 pt-2 text-xs font-medium text-muted-foreground">{dateGroupLabel(group.key)}</p>
-                  <ul className="space-y-1">
+                  <p className="mb-2 px-2 pt-1 text-label-sm font-medium text-tertiary">{dateGroupLabel(group.key)}</p>
+                  <ul className="space-y-1.5">
                     {group.sessions.map((session) => {
                       const repository = repositoryById.get(session.repoId);
                       const isUnstarred = !repository;
@@ -315,34 +315,33 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                         ?? repository?.owner.avatar_url
                         ?? `https://github.com/${session.repoFullName.split('/')[0]}.png?size=64`;
                       return (
-                        <li key={session.id} className="flex items-center gap-1 rounded-md border border-transparent hover:border-border">
-                          <Button
+                        <li key={session.id} className="flex items-center gap-1.5 rounded-md transition-colors hover:bg-fill-hover">
+                          <button
                             type="button"
-                            variant="ghost"
-                            className="h-auto min-w-0 flex-1 items-center justify-start gap-2.5 px-2 py-2 text-left"
+                            className="motion-press flex h-auto min-h-[56px] min-w-0 flex-1 items-center justify-start gap-2.5 rounded-md px-2.5 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                             onClick={() => onSelectSession(targetRepository, session.id)}
                             title={t('globalChatHistorySheet.open-conversation-in-v1', { v1: session.repoFullName })}
                           >
-                            <img src={avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-md border border-border" />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium text-foreground">{session.title}</span>
-                              <span className="block truncate text-xs text-muted-foreground">{session.repoFullName} · {formatTime(session.updatedAt)}</span>
+                            <img src={avatarUrl} alt="" className="size-7 shrink-0 rounded-sm object-cover shadow-elev-0" />
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <span className="block truncate text-label font-medium text-foreground">{session.title}</span>
+                              <span className="block truncate text-label-sm text-tertiary tabular-nums">{session.repoFullName} · {formatTime(session.updatedAt)}</span>
                             </span>
-                          </Button>
+                          </button>
                           {isUnstarred && (
-                            <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            <span className="inline-flex h-5 shrink-0 items-center rounded-xs bg-fill-hover px-1.5 text-caption text-tertiary">
                               {t('globalChatHistorySheet.unstarred-repository')}
                             </span>
                           )}
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                            size="icon-sm"
+                            className="mr-1 size-control-sm shrink-0 rounded-sm text-tertiary hover:bg-destructive-tint hover:text-destructive"
                             onClick={() => setPendingDeletion(session)}
                             aria-label={t('globalChatHistorySheet.delete-conversation-v1', { v1: session.title })}
                           >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Trash2 className="size-3.5" aria-hidden="true" />
                           </Button>
                         </li>
                       );
@@ -352,7 +351,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
               ))}
               </ul>
               {hasMore && (
-                <div ref={sentinelRef} className="py-3 text-center text-xs text-muted-foreground" role="status">
+                <div ref={sentinelRef} className="py-3 text-center text-label-sm text-tertiary" role="status">
                   {isLoadingMore ? t('globalChatHistorySheet.loading-history') : ''}
                 </div>
               )}
@@ -371,7 +370,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
             <AlertDialogFooter>
               <AlertDialogCancel>{t('globalChatHistorySheet.cancel')}</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-destructive-solid text-on-destructive hover:bg-destructive-solid/90"
                 onClick={() => {
                   if (pendingDeletion) void handleDelete(pendingDeletion.id);
                   setPendingDeletion(null);

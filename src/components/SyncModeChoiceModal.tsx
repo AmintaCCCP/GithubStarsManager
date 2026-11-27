@@ -30,7 +30,7 @@ export const SyncModeChoiceModal: React.FC = () => {
   const t = useT('app');
   const isOpen = !syncModeConfigured;
   const firstActionRef = useRef<HTMLButtonElement>(null);
-  const optionClassName = 'h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-card p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-card dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent';
+  const optionClassName = '!h-auto min-h-[68px] w-full items-start justify-start gap-3 whitespace-normal rounded-lg border-0 bg-raised p-3.5 text-left text-foreground shadow-elev-1 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover hover:text-foreground hover:duration-instant';
 
   const handleChooseSyncMode = (mode: 'stars' | 'stars-and-lists') => {
     setSyncMode(mode);
@@ -45,7 +45,7 @@ export const SyncModeChoiceModal: React.FC = () => {
           firstActionRef.current?.focus();
         }}
         onEscapeKeyDown={(event) => event.preventDefault()}
-        className="max-w-md p-6 sm:p-7"
+        className="max-w-md rounded-xl border-0 bg-floating p-5 shadow-elev-3"
       >
         <AlertDialogHeader>
           <AlertDialogTitle>{t('syncModeChoiceModal.choose-sync-scope')}</AlertDialogTitle>
@@ -53,16 +53,16 @@ export const SyncModeChoiceModal: React.FC = () => {
             {t('syncModeChoiceModal.what-should-be-synced-you-can-change-this-anytim')}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <AlertDialogAction
             ref={firstActionRef}
             onClick={() => handleChooseSyncMode('stars')}
             className={optionClassName}
           >
-            <Star className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <Star className="mt-0.5 size-4 shrink-0 text-accent-text" />
             <span>
-              <span className="block font-medium">{t('syncModeChoiceModal.starred-repos-only')}</span>
-              <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">
+              <span className="block text-label font-medium text-foreground">{t('syncModeChoiceModal.starred-repos-only')}</span>
+              <span className="mt-0.5 block text-label-sm font-normal text-secondary">
                 {t('syncModeChoiceModal.sync-all-your-starred-repositories-default-same')}
               </span>
             </span>
@@ -71,10 +71,10 @@ export const SyncModeChoiceModal: React.FC = () => {
             onClick={() => handleChooseSyncMode('stars-and-lists')}
             className={optionClassName}
           >
-            <ListChecks className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <ListChecks className="mt-0.5 size-4 shrink-0 text-accent-text" />
             <span>
-              <span className="block font-medium">{t('syncModeChoiceModal.starred-repos-lists')}</span>
-              <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">
+              <span className="block text-label font-medium text-foreground">{t('syncModeChoiceModal.starred-repos-lists')}</span>
+              <span className="mt-0.5 block text-label-sm font-normal text-secondary">
                 {t('syncModeChoiceModal.also-fetch-your-lists-and-categorize-by-tags-unl')}
               </span>
             </span>

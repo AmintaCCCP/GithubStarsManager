@@ -34,9 +34,10 @@ vi.mock('../../store/useAppStore', async () => {
 
 import { makeT } from '../../i18n/useT';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
-import { THEME_PRESETS } from '../../constants/themePresets';
+import { getThemePreset, THEME_PRESETS } from '../../constants/themePresets';
 import { DEFAULT_REPOSITORY_CARD_FIELDS } from '../../types/repositoryCardFields';
 import { DEFAULT_REPOSITORY_CARD_ACTIONS } from '../../types/repositoryCardActions';
+import { hslTripletToHex } from '../../utils/themeTokens';
 
 const t = makeT('zh', 'app');
 
@@ -147,8 +148,8 @@ describe('ThemeSettingsCard', () => {
   it('switches presets on click and persists through the store action', async () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
-    await user.click(screen.getByRole('radio', { name: /深邃紫/ }));
-    expect(mocks.state.themePresetDark).toBe('deep-purple');
+    await user.click(screen.getByRole('radio', { name: /Tokyo Night/ }));
+    expect(mocks.state.themePresetDark).toBe('tokyo-night');
     expect(mocks.state.themeMode).toBe('dark');
   });
 
@@ -159,8 +160,8 @@ describe('ThemeSettingsCard', () => {
     await user.click(within(modeGroup).getByText('浅色'));
     expect(mocks.state.themeMode).toBe('light');
 
-    await user.click(screen.getByRole('radio', { name: /深邃紫/ }));
-    expect(mocks.state.themePresetLight).toBe('deep-purple');
+    await user.click(screen.getByRole('radio', { name: /Tokyo Night/ }));
+    expect(mocks.state.themePresetLight).toBe('tokyo-night');
     expect(mocks.state.themePresetDark).toBe('default');
   });
 
@@ -213,8 +214,9 @@ describe('ThemeSettingsCard', () => {
     render(<ThemeSettingsCard t={t} />);
     await user.click(screen.getByRole('button', { name: '微调外观' }));
 
+    const expectedAccentHex = hslTripletToHex(getThemePreset('default').darkColors.primary);
     expect(screen.getByRole('button', { name: '蓝色 (#2563eb)' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByLabelText('自定义强调色')).toHaveValue('#f8fafc');
+    expect(screen.getByLabelText('自定义强调色')).toHaveValue(expectedAccentHex!);
   });
 
   it('resets every token back to the presets', async () => {

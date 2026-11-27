@@ -6,6 +6,7 @@ import { pluginMarketplaceService } from '../../services/pluginMarketplaceServic
 import type { MarketplaceState } from '../../plugins/types';
 import { comparePluginVersions } from '../../utils/pluginRegistryStatus';
 import { Button } from '../ui/button';
+import { SettingsCard, SettingsRow, SettingsSection } from './SettingsPrimitives';
 
 interface PluginRegistrySectionProps {
   t: TranslateFn;
@@ -26,13 +27,12 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ t,
   const installedSnapshot = useSyncExternalStore(
     pluginRegistry.subscribe,
     pluginRegistry.getSnapshot,
-    pluginRegistry.getSnapshot
+    pluginRegistry.getSnapshot,
   );
 
   useEffect(() => {
     if (!available) return;
     let disposed = false;
-    // 纯本地读取（源列表 + 上次遍历的目录缓存），不会发起网络请求。
     pluginMarketplaceService.getState().then((result) => {
       if (!disposed) setState(result);
     }).catch(() => undefined);
@@ -45,8 +45,6 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ t,
 
   const sourceCount = state?.sources.length ?? 0;
   const pluginCount = state?.entries.reduce((total, entry) => total + entry.plugins.length, 0) ?? 0;
-  // 与市场列表一致的跨源去重规则（同一插件 id 只认先遇到的源），
-  // 否则统计里的"可更新"可能是市场里根本不会展示的后续源条目。
   const firstEntryById = new Map<string, { version: string }>();
   for (const entry of state?.entries ?? []) {
     for (const plugin of entry.plugins) {
@@ -65,33 +63,34 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ t,
   ).size;
 
   return (
-    <div className="rounded-lg border border-border p-4" data-testid="plugin-registry">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <Store className="h-4 w-4" />
-            {t('pluginSettingsPanel.community-registry')}
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t('pluginSettingsPanel.community-registry-hint')}
-          </p>
-          {sourceCount > 0 && (
-            <p className="mt-2 text-xs text-muted-foreground" data-testid="plugin-registry-stats">
-              {t('pluginSettingsPanel.marketplace-sources-count-v1', { v1: sourceCount })}
-              {pluginCount > 0
-                ? ` · ${t('pluginSettingsPanel.marketplace-plugins-count-v1', { v1: pluginCount })}`
-                : ''}
-              {updatableCount > 0
-                ? ` · ${t('pluginSettingsPanel.marketplace-updatable-count-v1', { v1: updatableCount })}`
-                : ''}
-            </p>
+    <SettingsSection title={t('pluginSettingsPanel.community-registry')}>
+      <SettingsCard data-testid="plugin-registry">
+        <SettingsRow
+          icon={<Store />}
+          title={t('pluginSettingsPanel.community-registry')}
+          description={(
+            <>
+              <span className="block">{t('pluginSettingsPanel.community-registry-hint')}</span>
+              {sourceCount > 0 && (
+                <span className="mt-1 block text-label-sm text-tertiary tabular-nums" data-testid="plugin-registry-stats">
+                  {t('pluginSettingsPanel.marketplace-sources-count-v1', { v1: sourceCount })}
+                  {pluginCount > 0
+                    ? ` · ${t('pluginSettingsPanel.marketplace-plugins-count-v1', { v1: pluginCount })}`
+                    : ''}
+                  {updatableCount > 0
+                    ? ` · ${t('pluginSettingsPanel.marketplace-updatable-count-v1', { v1: updatableCount })}`
+                    : ''}
+                </span>
+              )}
+            </>
           )}
-        </div>
-        <Button type="button" size="sm" onClick={onOpenMarketplace} data-testid="plugin-registry-open">
-          {t('pluginSettingsPanel.browse-plugins')}
-        </Button>
-      </div>
-    </div>
+        >
+          <Button type="button" variant="primary" size="sm" onClick={onOpenMarketplace} data-testid="plugin-registry-open">
+            {t('pluginSettingsPanel.browse-plugins')}
+          </Button>
+        </SettingsRow>
+      </SettingsCard>
+    </SettingsSection>
   );
 };
 

@@ -84,57 +84,57 @@ export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialog
       scrollable
       footer={(
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-label-sm text-tertiary tabular-nums">
             {starredCount > 0 ? t('batchStar.completed', { count: starredCount }) : t('batchStar.selected', { count: selectedCount })}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" disabled={locked} onClick={onClose}>{t('batchStar.close')}</Button>
-            <Button disabled={busy || selectedCount === 0} onClick={() => void starSelected()}>
+            <Button variant="outline" size="md" disabled={locked} onClick={onClose}>{t('batchStar.close')}</Button>
+            <Button variant="primary" size="md" disabled={busy || selectedCount === 0} onClick={() => void starSelected()}>
               {isStarring ? t('batchStar.starring') : t('batchStar.star-selected', { count: selectedCount })}
             </Button>
           </div>
         </div>
       )}
     >
-      <p className="mb-3 text-sm text-muted-foreground">{t('batchStar.hint')}</p>
+      <p className="mb-2.5 text-label text-secondary">{t('batchStar.hint')}</p>
       <Textarea
         aria-label={t('batchStar.input-label')}
         value={text}
         onChange={event => { setText(event.target.value); clearPreview(); }}
         disabled={busy}
         placeholder={t('batchStar.placeholder')}
-        className="min-h-32 resize-y"
+        className="min-h-28 resize-y"
       />
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button variant="outline" disabled={busy || !text.trim()} onClick={() => { if (record(text, editingText)) setEditingText(text); void preview(text); }}>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="md" disabled={busy || !text.trim()} onClick={() => { if (record(text, editingText)) setEditingText(text); void preview(text); }}>
           {isResolving ? t('batchStar.checking') : t('batchStar.preview')}
         </Button>
-        <Button variant="outline" disabled={busy} aria-expanded={historyOpen} onClick={() => setHistoryOpen(value => !value)}>
+        <Button variant="outline" size="md" disabled={busy} aria-expanded={historyOpen} onClick={() => setHistoryOpen(value => !value)}>
           {t('batchStar.history')}
         </Button>
-        {editingText !== undefined && <Button variant="outline" disabled={busy || !text.trim()} onClick={() => { if (edit(editingText, text)) setEditingText(text); }}>
+        {editingText !== undefined && <Button variant="outline" size="md" disabled={busy || !text.trim()} onClick={() => { if (edit(editingText, text)) setEditingText(text); }}>
           {t('batchStar.save-history')}
         </Button>}
-        {duplicateCount > 0 && <span className="text-sm text-muted-foreground">{t('batchStar.duplicates', { count: duplicateCount })}</span>}
+        {duplicateCount > 0 && <span className="text-label-sm text-tertiary tabular-nums">{t('batchStar.duplicates', { count: duplicateCount })}</span>}
       </div>
-      {historyError && <p role="alert" className="mt-3 text-sm text-destructive">{t('batchStar.history-error')}</p>}
-      {historyOpen && <section className="mt-3 space-y-2" aria-label={t('batchStar.history')}>
-        <p className="text-sm text-muted-foreground">{t('batchStar.history-hint')}</p>
-        {history.length === 0 && <p className="text-sm text-muted-foreground">{t('batchStar.history-empty')}</p>}
+      {historyError && <p role="alert" className="mt-2.5 rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive">{t('batchStar.history-error')}</p>}
+      {historyOpen && <section className="mt-3 space-y-1.5" aria-label={t('batchStar.history')}>
+        <p className="text-label-sm text-tertiary">{t('batchStar.history-hint')}</p>
+        {history.length === 0 && <p className="text-label-sm text-tertiary">{t('batchStar.history-empty')}</p>}
         {history.map(entry => <button key={entry.text} type="button" disabled={busy}
-          className="block w-full rounded-lg border border-border p-3 text-left hover:bg-muted"
+          className="block w-full rounded-md bg-sunken p-2.5 text-left text-label shadow-elev-0 transition-colors hover:bg-fill-hover"
           onClick={() => { setText(entry.text); setEditingText(entry.text); clearPreview(); }}>
-          <time dateTime={new Date(entry.generatedAt).toISOString()} className="text-xs text-muted-foreground">{new Date(entry.generatedAt).toLocaleString()}</time>
-          <span className="mt-1 block whitespace-pre-wrap break-all line-clamp-2">{entry.text}</span>
+          <time dateTime={new Date(entry.generatedAt).toISOString()} className="text-label-sm text-tertiary tabular-nums">{new Date(entry.generatedAt).toLocaleString()}</time>
+          <span className="mt-1 block whitespace-pre-wrap break-all line-clamp-2 text-foreground">{entry.text}</span>
         </button>)}
       </section>}
-      {inputError && <p role="alert" className="mt-3 text-sm text-destructive">{errorLabels[inputError] ?? inputError}</p>}
-      {syncError && <p role="alert" className="mt-3 text-sm text-destructive">{t('batchStar.sync-failed')}: {syncError}</p>}
-      {translationError && <p role="alert" className="mt-3 text-sm text-destructive">{t('batchStar.translation-failed')}: {translationError}</p>}
+      {inputError && <p role="alert" className="mt-2.5 rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive">{errorLabels[inputError] ?? inputError}</p>}
+      {syncError && <p role="alert" className="mt-2.5 rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive">{t('batchStar.sync-failed')}: {syncError}</p>}
+      {translationError && <p role="alert" className="mt-2.5 rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive">{t('batchStar.translation-failed')}: {translationError}</p>}
       {rows.length > 0 && (
-        <div className="mt-5 space-y-2" aria-label={t('batchStar.results')}>
+        <div className="mt-4 space-y-2" aria-label={t('batchStar.results')}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <Button variant="outline" size="sm" disabled={busy || !hasSelectable} onClick={selectAll}>
                 {t('batchStar.select-all')}
               </Button>
@@ -151,6 +151,7 @@ export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialog
               {isTranslating ? t('batchStar.translating') : translationsVisible ? t('batchStar.show-original') : t('batchStar.translate-descriptions')}
             </Button>
           </div>
+          <div className="divide-y divide-separator overflow-hidden rounded-lg bg-raised shadow-elev-0">
           {rows.map((row, index) => {
             const renamed = row.detail && row.detail.full_name.toLowerCase() !== row.candidate.repositoryFullName.toLowerCase();
             const label = row.detail?.full_name ?? (row.candidate.repositoryFullName || row.candidate.originalValue);
@@ -166,8 +167,8 @@ export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialog
               ? translatedDescription
               : originalDescription;
             return (
-              <div key={`${row.candidate.originalValue}-${index}`} className="rounded-lg border border-border p-3">
-                <div className="flex items-start gap-3">
+              <div key={`${row.candidate.originalValue}-${index}`} className="p-3 transition-colors hover:bg-fill-hover">
+                <div className="flex items-start gap-2.5">
                   <Checkbox
                     checked={rowStarred ? true : row.selected}
                     disabled={busy || row.status !== 'ready'}
@@ -176,7 +177,7 @@ export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialog
                     className="mt-1"
                   />
                   <div className="min-w-0 flex-1">
-                    <button type="button" className="block w-full text-left hover:bg-muted rounded-md"
+                    <button type="button" className="block w-full rounded-sm text-left"
                       aria-label={t('batchStar.view-readme', { name: label })}
                       disabled={locked || !row.candidate.repositoryFullName || row.candidate.status === 'invalid'}
                       onClick={() => {
@@ -188,29 +189,30 @@ export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialog
                       }}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       {row.detail ? (
-                        <span className="break-all font-medium hover:underline">
+                        <span className="break-all text-label font-medium text-foreground hover:underline">
                           {renamed ? `${row.candidate.repositoryFullName} → ${label}` : label}
                         </span>
-                      ) : <span className="break-all font-medium">{label}</span>}
-                      <span className="text-xs text-muted-foreground">{t(`batchStar.${statusKey}`)}</span>
+                      ) : <span className="break-all text-label font-medium text-foreground">{label}</span>}
+                      <span className="inline-flex h-5 items-center rounded-xs bg-fill-hover px-1.5 text-label-sm text-secondary">{t(`batchStar.${statusKey}`)}</span>
                     </div>
                     {row.detail && (
                       <>
-                        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{row.detail.language || '—'} · ★ {row.detail.stargazers_count.toLocaleString()}</p>
+                        <p className="mt-1 text-label-sm leading-4.5 text-secondary">{description}</p>
+                        <p className="mt-1 text-label-sm text-tertiary tabular-nums">{row.detail.language || '—'} · ★ {row.detail.stargazers_count.toLocaleString()}</p>
                       </>
                     )}
-                    {row.error && <p className="mt-1 break-all text-xs text-destructive">{row.error}</p>}
+                    {row.error && <p className="mt-1 break-all text-label-sm text-destructive">{row.error}</p>}
                     </button>
                     {row.detail && <a href={row.detail.html_url} target="_blank" rel="noopener noreferrer"
-                      aria-label={t('batchStar.open-github', { name: label })} className="mt-2 inline-flex text-muted-foreground hover:text-foreground">
-                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                      aria-label={t('batchStar.open-github', { name: label })} className="mt-1.5 inline-flex items-center text-tertiary hover:text-foreground">
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
                     </a>}
                   </div>
                 </div>
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </Modal>

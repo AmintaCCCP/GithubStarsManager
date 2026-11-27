@@ -44,31 +44,31 @@ const Pagination: React.FC<{
   if (totalPages <= 1) return null;
 
   return (
-    <nav className="mt-3 flex items-center justify-end gap-1.5" aria-label={label}>
+    <nav className="mt-3 flex items-center justify-end gap-1" aria-label={label}>
       <Button
         type="button"
         variant="ghost"
-        size="icon"
-        className="h-7 w-7"
+        size="icon-sm"
+        className="size-control-sm rounded-sm"
         disabled={page === 1}
         onClick={() => onPageChange(page - 1)}
         aria-label={`${label} previous page`}
       >
-        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        <ChevronLeft className="size-3.5" aria-hidden="true" />
       </Button>
-      <span className="min-w-14 text-center text-xs text-muted-foreground" aria-live="polite">
+      <span className="min-w-12 text-center text-label-sm text-tertiary tabular-nums" aria-live="polite">
         {page} / {totalPages}
       </span>
       <Button
         type="button"
         variant="ghost"
-        size="icon"
-        className="h-7 w-7"
+        size="icon-sm"
+        className="size-control-sm rounded-sm"
         disabled={page === totalPages}
         onClick={() => onPageChange(page + 1)}
         aria-label={`${label} next page`}
       >
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        <ChevronRight className="size-3.5" aria-hidden="true" />
       </Button>
     </nav>
   );
@@ -112,24 +112,24 @@ const ReleaseAssetsTable: React.FC<{
             const isSending = downloadState === 'sending';
             const isSent = downloadState === 'sent';
             return (
-              <TableRow key={link.id} className={link.isSourceCode ? 'bg-muted/30' : undefined}>
+              <TableRow key={link.id} className={link.isSourceCode ? 'bg-sunken/60' : undefined}>
                 <TableCell className="max-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    {link.isSourceCode ? <Code2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" /> : <AssetLeadingIcon name={link.name} contentType={link.contentType} />}
-                    <span className="truncate text-xs" title={link.name}>{link.name}</span>
+                    {link.isSourceCode ? <Code2 className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" /> : <AssetLeadingIcon name={link.name} contentType={link.contentType} />}
+                    <span className="truncate text-label-sm text-foreground" title={link.name}>{link.name}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">{formatFileSize(link.size)}</TableCell>
+                <TableCell className="text-right text-label-sm text-tertiary tabular-nums">{formatFileSize(link.size)}</TableCell>
                 <TableCell className="text-right">
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
-                    className="h-7 px-2 text-xs"
+                    className="h-control-sm rounded-sm px-2 text-label-sm"
                     disabled={isSending || isSent}
                     onClick={() => onDownload(link)}
                   >
-                    {isSending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : isSent ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
+                    {isSending ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden="true" /> : isSent ? <CheckCircle2 className="mr-1 size-3.5 text-status-green" aria-hidden="true" /> : <Download className="mr-1 size-3.5" aria-hidden="true" />}
                     {isSent ? t('repositoryReleaseSheet.sent') : t('repositoryReleaseSheet.download')}
                   </Button>
                 </TableCell>
@@ -170,10 +170,10 @@ const ReleaseContent: React.FC<{
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid h-8 w-full grid-cols-3">
-        <TabsTrigger className="text-xs" value="assets">{t('repositoryReleaseSheet.assets')}</TabsTrigger>
-        <TabsTrigger className="text-xs" value="notes">{t('repositoryReleaseSheet.notes')}</TabsTrigger>
-        <TabsTrigger className="text-xs" value="summary">{t('repositoryReleaseSheet.summary')}</TabsTrigger>
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="assets">{t('repositoryReleaseSheet.assets')}</TabsTrigger>
+        <TabsTrigger value="notes">{t('repositoryReleaseSheet.notes')}</TabsTrigger>
+        <TabsTrigger value="summary">{t('repositoryReleaseSheet.summary')}</TabsTrigger>
       </TabsList>
       <TabsContent value="assets" className="mt-3">
         <ReleasePluginRecommendations release={release} repository={repository} language={language} />
@@ -193,34 +193,34 @@ const ReleaseContent: React.FC<{
       </TabsContent>
       <TabsContent value="notes" className="mt-3">
         {hasBody ? (
-          <div className="rounded-md border border-border bg-muted/20 px-3 py-3">
+          <div className="rounded-md bg-sunken px-3 py-3 shadow-elev-0">
             <MarkdownRenderer content={release.body || ''} shouldRender fontSize="small" baseUrl={repository.html_url} />
           </div>
         ) : (
-          <p className="py-5 text-center text-xs text-muted-foreground">{t('repositoryReleaseSheet.this-release-has-no-release-notes')}</p>
+          <p className="py-5 text-center text-label-sm text-tertiary">{t('repositoryReleaseSheet.this-release-has-no-release-notes')}</p>
         )}
       </TabsContent>
       <TabsContent value="summary" className="mt-3">
         {!hasBody ? (
-          <p className="py-5 text-center text-xs text-muted-foreground">{t('repositoryReleaseSheet.this-release-has-no-notes-to-summarize')}</p>
+          <p className="py-5 text-center text-label-sm text-tertiary">{t('repositoryReleaseSheet.this-release-has-no-notes-to-summarize')}</p>
         ) : summary?.status === 'loading' ? (
-          <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          <div className="flex items-center justify-center gap-2 py-6 text-label-sm text-secondary">
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             {t('repositoryReleaseSheet.generating-summary')}
           </div>
         ) : summary?.status === 'done' && summary.content ? (
-          <div className="rounded-md border border-border bg-muted/20 px-3 py-3">
+          <div className="rounded-md bg-sunken px-3 py-3 shadow-elev-0">
             <MarkdownRenderer content={summary.content} shouldRender breaks fontSize="small" baseUrl={repository.html_url} />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 py-5 text-center">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-label-sm text-secondary">
               {summary?.status === 'error'
                 ? t('repositoryReleaseSheet.summary-generation-failed-please-try-again')
                 : t('repositoryReleaseSheet.this-tab-uses-the-current-ai-configuration-to-ge')}
             </p>
-            <Button type="button" variant="secondary" size="sm" onClick={onGenerateSummary}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            <Button type="button" variant="outline" size="sm" onClick={onGenerateSummary}>
+              <Sparkles className="mr-1.5 size-3.5" aria-hidden="true" />
               {summary?.status === 'error' ? t('repositoryReleaseSheet.retry-summary') : t('repositoryReleaseSheet.generate-summary')}
             </Button>
           </div>
@@ -299,14 +299,14 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
           <SheetTitle>{t('repositoryReleaseSheet.repository-releases')}</SheetTitle>
           <SheetDescription className="truncate" title={repository.full_name}>{repository.full_name}</SheetDescription>
         </SheetHeader>
-        <div className="flex shrink-0 items-center gap-2 border-b border-border pb-3">
-          <Button type="button" variant="secondary" size="sm" onClick={refresh} disabled={isLoading}>
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+        <div className="flex shrink-0 items-center gap-1.5 border-b border-subtle pb-3">
+          <Button type="button" variant="outline" size="md" onClick={refresh} disabled={isLoading} className="h-control rounded-md">
+            <RefreshCw className={`mr-1.5 size-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
             {t('repositoryReleaseSheet.refresh')}
           </Button>
-          <Button asChild type="button" variant="ghost" size="sm">
+          <Button asChild type="button" variant="ghost" size="md" className="h-control rounded-md text-secondary hover:text-foreground">
             <a href={`${repository.html_url}/releases`} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              <ExternalLink className="mr-1.5 size-3.5" aria-hidden="true" />
               GitHub
             </a>
           </Button>
@@ -318,37 +318,37 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
           releases={isLoading || error ? undefined : releases}
           language={language}
         />
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1" data-testid="release-list">
+        <div className="-mx-5 min-h-0 flex-1 overflow-y-auto px-5" data-testid="release-list">
           {isLoading ? (
-            <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            <div className="flex h-40 items-center justify-center gap-2 text-label text-secondary" role="status" aria-live="polite">
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               {t('repositoryReleaseSheet.loading-latest-releases')}
             </div>
           ) : error ? (
             <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
-              <p className="max-w-sm text-sm text-destructive">{error}</p>
-              <Button type="button" variant="secondary" size="sm" onClick={refresh}>{t('repositoryReleaseSheet.retry')}</Button>
+              <p className="max-w-sm text-label text-destructive">{error}</p>
+              <Button type="button" variant="outline" size="md" onClick={refresh}>{t('repositoryReleaseSheet.retry')}</Button>
             </div>
           ) : releases.length === 0 ? (
-            <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-              <PackageOpen className="h-7 w-7" aria-hidden="true" />
-              <p className="text-sm">{t('repositoryReleaseSheet.this-repository-has-no-releases')}</p>
+            <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-secondary">
+              <PackageOpen className="size-8 stroke-[1.5] text-tertiary" aria-hidden="true" />
+              <p className="text-label">{t('repositoryReleaseSheet.this-repository-has-no-releases')}</p>
             </div>
           ) : (
             <>
-              <p className="mb-2 text-xs text-muted-foreground">
+              <p className="mb-2 text-label-sm text-tertiary tabular-nums">
                 {t('repositoryReleaseSheet.v1-live-releases-loaded', { v1: releases.length })}
               </p>
-              <Accordion type="multiple" value={expandedReleaseIds} onValueChange={setExpandedReleaseIds} className="rounded-md border border-border px-3">
+              <Accordion type="multiple" value={expandedReleaseIds} onValueChange={setExpandedReleaseIds} className="mx-0 overflow-hidden rounded-lg border border-default bg-raised px-3">
                 {visibleReleases.map((release) => (
                   <AccordionItem key={release.id} value={String(release.id)}>
-                    <AccordionTrigger>
+                    <AccordionTrigger className="min-w-0">
                       <span className="flex min-w-0 flex-1 items-center gap-2">
-                        <span className="truncate font-semibold">{release.tag_name}</span>
-                        {release.name && release.name !== release.tag_name && <span className="truncate text-xs font-normal text-muted-foreground">{release.name}</span>}
+                        <span className="truncate text-label font-semibold text-foreground">{release.tag_name}</span>
+                        {release.name && release.name !== release.tag_name && <span className="truncate text-label-sm font-normal text-secondary">{release.name}</span>}
                       </span>
-                      <span className="mr-1 flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span className="mr-1 flex shrink-0 items-center gap-1 text-label-sm font-normal text-tertiary tabular-nums">
+                        <Calendar className="size-3.5" aria-hidden="true" />
                         {formatDistanceToNow(new Date(release.published_at), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                       </span>
                     </AccordionTrigger>

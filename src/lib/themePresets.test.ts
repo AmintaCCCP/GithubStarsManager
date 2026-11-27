@@ -7,6 +7,7 @@ import {
   getThemeSwatch,
 } from './themePresets';
 import { DEFAULT_THEME_PRESET_ID, THEME_PRESETS } from '../constants/themePresets';
+import { cn } from './utils';
 
 describe('themePresets injector', () => {
   beforeEach(() => {
@@ -47,25 +48,35 @@ describe('themePresets injector', () => {
 
   it('sets data-theme for a known preset and clears it for the default', () => {
     const root = document.documentElement;
-    applyThemePreset('deep-purple', root);
-    expect(root.getAttribute('data-theme')).toBe('deep-purple');
+    applyThemePreset('tokyo-night', root);
+    expect(root.getAttribute('data-theme')).toBe('tokyo-night');
     applyThemePreset(DEFAULT_THEME_PRESET_ID, root);
     expect(root.hasAttribute('data-theme')).toBe(false);
   });
 
   it('clears data-theme for unknown ids (defensive)', () => {
     const root = document.documentElement;
-    root.setAttribute('data-theme', 'deep-purple');
+    root.setAttribute('data-theme', 'tokyo-night');
     applyThemePreset('nope' as never, root);
     expect(root.hasAttribute('data-theme')).toBe(false);
   });
 
   it('resolves swatch colors for the active mode', () => {
-    const preset = THEME_PRESETS.find((p) => p.id === 'deep-purple')!;
+    const preset = THEME_PRESETS.find((p) => p.id === 'tokyo-night')!;
     const light = getThemeSwatch(preset, false);
     const dark = getThemeSwatch(preset, true);
     expect(light.background).toMatch(/^hsl\(/);
     expect(dark.background).toMatch(/^hsl\(/);
     expect(light.background).not.toBe(dark.background);
+  });
+
+  it('preserves custom typography classes alongside text color classes in cn()', () => {
+    expect(cn('text-label-sm', 'text-secondary')).toBe('text-label-sm text-secondary');
+    expect(cn('text-label bg-accent-solid text-on-accent', 'h-control-sm text-label-sm')).toBe(
+      'bg-accent-solid text-on-accent h-control-sm text-label-sm',
+    );
+    expect(cn('h-control px-2.5', 'h-auto min-h-row-sidebar')).toBe('px-2.5 h-auto min-h-row-sidebar');
+    expect(cn('size-control', 'size-9')).toBe('size-9');
+    expect(cn('h-control', 'h-9')).toBe('h-9');
   });
 });

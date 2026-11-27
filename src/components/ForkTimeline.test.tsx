@@ -258,7 +258,10 @@ describe('ForkTimeline owner filtering', () => {
     await screen.findByRole('combobox', { name: '拥有者:' });
 
     const sidebar = screen.getByRole('complementary', { name: '复刻' });
+    const mainContent = document.querySelector('.workspace-content') as HTMLElement;
     expect(sidebar.querySelectorAll('[role="combobox"]')).toHaveLength(0);
+    expect(within(sidebar).queryByRole('button', { name: '刷新' })).not.toBeInTheDocument();
+    expect(within(mainContent).getByRole('button', { name: '刷新' })).toBeInTheDocument();
     expect(within(sidebar).getByRole('button', { name: '全部复刻1' })).toBeInTheDocument();
     expect(within(sidebar).getByRole('button', { name: '有更新0' })).toBeInTheDocument();
     expect(within(sidebar).getByRole('button', { name: '已同步0' })).toBeInTheDocument();
@@ -513,9 +516,8 @@ describe('ForkTimeline branch request ordering', () => {
     fireEvent.click(screen.getByText('tamina（个人）'));
     fireEvent.click(await screen.findByRole('option', { name: 'team-org' }));
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
-    const sidebar = screen.getByRole('complementary', { name: '复刻' });
     await screen.findByText(/team-org\/org-fork/);
-    const refreshButton = within(sidebar).getByRole('button', { name: '刷新' });
+    const refreshButton = screen.getByRole('button', { name: '刷新' });
     expect(refreshButton).not.toBeNull();
     fireEvent.click(refreshButton);
     await waitFor(() => {

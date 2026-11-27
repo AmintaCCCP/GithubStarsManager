@@ -62,24 +62,24 @@ export const ListsPushIndicator: React.FC = () => {
     : 0;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] w-80 max-w-[calc(100vw_-_2rem)] bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg p-4">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-sm font-medium text-foreground dark:text-foreground">
+    <div className="fixed bottom-4 right-4 z-[9999] w-80 max-w-[calc(100vw_-_2rem)] rounded-lg bg-floating p-3.5 shadow-elev-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-label font-medium text-foreground">
           {t('listsPushIndicator.pushing-categories-to-lists')}
         </span>
-        <span className="text-xs text-muted-foreground dark:text-muted-foreground shrink-0">
+        <span className="shrink-0 text-label-sm text-tertiary tabular-nums">
           {listsPush.total > 0 ? `${listsPush.done}/${listsPush.total}` : '…'}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
+      <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-fill-hover">
         {/* 只动 transform 的进度条：scaleX 表现进度，避免 width 逐帧重排 */}
         <div
-          className="h-full w-full bg-primary dark:bg-primary origin-left transition-transform duration-200"
+          className="h-full w-full origin-left bg-accent-solid transition-transform duration-base ease-out-snappy"
           style={{ transform: `scaleX(${percent / 100})` }}
         />
       </div>
       {listsPush.currentLabel && (
-        <p className="text-xs text-muted-foreground dark:text-muted-foreground truncate">
+        <p className="truncate text-label-sm text-tertiary">
           {listsPush.currentLabel}
         </p>
       )}

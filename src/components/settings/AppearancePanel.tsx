@@ -1,13 +1,13 @@
 import { TranslateFn } from '../../i18n/useT';
 import React from 'react';
-import { Globe } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { APP_LANGUAGES, type AppLanguage } from '../../i18n/languages';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { cn } from '../../lib/utils';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
+import { SettingsCard, SettingsPageStack, SettingsSection } from './SettingsPrimitives';
 
 interface AppearancePanelProps {
   t: TranslateFn;
@@ -20,43 +20,55 @@ export const AppearancePanel: React.FC<AppearancePanelProps> = ({ t }) => {
   })));
 
   return (
-    <div className="space-y-6">
+    <SettingsPageStack>
       <ThemeSettingsCard t={t} />
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-3">
-            <Globe className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-            <CardTitle id="language-settings-title">{t('generalPanel.language-settings')}</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <SettingsSection
+        title={t('generalPanel.language-settings')}
+        titleId="language-settings-title"
+      >
+        <SettingsCard className="p-3.5">
           <RadioGroup
             aria-labelledby="language-settings-title"
             value={language}
             onValueChange={(value) => setLanguage(value as AppLanguage)}
-            className="grid w-full grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3"
+            className="grid w-full grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-2"
           >
-            {APP_LANGUAGES.map((definition) => (
-              <Label
-                key={definition.code}
-                htmlFor={`language-${definition.code}`}
-                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
-              >
-                <RadioGroupItem value={definition.code} id={`language-${definition.code}`} aria-labelledby={`language-${definition.code}-label`} />
-                <span className="min-w-0">
-                  <span id={`language-${definition.code}-label`} className="block truncate text-sm font-medium text-foreground dark:text-foreground">
-                    {definition.nativeName}
+            {APP_LANGUAGES.map((definition) => {
+              const isSelected = language === definition.code;
+              return (
+                <Label
+                  key={definition.code}
+                  htmlFor={`language-${definition.code}`}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                    isSelected
+                      ? 'bg-fill-selected shadow-elev-0'
+                      : 'bg-sunken/60 shadow-elev-0 hover:bg-fill-hover',
+                  )}
+                >
+                  <RadioGroupItem
+                    value={definition.code}
+                    id={`language-${definition.code}`}
+                    aria-labelledby={`language-${definition.code}-label`}
+                  />
+                  <span className="min-w-0">
+                    <span
+                      id={`language-${definition.code}-label`}
+                      className="block truncate text-label font-medium text-foreground"
+                    >
+                      {definition.nativeName}
+                    </span>
+                    <span className="mt-px block truncate text-label-sm font-normal text-secondary">
+                      {definition.englishName}
+                    </span>
                   </span>
-                  <span className="mt-1 block truncate text-xs font-normal text-muted-foreground dark:text-muted-foreground">
-                    {definition.englishName}
-                  </span>
-                </span>
-              </Label>
-            ))}
+                </Label>
+              );
+            })}
           </RadioGroup>
-        </CardContent>
-      </Card>
-    </div>
+        </SettingsCard>
+      </SettingsSection>
+    </SettingsPageStack>
   );
 };

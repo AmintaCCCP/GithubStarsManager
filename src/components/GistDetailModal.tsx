@@ -90,27 +90,28 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onCon
 
   if (isLoadingRaw) {
     return (
-      <div className="flex items-center justify-center rounded-lg bg-muted p-8 dark:bg-muted/40">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
-        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('gistDetailModal.loading-file-content')}</span>
+      <div className="flex items-center justify-center rounded-md border border-subtle bg-sunken p-8">
+        <Loader2 className="mr-2 size-4 animate-spin text-tertiary" />
+        <span className="text-label text-secondary">{t('gistDetailModal.loading-file-content')}</span>
       </div>
     );
   }
 
   if (needsRawFetch && rawError) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg bg-muted p-8 dark:bg-muted/40">
-        <AlertCircle className="mb-3 h-8 w-8 text-muted-foreground dark:text-muted-foreground" />
-        <p className="mb-4 max-w-md text-center text-sm text-muted-foreground dark:text-muted-foreground">{rawError}</p>
+      <div className="flex flex-col items-center justify-center rounded-md border border-subtle bg-sunken p-8">
+        <AlertCircle className="mb-3 size-8 stroke-[1.5] text-tertiary" />
+        <p className="mb-4 max-w-md text-center text-label text-secondary">{rawError}</p>
         <Button
           type="button"
+          variant="secondary"
           onClick={() => {
             setRawContent(null);
             setRetryTick(tick => tick + 1);
           }}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="gap-1.5"
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className="size-3.5" />
           {t('gistDetailModal.retry')}
         </Button>
       </div>
@@ -118,8 +119,8 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onCon
   }
 
   return (
-    <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted p-4 text-sm leading-6 dark:bg-muted/40">
-      <code ref={codeRef} className={`language-${language} font-mono text-foreground `}>
+    <pre className="max-h-[60vh] overflow-auto rounded-md border border-subtle bg-sunken p-4 text-mono-ui leading-6">
+      <code ref={codeRef} className={`language-${language} font-mono text-foreground`}>
         {content || ''}
       </code>
     </pre>
@@ -200,9 +201,9 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={getGistTitle(gist)} maxWidth="max-w-5xl">
-      <div className="min-w-0 space-y-5">
+      <div className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 text-sm text-muted-foreground dark:text-muted-foreground">
+          <div className="min-w-0 text-label-sm text-tertiary tabular-nums">
             <span>{gist.owner?.login || t('gistDetailModal.unknown-owner')}</span>
             <span className="mx-2">·</span>
             <span>{t('gistDetailModal.updated')} {new Date(gist.updated_at).toLocaleString()}</span>
@@ -212,65 +213,73 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
+              variant="outline"
               onClick={() => handleCopy(gist.html_url, t('gistDetailModal.link-copied'))}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+              className="gap-1.5"
             >
-              <Copy className="h-4 w-4" />
+              <Copy className="size-3.5" />
               {t('gistDetailModal.copy-link')}
             </Button>
             <a
               href={gist.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="motion-press state-overlay inline-flex h-control items-center gap-1.5 rounded-md bg-accent-solid px-2.5 text-label font-medium text-on-accent"
             >
-              <ExternalLink className="h-4 w-4" />
+              <ExternalLink className="size-3.5" />
               {t('gistDetailModal.open')}
             </a>
           </div>
         </div>
 
         {gist.ai_summary && (
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground dark:border-primary/30 dark:bg-primary/10 dark:text-foreground">
+          <div className="rounded-md border border-subtle bg-accent-tint/50 px-3.5 py-2.5 text-label text-foreground">
             {gist.ai_summary}
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          {files.map(file => (
-            <Button
-              key={file.filename}
-              type="button"
-              aria-pressed={activeFile?.filename === file.filename}
-              onClick={() => setActiveFilename(file.filename)}
-                className={`min-w-0 max-w-full break-all rounded-lg border px-3 py-1.5 text-left text-sm transition-colors ${
-                activeFile?.filename === file.filename
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent'
-              }`}
-            >
-              {file.filename}
-            </Button>
-          ))}
+        <div className="flex flex-wrap gap-1.5">
+          {files.map(file => {
+            const isSelected = activeFile?.filename === file.filename;
+            return (
+              <Button
+                key={file.filename}
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-pressed={isSelected}
+                onClick={() => setActiveFilename(file.filename)}
+                className={`!h-auto min-h-control-sm min-w-0 max-w-full whitespace-normal break-all px-2.5 py-1 text-left ${
+                  isSelected
+                    ? 'bg-fill-selected text-foreground shadow-elev-0'
+                    : 'bg-fill-hover/60 text-secondary hover:bg-fill-hover hover:text-foreground'
+                }`}
+              >
+                {file.filename}
+              </Button>
+            );
+          })}
         </div>
 
         {activeFile ? (
-          <div className="min-w-0 space-y-3">
+          <div className="min-w-0 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate font-medium text-foreground dark:text-foreground">{activeFile.filename}</div>
-                <div className="text-xs text-muted-foreground dark:text-muted-foreground">
+                <div className="truncate text-label font-medium text-foreground">{activeFile.filename}</div>
+                <div className="text-label-sm text-tertiary tabular-nums">
                   {activeFile.language || inferGistCodeLanguage(activeFile.filename)} · {activeFile.size.toLocaleString()} bytes
                   {activeFile.truncated ? ` · ${t('gistDetailModal.content-truncated')}` : ''}
                 </div>
               </div>
               <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={!canCopyActiveFile}
                 onClick={() => handleCopy(activeCopyContent, t('gistDetailModal.file-copied'))}
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
+                className="gap-1.5"
               >
-                <Copy className="h-4 w-4" />
+                <Copy className="size-3.5" />
                 {t('gistDetailModal.copy-file')}
               </Button>
             </div>
@@ -282,7 +291,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
             />
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground dark:border-border dark:text-muted-foreground">
+          <div className="rounded-md bg-sunken py-10 text-center text-label text-tertiary">
             {t('gistDetailModal.no-files')}
           </div>
         )}

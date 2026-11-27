@@ -386,7 +386,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
       {isMobile ? (
         <section aria-label={t('categorySidebar.categories')} className="context-sidebar-section">
           <div className="app-side-section">
-            <p className="app-section-label app-side-group-label">
+            <p className="app-section-label app-side-group-label text-label-sm font-medium text-tertiary">
               {t('categorySidebar.quick-access')}
             </p>
             <div className="app-side-list">
@@ -407,72 +407,86 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   if (allCategory) void handleDropOnCategory(event, allCategory);
                 }}
                 title={isRepoDragging ? t('categorySidebar.drop-here-to-remove-category') : undefined}
-                className={`app-side-item justify-between text-left ${
+                className={`app-side-item !h-row-sidebar !rounded-sm !font-normal justify-between text-left ${
                   isRepoDragging
-                    ? 'border-dashed! border-warning/50! bg-warning/5! text-warning!'
+                    ? '!bg-warning-tint !text-warning'
                     : activeQuickAccess === 'all'
-                      ? ''
-                      : 'text-muted-foreground'
+                      ? '!bg-fill-selected !text-foreground'
+                      : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                 }`}
               >
                 <span className="app-side-item-label">
-                  {isRepoDragging ? <Undo2 className="h-4 w-4" /> : <Layers3 className="h-4 w-4" />}
+                  {isRepoDragging ? <Undo2 className="size-4" /> : <Layers3 className="size-4" />}
                   <span>{isRepoDragging ? t('categorySidebar.uncategorize') : t('categorySidebar.all-repositories')}</span>
                 </span>
-                <span className="app-side-count">{repositories.length}</span>
+                {repositories.length > 0 && (
+                  <span className="app-side-count tabular-nums">{repositories.length}</span>
+                )}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleQuickAccess('subscribed')}
                 aria-pressed={activeQuickAccess === 'subscribed'}
-                className={`app-side-item justify-between text-left ${
-                  activeQuickAccess === 'subscribed' ? '' : 'text-muted-foreground'
+                className={`app-side-item !h-row-sidebar !rounded-sm !font-normal justify-between text-left ${
+                  activeQuickAccess === 'subscribed'
+                    ? '!bg-fill-selected !text-foreground'
+                    : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                 }`}
               >
                 <span className="app-side-item-label">
-                  <BellRing className="h-4 w-4" />
+                  <BellRing className="size-4" />
                   <span>{t('searchBar.subscribed-to-releases')}</span>
                 </span>
-                <span className="app-side-count">{subscribedRepoCount}</span>
+                {subscribedRepoCount > 0 && (
+                  <span className="app-side-count tabular-nums">{subscribedRepoCount}</span>
+                )}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleQuickAccess('needs-review')}
                 aria-pressed={activeQuickAccess === 'needs-review'}
-                className={`app-side-item justify-between text-left ${
-                  activeQuickAccess === 'needs-review' ? '' : 'text-muted-foreground'
+                className={`app-side-item !h-row-sidebar !rounded-sm !font-normal justify-between text-left ${
+                  activeQuickAccess === 'needs-review'
+                    ? '!bg-fill-selected !text-foreground'
+                    : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                 }`}
               >
                 <span className="app-side-item-label">
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="size-4" />
                   <span>{t('categorySidebar.needs-review')}</span>
                 </span>
-                <span className="app-side-count">{needsReviewCount}</span>
+                {needsReviewCount > 0 && (
+                  <span className="app-side-count tabular-nums">{needsReviewCount}</span>
+                )}
               </Button>
             </div>
           </div>
 
+          <div className="mx-2 my-1 h-px bg-separator" />
+
           <div className="app-side-section">
             <div className="app-collection-row">
               <div className="flex items-center gap-2">
-                <h2 className="app-section-label">
+                <h2 className="app-section-label text-label-sm font-medium text-tertiary">
                   {t('categorySidebar.categories')}
                 </h2>
-                <span className="app-side-count shrink-0">
-                  {navigableCategories.length}
-                </span>
+                {navigableCategories.length > 0 && (
+                  <span className="app-side-count shrink-0 tabular-nums">
+                    {navigableCategories.length}
+                  </span>
+                )}
               </div>
               <Button
                 variant="ghost"
                 onClick={handleAddCategory}
                 size="icon"
-                className="linear-icon-button"
+                className="linear-icon-button size-control-sm rounded-sm text-tertiary hover:bg-fill-hover hover:text-foreground"
                 title={t('categorySidebar.add-category')}
                 aria-label={t('categorySidebar.add-category')}
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="size-3.5" />
               </Button>
             </div>
 
@@ -501,12 +515,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       variant="ghost"
                       onClick={() => handleCategoryClick(category.id)}
                       size="sm"
-                      className={`app-side-item app-category-pill relative justify-between text-left ${
+                      className={`app-side-item app-category-pill relative !h-row-sidebar !rounded-sm !font-normal justify-between text-left ${
                         isDragTarget
-                          ? 'bg-success/10! text-success! ring-1 ring-success/40'
+                          ? '!bg-success-tint !text-status-green ring-1 ring-status-green/30'
                           : isSelected
-                            ? ''
-                            : 'text-muted-foreground'
+                            ? '!bg-fill-selected !text-foreground'
+                            : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                       }`}
                       title={t('categorySidebar.drag-hint', { name: category.name })}
                       aria-pressed={isSelected}
@@ -520,13 +534,15 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                         />
                         <span className="truncate">{category.name}</span>
                       </span>
-                      <span
-                        className={`app-side-count shrink-0 ${
-                          isDragTarget ? 'bg-success/20! text-success!' : ''
-                        }`}
-                      >
-                        {count}
-                      </span>
+                      {(count > 0 || isDragTarget) && (
+                        <span
+                          className={`app-side-count shrink-0 tabular-nums ${
+                            isDragTarget ? '!text-status-green' : ''
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
                     </Button>
                   </div>
                 );
@@ -537,16 +553,15 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
       ) : (
         <div className="app-category-sidebar-shell relative flex shrink-0">
           <div className="linear-sidebar relative w-(--app-sidebar-width) overflow-visible">
-            <div className="context-sidebar-head">
-              <div>
-                <p className="app-side-eyebrow">{t('categorySidebar.workspace-label')}</p>
-                <h2 className="app-side-title">{t('categorySidebar.categories')}</h2>
-              </div>
+            <div className="context-sidebar-head !min-h-[44px] !px-gutter !pt-3 !pb-1.5">
+              <h2 className="app-side-title !text-label-lg !font-semibold">
+                {t('categorySidebar.categories')}
+              </h2>
             </div>
 
             <ContextSidebarBody>
-              <section className="app-side-section" aria-label={t('categorySidebar.quick-access')}>
-                <p className="app-section-label app-side-group-label">
+              <section className="app-side-section !pt-1" aria-label={t('categorySidebar.quick-access')}>
+                <p className="app-section-label app-side-group-label text-label-sm font-medium text-tertiary">
                   {t('categorySidebar.quick-access')}
                 </p>
                 <div className="app-side-list">
@@ -565,59 +580,83 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       const allCategory = allCategories.find((category) => category.id === 'all');
                       if (allCategory) void handleDropOnCategory(event, allCategory);
                     }}
-                    className={`app-side-item justify-between ${
-                      isRepoDragging ? 'border-dashed! border-warning/50! bg-warning/5! text-warning!' : ''
+                    className={`app-side-item !h-row-sidebar !rounded-sm !font-normal justify-between ${
+                      isRepoDragging
+                        ? '!bg-warning-tint !text-warning'
+                        : activeQuickAccess === 'all'
+                          ? '!bg-fill-selected !text-foreground'
+                          : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                     }`}
                     title={isRepoDragging ? t('categorySidebar.drop-here-to-remove-category') : undefined}
                   >
                     <span className="app-side-item-label">
-                      {isRepoDragging ? <Undo2 className="h-4 w-4" /> : <Layers3 className="h-4 w-4" />}
+                      {isRepoDragging ? <Undo2 className="size-4" /> : <Layers3 className="size-4" />}
                       <span>{isRepoDragging ? t('categorySidebar.uncategorize') : t('categorySidebar.all-repositories')}</span>
                     </span>
-                    <span className="app-side-count">{repositories.length}</span>
+                    {repositories.length > 0 && (
+                      <span className="app-side-count tabular-nums">{repositories.length}</span>
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={() => handleQuickAccess('subscribed')}
                     aria-pressed={activeQuickAccess === 'subscribed'}
-                    className="app-side-item justify-between"
+                    className={`app-side-item !h-row-sidebar !rounded-sm !font-normal justify-between ${
+                      activeQuickAccess === 'subscribed'
+                        ? '!bg-fill-selected !text-foreground'
+                        : 'text-secondary hover:bg-fill-hover hover:text-foreground'
+                    }`}
                   >
                     <span className="app-side-item-label">
-                      <BellRing className="h-4 w-4" />
+                      <BellRing className="size-4" />
                       <span>{t('searchBar.subscribed-to-releases')}</span>
                     </span>
-                    <span className="app-side-count">{subscribedRepoCount}</span>
+                    {subscribedRepoCount > 0 && (
+                      <span className="app-side-count tabular-nums">{subscribedRepoCount}</span>
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={() => handleQuickAccess('needs-review')}
                     aria-pressed={activeQuickAccess === 'needs-review'}
-                    className="app-side-item justify-between"
+                    className={`app-side-item !h-row-sidebar !rounded-sm !font-normal justify-between ${
+                      activeQuickAccess === 'needs-review'
+                        ? '!bg-fill-selected !text-foreground'
+                        : 'text-secondary hover:bg-fill-hover hover:text-foreground'
+                    }`}
                   >
                     <span className="app-side-item-label">
-                      <Sparkles className="h-4 w-4" />
+                      <Sparkles className="size-4" />
                       <span>{t('categorySidebar.needs-review')}</span>
                     </span>
-                    <span className="app-side-count">{needsReviewCount}</span>
+                    {needsReviewCount > 0 && (
+                      <span className="app-side-count tabular-nums">{needsReviewCount}</span>
+                    )}
                   </Button>
                 </div>
               </section>
 
-              <section className="app-side-section" aria-label={t('categorySidebar.category-group')}>
+              <div className="mx-2 my-1 h-px bg-separator" />
+
+              <section className="app-side-section !mt-1" aria-label={t('categorySidebar.category-group')}>
                 <div className="app-collection-row">
-                  <div className="flex items-center gap-2">
-                    <span className="app-section-label">{t('categorySidebar.category-group')}</span>
-                    <span className="app-side-count shrink-0">{navigableCategories.length}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="app-section-label text-label-sm font-medium text-tertiary">
+                      {t('categorySidebar.category-group')}
+                    </span>
+                    {navigableCategories.length > 0 && (
+                      <span className="app-side-count shrink-0 tabular-nums">{navigableCategories.length}</span>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
                     onClick={handleAddCategory}
                     size="icon"
-                    className="linear-icon-button"
+                    className="linear-icon-button size-control-sm rounded-sm text-tertiary hover:bg-fill-hover hover:text-foreground"
                     title={t('categorySidebar.add-category')}
                     aria-label={t('categorySidebar.add-category')}
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="size-3.5" />
                   </Button>
                 </div>
 
@@ -652,12 +691,12 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             onClick={() => handleCategoryClick(category.id)}
                             aria-pressed={isSelected}
                             size="sm"
-                            className={`app-side-item flex w-full items-center justify-between pr-2 text-left ${
+                            className={`app-side-item flex w-full !h-row-sidebar !rounded-sm !font-normal items-center justify-between pr-2 text-left ${
                               isDragTarget
-                                ? 'bg-success/10! text-success! ring-1 ring-success/40'
+                                ? '!bg-success-tint !text-status-green ring-1 ring-status-green/30'
                                 : isSelected
-                                  ? ''
-                                  : 'text-muted-foreground'
+                                  ? '!bg-fill-selected !text-foreground'
+                                  : 'text-secondary hover:bg-fill-hover hover:text-foreground'
                             }`}
                             title={t('categorySidebar.drag-hint', { name: category.name })}
                           >
@@ -669,16 +708,18 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                               />
                               <span className="truncate">{category.name}</span>
                             </span>
-                            <span
-                              className={`app-side-count ml-auto flex shrink-0 justify-center transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0 ${
-                                isDragTarget ? 'bg-success/20! text-success!' : ''
-                              }`}
-                            >
-                              {count}
-                            </span>
+                            {(count > 0 || isDragTarget) && (
+                              <span
+                                className={`app-side-count ml-auto flex shrink-0 justify-center tabular-nums transition-opacity duration-micro ease-out-subtle group-hover:opacity-0 group-focus-within:opacity-0 ${
+                                  isDragTarget ? '!text-status-green' : ''
+                                }`}
+                              >
+                                {count}
+                              </span>
+                            )}
                           </Button>
 
-                          <div className="pointer-events-none absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                          <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity duration-micro ease-out-subtle group-hover:pointer-events-auto group-hover:opacity-100 group-hover:duration-instant group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                             <Button
                               variant="ghost"
                               onClick={(e) => {
@@ -729,7 +770,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                 </div>
               </section>
             </ContextSidebarBody>
-            <div className="context-sidebar-foot">
+            <div className="context-sidebar-foot border-t border-subtle px-gutter py-2.5">
               {lastSync && !isSyncingStars && !isSyncingCategories && !hasCategorySyncFailure && (
                 <div className="app-side-foot-status">
                   <span className="app-status-dot" aria-hidden="true" />
@@ -738,7 +779,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               )}
               <div className="app-side-foot-meta">
                 <span>{t('categorySidebar.repository-count', { count: repositories.length })}</span>
-                {lastSync && !isSyncingStars && !isSyncingCategories && !hasCategorySyncFailure && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                {lastSync && !isSyncingStars && !isSyncingCategories && !hasCategorySyncFailure && <CheckCircle2 className="size-3.5" aria-hidden="true" />}
               </div>
             </div>
           </div>

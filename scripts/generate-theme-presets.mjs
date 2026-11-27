@@ -1,53 +1,87 @@
 #!/usr/bin/env node
 /**
- * Generates src/constants/themePresets.generated.ts from the vendored tweakcn
- * preset subset (scripts/theme-source/tweakcn-presets.json).
+ * Generates src/constants/themePresets.generated.ts from curated desktop
+ * color palettes.
  *
- * Colors are converted to HSL triplets ("H S% L%") so every existing
- * `hsl(var(--token) / alpha)` usage and Tailwind alpha modifier keeps working
- * unchanged. Supported input formats: hex, rgb()/rgba(), hsl()/hsla(),
- * oklch() (converted through OKLab with naive channel clamping).
+ * Colors are derived using OKLab surface layering and converted to HSL triplets
+ * ("H S% L%") so every `hsl(var(--token) / alpha)` usage and Tailwind alpha
+ * modifier works across all presets.
  *
  * Usage: node scripts/generate-theme-presets.mjs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const source = JSON.parse(
-  readFileSync(join(root, 'scripts/theme-source/tweakcn-presets.json'), 'utf8'),
-);
 
-const COLOR_KEYS = [
-  'background',
-  'foreground',
-  'card',
-  'card-foreground',
-  'popover',
-  'popover-foreground',
-  'primary',
-  'primary-foreground',
-  'secondary',
-  'secondary-foreground',
-  'muted',
-  'muted-foreground',
-  'accent',
-  'accent-foreground',
-  'destructive',
-  'destructive-foreground',
-  'border',
-  'input',
-  'ring',
-];
-
-// ---------- color parsing ----------
+// ---------- OKLab & sRGB math ----------
 
 function clamp01(v) {
   return Math.min(1, Math.max(0, v));
 }
 
-function srgbChannelToHsl(r, g, b) {
+function toLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function toGamma(c) {
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+
+function rgbToOklab(r, g, b) {
+  const R = toLinear(r);
+  const G = toLinear(g);
+  const B = toLinear(b);
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+  const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+  return {
+    L: 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    a: 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    b: 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  };
+}
+
+function oklabToRgb(c) {
+  const l = Math.pow(c.L + 0.3963377774 * c.a + 0.2158037573 * c.b, 3);
+  const m = Math.pow(c.L - 0.1055613458 * c.a - 0.0638541728 * c.b, 3);
+  const s = Math.pow(c.L - 0.0894841775 * c.a - 1.291485548 * c.b, 3);
+  const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const b = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
+  return [clamp01(toGamma(r)), clamp01(toGamma(g)), clamp01(toGamma(b))];
+}
+
+function mixOklab(x, y, p) {
+  return {
+    L: x.L * p + y.L * (1 - p),
+    a: x.a * p + y.a * (1 - p),
+    b: x.b * p + y.b * (1 - p),
+  };
+}
+
+function parseColorToOklab(input) {
+  const s = String(input).trim().toLowerCase();
+  if (s.startsWith('#')) {
+    let h = s.slice(1);
+    if (h.length === 3 || h.length === 4) h = h.split('').map((c) => c + c).join('');
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    return rgbToOklab(r, g, b);
+  }
+  if (s.startsWith('oklch(')) {
+    const inner = s.slice(6, -1).replace(/,/g, ' ').trim().split(/\s+/);
+    const L = inner[0].endsWith('%') ? parseFloat(inner[0]) / 100 : parseFloat(inner[0]);
+    const C = inner[1].endsWith('%') ? (parseFloat(inner[1]) / 100) * 0.4 : parseFloat(inner[1]);
+    const H = (parseFloat(inner[2]) * Math.PI) / 180;
+    return { L, a: C * Math.cos(H), b: C * Math.sin(H) };
+  }
+  throw new Error(`Unsupported color: ${input}`);
+}
+
+function srgbToHslTriplet(r, g, b) {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const l = (max + min) / 2;
@@ -62,80 +96,14 @@ function srgbChannelToHsl(r, g, b) {
       default: h = ((r - g) / d + 4) / 6;
     }
   }
-  return { h: h * 360, s: s * 100, l: l * 100 };
-}
-
-function hexToRgb(hex) {
-  let value = hex.slice(1);
-  if (value.length === 3 || value.length === 4) {
-    value = value.split('').map((c) => c + c).join('');
-  }
-  const num = parseInt(value.slice(0, 6), 16);
-  return {
-    r: ((num >> 16) & 255) / 255,
-    g: ((num >> 8) & 255) / 255,
-    b: (num & 255) / 255,
-  };
-}
-
-function parseNumberList(input) {
-  return input.replace(/[/,]/g, ' ').trim().split(/\s+/).map(Number);
-}
-
-function rgbToTriplet(value) {
-  const inner = value.slice(value.indexOf('(') + 1, value.lastIndexOf(')'));
-  const parts = parseNumberList(inner);
-  const scale = parts[0] > 1 || parts[1] > 1 || parts[2] > 1 ? 255 : 1;
-  return srgbChannelToHsl(parts[0] / scale, parts[1] / scale, parts[2] / scale);
-}
-
-function hslToTriplet(value) {
-  const inner = value.slice(value.indexOf('(') + 1, value.lastIndexOf(')'));
-  const parts = parseNumberList(inner.replace(/%/g, ''));
-  return { h: parts[0], s: parts[1], l: parts[2] };
-}
-
-// oklch -> sRGB via OKLab (Björn Ottosson's matrices), channels clamped.
-function oklchToTriplet(value) {
-  const inner = value.slice(value.indexOf('(') + 1, value.lastIndexOf(')'));
-  const parts = parseNumberList(inner);
-  const L = parts[0];
-  const C = parts[1];
-  const hDeg = parts[2];
-  const a = C * Math.cos((hDeg * Math.PI) / 180);
-  const b = C * Math.sin((hDeg * Math.PI) / 180);
-
-  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
-  const l = l_ ** 3;
-  const m = m_ ** 3;
-  const s = s_ ** 3;
-
-  let rLin = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-  let gLin = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-  let bLin = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
-
-  const gamma = (v) => (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
-  return srgbChannelToHsl(gamma(clamp01(rLin)), gamma(clamp01(gLin)), gamma(clamp01(bLin)));
-}
-
-function toTriplet(value) {
-  const trimmed = String(value).trim();
-  let triplet;
-  if (trimmed.startsWith('#')) triplet = srgbChannelToHsl(...Object.values(hexToRgb(trimmed)));
-  else if (trimmed.startsWith('rgb')) triplet = rgbToTriplet(trimmed);
-  else if (trimmed.startsWith('hsl')) triplet = hslToTriplet(trimmed);
-  else if (trimmed.startsWith('oklch')) triplet = oklchToTriplet(trimmed);
-  else throw new Error(`Unsupported color format: ${value}`);
-  // Snap near-neutral colors to hue 0: oklch matrix noise leaves random hues
-  // on grays (visually irrelevant at s≈0, but noisy in diffs).
+  const triplet = { h: h * 360, s: s * 100, l: l * 100 };
   if (triplet.s < 0.5) triplet.h = 0;
   return triplet;
 }
 
-function fmtTriplet({ h, s, l }) {
-  return `${round(h, 1)} ${round(s, 1)}% ${round(l, 1)}%`;
+function oklabToTriplet(lab) {
+  const [r, g, b] = oklabToRgb(lab);
+  return srgbToHslTriplet(r, g, b);
 }
 
 function round(v, digits) {
@@ -143,68 +111,119 @@ function round(v, digits) {
   return Math.round(v * f) / f;
 }
 
-/** Derive --border-strong from --border by pushing lightness toward the page. */
+function fmtTriplet({ h, s, l }) {
+  return `${round(h, 1)} ${round(s, 1)}% ${round(l, 1)}%`;
+}
+
+/** The exact triplet that `fmtTriplet` writes — contrast must be checked on this. */
+function roundTriplet({ h, s, l }) {
+  return { h: round(h, 1), s: round(s, 1), l: round(l, 1) };
+}
+
+// ---------- WCAG contrast & normalization ----------
+
+function hslTripletToRgb({ h, s, l }) {
+  const H = ((h % 360) + 360) % 360;
+  const S = s / 100;
+  const L = l / 100;
+  const c = (1 - Math.abs(2 * L - 1)) * S;
+  const x = c * (1 - Math.abs(((H / 60) % 2) - 1));
+  const m = L - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (H < 60) [r, g, b] = [c, x, 0];
+  else if (H < 120) [r, g, b] = [x, c, 0];
+  else if (H < 180) [r, g, b] = [0, c, x];
+  else if (H < 240) [r, g, b] = [0, x, c];
+  else if (H < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+
+function relativeLuminance(rgb) {
+  const [r, g, b] = rgb.map((v) => {
+    const s = v / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastTriplets(a, b) {
+  const [l1, l2] = [relativeLuminance(hslTripletToRgb(a)), relativeLuminance(hslTripletToRgb(b))]
+    .sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+function shiftL(triplet, delta) {
+  return { ...triplet, l: Math.min(100, Math.max(0, triplet.l + delta)) };
+}
+
+function ensureTextOnFill(fg, fill, req) {
+  if (contrastTriplets(fg, fill) >= req) return { fg, fill };
+  const fgLum = relativeLuminance(hslTripletToRgb(fg));
+  const fillLum = relativeLuminance(hslTripletToRgb(fill));
+  const dir = fillLum >= fgLum ? 1 : -1;
+  let best = fill;
+  let moved = false;
+  for (let d = 1; d <= 30; d += 0.5) {
+    const cand = roundTriplet(shiftL(fill, dir * d));
+    best = cand;
+    moved = true;
+    if (contrastTriplets(fg, cand) >= req) return { fg, fill: cand };
+  }
+  for (const flipped of [{ ...fg, s: 0, l: 98 }, { ...fg, s: 0, l: 6 }]) {
+    if (contrastTriplets(flipped, fill) >= req) {
+      return { fg: flipped, fill };
+    }
+  }
+  return { fg, fill: moved ? best : fill };
+}
+
+function ensureTextOnSurfaces(token, surfaces, req) {
+  const worst = (t) => Math.min(...surfaces.map((s) => contrastTriplets(t, s)));
+  if (worst(token) >= req) return token;
+  let bestUp = null;
+  let bestDown = null;
+  for (let d = 0.5; d <= 60; d += 0.5) {
+    if (bestUp === null && worst(shiftL(token, d)) >= req) bestUp = d;
+    if (bestDown === null && worst(shiftL(token, -d)) >= req) bestDown = d;
+    if (bestUp !== null && bestDown !== null) break;
+  }
+  const up = bestUp !== null ? shiftL(token, bestUp) : null;
+  const down = bestDown !== null ? shiftL(token, -bestDown) : null;
+  if (up && down) return bestUp <= bestDown ? up : down;
+  if (up || down) return up ?? down;
+  let best = token;
+  let bestScore = worst(token);
+  for (let l = 0; l <= 100; l += 1) {
+    const cand = { ...token, l };
+    const score = worst(cand);
+    if (score > bestScore) {
+      bestScore = score;
+      best = cand;
+    }
+  }
+  return best;
+}
+
 function deriveBorderStrong(triplet, isLightMode) {
   const delta = isLightMode ? -11 : 11;
   const l = Math.min(97, Math.max(3, triplet.l + delta));
-  return fmtTriplet({ ...triplet, l });
+  return { ...triplet, l };
 }
 
-// ---------- text selection & search highlight derivation ----------
-//
-// The vendored palettes ship selection-hostile accents: zen-inspired light
-// accent (52 23.1% 87.3%) is nearly identical to its card (41.2 42.2% 92.5%),
-// so ::selection rendered invisible (issue #348), and no single palette token
-// is safe everywhere — accent collides with card, while primary/ring can sit
-// mid-tone or near the foreground depending on the preset. Selection and
-// search-highlight are therefore derived per mode into a mid-tone band with
-// two enforced invariants: visible against every surface text can sit on, and
-// body text stays readable on top.
-
-/** Every surface selected or highlighted text can render over. */
 function textSurfaces(t) {
   return [t.background, t.card, t.popover, t.secondary, t.muted];
 }
 
-/**
- * Smallest WCAG contrast between a candidate fill and a set of surfaces.
- *
- * @param {{ h: number, s: number, l: number }} triplet Candidate fill triplet.
- * @param {Array<{ h: number, s: number, l: number }>} surfaces Surface triplets.
- * @returns {number} Minimum contrast ratio across the surfaces.
- */
 function minSurfaceContrast(triplet, surfaces) {
   return Math.min(...surfaces.map((surface) => contrastTriplets(triplet, surface)));
 }
 
-/**
- * Pick the hue source for derived text marks: primary, falling back to
- * ring/accent when primary is neutral so colorful themes keep their identity
- * while truly monochrome ones stay achromatic instead of inventing a hue.
- *
- * @param {Record<string, { h: number, s: number, l: number }>} t Normalized palette triplets.
- * @returns {{ h: number, s: number, l: number }} Hue source triplet.
- */
 function selectionHueSource(t) {
   if (t.primary.s >= 8) return t.primary;
   return [t.ring, t.accent].find((candidate) => candidate.s >= 14) ?? t.primary;
 }
 
-/**
- * Derive the ::selection fill plus its foreground for one palette mode.
- *
- * Lightness starts from a mid-tone "highlighter" band and sweeps in both
- * directions until the fill clears every text surface while the body
- * foreground stays readable on top; the nearest passing candidate wins so each
- * preset keeps its own character. Both targets carry a small guard margin so
- * the one-decimal output rounding cannot land below the audited 1.5/4.5
- * invariants. When no lightness satisfies both (e.g. dark text over dark
- * fills), ensureTextOnFill flips the selection foreground toward white/black
- * instead.
- *
- * @param {Record<string, { h: number, s: number, l: number }>} t Normalized palette triplets.
- * @returns {{ selection: { h: number, s: number, l: number }, selectionForeground: { h: number, s: number, l: number } }} Derived triplets.
- */
 function deriveSelection(t) {
   const surfaces = textSurfaces(t);
   const isLight = relativeLuminance(hslTripletToRgb(t.background)) > 0.35;
@@ -248,20 +267,6 @@ function deriveSelection(t) {
   return { selection: pair.fill, selectionForeground: pair.fg };
 }
 
-/**
- * Derive the search-result highlight for one palette mode: the selection hue
- * pulled halfway toward the closest surface it renders on, so hits stay
- * visible without competing with an active text selection. Only card,
- * popover, and canvas count as surfaces — the highlight class is used inside
- * repository cards, never on chip/secondary fills whose vendored colors can
- * be extreme outliers (claude dark ships a near-white secondary). Lightness
- * is swept until the fill clears card and canvas with readable text on top;
- * targets carry a guard margin over the audited 1.25/4.5 invariants.
- *
- * @param {Record<string, { h: number, s: number, l: number }>} t Normalized palette triplets.
- * @param {{ h: number, s: number, l: number }} selection Derived selection fill.
- * @returns {{ h: number, s: number, l: number }} Highlight fill triplet.
- */
 function deriveSearchHighlight(t, selection) {
   const surfaces = [t.card, t.popover, t.background];
   const isLight = relativeLuminance(hslTripletToRgb(t.background)) > 0.35;
@@ -287,325 +292,403 @@ function deriveSearchHighlight(t, selection) {
   return base;
 }
 
-// ---------- accessibility & surface normalization ----------
-//
-// Vendored tweakcn palettes predate this app's token usage: several fail WCAG
-// contrast once rendered through the shared components (dim text on canvas,
-// white text on mid-tone fills, focus rings at whisper contrast), and most
-// light/dark pairs ship canvas === card, which flattens the surface hierarchy
-// the shell is built on. normalizeMode nudges lightness — hue and saturation
-// stay untouched — just enough to clear the threshold, so a preset keeps its
-// identity while its UI stops failing.
+function buildModePalette(spec, isLight) {
+  const bgLab = parseColorToOklab(spec.background);
+  const fgLab = parseColorToOklab(spec.foreground);
+  const accLab = parseColorToOklab(spec.accent);
+  const destLab = parseColorToOklab(spec.destructive);
 
-/**
- * Convert an HSL triplet ({ h, s, l }) to sRGB channel values in [0, 255].
- *
- * @param {{ h: number, s: number, l: number }} triplet HSL values with h in [0, 360), s in [0, 100], l in [0, 100].
- * @returns {[number, number, number]} RGB channel values in [0, 255].
- */
-function hslTripletToRgb({ h, s, l }) {
-  const H = ((h % 360) + 360) % 360;
-  const S = s / 100;
-  const L = l / 100;
-  const c = (1 - Math.abs(2 * L - 1)) * S;
-  const x = c * (1 - Math.abs(((H / 60) % 2) - 1));
-  const m = L - c / 2;
-  let r = 0, g = 0, b = 0;
-  if (H < 60) [r, g, b] = [c, x, 0];
-  else if (H < 120) [r, g, b] = [x, c, 0];
-  else if (H < 180) [r, g, b] = [0, c, x];
-  else if (H < 240) [r, g, b] = [0, x, c];
-  else if (H < 300) [r, g, b] = [x, 0, c];
-  else [r, g, b] = [c, 0, x];
-  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
-}
+  const whiteLab = parseColorToOklab('#ffffff');
+  const blackLab = parseColorToOklab('#0d0e10');
 
-/**
- * Compute the relative luminance of an sRGB color per WCAG 2.1 specifications.
- *
- * @param {[number, number, number]} rgb RGB channel values in [0, 255].
- * @returns {number} Relative luminance in [0, 1].
- */
-function relativeLuminance(rgb) {
-  const [r, g, b] = rgb.map((v) => {
-    const s = v / 255;
-    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
+  let canvasLab;
+  let cardLab;
+  let popoverLab;
+  let raisedLab;
+  let sunkenLab;
+  let accentWellLab;
+  let borderLab;
 
-/**
- * Compute the WCAG contrast ratio between two HSL triplet colors.
- *
- * @param {{ h: number, s: number, l: number }} a First color triplet.
- * @param {{ h: number, s: number, l: number }} b Second color triplet.
- * @returns {number} Contrast ratio in range [1, 21].
- */
-function contrastTriplets(a, b) {
-  const [l1, l2] = [relativeLuminance(hslTripletToRgb(a)), relativeLuminance(hslTripletToRgb(b))]
-    .sort((x, y) => y - x);
-  return (l1 + 0.05) / (l2 + 0.05);
-}
-
-/**
- * Shift the lightness of an HSL triplet by a delta while clamping within [0, 100].
- *
- * @param {{ h: number, s: number, l: number }} triplet Original color triplet.
- * @param {number} delta Lightness delta to add.
- * @returns {{ h: number, s: number, l: number }} Clamped color triplet.
- */
-function shiftL(triplet, delta) {
-  return { ...triplet, l: Math.min(100, Math.max(0, triplet.l + delta)) };
-}
-
-/**
- * Nudge a fill surface away from its text color until the pair clears `req`.
- * Hue and saturation are preserved; the search is capped so a theme cannot be
- * dragged into a different color. Falls back to flipping the text toward
- * white/black when the fill cannot move far enough. Returns both tokens since
- * either side may end up adjusted.
- *
- * @param {{ h: number, s: number, l: number }} fg Foreground text triplet.
- * @param {{ h: number, s: number, l: number }} fill Background fill triplet.
- * @param {number} req Required minimum contrast ratio.
- * @returns {{ fg: { h: number, s: number, l: number }, fill: { h: number, s: number, l: number } }} Adjusted pair.
- */
-function ensureTextOnFill(fg, fill, req) {
-  if (contrastTriplets(fg, fill) >= req) return { fg, fill };
-  const fgLum = relativeLuminance(hslTripletToRgb(fg));
-  const fillLum = relativeLuminance(hslTripletToRgb(fill));
-  const dir = fillLum >= fgLum ? 1 : -1;
-  let best = fill;
-  let moved = false;
-  for (let d = 1; d <= 30; d += 0.5) {
-    const cand = shiftL(fill, dir * d);
-    best = cand;
-    moved = true;
-    if (contrastTriplets(fg, cand) >= req) return { fg, fill: cand };
+  if (isLight) {
+    // Light: paper (card/popover) is the crispest surface; navigator canvas recedes ~4% toward fg.
+    cardLab = bgLab;
+    canvasLab = mixOklab(fgLab, bgLab, 0.045);
+    popoverLab = cardLab;
+    raisedLab = mixOklab(fgLab, cardLab, 0.03);
+    sunkenLab = mixOklab(fgLab, cardLab, 0.035);
+    accentWellLab = mixOklab(fgLab, cardLab, 0.07);
+    borderLab = mixOklab(fgLab, cardLab, 0.12);
+  } else {
+    // Dark: navigator canvas is deepest; paper/card steps +4.5% toward fg; floating steps +10%.
+    canvasLab = mixOklab(blackLab, bgLab, 0.28);
+    cardLab = mixOklab(fgLab, canvasLab, 0.05);
+    raisedLab = mixOklab(fgLab, canvasLab, 0.08);
+    sunkenLab = mixOklab(fgLab, canvasLab, 0.025);
+    popoverLab = spec.popoverSolid
+      ? parseColorToOklab(spec.popoverSolid)
+      : mixOklab(fgLab, canvasLab, 0.105);
+    accentWellLab = mixOklab(fgLab, canvasLab, 0.12);
+    borderLab = mixOklab(fgLab, canvasLab, 0.14);
   }
-  for (const flipped of [{ ...fg, s: 0, l: 98 }, { ...fg, s: 0, l: 6 }]) {
-    if (contrastTriplets(flipped, fill) >= req) {
-      return { fg: flipped, fill };
-    }
-  }
-  return { fg, fill: moved ? best : fill };
-}
 
-/**
- * Nudge a text/ring token until it clears `req` against every surface it
- * renders on. Both directions are searched; the smaller passing shift wins.
- *
- * @param {{ h: number, s: number, l: number }} token Token to adjust.
- * @param {Array<{ h: number, s: number, l: number }>} surfaces Array of surface color triplets.
- * @param {number} req Required minimum contrast ratio.
- * @returns {{ h: number, s: number, l: number }} Adjusted token.
- */
-function ensureTextOnSurfaces(token, surfaces, req) {
-  const worst = (t) => Math.min(...surfaces.map((s) => contrastTriplets(t, s)));
-  if (worst(token) >= req) return token;
-  let bestUp = null;
-  let bestDown = null;
-  for (let d = 0.5; d <= 60; d += 0.5) {
-    if (bestUp === null && worst(shiftL(token, d)) >= req) bestUp = d;
-    if (bestDown === null && worst(shiftL(token, -d)) >= req) bestDown = d;
-    if (bestUp !== null && bestDown !== null) break;
-  }
-  const up = bestUp !== null ? shiftL(token, bestUp) : null;
-  const down = bestDown !== null ? shiftL(token, -bestDown) : null;
-  if (up && down) return bestUp <= bestDown ? up : down;
-  if (up || down) return up ?? down;
-  let best = token;
-  let bestScore = worst(token);
-  for (let l = 0; l <= 100; l += 1) {
-    const cand = { ...token, l };
-    const score = worst(cand);
-    if (score > bestScore) {
-      bestScore = score;
-      best = cand;
-    }
-  }
-  return best;
-}
+  const mutedFgLab = mixOklab(fgLab, cardLab, isLight ? 0.60 : 0.62);
+  const whiteTriplet = oklabToTriplet(whiteLab);
+  const darkInkTriplet = oklabToTriplet(mixOklab(blackLab, fgLab, 0.85));
 
-/**
- * Normalizes all color tokens for a single preset mode (light or dark)
- * to satisfy WCAG contrast targets and surface layering hierarchy.
- *
- * @param {Record<string, { h: number, s: number, l: number }>} triplets Palette color triplets.
- * @returns {Record<string, { h: number, s: number, l: number }>} Normalized color triplets.
- */
-function normalizeMode(triplets) {
-  const out = { ...triplets };
+  const primaryFill = oklabToTriplet(accLab);
+  const destFill = oklabToTriplet(destLab);
 
-  // Surface layering: canvas must sit apart from card, darker in both modes
-  // so white/light cards float and dark cards lift off the page.
-  const bgLum = relativeLuminance(hslTripletToRgb(out.background));
-  const cardLum = relativeLuminance(hslTripletToRgb(out.card));
+  // Pick readable foreground on solid primary/destructive buttons
+  const primaryContrastWhite = contrastTriplets(whiteTriplet, primaryFill);
+  const primaryContrastDark = contrastTriplets(darkInkTriplet, primaryFill);
+  const primaryFgInit = primaryContrastWhite >= 4.5 || primaryContrastWhite >= primaryContrastDark
+    ? whiteTriplet
+    : darkInkTriplet;
+
+  const t = {
+    background: oklabToTriplet(canvasLab),
+    foreground: oklabToTriplet(fgLab),
+    card: oklabToTriplet(cardLab),
+    'card-foreground': oklabToTriplet(fgLab),
+    popover: oklabToTriplet(popoverLab),
+    'popover-foreground': oklabToTriplet(fgLab),
+    primary: primaryFill,
+    'primary-foreground': primaryFgInit,
+    secondary: oklabToTriplet(isLight ? sunkenLab : raisedLab),
+    'secondary-foreground': oklabToTriplet(fgLab),
+    muted: oklabToTriplet(sunkenLab),
+    'muted-foreground': oklabToTriplet(mutedFgLab),
+    accent: oklabToTriplet(accentWellLab),
+    'accent-foreground': oklabToTriplet(fgLab),
+    destructive: destFill,
+    'destructive-foreground': whiteTriplet,
+    border: oklabToTriplet(borderLab),
+    input: oklabToTriplet(borderLab),
+    ring: primaryFill,
+  };
+
+  // Ensure surface separation between background and card
+  const bgLum = relativeLuminance(hslTripletToRgb(t.background));
+  const cardLum = relativeLuminance(hslTripletToRgb(t.card));
   if (Math.abs(bgLum - cardLum) < 0.015) {
     const dir = bgLum > cardLum ? 1 : -1;
-    for (let d = 1.5; d <= 6; d += 0.5) {
-      const cand = shiftL(out.background, dir * d);
+    for (let d = 1.5; d <= 8; d += 0.5) {
+      const cand = shiftL(t.background, dir * d);
       if (Math.abs(relativeLuminance(hslTripletToRgb(cand)) - cardLum) >= 0.015) {
-        out.background = cand;
+        t.background = cand;
         break;
       }
     }
   }
 
-  // Text on filled surfaces (buttons, chips, pills).
   for (const [fillKey, fgKey] of [
     ['destructive', 'destructive-foreground'],
     ['primary', 'primary-foreground'],
     ['accent', 'accent-foreground'],
     ['secondary', 'secondary-foreground'],
   ]) {
-    const pair = ensureTextOnFill(out[fgKey], out[fillKey], 4.5);
-    out[fillKey] = pair.fill;
-    out[fgKey] = pair.fg;
+    // Check the rounded triplets: fmtTriplet writes one decimal, and rounding
+    // can drop a marginal pair (e.g. solarized dark primary) below 4.5:1.
+    const pair = ensureTextOnFill(roundTriplet(t[fgKey]), roundTriplet(t[fillKey]), 4.5);
+    t[fillKey] = pair.fill;
+    t[fgKey] = pair.fg;
   }
 
-  // Dim text and focus ring against the surfaces they render on.
-  out['muted-foreground'] = ensureTextOnSurfaces(
-    out['muted-foreground'], [out.background, out.card, out.muted], 4.55,
+  t['muted-foreground'] = ensureTextOnSurfaces(
+    t['muted-foreground'],
+    [t.background, t.card, t.popover, t.muted],
+    4.6,
   );
-  out.ring = ensureTextOnSurfaces(
-    out.ring, [out.background, out.card, out.muted], 3.05,
+  t.ring = ensureTextOnSurfaces(
+    t.ring,
+    [t.background, t.card, t.muted],
+    3.05,
   );
 
-  return out;
-}
+  const borderStrong = deriveBorderStrong(t.border, isLight);
+  const sel = deriveSelection(t);
+  const hl = deriveSearchHighlight(t, sel.selection);
 
-// ---------- shadow composition ----------
-
-/**
- * Parse and validate a pixel value string, returning formatted px length.
- *
- * @param {string | number} value Pixel length string (e.g. "3px" or 3).
- * @returns {string} Formatted pixel string.
- */
-function px(value) {
-  const raw = String(value).trim();
-  const num = Number(raw.replace(/px$/, ''));
-  if (!Number.isFinite(num)) {
-    throw new Error(`Unsupported shadow length: ${value}`);
-  }
-  return `${round(num, 2)}px`;
-}
-
-/**
- * Compose one faithful box-shadow from the tweakcn recipe. Non-default themes
- * share this single recipe across subtle/elevated/dialog tokens (their designs
- * lean on borders/tints for depth); the default preset keeps its hand-tuned
- * hierarchy. Presets without shadow params fall back to tweakcn's global
- * defaults (soft 1px/3px at 0.1 opacity).
- */
-function composeShadow(styles) {
-  const color = styles['shadow-color'] ?? '#000000';
-  const opacity = Number(styles['shadow-opacity'] ?? '0.1');
-  if (!Number.isFinite(opacity)) {
-    throw new Error(`Unsupported shadow-opacity: ${styles['shadow-opacity']}`);
-  }
-  const ox = px(styles['shadow-offset-x'] ?? '0px');
-  const oy = px(styles['shadow-offset-y'] ?? '1px');
-  const blur = px(styles['shadow-blur'] ?? '3px');
-  const spread = px(styles['shadow-spread'] ?? '0px');
-  const triplet = fmtTriplet(toTriplet(color));
   return {
-    colorTriplet: triplet,
-    opacity: round(clamp01(opacity), 3),
-    // Emit the raw params so runtime CSS can rebuild with its own alphas.
-    shadow: `${ox} ${oy} ${blur} ${spread} hsl(var(--shadow-color) / var(--shadow-opacity))`,
+    background: fmtTriplet(t.background),
+    foreground: fmtTriplet(t.foreground),
+    card: fmtTriplet(t.card),
+    'card-foreground': fmtTriplet(t['card-foreground']),
+    popover: fmtTriplet(t.popover),
+    'popover-foreground': fmtTriplet(t['popover-foreground']),
+    primary: fmtTriplet(t.primary),
+    'primary-foreground': fmtTriplet(t['primary-foreground']),
+    secondary: fmtTriplet(t.secondary),
+    'secondary-foreground': fmtTriplet(t['secondary-foreground']),
+    muted: fmtTriplet(t.muted),
+    'muted-foreground': fmtTriplet(t['muted-foreground']),
+    accent: fmtTriplet(t.accent),
+    'accent-foreground': fmtTriplet(t['accent-foreground']),
+    destructive: fmtTriplet(t.destructive),
+    'destructive-foreground': fmtTriplet(t['destructive-foreground']),
+    border: fmtTriplet(t.border),
+    'border-strong': fmtTriplet(borderStrong),
+    input: fmtTriplet(t.input),
+    ring: fmtTriplet(t.ring),
+    selection: fmtTriplet(sel.selection),
+    'selection-foreground': fmtTriplet(sel.selectionForeground),
+    'search-highlight': fmtTriplet(hl),
   };
 }
 
-/**
- * @fontsource-variable packages register families as "<Name> Variable", so
- * only those bundled families are aliased here. Regular @fontsource families,
- * including the imported serif fonts, retain their declared family names.
- */
-const BUNDLED_VARIABLE_FONTS = new Set([
-  'Open Sans',
-  'Inter',
-  'Outfit',
-  'Geist',
-  'Geist Mono',
-  'Montserrat',
-  'DM Sans',
-  'Plus Jakarta Sans',
-  'JetBrains Mono',
-  'Fira Code',
-]);
+// ---------- 15 curated desktop theme definitions ----------
 
-function aliasFontFamily(stack) {
-  if (!stack) return stack;
-  return stack
-    .split(',')
-    .map((part) => part.trim())
-    .map((family) => {
-      const bare = family.replace(/^['"]|['"]$/g, '');
-      return BUNDLED_VARIABLE_FONTS.has(bare) ? `'${bare} Variable'` : family;
-    })
-    .join(', ');
-}
+const CURATED_THEMES = {
+  catppuccin: {
+    label: 'Catppuccin',
+    light: {
+      background: '#eff1f5',
+      foreground: '#4c4f69',
+      accent: '#8839ef',
+      destructive: '#d20f39',
+    },
+    dark: {
+      background: '#1e1e2e',
+      foreground: '#cdd6f4',
+      accent: '#cba6f7',
+      destructive: '#f38ba8',
+    },
+  },
+  dracula: {
+    label: 'Dracula',
+    light: {
+      background: '#f7f6fb',
+      foreground: '#282a36',
+      accent: '#7c4dff',
+      destructive: '#d6336c',
+    },
+    dark: {
+      background: '#282a36',
+      foreground: '#f8f8f2',
+      accent: '#bd93f9',
+      destructive: '#ff5555',
+    },
+  },
+  ghostty: {
+    label: 'Ghostty',
+    light: {
+      background: '#f8f9fb',
+      foreground: '#1f232a',
+      accent: '#3b66a8',
+      destructive: '#c55757',
+    },
+    dark: {
+      background: '#292c33',
+      foreground: '#ffffff',
+      accent: '#83a5d6',
+      destructive: '#c55757',
+    },
+  },
+  github: {
+    label: 'GitHub',
+    light: {
+      background: '#ffffff',
+      foreground: '#1f2328',
+      accent: '#0969da',
+      destructive: '#cf222e',
+    },
+    dark: {
+      background: '#0d1117',
+      foreground: '#e6edf3',
+      accent: '#58a6ff',
+      destructive: '#f85149',
+    },
+  },
+  gruvbox: {
+    label: 'Gruvbox',
+    light: {
+      background: '#fbf1c7',
+      foreground: '#3c3836',
+      accent: '#458588',
+      destructive: '#cc241d',
+    },
+    dark: {
+      background: '#282828',
+      foreground: '#ebdbb2',
+      accent: '#83a598',
+      destructive: '#fb4934',
+    },
+  },
+  haze: {
+    label: 'Haze',
+    light: {
+      background: '#f7f7fa',
+      foreground: '#1f1f26',
+      accent: '#7c5ce6',
+      destructive: '#dc2626',
+    },
+    dark: {
+      background: '#16161a',
+      foreground: '#f5f5f7',
+      accent: '#a78bfa',
+      destructive: '#ef4444',
+      popoverSolid: '#2a2a2e',
+    },
+  },
+  'night-owl': {
+    label: 'Night Owl',
+    light: {
+      background: '#f5f8fc',
+      foreground: '#112233',
+      accent: '#2563c9',
+      destructive: '#d9383a',
+    },
+    dark: {
+      background: '#011627',
+      foreground: '#d6deeb',
+      accent: '#82aaff',
+      destructive: '#ef5350',
+    },
+  },
+  nord: {
+    label: 'Nord',
+    light: {
+      background: '#eceff4',
+      foreground: '#2e3440',
+      accent: '#5e81ac',
+      destructive: '#bf616a',
+    },
+    dark: {
+      background: '#2e3440',
+      foreground: '#eceff4',
+      accent: '#88c0d0',
+      destructive: '#bf616a',
+    },
+  },
+  'one-dark-pro': {
+    label: 'One Dark Pro',
+    light: {
+      background: '#fafafa',
+      foreground: '#383a42',
+      accent: '#4078f2',
+      destructive: '#e45649',
+    },
+    dark: {
+      background: '#282c34',
+      foreground: '#c8ccd4',
+      accent: '#61afef',
+      destructive: '#e06c75',
+    },
+  },
+  paper: {
+    label: 'Paper',
+    fontSans: "'Plus Jakarta Sans Variable', system-ui, -apple-system, sans-serif",
+    fontSerif: "'Lora', ui-serif, Georgia, serif",
+    fontMono: "'JetBrains Mono Variable', ui-monospace, monospace",
+    light: {
+      background: '#fcf9f7',
+      foreground: '#2b2826',
+      accent: 'oklch(0.50 0.12 255)',
+      destructive: '#c2412d',
+    },
+    dark: {
+      background: '#1c1b1a',
+      foreground: '#ece8e4',
+      accent: 'oklch(0.74 0.10 255)',
+      destructive: '#ef7a63',
+    },
+  },
+  pierre: {
+    label: 'Pierre',
+    light: {
+      background: '#ffffff',
+      foreground: '#24292f',
+      accent: '#0077cc',
+      destructive: '#d92662',
+    },
+    dark: {
+      background: '#0d1117',
+      foreground: '#c9d1d9',
+      accent: '#69b1ff',
+      destructive: '#ff678d',
+    },
+  },
+  'rose-pine': {
+    label: 'Rosé Pine',
+    light: {
+      background: '#faf4ed',
+      foreground: '#575279',
+      accent: '#907aa9',
+      destructive: '#b4637a',
+    },
+    dark: {
+      background: '#191724',
+      foreground: '#e0def4',
+      accent: '#c4a7e7',
+      destructive: '#eb6f92',
+    },
+  },
+  solarized: {
+    label: 'Solarized',
+    light: {
+      background: '#fdf6e3',
+      foreground: '#44575e',
+      accent: '#268bd2',
+      destructive: '#dc322f',
+    },
+    dark: {
+      background: '#002b36',
+      foreground: '#b5c4c4',
+      accent: '#268bd2',
+      destructive: '#dc322f',
+    },
+  },
+  'tokyo-night': {
+    label: 'Tokyo Night',
+    light: {
+      background: '#f5f6fb',
+      foreground: '#1f2335',
+      accent: '#3d59a1',
+      destructive: '#c93c5a',
+    },
+    dark: {
+      background: '#1a1b26',
+      foreground: '#c0caf5',
+      accent: '#7aa2f7',
+      destructive: '#f7768e',
+    },
+  },
+  vitesse: {
+    label: 'Vitesse',
+    light: {
+      background: '#ffffff',
+      foreground: '#393a34',
+      accent: '#1e754f',
+      destructive: '#ab5959',
+    },
+    dark: {
+      background: '#121212',
+      foreground: '#dbd7ca',
+      accent: '#4d9375',
+      destructive: '#cb7676',
+    },
+  },
+};
 
-// ---------- generation ----------
-
-const presets = Object.entries(source.presets).map(([id, preset]) => {
-  const lightStyles = preset.styles.light;
-  const darkStyles = preset.styles.dark ?? preset.styles.light;
-
-  const lightTriplets = {};
-  const darkTriplets = {};
-  for (const key of COLOR_KEYS) {
-    const lightValue = lightStyles[key];
-    const darkValue = darkStyles[key] ?? lightValue;
-    if (!lightValue) throw new Error(`${id}: missing light color "${key}"`);
-    lightTriplets[key] = toTriplet(lightValue);
-    darkTriplets[key] = toTriplet(darkValue);
-  }
-
-  const normalizedLight = normalizeMode(lightTriplets);
-  const normalizedDark = normalizeMode(darkTriplets);
-
-  const lightColors = {};
-  const darkColors = {};
-  for (const key of COLOR_KEYS) {
-    lightColors[key] = fmtTriplet(normalizedLight[key]);
-    darkColors[key] = fmtTriplet(normalizedDark[key]);
-  }
-  lightColors['border-strong'] = deriveBorderStrong(lightTriplets.border, true);
-  darkColors['border-strong'] = deriveBorderStrong(darkTriplets.border, false);
-
-  const lightSelection = deriveSelection(normalizedLight);
-  const darkSelection = deriveSelection(normalizedDark);
-  lightColors['selection'] = fmtTriplet(lightSelection.selection);
-  lightColors['selection-foreground'] = fmtTriplet(lightSelection.selectionForeground);
-  lightColors['search-highlight'] = fmtTriplet(deriveSearchHighlight(normalizedLight, lightSelection.selection));
-  darkColors['selection'] = fmtTriplet(darkSelection.selection);
-  darkColors['selection-foreground'] = fmtTriplet(darkSelection.selectionForeground);
-  darkColors['search-highlight'] = fmtTriplet(deriveSearchHighlight(normalizedDark, darkSelection.selection));
-
-  const shadow = composeShadow(lightStyles);
-
-  return {
+const presets = Object.entries(CURATED_THEMES)
+  .map(([id, def]) => ({
     id,
-    labelEn: preset.label,
-    radius: lightStyles.radius ?? '0.5rem',
-    fontSans: aliasFontFamily(lightStyles['font-sans']),
-    fontMono: aliasFontFamily(lightStyles['font-mono']),
-    fontSerif: aliasFontFamily(lightStyles['font-serif']),
-    lightColors,
-    darkColors,
-    shadowColor: shadow.colorTriplet,
-    shadowOpacity: shadow.opacity,
-    shadow: shadow.shadow,
-  };
-}).sort((a, b) => a.id.localeCompare(b.id));
+    labelEn: def.label,
+    radius: '0.5rem',
+    ...(def.fontSans ? { fontSans: def.fontSans } : {}),
+    ...(def.fontMono ? { fontMono: def.fontMono } : {}),
+    ...(def.fontSerif ? { fontSerif: def.fontSerif } : {}),
+    lightColors: buildModePalette(def.light, true),
+    darkColors: buildModePalette(def.dark, false),
+    shadowColor: '0 0% 0%',
+    shadowOpacity: 0.08,
+    shadow: '0 1px 3px 0px hsl(var(--shadow-color) / var(--shadow-opacity))',
+  }))
+  .sort((a, b) => a.id.localeCompare(b.id));
 
-const banner = `// Generated by scripts/generate-theme-presets.mjs from
-// scripts/theme-source/tweakcn-presets.json (${source._meta.source}).
-// Colors are normalized for WCAG contrast and canvas/card surface layering
-// (see normalizeMode) — rerun "npm run gen:themes" instead of editing.
+const banner = `// Generated by scripts/generate-theme-presets.mjs from curated desktop palettes.
+// Colors are normalized for WCAG contrast and canvas/card surface layering —
+// rerun "npm run gen:themes" instead of editing.
 // DO NOT EDIT MANUALLY.
 `;
 

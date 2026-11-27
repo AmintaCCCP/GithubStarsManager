@@ -48,7 +48,7 @@ const FacetGroup: React.FC<{
   const shown = expanded ? buckets : buckets.slice(0, maxShown);
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-semibold text-muted-foreground">{title}</p>
+      <p className="text-label-sm font-medium text-tertiary">{title}</p>
       <div className="flex flex-wrap gap-1.5">
         {shown.map((bucket) => {
           const active = selected.has(bucket.val);
@@ -59,14 +59,14 @@ const FacetGroup: React.FC<{
               onClick={() => onToggle(bucket.val)}
               aria-pressed={active}
               title={`${bucket.val} (${bucket.count})`}
-              className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              className={`inline-flex h-control-sm max-w-full items-center gap-1.5 rounded-full px-2.5 text-label-sm font-medium transition-[background-color,color] duration-micro ease-out-subtle hover:duration-instant ${
                 active
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground'
+                  ? 'bg-accent-tint text-accent-text shadow-[inset_0_0_0_1px_var(--accent-tint-strong)]'
+                  : 'bg-fill-hover text-secondary hover:bg-fill-pressed hover:text-foreground'
               }`}
             >
               <span className="truncate">{bucket.val}</span>
-              <span className="shrink-0 rounded-full bg-muted px-1.5 text-[10px]">{bucket.count}</span>
+              <span className="shrink-0 text-caption text-tertiary tabular-nums">{bucket.count}</span>
             </button>
           );
         })}
@@ -75,7 +75,7 @@ const FacetGroup: React.FC<{
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="text-xs text-primary hover:underline"
+          className="text-label-sm text-accent-text hover:underline"
         >
           {expanded ? t('codeSearchView.show-less') : t('codeSearchView.show-all-v1', { v1: buckets.length })}
         </button>
@@ -102,27 +102,27 @@ const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: TranslateFn }
   const snippet = useMemo(() => sanitizeGrepSnippet(hit.snippetHtml), [hit.snippetHtml]);
   if (!repo) return null;
   return (
-    <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <FileCode2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+    <article className="rounded-lg bg-paper p-3.5 shadow-elev-0 transition-[background-color] duration-micro ease-out-subtle hover:bg-fill-hover/40 hover:duration-instant">
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <FileCode2 className="size-4 shrink-0 text-tertiary" />
         <a
           href={`https://github.com/${hit.repo}`}
           target="_blank"
           rel="noreferrer"
-          className="truncate text-sm font-semibold text-primary hover:underline"
+          className="truncate text-label-lg font-semibold text-accent-text hover:underline"
         >
           {hit.repo}
         </a>
         {isStarred && (
-          <Badge variant="secondary" className="gap-1">
-            <Star className="h-3 w-3" />
+          <Badge variant="secondary" className="gap-1 border-0 bg-accent-tint text-accent-text">
+            <Star className="size-3" />
             {t('codeSearchView.starred')}
           </Badge>
         )}
-        <span className="text-xs text-muted-foreground">{hit.branch}</span>
-        {hit.language && <Badge variant="outline">{hit.language}</Badge>}
+        <span className="text-label-sm text-tertiary font-mono">{hit.branch}</span>
+        {hit.language && <Badge variant="secondary" className="border-0">{hit.language}</Badge>}
         {hit.totalMatches && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-label-sm text-tertiary tabular-nums">
             {hit.totalMatches} {t('codeSearchView.matches')}
           </span>
         )}
@@ -131,28 +131,28 @@ const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: TranslateFn }
         href={fileUrl}
         target="_blank"
         rel="noreferrer"
-        className="mb-2 block truncate text-xs text-muted-foreground hover:text-primary hover:underline"
+        className="mb-2 block truncate text-label-sm text-tertiary font-mono hover:text-accent-text hover:underline"
         title={hit.path}
       >
         {hit.path}
       </a>
       {snippet ? (
         <div
-          className="grep-snippet overflow-x-auto rounded-lg border border-border/50 bg-muted/40 p-2 text-xs leading-relaxed [&_mark]:rounded [&_mark]:bg-yellow-200 [&_mark]:px-0.5 dark:[&_mark]:bg-yellow-500/40"
+          className="grep-snippet overflow-x-auto rounded-md border border-subtle bg-sunken p-3 font-mono text-mono-ui leading-relaxed [&_mark]:rounded-xs [&_mark]:bg-[var(--ui-search-highlight)] [&_mark]:text-[var(--ui-search-highlight-foreground)] [&_mark]:px-0.5"
           dangerouslySetInnerHTML={{ __html: snippet }}
         />
       ) : (
-        <p className="text-xs text-muted-foreground">{t('codeSearchView.no-snippet-preview')}</p>
+        <p className="text-label-sm text-tertiary">{t('codeSearchView.no-snippet-preview')}</p>
       )}
       <div className="mt-2 flex justify-end">
         <a
           href={fileUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          className="inline-flex items-center gap-1 text-label-sm font-medium text-accent-text hover:underline"
         >
           {t('codeSearchView.view-file-on-github')}
-          <ExternalLink className="h-3 w-3" />
+          <ExternalLink className="size-3" />
         </a>
       </div>
     </article>
@@ -298,10 +298,10 @@ export const CodeSearchView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* 搜索框 */}
-      <div className="ui-toolbar space-y-3 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="ui-toolbar space-y-3">
+        <div className="flex flex-col gap-2.5 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
             <Input
               type="text"
               aria-label={t('codeSearchView.code-search-keywords')}
@@ -315,34 +315,38 @@ export const CodeSearchView: React.FC = () => {
                 if (e.key === 'Escape') setQuery('');
               }}
               placeholder={t('codeSearchView.type-to-search-code-live-min-2-chars')}
-              className="ui-field h-auto w-full py-2.5 pl-10 pr-9"
+              className="w-full pl-8 pr-8"
             />
             {query && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => setQuery('')}
                 aria-label={t('codeSearchView.clear')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-tertiary hover:text-foreground"
               >
-                <X className="h-4 w-4" />
-              </button>
+                <X className="size-3.5" />
+              </Button>
             )}
           </div>
           <Button
+            variant="primary"
+            size="lg"
             onClick={() => {
               if (debounceRef.current) clearTimeout(debounceRef.current);
               void runSearch(1, false);
             }}
             disabled={query.trim().length < MIN_QUERY_LENGTH || loading}
-            className="shrink-0 gap-2"
+            className="shrink-0 gap-1.5"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
             {t('codeSearchView.search')}
           </Button>
         </div>
 
         {/* 匹配模式 */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-label">
           <RadioGroup
             value={mode}
             onValueChange={(v) => setMode(v as GrepMatchMode)}
@@ -351,33 +355,33 @@ export const CodeSearchView: React.FC = () => {
           >
             <div className="flex items-center gap-1.5">
               <RadioGroupItem value="fuzzy" id="grep-mode-fuzzy" />
-              <Label htmlFor="grep-mode-fuzzy" className="cursor-pointer text-sm font-normal">
+              <Label htmlFor="grep-mode-fuzzy" className="cursor-pointer text-label font-normal text-secondary">
                 {t('codeSearchView.fuzzy')}
               </Label>
             </div>
             <div className="flex items-center gap-1.5">
               <RadioGroupItem value="words" id="grep-mode-words" />
-              <Label htmlFor="grep-mode-words" className="cursor-pointer text-sm font-normal">
+              <Label htmlFor="grep-mode-words" className="cursor-pointer text-label font-normal text-secondary">
                 {t('codeSearchView.whole-word')}
               </Label>
             </div>
             <div className="flex items-center gap-1.5">
               <RadioGroupItem value="regexp" id="grep-mode-regexp" />
-              <Label htmlFor="grep-mode-regexp" className="cursor-pointer text-sm font-normal">
+              <Label htmlFor="grep-mode-regexp" className="cursor-pointer text-label font-normal text-secondary">
                 {t('codeSearchView.regexp-re2')}
               </Label>
             </div>
           </RadioGroup>
           <div className="flex items-center gap-2">
             <Switch id="grep-case" checked={caseSensitive} onCheckedChange={setCaseSensitive} />
-            <Label htmlFor="grep-case" className="cursor-pointer text-sm font-normal">
+            <Label htmlFor="grep-case" className="cursor-pointer text-label font-normal text-secondary">
               {t('codeSearchView.match-case')}
             </Label>
           </div>
           <div className="flex items-center gap-2">
             <Switch id="grep-starred" checked={starredOnly} onCheckedChange={setStarredOnly} />
-            <Label htmlFor="grep-starred" className="flex cursor-pointer items-center gap-1 text-sm font-normal">
-              <Star className="h-3.5 w-3.5" />
+            <Label htmlFor="grep-starred" className="flex cursor-pointer items-center gap-1 text-label font-normal text-secondary">
+              <Star className="size-3.5" />
               {t('codeSearchView.starred-only')}
             </Label>
           </div>
@@ -385,18 +389,18 @@ export const CodeSearchView: React.FC = () => {
 
         {/* 动态过滤器 */}
         {result && (result.repoFacets.length > 0 || result.langFacets.length > 0 || result.pathFacets.length > 0) && (
-          <div className="space-y-3 border-t border-border/60 pt-3">
+          <div className="space-y-2.5 border-t border-subtle pt-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">
+              <p className="text-label font-medium text-foreground">
                 {t('codeSearchView.filters')}
                 {hasActiveFilters && (
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  <span className="ml-2 text-label-sm font-normal text-tertiary">
                     {t('codeSearchView.selections-re-search-automatically')}
                   </span>
                 )}
               </p>
               {hasActiveFilters && (
-                <button type="button" onClick={clearFilters} className="text-xs text-primary hover:underline">
+                <button type="button" onClick={clearFilters} className="text-label-sm text-accent-text hover:underline">
                   {t('codeSearchView.clear-filters')}
                 </button>
               )}
@@ -429,33 +433,33 @@ export const CodeSearchView: React.FC = () => {
       {/* 状态区 */}
       {loading && !result && (
         <div className="flex flex-col items-center justify-center gap-3 py-14">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{t('codeSearchView.searching-code')}</p>
+          <Loader2 className="size-6 animate-spin text-accent-text" />
+          <p className="text-label text-secondary">{t('codeSearchView.searching-code')}</p>
         </div>
       )}
       {error && (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 py-8 text-center">
-          <p className="max-w-md text-sm text-destructive">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => void runSearch(1, false)} className="gap-2">
-            <RefreshCw className="h-3.5 w-3.5" />
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-destructive-tint px-4 py-6 text-center">
+          <p className="max-w-md text-label text-destructive">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => void runSearch(1, false)} className="gap-1.5">
+            <RefreshCw className="size-3.5" />
             {t('codeSearchView.retry')}
           </Button>
         </div>
       )}
       {!loading && !error && !result && (
         <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-          <Search className="h-8 w-8 text-muted-foreground/50" />
-          <p className="font-medium text-muted-foreground">{t('codeSearchView.code-search')}</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
+          <Search className="size-10 stroke-[1.5] text-tertiary" />
+          <p className="text-label-lg font-medium text-foreground">{t('codeSearchView.code-search')}</p>
+          <p className="max-w-sm text-label text-secondary">
             {t('codeSearchView.full-text-code-search-across-public-repos-with-f')}
           </p>
         </div>
       )}
       {result && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-label-sm text-tertiary tabular-nums">
             <span>
-              {t('codeSearchView.total')} <strong className="text-foreground">{starredOnly ? visibleHits.length : result.total}</strong>{' '}
+              {t('codeSearchView.total')} <strong className="font-medium text-foreground">{starredOnly ? visibleHits.length : result.total}</strong>{' '}
               {t('codeSearchView.results')}
               {starredOnly && (
                 <span className="ml-1">
@@ -466,15 +470,15 @@ export const CodeSearchView: React.FC = () => {
             </span>
           </div>
           {visibleHits.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-border/60 py-12 text-center">
-              <Star className="h-6 w-6 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
+            <div className="flex flex-col items-center gap-3 rounded-lg bg-paper py-12 text-center shadow-elev-0">
+              <Star className="size-10 stroke-[1.5] text-tertiary" />
+              <p className="text-label text-secondary">
                 {starredOnly
                   ? t('codeSearchView.no-hits-in-starred-repos-try-turning-off-starred')
                   : t('codeSearchView.no-matches-try-another-keyword-or-looser-filters')}
               </p>
               {starredOnly && (
-                <Button variant="outline" size="sm" onClick={() => setStarredOnly(false)}>
+                <Button variant="secondary" size="sm" onClick={() => setStarredOnly(false)}>
                   {t('codeSearchView.turn-off-starred-only')}
                 </Button>
               )}
@@ -490,18 +494,18 @@ export const CodeSearchView: React.FC = () => {
             ))
           )}
           {loadingMore && (
-            <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+            <div className="flex items-center justify-center gap-2 py-4 text-label-sm text-tertiary">
+              <Loader2 className="size-4 animate-spin" />
               {t('codeSearchView.loading-more')}
             </div>
           )}
           {!loadingMore && hasMore && (visibleHits.length > 0 || starredOnly) && (
             <div className="flex justify-center pt-1">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => void runSearch(page + 1, true)}
                 disabled={loading}
-                className="gap-2"
+                className="gap-1.5 tabular-nums"
               >
                 {t('codeSearchView.load-more-v1-v2', { v1: result.hits.length, v2: result.total })}
               </Button>

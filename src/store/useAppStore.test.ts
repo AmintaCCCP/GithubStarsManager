@@ -1104,20 +1104,36 @@ describe('useAppStore theme preset', () => {
 
   it('migrates legacy theme/themePreset into the new mode-aware fields', () => {
     const normalized = normalizePersistedState(
-      { theme: 'light', themePreset: 'deep-purple' } as never,
+      { theme: 'light', themePreset: 'nord' } as never,
       useAppStore.getState(),
     );
     expect(normalized.themeMode).toBe('light');
-    expect(normalized.themePresetLight).toBe('deep-purple');
-    expect(normalized.themePresetDark).toBe('deep-purple');
+    expect(normalized.themePresetLight).toBe('nord');
+    expect(normalized.themePresetDark).toBe('nord');
+  });
+
+  it('migrates removed legacy preset IDs to curated replacements', () => {
+    const fromLegacySingle = normalizePersistedState(
+      { theme: 'dark', themePreset: 'claude' } as never,
+      useAppStore.getState(),
+    );
+    expect(fromLegacySingle.themePresetLight).toBe('paper');
+    expect(fromLegacySingle.themePresetDark).toBe('paper');
+
+    const fromSplit = normalizePersistedState(
+      { themePresetLight: 'vercel' as never, themePresetDark: 'deep-purple' as never },
+      useAppStore.getState(),
+    );
+    expect(fromSplit.themePresetLight).toBe('default');
+    expect(fromSplit.themePresetDark).toBe('haze');
   });
 
   it('keeps light and dark presets independent at runtime', () => {
     useAppStore.setState({ themePresetLight: 'default', themePresetDark: 'default' });
-    useAppStore.getState().setThemePresetLight('deep-purple');
-    useAppStore.getState().setThemePresetDark('zen-inspired');
-    expect(useAppStore.getState().themePresetLight).toBe('deep-purple');
-    expect(useAppStore.getState().themePresetDark).toBe('zen-inspired');
+    useAppStore.getState().setThemePresetLight('nord');
+    useAppStore.getState().setThemePresetDark('tokyo-night');
+    expect(useAppStore.getState().themePresetLight).toBe('nord');
+    expect(useAppStore.getState().themePresetDark).toBe('tokyo-night');
   });
 });
 

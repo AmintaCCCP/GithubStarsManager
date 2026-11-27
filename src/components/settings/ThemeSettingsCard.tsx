@@ -1,14 +1,13 @@
-
-import { useTPair, TranslateFn } from '../../i18n/useT';
+import type { TranslateFn } from '../../i18n/useT';
 import React from 'react';
-import { Check, MonitorCog, Moon, Palette, Sun } from 'lucide-react';
+import { Check, MonitorCog, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveTheme } from '../../store/selectors';
 import { getThemePreset, THEME_PRESETS } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
 import { getThemeSwatch } from '../../lib/themePresets';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
 import {
@@ -25,13 +24,32 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { REPOSITORY_CARD_FIELD_IDS } from '../../types/repositoryCardFields';
 import { isRepositoryCardFieldVisible } from '../../utils/repositoryCardFields';
 import { RepositoryCardActionsSettings } from './RepositoryCardActionsSettings';
+import { SettingsCard, SettingsDivider, SettingsSection } from './SettingsPrimitives';
+
+const THEME_PRESET_LABEL_KEYS: Partial<Record<ThemePresetId, string>> = {
+  default: 'themeSettingsCard.preset-default',
+  catppuccin: 'themeSettingsCard.preset-catppuccin',
+  dracula: 'themeSettingsCard.preset-dracula',
+  ghostty: 'themeSettingsCard.preset-ghostty',
+  github: 'themeSettingsCard.preset-github',
+  gruvbox: 'themeSettingsCard.preset-gruvbox',
+  haze: 'themeSettingsCard.preset-haze',
+  'night-owl': 'themeSettingsCard.preset-night-owl',
+  nord: 'themeSettingsCard.preset-nord',
+  'one-dark-pro': 'themeSettingsCard.preset-one-dark-pro',
+  paper: 'themeSettingsCard.preset-paper',
+  pierre: 'themeSettingsCard.preset-pierre',
+  'rose-pine': 'themeSettingsCard.preset-rose-pine',
+  solarized: 'themeSettingsCard.preset-solarized',
+  'tokyo-night': 'themeSettingsCard.preset-tokyo-night',
+  vitesse: 'themeSettingsCard.preset-vitesse',
+};
 
 interface ThemeSettingsCardProps {
   t: TranslateFn;
 }
 
 export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
-  const tPair = useTPair();
   const {
     themeMode,
     systemTheme,
@@ -57,8 +75,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     repositoryCardFields: state.repositoryCardFields,
     setRepositoryCardField: state.setRepositoryCardField,
   })));
-  // 预设按深浅分别记忆；编辑目标用本地状态，默认落在当前实际模式上，
-  // 避免跟随系统时预设选择随系统翻动而漂移。
+
   const theme = resolveTheme(themeMode, systemTheme);
   const [editMode, setEditMode] = React.useState<'light' | 'dark'>(theme);
   const editPresetId = editMode === 'dark' ? themePresetDark : themePresetLight;
@@ -70,17 +87,15 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
       setThemePresetLight(preset);
     }
   }, [editMode, setThemePresetDark, setThemePresetLight]);
-  // 显式选定深/浅（含头部快捷键切换）时，配色编辑目标同步跟随；
-  // 跟随系统时保持当前目标，不随系统翻动漂移。
+
   React.useEffect(() => {
     if (themeMode === 'light' || themeMode === 'dark') setEditMode(themeMode);
   }, [themeMode]);
+
   const presetAccentColor = hslTripletToHex(
     (editMode === 'dark' ? activePreset.darkColors : activePreset.lightColors).primary,
   ) ?? '#2563eb';
 
-  // Roving tabindex: arrow keys move focus across preset options; selection
-  // stays on click/Enter (Space) as with any button.
   const handlePresetGridKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
@@ -109,8 +124,6 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     nextButton?.focus();
   }, [setEditPreset]);
 
-  // 编辑目标只有两项：radiogroup 语义下方向键直接切换选中项并在两项间
-  // 循环，焦点、aria-checked 与 Tab 入口同步移动；Home/End 跳到首尾。
   const handleEditModeKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
@@ -128,295 +141,363 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     event.preventDefault();
   }, [editMode]);
 
+  const modeOptions = [
+    { value: 'light' as const, icon: Sun, label: t('themeSettingsCard.light') },
+    { value: 'dark' as const, icon: Moon, label: t('themeSettingsCard.dark') },
+    { value: 'system' as const, icon: MonitorCog, label: t('themeSettingsCard.system') },
+  ];
+
   return (
     <>
-    <Card>
-      <CardHeader>
-        <div className="flex items-center space-x-3">
-          <Palette className="h-5 w-5 text-muted-foreground" />
-          <CardTitle>{t('themeSettingsCard.appearance')}</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <p id="theme-mode-label" className="mb-3 text-sm font-medium text-foreground">
-            {t('themeSettingsCard.display-mode')}
-          </p>
-          <RadioGroup
-            aria-labelledby="theme-mode-label"
-            value={themeMode}
-            onValueChange={(value) => {
-              setThemeMode(value as 'light' | 'dark' | 'system');
-            }}
-            className="grid max-w-2xl grid-cols-[repeat(auto-fit,minmax(min(100%,12.5rem),1fr))] gap-3"
-          >
-            <Label
-              htmlFor="theme-mode-light"
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
+      <SettingsSection title={t('themeSettingsCard.appearance')}>
+        <SettingsCard>
+          <div className="px-3.5 py-3">
+            <p id="theme-mode-label" className="text-label font-medium text-foreground">
+              {t('themeSettingsCard.display-mode')}
+            </p>
+            <RadioGroup
+              aria-labelledby="theme-mode-label"
+              value={themeMode}
+              onValueChange={(value) => setThemeMode(value as 'light' | 'dark' | 'system')}
+              className="mt-2.5 grid max-w-xl grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-2"
             >
-              <RadioGroupItem value="light" id="theme-mode-light" aria-labelledby="theme-mode-light-label" />
-              <Sun className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span id="theme-mode-light-label" className="whitespace-nowrap text-sm font-medium text-foreground">
-                {t('themeSettingsCard.light')}
-              </span>
-            </Label>
-            <Label
-              htmlFor="theme-mode-dark"
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
-            >
-              <RadioGroupItem value="dark" id="theme-mode-dark" aria-labelledby="theme-mode-dark-label" />
-              <Moon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span id="theme-mode-dark-label" className="whitespace-nowrap text-sm font-medium text-foreground">
-                {t('themeSettingsCard.dark')}
-              </span>
-            </Label>
-            <Label
-              htmlFor="theme-mode-system"
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
-            >
-              <RadioGroupItem value="system" id="theme-mode-system" aria-labelledby="theme-mode-system-label" />
-              <MonitorCog className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span id="theme-mode-system-label" className="whitespace-nowrap text-sm font-medium text-foreground">
-                {t('themeSettingsCard.system')}
-              </span>
-            </Label>
-          </RadioGroup>
-        </div>
+              {modeOptions.map((opt) => {
+                const Icon = opt.icon;
+                const isSelected = themeMode === opt.value;
+                return (
+                  <Label
+                    key={opt.value}
+                    htmlFor={`theme-mode-${opt.value}`}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                      isSelected
+                        ? 'bg-fill-selected shadow-elev-0'
+                        : 'bg-sunken/60 shadow-elev-0 hover:bg-fill-hover',
+                    )}
+                  >
+                    <RadioGroupItem
+                      value={opt.value}
+                      id={`theme-mode-${opt.value}`}
+                      aria-labelledby={`theme-mode-${opt.value}-label`}
+                    />
+                    <Icon className={cn('size-4', isSelected ? 'text-foreground' : 'text-tertiary')} aria-hidden="true" />
+                    <span
+                      id={`theme-mode-${opt.value}-label`}
+                      className="whitespace-nowrap text-label font-medium text-foreground"
+                    >
+                      {opt.label}
+                    </span>
+                  </Label>
+                );
+              })}
+            </RadioGroup>
+          </div>
 
-        <div>
-          <p id="theme-preset-label" className="mb-1 text-sm font-medium text-foreground">
-            {t('themeSettingsCard.theme-color')}
-          </p>
-          <p className="mb-3 text-xs text-muted-foreground">
-            {t('themeSettingsCard.switch-the-interface-color-scheme-instantly-chan')}
-          </p>
-          <div className="mb-3 flex flex-wrap items-center gap-3">
+          <SettingsDivider />
+
+          <div className="px-3.5 py-3.5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p id="theme-preset-label" className="text-label font-medium text-foreground">
+                  {t('themeSettingsCard.theme-color')}
+                </p>
+                <p className="mt-px text-label-sm leading-[18px] text-secondary">
+                  {t('themeSettingsCard.switch-the-interface-color-scheme-instantly-chan')}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div
+                  role="radiogroup"
+                  aria-label={t('themeSettingsCard.color-mode-target')}
+                  className="inline-flex h-control items-center gap-0.5 rounded-md bg-fill-hover p-0.5"
+                  onKeyDown={handleEditModeKeyDown}
+                >
+                  {(['light', 'dark'] as const).map((mode) => {
+                    const isTarget = editMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="radio"
+                        aria-checked={isTarget}
+                        tabIndex={isTarget ? 0 : -1}
+                        data-edit-mode={mode}
+                        onClick={() => setEditMode(mode)}
+                        className={cn(
+                          'motion-press inline-flex h-control-sm items-center gap-1.5 rounded-sm px-2.5 text-label-sm font-medium transition-[background-color,color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                          isTarget
+                            ? 'bg-floating text-foreground shadow-elev-1'
+                            : 'text-secondary hover:text-foreground',
+                        )}
+                      >
+                        {mode === 'light'
+                          ? <Sun className="size-3.5" aria-hidden="true" />
+                          : <Moon className="size-3.5" aria-hidden="true" />}
+                        {t(mode === 'light' ? 'themeSettingsCard.light' : 'themeSettingsCard.dark')}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <p className="mt-1.5 text-label-sm text-tertiary">
+              {t('themeSettingsCard.per-mode-hint')}
+            </p>
+
             <div
               role="radiogroup"
-              aria-label={t('themeSettingsCard.color-mode-target')}
-              className="inline-flex overflow-hidden rounded-lg border border-border"
-              onKeyDown={handleEditModeKeyDown}
+              aria-labelledby="theme-preset-label"
+              className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4"
+              onKeyDown={handlePresetGridKeyDown}
             >
-              {(['light', 'dark'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={editMode === mode}
-                  tabIndex={editMode === mode ? 0 : -1}
-                  data-edit-mode={mode}
-                  onClick={() => setEditMode(mode)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
-                    editMode === mode
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-background dark:hover:bg-card/[0.10]'
-                  }`}
-                >
-                  {mode === 'light'
-                    ? <Sun className="h-3.5 w-3.5" aria-hidden="true" />
-                    : <Moon className="h-3.5 w-3.5" aria-hidden="true" />}
-                  {t(mode === 'light' ? 'themeSettingsCard.light' : 'themeSettingsCard.dark')}
-                </button>
-              ))}
-            </div>
-            <span className="text-xs text-muted-foreground">{t('themeSettingsCard.per-mode-hint')}</span>
-          </div>
-          <div
-            role="radiogroup"
-            aria-labelledby="theme-preset-label"
-            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
-            onKeyDown={handlePresetGridKeyDown}
-          >
-            {THEME_PRESETS.map((preset) => {
-
-              const swatch = getThemeSwatch(preset, editMode === 'dark');
-              const isActive = editPresetId === preset.id;
-              return (
-                <button
-                  key={preset.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={isActive}
-                  tabIndex={isActive ? 0 : -1}
-                  data-theme-preset-id={preset.id}
-                  onClick={() => setEditPreset(preset.id as ThemePresetId)}
-                  className={`group relative flex flex-col items-center gap-2 rounded-lg border p-2.5 transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                    isActive
-                      ? 'border-primary ring-2 ring-primary/30'
-                      : 'border-border hover:border-primary/40'
-                  }`}
-                >
-                  {isActive && (
-                    <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Check className="h-3 w-3" aria-hidden="true" />
-                    </span>
-                  )}
-                  <span
-                    aria-hidden="true"
-                    className="flex h-12 w-full items-end overflow-hidden rounded-md border border-border/60"
-                    style={{ background: swatch.background }}
+              {THEME_PRESETS.map((preset) => {
+                const swatch = getThemeSwatch(preset, editMode === 'dark');
+                const isActive = editPresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isActive}
+                    tabIndex={isActive ? 0 : -1}
+                    data-theme-preset-id={preset.id}
+                    onClick={() => setEditPreset(preset.id as ThemePresetId)}
+                    className={cn(
+                      'group relative flex flex-col items-stretch gap-2 rounded-md p-2 text-left transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                      isActive
+                        ? 'bg-fill-selected ring-2 ring-primary shadow-elev-1'
+                        : 'bg-sunken/40 shadow-elev-0 hover:bg-fill-hover',
+                    )}
                   >
                     <span
-                      className="m-1 h-7 flex-1 rounded-sm border"
-                      style={{ background: swatch.card, borderColor: `hsl(var(--border))` }}
+                      aria-hidden="true"
+                      className="relative flex h-12 w-full overflow-hidden rounded-sm p-1 shadow-elev-0"
+                      style={{ background: swatch.background }}
                     >
-                      <span className="mx-auto mt-1 block h-1.5 w-8 rounded-full" style={{ background: swatch.primary }} />
-                      <span className="mx-auto mt-1 block h-1.5 w-5 rounded-full" style={{ background: swatch.accent }} />
+                      {/* Miniature navigator sidebar */}
+                      <span className="flex w-[26%] flex-col gap-1 pr-1 pt-1">
+                        <span
+                          className="h-1 w-full rounded-full opacity-35"
+                          style={{ background: swatch.foreground }}
+                        />
+                        <span
+                          className="h-1 w-3/4 rounded-full opacity-20"
+                          style={{ background: swatch.foreground }}
+                        />
+                      </span>
+                      {/* Miniature paper pane */}
+                      <span
+                        className="flex flex-1 flex-col justify-center gap-1 rounded-xs px-1.5 py-1"
+                        style={{
+                          background: swatch.card,
+                          boxShadow: `0 0 0 1px color-mix(in srgb, ${swatch.foreground} 10%, transparent)`,
+                        }}
+                      >
+                        <span
+                          className="block h-1.5 w-8 rounded-full"
+                          style={{ background: swatch.primary }}
+                        />
+                        <span
+                          className="block h-1 w-10 rounded-full opacity-30"
+                          style={{ background: swatch.foreground }}
+                        />
+                        <span
+                          className="block h-1 w-6 rounded-full"
+                          style={{ background: swatch.accent }}
+                        />
+                      </span>
+                      {isActive && (
+                        <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-accent-solid text-on-accent shadow-elev-1">
+                          <Check className="size-2.5" strokeWidth={2.5} aria-hidden="true" />
+                        </span>
+                      )}
                     </span>
+                    <span className="truncate px-0.5 text-label-sm font-medium text-foreground">
+                      {THEME_PRESET_LABEL_KEYS[preset.id] ? t(THEME_PRESET_LABEL_KEYS[preset.id]!) : preset.labelEn}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <SettingsDivider />
+
+          <Accordion type="single" collapsible className="px-3.5">
+            <AccordionItem value="fine-tune" className="border-0">
+              <AccordionTrigger className="py-3 text-label font-medium">
+                {t('themeSettingsCard.fine-tune-appearance')}
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pb-3.5 pt-1">
+                <div>
+                  <p className="mb-2 text-label font-medium text-foreground">
+                    {t('themeSettingsCard.accent-color')}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={themeTokens.accentColor === null}
+                      onClick={() => updateThemeTokens({ accentColor: null })}
+                      className={cn(
+                        'h-control-sm rounded-sm px-2.5 text-label-sm font-medium transition-[background-color,color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                        themeTokens.accentColor === null
+                          ? 'bg-fill-selected text-foreground shadow-elev-0 ring-1 ring-primary/50'
+                          : 'bg-sunken text-secondary shadow-elev-0 hover:bg-fill-hover hover:text-foreground',
+                      )}
+                    >
+                      {t('themeSettingsCard.follow-the-theme-preset')}
+                    </button>
+                    {ACCENT_PRESETS.map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        aria-label={`${t(ACCENT_PRESET_NAME_KEYS[hex])} (${hex})`}
+                        aria-pressed={themeTokens.accentColor === hex}
+                        onClick={() => updateThemeTokens({ accentColor: hex })}
+                        className={cn(
+                          'size-6 rounded-full transition-transform duration-micro hover:scale-105',
+                          themeTokens.accentColor === hex
+                            ? 'ring-2 ring-foreground ring-offset-2 ring-offset-raised'
+                            : 'ring-1 ring-black/10 dark:ring-white/10',
+                        )}
+                        style={{ background: hex }}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      aria-label={t('themeSettingsCard.custom-accent-color')}
+                      value={themeTokens.accentColor ?? presetAccentColor}
+                      onChange={(event) => updateThemeTokens({ accentColor: event.target.value })}
+                      className="h-control-sm w-9 cursor-pointer rounded-sm bg-sunken p-0.5 shadow-elev-0"
+                    />
+                  </div>
+                </div>
+
+                <SettingsDivider />
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-label font-medium text-foreground">
+                    {t('themeSettingsCard.border-radius')}
                   </span>
-                  <span className="line-clamp-1 text-xs font-medium text-foreground">
-                    {tPair(preset.labelZh, preset.labelEn)}
+                  <select
+                    aria-label={t('themeSettingsCard.border-radius')}
+                    value={themeTokens.radius}
+                    onChange={(event) => updateThemeTokens({ radius: event.target.value as ThemeRadius })}
+                    className="field-surface h-control rounded-md px-2.5 text-label text-foreground"
+                  >
+                    <option value="default">{t('themeSettingsCard.follow-the-theme-preset')}</option>
+                    <option value="none">{t('themeSettingsCard.radius-none')}</option>
+                    <option value="small">{t('themeSettingsCard.radius-small')}</option>
+                    <option value="medium">{t('themeSettingsCard.radius-medium')}</option>
+                    <option value="large">{t('themeSettingsCard.radius-large')}</option>
+                  </select>
+                </div>
+
+                <SettingsDivider />
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-label font-medium text-foreground">
+                    {t('themeSettingsCard.font-scale')}
                   </span>
+                  <select
+                    aria-label={t('themeSettingsCard.font-scale')}
+                    value={String(themeTokens.fontScale)}
+                    onChange={(event) => updateThemeTokens({ fontScale: Number(event.target.value) })}
+                    className="field-surface h-control rounded-md px-2.5 text-label text-foreground"
+                  >
+                    {FONT_SCALE_OPTIONS.map((scale) => (
+                      <option key={scale} value={String(scale)}>{`${Math.round(scale * 100)}%`}</option>
+                    ))}
+                    {!FONT_SCALE_OPTIONS.some((scale) => scale === themeTokens.fontScale) && (
+                      <option value={String(themeTokens.fontScale)}>{`${Math.round(themeTokens.fontScale * 100)}%`}</option>
+                    )}
+                  </select>
+                </div>
+
+                <SettingsDivider />
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-label font-medium text-foreground">
+                      {t('themeSettingsCard.reduce-motion')}
+                    </p>
+                    <p className="mt-px text-label-sm leading-[18px] text-secondary">
+                      {t('themeSettingsCard.reduce-motion-hint')}
+                    </p>
+                  </div>
+                  <Switch
+                    aria-label={t('themeSettingsCard.reduce-motion')}
+                    checked={themeTokens.animation === 'reduced'}
+                    onCheckedChange={(checked) => updateThemeTokens({
+                      animation: checked ? 'reduced' : 'normal',
+                    })}
+                  />
+                </div>
+
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => updateThemeTokens({ ...DEFAULT_THEME_TOKENS })}
+                  >
+                    {t('themeSettingsCard.reset-appearance')}
+                  </Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('themeSettingsCard.card-fields')}
+        description={t('themeSettingsCard.card-fields-hint')}
+      >
+        <SettingsCard className="p-3.5">
+          <div className="flex flex-wrap gap-2">
+            {REPOSITORY_CARD_FIELD_IDS.map((id) => {
+              const visible = isRepositoryCardFieldVisible(repositoryCardFields, id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={visible}
+                  onClick={() => setRepositoryCardField(id, !visible)}
+                  className={cn(
+                    'motion-press inline-flex h-control-sm items-center gap-1.5 rounded-sm px-2.5 text-label-sm font-medium transition-[background-color,color,box-shadow] duration-micro ease-out-subtle hover:duration-instant',
+                    visible
+                      ? 'bg-accent-tint text-accent-text shadow-elev-0'
+                      : 'bg-sunken text-secondary shadow-elev-0 hover:bg-fill-hover hover:text-foreground',
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'flex size-3.5 items-center justify-center rounded-xs',
+                      visible
+                        ? 'bg-accent-solid text-on-accent'
+                        : 'border border-control text-transparent',
+                    )}
+                  >
+                    <Check className="size-2.5" strokeWidth={2.5} />
+                  </span>
+                  {t(`themeSettingsCard.card-field-${id}`)}
                 </button>
               );
             })}
           </div>
-        </div>
+        </SettingsCard>
+      </SettingsSection>
 
-        {/* Theme token（开发守则 §14）：强调色 / 圆角 / 字号 / 动效，全部落到 <html>
-            的 CSS 变量与 data 属性上，恢复默认即删掉内联值让预设重新生效。 */}
-        <Accordion type="single" collapsible className="border-t border-border">
-          <AccordionItem value="fine-tune" className="border-0">
-            <AccordionTrigger>{t('themeSettingsCard.fine-tune-appearance')}</AccordionTrigger>
-            <AccordionContent className="space-y-5">
-          <div>
-            <p className="mb-2 text-sm font-medium text-foreground">{t('themeSettingsCard.accent-color')}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                aria-pressed={themeTokens.accentColor === null}
-                onClick={() => updateThemeTokens({ accentColor: null })}
-                className={`rounded-md border px-2.5 py-1 text-xs ${
-                  themeTokens.accentColor === null ? 'border-primary text-foreground' : 'border-border text-muted-foreground'
-                }`}
-              >
-                {t('themeSettingsCard.follow-the-theme-preset')}
-              </button>
-              {ACCENT_PRESETS.map((hex) => (
-                <button
-                  key={hex}
-                  type="button"
-                  aria-label={`${t(ACCENT_PRESET_NAME_KEYS[hex])} (${hex})`}
-                  aria-pressed={themeTokens.accentColor === hex}
-                  onClick={() => updateThemeTokens({ accentColor: hex })}
-                  className={`h-7 w-7 rounded-full border-2 ${
-                    themeTokens.accentColor === hex ? 'border-foreground' : 'border-transparent'
-                  }`}
-                  style={{ background: hex }}
-                />
-              ))}
-              <input
-                type="color"
-                aria-label={t('themeSettingsCard.custom-accent-color')}
-                value={themeTokens.accentColor ?? presetAccentColor}
-                onChange={(event) => updateThemeTokens({ accentColor: event.target.value })}
-                className="h-7 w-10 cursor-pointer rounded border border-border bg-transparent"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm font-medium text-foreground">{t('themeSettingsCard.border-radius')}</span>
-            <select
-              aria-label={t('themeSettingsCard.border-radius')}
-              value={themeTokens.radius}
-              onChange={(event) => updateThemeTokens({ radius: event.target.value as ThemeRadius })}
-              className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-            >
-              <option value="default">{t('themeSettingsCard.follow-the-theme-preset')}</option>
-              <option value="none">{t('themeSettingsCard.radius-none')}</option>
-              <option value="small">{t('themeSettingsCard.radius-small')}</option>
-              <option value="medium">{t('themeSettingsCard.radius-medium')}</option>
-              <option value="large">{t('themeSettingsCard.radius-large')}</option>
-            </select>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm font-medium text-foreground">{t('themeSettingsCard.font-scale')}</span>
-            <select
-              aria-label={t('themeSettingsCard.font-scale')}
-              value={String(themeTokens.fontScale)}
-              onChange={(event) => updateThemeTokens({ fontScale: Number(event.target.value) })}
-              className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-            >
-              {FONT_SCALE_OPTIONS.map((scale) => (
-                <option key={scale} value={String(scale)}>{`${Math.round(scale * 100)}%`}</option>
-              ))}
-              {!FONT_SCALE_OPTIONS.some((scale) => scale === themeTokens.fontScale) && (
-                <option value={String(themeTokens.fontScale)}>{`${Math.round(themeTokens.fontScale * 100)}%`}</option>
-              )}
-            </select>
-          </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-foreground">{t('themeSettingsCard.reduce-motion')}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('themeSettingsCard.reduce-motion-hint')}</p>
-            </div>
-            <Switch
-              aria-label={t('themeSettingsCard.reduce-motion')}
-              checked={themeTokens.animation === 'reduced'}
-              onCheckedChange={(checked) => updateThemeTokens({
-                animation: checked ? 'reduced' : 'normal',
-              })}
-            />
-          </div>
-
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => updateThemeTokens({ ...DEFAULT_THEME_TOKENS })}
-          >
-            {t('themeSettingsCard.reset-appearance')}
-          </Button>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('themeSettingsCard.card-fields')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="mb-3 text-xs text-muted-foreground">{t('themeSettingsCard.card-fields-hint')}</p>
-        <div className="flex flex-wrap gap-2">
-          {REPOSITORY_CARD_FIELD_IDS.map((id) => {
-            const visible = isRepositoryCardFieldVisible(repositoryCardFields, id);
-            return (
-              <Button
-                key={id}
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-pressed={visible}
-                onClick={() => setRepositoryCardField(id, !visible)}
-                className={visible ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15' : ''}
-              >
-                <span
-                  aria-hidden="true"
-                  className={visible
-                    ? 'flex h-4 w-4 items-center justify-center rounded-sm bg-primary text-primary-foreground'
-                    : 'flex h-4 w-4 items-center justify-center rounded-sm border border-border text-transparent'}
-                >
-                  <Check className="h-3 w-3" />
-                </span>
-                {t(`themeSettingsCard.card-field-${id}`)}
-              </Button>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-    <RepositoryCardActionsSettings
-      title={t('themeSettingsCard.card-actions')}
-      hint={t('themeSettingsCard.card-actions-hint')}
-      resetLabel={t('themeSettingsCard.reset-card-actions')}
-      moveUpLabel={(action) => t('menuManagementPanel.move-v1-up', { v1: action })}
-      moveDownLabel={(action) => t('menuManagementPanel.move-v1-down', { v1: action })}
-      visibilityLabel={(action) => t('themeSettingsCard.quick-action-visibility', { action })}
-    />
+      <RepositoryCardActionsSettings
+        title={t('themeSettingsCard.card-actions')}
+        hint={t('themeSettingsCard.card-actions-hint')}
+        resetLabel={t('themeSettingsCard.reset-card-actions')}
+        moveUpLabel={(action) => t('menuManagementPanel.move-v1-up', { v1: action })}
+        moveDownLabel={(action) => t('menuManagementPanel.move-v1-down', { v1: action })}
+        visibilityLabel={(action) => t('themeSettingsCard.quick-action-visibility', { action })}
+      />
     </>
   );
 };

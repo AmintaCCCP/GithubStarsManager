@@ -70,91 +70,96 @@ export const RepositoryChatHistoryPanel: React.FC<RepositoryChatHistoryPanelProp
   };
 
   return (
-    <section aria-label={t('repositoryChatHistoryPanel.history-for-this-repository')} className="flex min-h-0 h-full flex-col gap-3">
+    <section aria-label={t('repositoryChatHistoryPanel.history-for-this-repository')} className="flex min-h-0 h-full flex-col gap-2.5">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-tertiary" aria-hidden="true" />
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="h-8 pl-8 text-xs"
+          className="h-control-lg pl-8 text-label"
           placeholder={t('repositoryChatHistoryPanel.search-this-repository')}
           aria-label={t('repositoryChatHistoryPanel.search-repository-chat-history')}
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {!hasVisibleSessions ? (
-          <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 text-center text-xs text-muted-foreground">
-            <History className="h-5 w-5" aria-hidden="true" />
+          <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg bg-sunken px-4 text-center text-label-sm text-tertiary">
+            <History className="size-6 stroke-[1.5]" aria-hidden="true" />
             <p>{sessions.length === 0
               ? t('repositoryChatHistoryPanel.there-are-no-saved-conversations-for-this-reposi')
               : t('repositoryChatHistoryPanel.no-matching-conversations-found')}</p>
           </div>
         ) : (
-          (Object.keys(groupedSessions) as HistoryGroup[]).map((group) => groupedSessions[group].length > 0 && (
-            <div key={group} className="mb-4">
-              <h3 className="mb-1 px-1 text-xs font-medium text-muted-foreground">{groupLabels[group]}</h3>
-              <ul className="space-y-1">
-                {groupedSessions[group].map((session) => (
-                  <li key={session.id} className="flex items-center gap-1">
-                    {editingId === session.id ? (
-                      <div className="flex min-w-0 flex-1 items-center gap-1">
-                        <Input
-                          value={editingTitle}
-                          onChange={(event) => setEditingTitle(event.target.value)}
-                          className="h-8 min-w-0 text-xs"
-                          autoFocus
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' && !disabled && !event.nativeEvent.isComposing) {
-                              onRename(session.id, editingTitle);
-                              setEditingId(null);
-                            }
-                            if (event.key === 'Escape') setEditingId(null);
+          <div className="space-y-4">
+            {(Object.keys(groupedSessions) as HistoryGroup[]).map((group) => groupedSessions[group].length > 0 && (
+              <div key={group}>
+                <h3 className="mb-2 px-2 text-label-sm font-medium text-tertiary">{groupLabels[group]}</h3>
+                <ul className="space-y-1">
+                  {groupedSessions[group].map((session) => (
+                    <li key={session.id} className="flex items-center gap-1.5">
+                      {editingId === session.id ? (
+                        <div className="flex min-w-0 flex-1 items-center gap-1">
+                          <Input
+                            value={editingTitle}
+                            onChange={(event) => setEditingTitle(event.target.value)}
+                            className="h-control min-w-0 text-label-sm"
+                            autoFocus
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' && !disabled && !event.nativeEvent.isComposing) {
+                                onRename(session.id, editingTitle);
+                                setEditingId(null);
+                              }
+                              if (event.key === 'Escape') setEditingId(null);
+                            }}
+                          />
+                          <Button type="button" variant="ghost" size="icon-sm" className="size-control-sm rounded-sm" onClick={() => { onRename(session.id, editingTitle); setEditingId(null); }} disabled={disabled} aria-label={t('repositoryChatSheet.save-title')}>
+                            <Check className="size-3.5" aria-hidden="true" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon-sm" className="size-control-sm rounded-sm" onClick={() => setEditingId(null)} aria-label={t('repositoryChatSheet.cancel-edit')}>
+                            <X className="size-3.5" aria-hidden="true" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`motion-press flex min-h-row-sidebar min-w-0 flex-1 items-center justify-start rounded-sm px-2 py-1.5 text-left text-label font-normal outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                            session.id === activeSessionId
+                              ? 'bg-fill-selected text-foreground'
+                              : 'text-secondary hover:bg-fill-hover hover:text-foreground'
+                          }`}
+                          onClick={() => {
+                            if (!disabled) onSelect(session.id);
                           }}
-                        />
-                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => { onRename(session.id, editingTitle); setEditingId(null); }} disabled={disabled} aria-label={t('repositoryChatSheet.save-title')}>
-                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                        </Button>
-                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingId(null)} aria-label={t('repositoryChatSheet.cancel-edit')}>
-                          <X className="h-3.5 w-3.5" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    ) : (
+                          onDoubleClick={() => { setEditingId(session.id); setEditingTitle(session.title); }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'F2') {
+                              setEditingId(session.id);
+                              setEditingTitle(session.title);
+                            }
+                          }}
+                          aria-disabled={disabled || undefined}
+                          aria-current={session.id === activeSessionId ? 'true' : undefined}
+                        >
+                          <span className="truncate">{session.title}</span>
+                        </button>
+                      )}
                       <Button
                         type="button"
-                        variant={session.id === activeSessionId ? 'secondary' : 'ghost'}
-                        className="h-auto min-w-0 flex-1 justify-start px-2 py-2 text-left text-xs"
-                        onClick={() => {
-                          if (!disabled) onSelect(session.id);
-                        }}
-                        onDoubleClick={() => { setEditingId(session.id); setEditingTitle(session.title); }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'F2') {
-                            setEditingId(session.id);
-                            setEditingTitle(session.title);
-                          }
-                        }}
-                        aria-disabled={disabled || undefined}
-                        aria-current={session.id === activeSessionId ? 'true' : undefined}
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-control-sm shrink-0 rounded-sm text-tertiary hover:bg-destructive-tint hover:text-destructive"
+                        onClick={() => onDelete(session.id)}
+                        disabled={disabled}
+                        aria-label={t('repositoryChatHistoryPanel.delete-conversation-v1', { v1: session.title })}
                       >
-                        <span className="truncate">{session.title}</span>
+                        <Trash2 className="size-3.5" aria-hidden="true" />
                       </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => onDelete(session.id)}
-                      disabled={disabled}
-                      aria-label={t('repositoryChatHistoryPanel.delete-conversation-v1', { v1: session.title })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </section>

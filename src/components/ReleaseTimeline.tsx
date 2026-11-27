@@ -847,11 +847,12 @@ export const ReleaseTimeline: React.FC = () => {
       </label>
       {activeReleaseRepoCount > 0 && (
         <Button
+          variant="primary"
           onClick={handleRefresh}
           disabled={releaseIsRefreshing}
-          className="ui-button-primary flex items-center gap-2 px-3 disabled:cursor-not-allowed disabled:opacity-50"
+          className="gap-1.5"
         >
-          <RefreshCw className={`h-4 w-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`size-3.5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
           <span>{releaseIsRefreshing ? t('releaseTimeline.refreshing') : t('releaseTimeline.refresh')}</span>
         </Button>
       )}
@@ -859,10 +860,10 @@ export const ReleaseTimeline: React.FC = () => {
   );
 
   const releaseToolbar = (
-    <div className="ui-toolbar app-page-toolbar app-release-toolbar">
+    <div className="ui-toolbar app-page-toolbar app-release-toolbar !mt-3">
       <div className="app-release-search-row">
-        <div className="app-release-search-field">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative app-release-search-field">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
           <Input
             type="text"
             placeholder={t('releaseTimeline.search-releases')}
@@ -871,20 +872,21 @@ export const ReleaseTimeline: React.FC = () => {
               setReleaseSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            className="ui-field app-page-search w-full pl-10 pr-12"
+            className="w-full pl-8 pr-8"
           />
           {searchQuery && (
             <Button
               type="button"
               variant="ghost"
+              size="icon-sm"
               onClick={() => {
                 setReleaseSearchQuery('');
                 setCurrentPage(1);
               }}
               aria-label={t('releaseTimeline.clear-search')}
-              className="absolute right-2 top-1/2 h-8 w-8 p-0 -translate-y-1/2 text-muted-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-tertiary hover:text-foreground"
             >
-              <X className="h-4 w-4" />
+              <X className="size-3.5" />
             </Button>
           )}
         </div>
@@ -1085,10 +1087,8 @@ export const ReleaseTimeline: React.FC = () => {
               actions={releaseHeaderActions}
             />
             {releaseToolbar}
-            <div className="ui-empty-state app-empty-state">
-              <div className="app-empty-visual">
-                <Package className="h-6 w-6" aria-hidden="true" />
-              </div>
+            <div className="ui-empty-state app-empty-state border-0 bg-paper shadow-elev-0">
+              <Package className="size-10 stroke-[1.5] text-tertiary" aria-hidden="true" />
               <div className="app-empty-copy">
                 <h3 className="app-empty-title">
                   {subscribedRepoCount === 0 ? t('releaseTimeline.no-release-subscriptions') : t('releaseTimeline.no-recent-releases')}
@@ -1135,7 +1135,7 @@ export const ReleaseTimeline: React.FC = () => {
         <div className="workspace-content app-workspace-content">
           <div className="w-full">
       {/* Header */}
-      <div className="mb-6 sm:mb-8">
+      <div className="mb-4">
         <WorkspacePageHeader
           eyebrow={t('releaseTimeline.inbox-label')}
           section={t('app:header.menu-releases')}
@@ -1149,10 +1149,10 @@ export const ReleaseTimeline: React.FC = () => {
         {releaseToolbar}
 
         {/* Results Info and Controls */}
-        <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+        <div className="flex flex-col gap-2 mb-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {visibleResultCount > 0 && (
-              <span className="text-sm text-muted-foreground dark:text-muted-foreground">
+              <span className="text-label-sm text-tertiary tabular-nums">
                 {viewMode === 'timeline'
                   ? releaseShowMode === 'unread'
                     ? t('releaseTimeline.showing-v1-v2-of-v3-unread-total-v4', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, filteredReleases.length), v3: filteredReleases.length, v4: preUnreadFilteredReleases.length })
@@ -1164,42 +1164,42 @@ export const ReleaseTimeline: React.FC = () => {
               </span>
             )}
             {releaseShowMode === 'all' && unreadCount > 0 && (
-              <span className="text-sm text-primary dark:text-primary">
+              <span className="text-label-sm text-accent-text tabular-nums">
                 ({unreadCount} {t('releaseTimeline.unread')})
               </span>
             )}
             {(searchQuery || releaseSourceRepoFilter || selectedFilters.length > 0) && (
-              <span className="text-sm text-primary dark:text-primary">
+              <span className="text-label-sm text-accent-text">
                 ({t('releaseTimeline.filtered')})
               </span>
             )}
             {releaseLatestMode === 'latest' && (
-              <span className="text-sm text-primary dark:text-primary">
+              <span className="text-label-sm text-accent-text">
                 ({t('releaseTimeline.latest-only')})
               </span>
             )}
           </div>
 
-          <div className="flex w-full flex-wrap items-center justify-start gap-3 lg:w-auto lg:justify-end">
+          <div className="flex w-full flex-wrap items-center justify-start gap-2 lg:w-auto lg:justify-end">
             {/* Items per page selector */}
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <span className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('releaseTimeline.per-page')}</span>
+              <span className="whitespace-nowrap text-label-sm text-tertiary">{t('releaseTimeline.per-page')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger aria-label={t('releaseTimeline.items-per-page')} className="ui-field h-9 w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('releaseTimeline.items-per-page')} className="h-control w-20 shrink-0 px-2.5 text-label tabular-nums"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
               </Select>
             </div>
 
             {/* Mark All Read button */}
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={handleMarkAllRead}
               disabled={isMarkingAllRead || unreadCount === 0}
-              className="flex shrink-0 items-center space-x-2 rounded-lg bg-muted px-3 py-2 transition-[background-color] hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted/40 dark:hover:bg-accent"
+              className="shrink-0 gap-1.5"
               title={t('releaseTimeline.mark-all-as-read')}
             >
-              {isMarkingAllRead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('releaseTimeline.mark-all-read')}</span>
+              {isMarkingAllRead ? <RefreshCw className="size-3.5 animate-spin" /> : <CheckCircle className="size-3.5" />}
+              <span>{t('releaseTimeline.mark-all-read')}</span>
             </Button>
             <Select
               value={viewMode}
@@ -1212,7 +1212,7 @@ export const ReleaseTimeline: React.FC = () => {
             >
               <SelectTrigger
                 aria-label={t('releaseTimeline.view-mode')}
-                className="ui-field app-release-view-select"
+                className="app-release-view-select h-control"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -1228,10 +1228,8 @@ export const ReleaseTimeline: React.FC = () => {
        {/* Releases List */}
        <div className="app-flat-list app-release-list">
          {paginatedReleases.length === 0 ? (
-           <div className="ui-empty-state app-empty-state">
-            <div className="app-empty-visual">
-              <Package className="h-6 w-6" aria-hidden="true" />
-            </div>
+           <div className="ui-empty-state app-empty-state border-0">
+            <Package className="size-10 stroke-[1.5] text-tertiary" aria-hidden="true" />
             <div className="app-empty-copy">
               <h3 className="app-empty-title">
                 {releaseShowMode === 'unread' && unreadCount === 0
@@ -1250,24 +1248,27 @@ export const ReleaseTimeline: React.FC = () => {
             </div>
             {releaseShowMode === 'unread' && (
               <Button
+                variant="secondary"
                 onClick={() => handleShowModeChange('all')}
-                className="ui-button-primary mt-4 px-4 py-2 text-sm"
+                className="mt-2"
               >
                 {t('releaseTimeline.show-all-2')}
               </Button>
             )}
             {deviceEmptyState && releaseShowMode !== 'unread' && (
               <Button
+                variant="secondary"
                 onClick={() => handleFilterToggle(BUILTIN_CURRENT_SYSTEM_FILTER_ID)}
-                className="ui-button-primary mt-4 px-4 py-2 text-sm"
+                className="mt-2"
               >
                 {t('releaseTimeline.disable-current-system-filter')}
               </Button>
             )}
             {effectiveFilterIds.length > 0 && !deviceEmptyState && releaseShowMode !== 'unread' && (
               <Button
+                variant="secondary"
                 onClick={handleClearFilters}
-                className="ui-button-primary mt-4 px-4 py-2 text-sm"
+                className="mt-2"
               >
                 {t('releaseTimeline.clear-filters')}
               </Button>
@@ -1329,39 +1330,39 @@ export const ReleaseTimeline: React.FC = () => {
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
                   aria-expanded={isExpanded}
                   aria-controls={`release-group-${repository.id}`}
-                  className="h-auto w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
+                  className="!h-auto w-full flex items-center justify-between rounded-none px-3.5 py-2.5 font-normal hover:bg-fill-hover"
                 >
-                  <span className="flex items-center space-x-2">
-                    {hasUnread && (
-                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse"></span>
-                    )}
-                    <span className="flex items-center justify-center w-6 h-6 bg-primary/20 rounded flex-shrink-0">
-                      <LayoutGrid className="w-3.5 h-3.5 text-primary" />
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    <span className="app-unread-marker-slot" aria-hidden="true">
+                      {hasUnread && <span className="app-unread-marker" />}
                     </span>
-                    <span className="text-left">
-                      <span className="block font-semibold text-sm text-foreground dark:text-foreground">
+                    <span className="flex items-center justify-center size-7 bg-fill-hover rounded-sm shrink-0 text-secondary">
+                      <LayoutGrid className="size-3.5" />
+                    </span>
+                    <span className="text-left min-w-0">
+                      <span className="block font-semibold text-label-lg text-foreground truncate">
                         {repository.name}
                       </span>
-                      <span className="block text-xs text-muted-foreground dark:text-muted-foreground">
+                      <span className="block text-label-sm text-tertiary font-mono truncate">
                         {repository.full_name}
                       </span>
                     </span>
                   </span>
-                  <span className="flex items-center space-x-2 min-w-0 ml-2">
-                    <span className="text-right min-w-0">
-                      <span className="block text-xs text-muted-foreground dark:text-muted-foreground hidden sm:block">
+                  <span className="flex items-center gap-3 min-w-0 ml-2">
+                    <span className="text-right min-w-0 tabular-nums">
+                      <span className="hidden sm:block text-label-sm text-tertiary">
                         {releases.length} {t('releaseTimeline.releases')}
                       </span>
                       {latestRelease && (
                         <>
-                          <span className="block text-xs text-muted-foreground dark:text-muted-foreground truncate">
+                          <span className="block text-label-sm text-secondary truncate">
                             {t('releaseTimeline.latest')} {latestRelease.tag_name}
                           </span>
                           {latestEffectiveTime && (
-                            <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap">
+                            <span className="flex items-center justify-end gap-1.5 text-label-sm text-tertiary whitespace-nowrap">
                               {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
                               {latestAssetsUpdated && (
-                                <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium">
+                                <span className="rounded-xs bg-accent-tint px-1.5 py-px text-caption font-medium text-accent-text">
                                   {t('releaseTimeline.assets-updated')}
                                 </span>
                               )}
@@ -1370,8 +1371,8 @@ export const ReleaseTimeline: React.FC = () => {
                         </>
                       )}
                     </span>
-                    <span className={`transform transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
-                      <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70" />
+                    <span className={`transform transition-transform duration-fast shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
+                      <ChevronDown className="size-4 text-tertiary" />
                     </span>
                   </span>
                 </Button>
@@ -1386,8 +1387,8 @@ export const ReleaseTimeline: React.FC = () => {
                       会直接打断 grid-rows 折叠/展开动画；visibility 过渡同样能把折叠内容
                       移出 Tab 焦点序与无障碍树，但动画得以保留。 */}
                   <div className={`overflow-hidden min-h-0 ${isExpanded ? '' : 'collapse-hidden'}`}>
-                    <div className="border-t ui-divider bg-background dark:bg-card/50">
-                      <div className="p-1.5 space-y-1.5">
+                    <div className="border-t border-subtle bg-sunken/60">
+                      <div className="p-2 space-y-2">
                       {releases.map(({ release, displayLinks, allLinks, assetBadges }) => {
                         const isUnread = isReleaseUnread(release.id);
                         const isAssetsExpanded = expandedAssets.has(release.id);
@@ -1431,8 +1432,8 @@ export const ReleaseTimeline: React.FC = () => {
 
       {/* Bottom Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center mt-8">
-          <div className="flex items-center space-x-1">
+        <div className="flex items-center justify-center mt-6">
+          <div className="flex items-center gap-1 tabular-nums">
             <Button
               type="button"
               variant="ghost"
@@ -1440,9 +1441,8 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
               aria-label={t('releaseTimeline.first-page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronsLeft className="w-4 h-4" />
+              <ChevronsLeft className="size-4" />
             </Button>
             <Button
               type="button"
@@ -1451,9 +1451,8 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
               aria-label={t('releaseTimeline.previous-page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="size-4" />
             </Button>
             
             {getPageNumbers().map((page, index) => (
@@ -1461,18 +1460,15 @@ export const ReleaseTimeline: React.FC = () => {
                 <Button
                   key={index}
                   type="button"
+                  variant={page === clampedPage ? 'primary' : 'ghost'}
                   aria-current={page === clampedPage ? 'page' : undefined}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-2 rounded-lg text-sm ${
-                    page === clampedPage
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
-                  }`}
+                  className="min-w-control px-2.5 tabular-nums"
                 >
                   {page}
                 </Button>
               ) : (
-                <span key={index} className="px-3 py-2 text-sm text-muted-foreground">
+                <span key={index} className="px-2 text-label text-tertiary">
                   {page}
                 </span>
               )
@@ -1485,9 +1481,8 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
               aria-label={t('releaseTimeline.next-page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="size-4" />
             </Button>
             <Button
               type="button"
@@ -1496,9 +1491,8 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
               aria-label={t('releaseTimeline.last-page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronsRight className="w-4 h-4" />
+              <ChevronsRight className="size-4" />
             </Button>
           </div>
         </div>

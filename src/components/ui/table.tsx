@@ -6,7 +6,7 @@ const Table = React.forwardRef<
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
   <div className="relative w-full overflow-x-auto">
-    <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
+    <table ref={ref} className={cn('w-full caption-bottom text-label', className)} {...props} />
   </div>
 ));
 Table.displayName = 'Table';
@@ -15,7 +15,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('[&_tr]:border-b', className)} {...props} />
+  <thead ref={ref} className={cn('[&_tr]:border-b [&_tr]:border-subtle', className)} {...props} />
 ));
 TableHeader.displayName = 'TableHeader';
 
@@ -31,7 +31,7 @@ const TableFooter = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tfoot ref={ref} className={cn('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', className)} {...props} />
+  <tfoot ref={ref} className={cn('border-t border-subtle bg-sunken font-medium [&>tr]:last:border-b-0', className)} {...props} />
 ));
 TableFooter.displayName = 'TableFooter';
 
@@ -39,7 +39,7 @@ const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
 >(({ className, ...props }, ref) => (
-  <tr ref={ref} className={cn('border-b border-border transition-colors hover:bg-muted/50', className)} {...props} />
+  <tr ref={ref} className={cn('border-b border-subtle transition-[background-color] duration-micro ease-out-subtle hover:duration-instant hover:bg-fill-hover', className)} {...props} />
 ));
 TableRow.displayName = 'TableRow';
 
@@ -49,7 +49,7 @@ const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
-    className={cn('h-10 px-2 text-left align-middle text-xs font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0', className)}
+    className={cn('h-9 px-2 text-left align-middle text-label-sm font-medium text-tertiary [&:has([role=checkbox])]:pr-0', className)}
     {...props}
   />
 ));

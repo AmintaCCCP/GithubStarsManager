@@ -39,11 +39,14 @@ export const PluginUninstallDialog: React.FC<PluginUninstallDialogProps> = ({ ta
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{t('pluginSettingsPanel.cancel')}</AlertDialogCancel>
-        <AlertDialogAction onClick={() => onUninstall(false)}>
+        <AlertDialogAction
+          className="bg-raised text-foreground shadow-elev-1 hover:bg-fill-hover"
+          onClick={() => onUninstall(false)}
+        >
           {t('pluginSettingsPanel.uninstall-keep-data')}
         </AlertDialogAction>
         <AlertDialogAction
-          className="bg-destructive hover:bg-destructive/90"
+          className="bg-destructive-solid text-on-destructive hover:opacity-95"
           onClick={() => onUninstall(true)}
         >
           {t('pluginSettingsPanel.uninstall-and-delete-data')}

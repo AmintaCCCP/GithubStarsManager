@@ -160,12 +160,12 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
       <div id="asset-filter-panel" className="app-side-list app-side-filter-list">
         {currentSystemFilter && (
-          <div className="app-side-filter-row">
+          <div className="app-side-filter-row relative flex w-full items-center">
             <Button
               variant="ghost"
               onClick={() => onFilterToggle(currentSystemFilter.id)}
               disabled={currentSystemUnsupported}
-              className="app-side-item app-side-multiline-label justify-between"
+              className="app-side-item app-side-multiline-label w-full min-w-0 justify-between rounded-sm px-2 pr-8"
               title={currentSystemUnsupported
                 ? t('assetFilterManager.builtin-ignored')
                 : t('assetFilterManager.builtin-tooltip', { device: currentSystemFilter.label })}
@@ -178,11 +178,11 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 <span className="flex min-w-0 flex-col items-start">
                   <span className="flex w-full min-w-0 items-center gap-1.5">
                     <span className="truncate">{t('assetFilterManager.builtin-current-system')}</span>
-                    <Badge variant="secondary" className="h-4 shrink-0 whitespace-nowrap px-1.5 text-[9px] font-medium leading-none">
+                    <Badge variant="secondary" className="h-4 shrink-0 whitespace-nowrap rounded-xs border-0 px-1.5 text-caption font-medium leading-none">
                       {t('assetFilterManager.builtin-badge')}
                     </Badge>
                   </span>
-                  <span className={`w-full truncate text-[11px] ${currentSystemUnsupported ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <span className={`w-full truncate text-label-sm ${currentSystemUnsupported ? 'text-destructive' : 'text-tertiary'}`}>
                     {currentSystemUnsupported
                       ? currentSystemSelected
                         ? t('assetFilterManager.builtin-ignored')
@@ -192,9 +192,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 </span>
               </span>
             </Button>
-            <div className="app-side-row-actions">
+            <div className="app-side-row-actions ml-auto shrink-0 [inset-inline-start:auto] [inset-inline-end:0.375rem] !bg-transparent">
               <span title={t('assetFilterManager.builtin-locked')}>
-                <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                <Lock className="size-3.5 text-tertiary" aria-hidden="true" />
               </span>
             </div>
           </div>
@@ -204,21 +204,23 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           const Icon = filter.icon ? ICON_MAP[filter.icon] : Filter;
           const isSelected = selectedFilters.includes(filter.id);
           return (
-            <div key={filter.id} className="app-side-filter-row">
+            <div key={filter.id} className="app-side-filter-row group/filter-row relative flex w-full items-center">
               <Button
                 variant="ghost"
                 onClick={() => onFilterToggle(filter.id)}
-                className="app-side-item justify-between"
+                className={`app-side-item w-full min-w-0 justify-between rounded-sm px-2 ${
+                  filter.isPreset ? 'app-side-filter-row-preset' : 'app-side-filter-row-custom'
+                }`}
                 title={filter.keywords.join(', ')}
                 type="button"
                 aria-pressed={isSelected}
               >
-                <span className="app-side-item-label">
+                <span className="app-side-item-label min-w-0 flex-1">
                   {Icon && <Icon aria-hidden="true" />}
                   <span className="truncate">{filter.name}</span>
                 </span>
               </Button>
-              <div className="app-side-row-actions">
+              <div className="app-side-row-actions ml-auto shrink-0 [inset-inline-start:auto] [inset-inline-end:0.375rem] !bg-transparent">
                 <Button
                   variant="ghost"
                   onClick={() => handleEditFilter(filter)}

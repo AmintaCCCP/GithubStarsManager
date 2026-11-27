@@ -73,19 +73,18 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
   // 全高纵向 flex：ContextSidebarBody 独立滚动，页脚经 margin-block-start: auto 固定在底部
   return (
     <div className="flex h-full min-h-0 w-full shrink-0 flex-col">
-      <div className="context-sidebar-head">
+      <div className="context-sidebar-head !min-h-[44px] !px-gutter !pt-3 !pb-1.5">
         <div className="min-w-0">
-          <p className="app-side-eyebrow">{t('discoverySidebar.discovery-label')}</p>
-          <h3 className="app-side-title truncate">
+          <h3 className="app-side-title truncate !text-label-lg !font-semibold">
             {t('discoverySidebar.discovery-channels')}
           </h3>
         </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             <DiscoveryChannelMenu
               channels={channels}
               language={language}
               onToggleChannel={onToggleChannel}
-              triggerClassName="h-8 w-8"
+              triggerClassName="size-control rounded-md text-secondary hover:bg-fill-hover hover:text-foreground"
             />
             <Button
               type="button"
@@ -95,9 +94,9 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
               disabled={anyLoading || isAnalyzing}
               aria-label={t('discoverySidebar.refresh-all')}
               title={t('discoverySidebar.refresh-all')}
-              className="h-8 w-8"
+              className="size-control rounded-md text-secondary hover:bg-fill-hover hover:text-foreground"
             >
-              <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 ${anyLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
       </div>
@@ -105,42 +104,52 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
         {[
           { key: 'channels', label: t('discoverySidebar.channels-section'), items: primaryChannels },
           { key: 'sources', label: t('discoverySidebar.sources-section'), items: sourceChannels },
-        ].map((section) => section.items.length > 0 && (
-          <section key={section.key} className="app-side-section" aria-label={section.label}>
-            <p className="app-section-label app-side-group-label">{section.label}</p>
-            <div className="app-side-list">
-              {section.items.map((channel) => {
-                const isSelected = selectedChannel === channel.id;
-                const ChannelIcon = discoveryChannelIconMap[channel.icon] || Crown;
-                const channelLoading = isLoading && typeof isLoading === 'object' ? !!(isLoading as Record<string, unknown>)[channel.id] : false;
+        ].map((section, sectionIndex) => section.items.length > 0 && (
+          <React.Fragment key={section.key}>
+            {sectionIndex > 0 && <div className="mx-2 my-1 h-px bg-separator" />}
+            <section className="app-side-section" aria-label={section.label}>
+              <p className="app-section-label app-side-group-label text-label-sm font-medium text-tertiary">
+                {section.label}
+              </p>
+              <div className="app-side-list">
+                {section.items.map((channel) => {
+                  const isSelected = selectedChannel === channel.id;
+                  const ChannelIcon = discoveryChannelIconMap[channel.icon] || Crown;
+                  const channelLoading = isLoading && typeof isLoading === 'object' ? !!(isLoading as Record<string, unknown>)[channel.id] : false;
+                  const count = totalCount[channel.id] ?? 0;
 
-                return (
-                  <Button
-                    key={channel.id}
-                    onClick={() => onChannelSelect(channel.id)}
-                    variant="ghost"
-                    aria-pressed={isSelected}
-                    className="app-side-item justify-between text-left"
-                  >
-                    <span className="app-side-item-label">
-                      <ChannelIcon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{discoveryChannelName(channel, language)}</span>
-                    </span>
-                    <span className="app-side-item-label shrink-0 justify-end">
-                      {channelLoading ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : channel.id !== 'code-search' ? (
-                        <span className="app-side-count">{totalCount[channel.id] ?? 0}</span>
-                      ) : null}
-                    </span>
-                  </Button>
-                );
-              })}
-            </div>
-          </section>
+                  return (
+                    <Button
+                      key={channel.id}
+                      onClick={() => onChannelSelect(channel.id)}
+                      variant="ghost"
+                      aria-pressed={isSelected}
+                      className={`app-side-item !h-row-sidebar !rounded-sm !font-normal justify-between text-left ${
+                        isSelected
+                          ? '!bg-fill-selected !text-foreground'
+                          : 'text-secondary hover:bg-fill-hover hover:text-foreground'
+                      }`}
+                    >
+                      <span className="app-side-item-label">
+                        <ChannelIcon className="size-4 shrink-0" />
+                        <span className="truncate">{discoveryChannelName(channel, language)}</span>
+                      </span>
+                      <span className="app-side-item-label shrink-0 justify-end">
+                        {channelLoading ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : channel.id !== 'code-search' && count > 0 ? (
+                          <span className="app-side-count tabular-nums">{count}</span>
+                        ) : null}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </section>
+          </React.Fragment>
         ))}
       </ContextSidebarBody>
-      <div className="context-sidebar-foot">
+      <div className="context-sidebar-foot border-t border-subtle px-gutter py-2.5">
         <div className="app-side-foot-status">
           <span className="app-status-dot" aria-hidden="true" />
           <span>

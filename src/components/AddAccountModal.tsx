@@ -78,7 +78,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5" />
+            <UserPlus className="size-4 text-secondary" />
             {t('accountSwitcher.add-account-title')}
           </DialogTitle>
           <DialogDescription>
@@ -87,8 +87,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="add-account-pat" className="text-sm font-medium text-foreground">
+          <div className="space-y-1.5">
+            <label htmlFor="add-account-pat" className="text-label font-medium text-foreground">
               {t('accountSwitcher.github-pat-label')}
             </label>
             <div className="relative">
@@ -103,23 +103,23 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 placeholder={t('accountSwitcher.github-pat-placeholder')}
                 autoComplete="off"
                 disabled={submitting}
-                className="pr-10"
+                className="pr-9"
               />
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                size="icon-sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-tertiary hover:text-foreground"
                 onClick={() => setShowToken((prev) => !prev)}
                 aria-label={showToken ? t('accountSwitcher.hide-token') : t('accountSwitcher.show-token')}
                 disabled={submitting}
               >
-                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showToken ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
               </Button>
             </div>
           </div>
 
-          <div className="flex items-start gap-2.5 rounded-md border border-border bg-muted/40 p-3">
+          <div className="flex items-start gap-2.5 rounded-md bg-sunken px-3 py-2.5 shadow-elev-0">
             <Checkbox
               id="add-account-copy-settings"
               checked={copySettings}
@@ -129,14 +129,14 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             />
             <label
               htmlFor="add-account-copy-settings"
-              className="cursor-pointer text-sm leading-snug text-foreground"
+              className="cursor-pointer text-label leading-snug text-foreground"
             >
               {t('accountSwitcher.copy-general-settings')}
             </label>
           </div>
 
           {error && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="rounded-md bg-destructive-tint px-3 py-2 text-label-sm text-destructive" role="alert">
               {error}
             </p>
           )}
@@ -150,8 +150,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             >
               {t('accountSwitcher.cancel')}
             </Button>
-            <Button type="submit" disabled={submitting || !token.trim()}>
-              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" variant="primary" disabled={submitting || !token.trim()}>
+              {submitting && <Loader2 className="mr-1.5 size-4 animate-spin" />}
               {t('accountSwitcher.add-and-switch')}
             </Button>
           </DialogFooter>

@@ -73,37 +73,30 @@ export const BackToTop: React.FC = () => {
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="ghost"
       size="icon"
       onClick={scrollToTop}
       className={`
         fixed z-50
-        flex items-center justify-center
-        w-12 h-12
-        bg-card dark:bg-accent/60
-        text-muted-foreground dark:text-muted-foreground
-        rounded-full
-        shadow-lg hover:shadow-xl
-        border border-border dark:border-border
-        transform transition-[opacity,transform,background-color] duration-300 ease-out
-        hover:scale-110 hover:bg-accent dark:hover:bg-card/[0.1]
-        focus:outline-none focus:ring-2 focus:ring-ring/60 focus:ring-offset-2
-        dark:focus:ring-offset-gray-900
+        flex size-9 items-center justify-center
+        rounded-lg border-0 bg-floating text-secondary shadow-elev-2
+        transition-[opacity,transform,background-color,color] duration-micro ease-out-subtle
+        hover:bg-fill-hover hover:text-foreground hover:duration-instant
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50
         ${isVisible && !readmeModalOpen
           ? 'opacity-100 translate-y-0 pointer-events-auto'
-          : 'opacity-0 translate-y-4 pointer-events-none'
+          : 'opacity-0 translate-y-3 pointer-events-none'
         }
         ${isBouncing ? 'animate-bounce-twice' : ''}
-        bottom-24 right-4
-        sm:bottom-28 sm:right-6
-        lg:bottom-24 lg:right-10
+        bottom-20 right-4
+        sm:bottom-20 sm:right-6
       `}
       aria-label={t('backToTop.back-to-top')}
       aria-hidden={!isVisible || readmeModalOpen}
       tabIndex={isVisible && !readmeModalOpen ? 0 : -1}
       title={t('backToTop.back-to-top')}
     >
-      <ArrowUp className="h-5 w-5 sm:h-6 sm:w-6" />
+      <ArrowUp className="size-4" />
     </Button>
   );
 };

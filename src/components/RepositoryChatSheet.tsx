@@ -368,7 +368,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
       >
         <SheetTitle className="sr-only">{repository.full_name}</SheetTitle>
         <SheetDescription className="sr-only">{t('repositoryChatSheet.ask-this-repository')}</SheetDescription>
-        <div className="px-3 pr-12">
+        <div className="shrink-0 border-b border-subtle px-3 pr-12 [&_header]:border-b-0">
           <ChatHeader
             repository={repository}
             session={activeSession}
@@ -388,8 +388,8 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
         <div className="relative flex min-h-0 flex-1 flex-row overflow-hidden">
           {showHistory ? (
             <>
-              <button type="button" className="absolute inset-0 z-10 bg-black/20 md:hidden" onClick={() => setShowHistory(false)} aria-label={t('repositoryChatSheet.close-history')} />
-              <aside className="absolute inset-y-0 left-0 z-20 w-64 shrink-0 border-r border-border bg-card p-3 shadow-xl md:static md:z-auto md:shadow-none">
+              <button type="button" className="absolute inset-0 z-10 bg-scrim md:hidden" onClick={() => setShowHistory(false)} aria-label={t('repositoryChatSheet.close-history')} />
+              <aside className="absolute inset-y-0 left-0 z-20 h-full w-64 shrink-0 border-r border-subtle bg-navigator p-3 shadow-elev-2 md:static md:z-auto md:shadow-none">
                 <RepositoryChatHistoryPanel
                   sessions={sessions}
                   activeSessionId={activeSession?.id}
@@ -405,114 +405,116 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
               </aside>
             </>
           ) : null}
-          <div className="relative min-h-0 min-w-0 flex-1">
-            <div ref={messageRegionRef} onScroll={handleRegionScroll} className="h-full overflow-y-auto px-4 sm:px-6">
-              {error ? (
-                <div className="mx-auto mt-16 max-w-md rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-center text-sm text-destructive">
-                  <p>{error}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => {
-                      if (activeSession) void selectSession(activeSession.id);
-                      else void refresh();
-                    }}
-                  >
-                    {t('repositoryChatSheet.retry')}
-                  </Button>
-                </div>
-              ) : isLoading ? (
-                <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 pt-8" role="status" aria-label={t('repositoryChatSheet.restoring-conversation')}>
-                  <div className="ml-auto h-12 w-2/3 animate-pulse rounded-3xl bg-muted" />
-                  <div className="h-28 w-full animate-pulse rounded-2xl bg-muted/60" />
-                  <div className="h-20 w-4/5 animate-pulse rounded-2xl bg-muted/40" />
-                </div>
-              ) : !canChat ? (
-                <div className="mx-auto mt-20 flex max-w-md flex-col items-center gap-4 rounded-3xl border border-dashed border-border px-6 py-8 text-center">
-                  <MessageSquareText className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{t('repositoryChatSheet.repository-chat-is-not-ready')}</p>
-                    <p className="text-xs text-muted-foreground">{unavailableReason}</p>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className="relative min-h-0 flex-1">
+              <div ref={messageRegionRef} onScroll={handleRegionScroll} className="h-full overflow-y-auto px-4 sm:px-6">
+                {error ? (
+                  <div className="mx-auto mt-16 max-w-md rounded-lg bg-destructive-tint px-5 py-4 text-center text-label text-destructive">
+                    <p>{error}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => {
+                        if (activeSession) void selectSession(activeSession.id);
+                        else void refresh();
+                      }}
+                    >
+                      {t('repositoryChatSheet.retry')}
+                    </Button>
                   </div>
-                  <Button type="button" onClick={navigateToAiSettings}>
-                    <Settings2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                    {t('repositoryChatSheet.configure-ai-service')}
-                  </Button>
-                </div>
-              ) : messages.length === 0 ? (
-                <EmptyState repository={repository} onAsk={(question) => void submit(question)} />
-              ) : (
-                <MessageList
-                  repository={repository}
-                  messages={messages}
-                  toolEvents={toolEvents}
-                  evidenceById={evidenceById}
-                  feedbackById={feedbackById}
-                  language={language}
-                  isSending={isSending}
-                  canRegenerate={Boolean(lastMessage && lastMessage.role === 'assistant' && lastMessage === messages[messages.length - 1])}
-                  errorMessage={chatError}
-                  isAnswerCopyable={isCopyable}
-                  onCopy={(message) => {
-                    void handleCopyAnswer(message);
-                  }}
-                  onEdit={handleEdit}
-                  onRegenerate={() => void regenerate()}
-                  onRetry={() => void retry()}
-                  onFeedback={(messageId, rating) => void submitFeedback(messageId, rating)}
-                />
+                ) : isLoading ? (
+                  <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 pt-8" role="status" aria-label={t('repositoryChatSheet.restoring-conversation')}>
+                    <div className="ml-auto h-11 w-2/3 animate-pulse rounded-lg bg-fill-hover" />
+                    <div className="h-24 w-full animate-pulse rounded-lg bg-fill-hover" />
+                    <div className="h-16 w-4/5 animate-pulse rounded-lg bg-fill-hover" />
+                  </div>
+                ) : !canChat ? (
+                  <div className="mx-auto mt-20 flex max-w-md flex-col items-center gap-3 rounded-lg bg-sunken px-6 py-8 text-center">
+                    <MessageSquareText className="size-10 stroke-[1.5] text-tertiary" aria-hidden="true" />
+                    <div className="space-y-1">
+                      <p className="text-label-lg font-medium text-foreground">{t('repositoryChatSheet.repository-chat-is-not-ready')}</p>
+                      <p className="text-label-sm text-secondary">{unavailableReason}</p>
+                    </div>
+                    <Button type="button" variant="primary" size="md" onClick={navigateToAiSettings}>
+                      <Settings2 className="mr-1.5 size-3.5" aria-hidden="true" />
+                      {t('repositoryChatSheet.configure-ai-service')}
+                    </Button>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <EmptyState repository={repository} onAsk={(question) => void submit(question)} />
+                ) : (
+                  <MessageList
+                    repository={repository}
+                    messages={messages}
+                    toolEvents={toolEvents}
+                    evidenceById={evidenceById}
+                    feedbackById={feedbackById}
+                    language={language}
+                    isSending={isSending}
+                    canRegenerate={Boolean(lastMessage && lastMessage.role === 'assistant' && lastMessage === messages[messages.length - 1])}
+                    errorMessage={chatError}
+                    isAnswerCopyable={isCopyable}
+                    onCopy={(message) => {
+                      void handleCopyAnswer(message);
+                    }}
+                    onEdit={handleEdit}
+                    onRegenerate={() => void regenerate()}
+                    onRetry={() => void retry()}
+                    onFeedback={(messageId, rating) => void submitFeedback(messageId, rating)}
+                  />
+                )}
+              </div>
+              {!isPinnedToBottom && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="absolute bottom-4 right-4 size-control rounded-full bg-floating shadow-elev-2 text-secondary hover:text-foreground"
+                  onClick={scrollToBottom}
+                  aria-label={t('repositoryChatSheet.scroll-to-latest')}
+                >
+                  <span aria-hidden="true">↓</span>
+                </Button>
               )}
             </div>
-            {!isPinnedToBottom && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="absolute bottom-4 right-4 h-8 w-8 rounded-full bg-background shadow-md"
-                onClick={scrollToBottom}
-                aria-label={t('repositoryChatSheet.scroll-to-latest')}
-              >
-                <span aria-hidden="true">↓</span>
-              </Button>
-            )}
-          </div>
-        </div>
 
-        <div className="px-4 sm:px-6">
-          {pendingUndo.length > 0 ? (
-            <div className="mx-auto -mb-1 w-full max-w-3xl space-y-1">
-              {pendingUndo.map((deleted) => (
-                <div key={deleted.id} className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-                  <span className="truncate">{t('repositoryChatSheet.conversation-deleted')}</span>
-                  <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0" onClick={() => void undoDelete(deleted)}>
-                    <Undo2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                    {t('repositoryChatSheet.undo')}
-                  </Button>
+            <div className="shrink-0 px-4 sm:px-6">
+              {pendingUndo.length > 0 ? (
+                <div className="mx-auto -mb-1 w-full max-w-3xl space-y-1">
+                  {pendingUndo.map((deleted) => (
+                    <div key={deleted.id} className="flex items-center justify-between rounded-md bg-raised px-3 py-1.5 text-label-sm text-secondary shadow-elev-1">
+                      <span className="truncate">{t('repositoryChatSheet.conversation-deleted')}</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-control-sm shrink-0 rounded-sm" onClick={() => void undoDelete(deleted)}>
+                        <Undo2 className="mr-1 size-3.5" aria-hidden="true" />
+                        {t('repositoryChatSheet.undo')}
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : null}
+              <p role="status" className="sr-only">{statusAnnouncement}</p>
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSend={() => void submit(draft)}
+                onStop={stop}
+                onEditLast={editLast}
+                onCancelEdit={() => {
+                  setEditingMessageId(null);
+                  setDraft('');
+                }}
+                editing={Boolean(editingMessageId)}
+                isSending={isSending}
+                canChat={canChat && !isLoading && !error}
+                taskDepth={repositoryChatSettings.taskDepth}
+                onDepthChange={(taskDepth) => setRepositoryChatSettings({ taskDepth })}
+                language={language}
+                sourceSha={activeSession?.sourceRefSha}
+              />
             </div>
-          ) : null}
-          <p role="status" className="sr-only">{statusAnnouncement}</p>
-          <Composer
-            value={draft}
-            onChange={setDraft}
-            onSend={() => void submit(draft)}
-            onStop={stop}
-            onEditLast={editLast}
-            onCancelEdit={() => {
-              setEditingMessageId(null);
-              setDraft('');
-            }}
-            editing={Boolean(editingMessageId)}
-            isSending={isSending}
-            canChat={canChat && !isLoading && !error}
-            taskDepth={repositoryChatSettings.taskDepth}
-            onDepthChange={(taskDepth) => setRepositoryChatSettings({ taskDepth })}
-            language={language}
-            sourceSha={activeSession?.sourceRefSha}
-          />
+          </div>
         </div>
       </SheetContent>
     </Sheet>
