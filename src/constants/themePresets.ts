@@ -213,6 +213,19 @@ export function isThemePresetId(value: unknown): value is ThemePresetId {
 }
 
 /**
+ * Resolve a persisted preset identifier, including legacy removed IDs, to a
+ * current ThemePresetId. Returns `null` when the value is unknown — use this
+ * when "absent" must stay distinct from the default (e.g. backup import).
+ */
+export function resolveKnownThemePresetId(value: unknown): ThemePresetId | null {
+  if (isThemePresetId(value)) return value;
+  if (typeof value === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_THEME_PRESET_ALIASES, value)) {
+    return LEGACY_THEME_PRESET_ALIASES[value];
+  }
+  return null;
+}
+
+/**
  * Resolve a persisted theme preset identifier (including legacy removed IDs)
  * to a valid current ThemePresetId, falling back when unknown.
  */
@@ -220,9 +233,5 @@ export function resolveThemePresetId(
   value: unknown,
   fallback: ThemePresetId = DEFAULT_THEME_PRESET_ID,
 ): ThemePresetId {
-  if (isThemePresetId(value)) return value;
-  if (typeof value === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_THEME_PRESET_ALIASES, value)) {
-    return LEGACY_THEME_PRESET_ALIASES[value];
-  }
-  return fallback;
+  return resolveKnownThemePresetId(value) ?? fallback;
 }

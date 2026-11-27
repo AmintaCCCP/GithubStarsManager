@@ -5,6 +5,7 @@ import {
   THEME_PRESETS,
   getThemePreset,
   isThemePresetId,
+  resolveKnownThemePresetId,
   resolveThemePresetId,
 } from './themePresets';
 import { GENERATED_THEME_PRESETS } from './themePresets.generated';
@@ -123,6 +124,14 @@ describe('themePresets registry', () => {
     expect(resolveThemePresetId('tokyo-night')).toBe('tokyo-night');
     expect(resolveThemePresetId('unknown-id')).toBe(DEFAULT_THEME_PRESET_ID);
     expect(resolveThemePresetId(undefined, 'nord')).toBe('nord');
+  });
+
+  it('resolves legacy aliases without inventing a value for unknown input', () => {
+    // Backup import must keep "absent" distinct from the default preset.
+    expect(resolveKnownThemePresetId('enterprise-mod-2')).toBe('github');
+    expect(resolveKnownThemePresetId('dracula')).toBe('dracula');
+    expect(resolveKnownThemePresetId('unknown-id')).toBeNull();
+    expect(resolveKnownThemePresetId(undefined)).toBeNull();
   });
 
   it('keeps every solid fill/foreground pair at >= 4.5:1 after rounding', () => {

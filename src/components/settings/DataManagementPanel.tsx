@@ -68,7 +68,7 @@ import {
 } from '../../services/profileStorage';
 import { normalizePluginCustomIcons } from '../../store/normalizers/persistedState';
 import { useShallow } from 'zustand/react/shallow';
-import { isThemePresetId } from '../../constants/themePresets';
+import { resolveKnownThemePresetId } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import type { 
@@ -855,12 +855,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           if (importedMode) {
             useAppStore.getState().setThemeMode(importedMode);
           }
-          const importedPresetLight = isThemePresetId(importedData.themePresetLight)
-            ? importedData.themePresetLight
-            : (isThemePresetId(importedData.themePreset) ? importedData.themePreset : null);
-          const importedPresetDark = isThemePresetId(importedData.themePresetDark)
-            ? importedData.themePresetDark
-            : (isThemePresetId(importedData.themePreset) ? importedData.themePreset : null);
+          const importedPresetLight = resolveKnownThemePresetId(importedData.themePresetLight)
+            ?? resolveKnownThemePresetId(importedData.themePreset);
+          const importedPresetDark = resolveKnownThemePresetId(importedData.themePresetDark)
+            ?? resolveKnownThemePresetId(importedData.themePreset);
           if (importedPresetLight) {
             useAppStore.getState().setThemePresetLight(importedPresetLight);
           }
@@ -1083,12 +1081,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           const importedMode = importedUiSettings.themeMode === 'light' || importedUiSettings.themeMode === 'dark' || importedUiSettings.themeMode === 'system'
             ? importedUiSettings.themeMode
             : (importedUiSettings.theme === 'light' || importedUiSettings.theme === 'dark' ? importedUiSettings.theme : null);
-          const importedPresetLight = isThemePresetId(importedUiSettings.themePresetLight)
-            ? importedUiSettings.themePresetLight
-            : (isThemePresetId(importedUiSettings.themePreset) ? importedUiSettings.themePreset : null);
-          const importedPresetDark = isThemePresetId(importedUiSettings.themePresetDark)
-            ? importedUiSettings.themePresetDark
-            : (isThemePresetId(importedUiSettings.themePreset) ? importedUiSettings.themePreset : null);
+          const importedPresetLight = resolveKnownThemePresetId(importedUiSettings.themePresetLight)
+            ?? resolveKnownThemePresetId(importedUiSettings.themePreset);
+          const importedPresetDark = resolveKnownThemePresetId(importedUiSettings.themePresetDark)
+            ?? resolveKnownThemePresetId(importedUiSettings.themePreset);
           useAppStore.setState({
             ...(importedMode
               ? { themeMode: importedMode }
