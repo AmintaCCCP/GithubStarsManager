@@ -535,7 +535,8 @@ textarea::-webkit-resizer {
 @media (max-width: 768px) {
   textarea,
   input[type="text"] {
-    font-size: 16px;
+    /* Keep the 16px mobile floor (iOS zoom) but still honour the app font scale. */
+    font-size: max(16px, 1rem);
   }
 }
 
@@ -697,13 +698,22 @@ textarea::-webkit-resizer {
     transform var(--dur-micro) var(--ease-out-subtle);
 }
 
+/* Hover/press tints must push the fill *away* from the label, or a dark label on
+   a mid-tone fill loses contrast on press (e.g. #777777: 4.69:1 → 3.55:1).
+   `currentColor` is the label, so its inverted lightness is the safe overlay. */
 .state-overlay:hover:not(:disabled) {
-  background-image: linear-gradient(rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.08));
+  background-image: linear-gradient(
+    color-mix(in srgb, oklch(from currentColor calc(1 - l) 0 0) 8%, transparent),
+    color-mix(in srgb, oklch(from currentColor calc(1 - l) 0 0) 8%, transparent)
+  );
   transition-duration: var(--dur-instant);
 }
 
 .state-overlay:active:not(:disabled) {
-  background-image: linear-gradient(rgb(0 0 0 / 0.16), rgb(0 0 0 / 0.16));
+  background-image: linear-gradient(
+    color-mix(in srgb, oklch(from currentColor calc(1 - l) 0 0) 16%, transparent),
+    color-mix(in srgb, oklch(from currentColor calc(1 - l) 0 0) 16%, transparent)
+  );
 }
 
 .motion-press {
@@ -1147,7 +1157,12 @@ html[data-animation='reduced'] *::after {
 }
 
 .ui-button-primary:hover:not(:disabled) {
-  background-image: linear-gradient(rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.08));
+  /* Same rule as .state-overlay: darken away from a light label, lighten away
+     from a dark one, so hover never eats the contrast. */
+  background-image: linear-gradient(
+    color-mix(in srgb, oklch(from currentColor calc(1 - l) 0 0) 8%, transparent),
+    color-mix(in srgb, oklch(from currentColor calc(1 - l) 0 0) 8%, transparent)
+  );
   transition-duration: var(--dur-instant);
 }
 
@@ -1496,7 +1511,7 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0.25rem 0.5rem 0.75rem;
+  padding: 0.25rem 0.5rem 2rem;
 }
 
 .context-sidebar-body.scrollbar-on-scroll::-webkit-scrollbar {
@@ -1829,6 +1844,16 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
   .app-side-row-actions {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  /* Touch devices keep the action cluster permanently visible, so reserve its
+     space up front — otherwise long names sit under transparent buttons. */
+  .app-side-filter-row > .app-side-item:not(:disabled) {
+    padding-inline-end: 2.75rem;
+  }
+
+  .app-side-filter-row > .app-side-item.app-side-filter-row-custom:not(:disabled) {
+    padding-inline-end: 3.75rem;
   }
 }
 
@@ -3033,6 +3058,12 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
 
 .app-dialog-content.p-0 {
   padding: 0;
+}
+
+/* The unlayered `gap` above outranks Tailwind's layered `gap-0`, so scrollable
+   dialogs (header / body / footer) have to cancel it here. */
+.app-dialog-content.gap-0 {
+  gap: 0;
 }
 
 .app-dialog-content.app-dialog-fullscreen {

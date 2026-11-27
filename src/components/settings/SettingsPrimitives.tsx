@@ -139,9 +139,11 @@ interface SettingsNoticeProps {
 
 const NOTICE_TONE_CLASSES: Record<SettingsNoticeTone, string> = {
   neutral: 'bg-sunken text-secondary shadow-elev-0 [&_svg]:text-tertiary',
+  // Body copy stays on `foreground`: status hues on their own tint land at
+  // 2.4–4.3:1, so only the icon keeps the hue.
   warning: 'bg-warning-tint text-foreground [&_svg]:text-warning',
-  destructive: 'bg-destructive-tint text-destructive [&_svg]:text-destructive',
-  success: 'bg-success-tint text-status-green [&_svg]:text-status-green',
+  destructive: 'bg-destructive-tint text-foreground [&_svg]:text-destructive',
+  success: 'bg-success-tint text-foreground [&_svg]:text-status-green',
 };
 
 /** Subtle desktop-toned inline notice banner without heavy borders. */

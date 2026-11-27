@@ -125,6 +125,30 @@ describe('themePresets registry', () => {
     expect(resolveThemePresetId(undefined, 'nord')).toBe('nord');
   });
 
+  it('keeps every solid fill/foreground pair at >= 4.5:1 after rounding', () => {
+    // Guards the generator regression: contrast was checked on pre-round values,
+    // and rounding solarized dark primary to one decimal landed at 4.494:1.
+    const pairs = [
+      ['primary', 'primary-foreground'],
+      ['destructive', 'destructive-foreground'],
+      ['secondary', 'secondary-foreground'],
+      ['accent', 'accent-foreground'],
+    ] as const;
+    for (const preset of THEME_PRESETS) {
+      for (const [mode, palette] of [
+        ['light', preset.lightColors],
+        ['dark', preset.darkColors],
+      ] as const) {
+        for (const [fill, foreground] of pairs) {
+          expect(
+            contrast(palette[fill], palette[foreground]),
+            `${preset.id}/${mode}: ${foreground} on ${fill}`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+
   it('enforces >= 4.55:1 contrast for muted-foreground on background, card, popover, and muted', () => {
     const surfaces = ['background', 'card', 'popover', 'muted'] as const;
     for (const preset of THEME_PRESETS) {

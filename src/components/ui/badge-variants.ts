@@ -7,9 +7,11 @@ export const badgeVariants = cva(
       variant: {
         default: 'border-transparent bg-primary text-primary-foreground',
         secondary: 'border-transparent bg-fill-hover text-secondary',
-        destructive: 'border-transparent bg-destructive-tint text-destructive',
+        // Status hues are too light to read on their own 10% tint (2.7–4.3:1);
+        // the tint carries the tone, the text stays at full contrast.
+        destructive: 'border-transparent bg-destructive-tint text-foreground',
         outline: 'border-default text-secondary',
-        success: 'border-transparent bg-success-tint text-status-green',
+        success: 'border-transparent bg-success-tint text-foreground',
       },
     },
     defaultVariants: {

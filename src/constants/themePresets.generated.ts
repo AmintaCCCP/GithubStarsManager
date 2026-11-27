@@ -780,7 +780,7 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "card-foreground": "180 11.3% 73.9%",
       "popover": "194.2 39.8% 16%",
       "popover-foreground": "180 11.3% 73.9%",
-      "primary": "204.8 69.4% 50.6%",
+      "primary": "204.8 69.4% 51.1%",
       "primary-foreground": "205.1 6.3% 14.2%",
       "secondary": "194.2 44.5% 14.6%",
       "secondary-foreground": "180 11.3% 73.9%",

@@ -16,6 +16,10 @@ const customTwMerge = extendTailwindMerge({
         'row-list-2',
         'row-touch',
       ],
+      // Registering the elevation scale keeps `shadow-elev-1` in the shadow
+      // *size* group, so `shadow-black` only recolours it instead of
+      // swallowing it as a competing shadow colour.
+      shadow: ['elev-0', 'elev-1', 'elev-2', 'elev-3'],
     },
     classGroups: {
       'font-size': [

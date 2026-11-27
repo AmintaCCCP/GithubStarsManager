@@ -115,6 +115,11 @@ function fmtTriplet({ h, s, l }) {
   return `${round(h, 1)} ${round(s, 1)}% ${round(l, 1)}%`;
 }
 
+/** The exact triplet that `fmtTriplet` writes — contrast must be checked on this. */
+function roundTriplet({ h, s, l }) {
+  return { h: round(h, 1), s: round(s, 1), l: round(l, 1) };
+}
+
 // ---------- WCAG contrast & normalization ----------
 
 function hslTripletToRgb({ h, s, l }) {
@@ -160,7 +165,7 @@ function ensureTextOnFill(fg, fill, req) {
   let best = fill;
   let moved = false;
   for (let d = 1; d <= 30; d += 0.5) {
-    const cand = shiftL(fill, dir * d);
+    const cand = roundTriplet(shiftL(fill, dir * d));
     best = cand;
     moved = true;
     if (contrastTriplets(fg, cand) >= req) return { fg, fill: cand };
@@ -382,7 +387,9 @@ function buildModePalette(spec, isLight) {
     ['accent', 'accent-foreground'],
     ['secondary', 'secondary-foreground'],
   ]) {
-    const pair = ensureTextOnFill(t[fgKey], t[fillKey], 4.5);
+    // Check the rounded triplets: fmtTriplet writes one decimal, and rounding
+    // can drop a marginal pair (e.g. solarized dark primary) below 4.5:1.
+    const pair = ensureTextOnFill(roundTriplet(t[fgKey]), roundTriplet(t[fillKey]), 4.5);
     t[fillKey] = pair.fill;
     t[fgKey] = pair.fg;
   }
