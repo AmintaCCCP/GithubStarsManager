@@ -1,25 +1,29 @@
 <div align="center">
 
-<img src="assets/readme/hero.svg" alt="GithubStarsManager — Turn thousands of GitHub stars into an AI-organized, searchable knowledge base." width="100%" />
-
-<p>
-  <strong>English</strong> &nbsp;|&nbsp; <a href="README_zh.md">简体中文</a>
-</p>
-
-<img src="assets/readme/brand/logo.png" alt="GithubStarsManager logo" width="68" />
+<img src="assets/readme/brand/logo.png" alt="GithubStarsManager Logo" width="72" />
 
 # GithubStarsManager
 
 **Turn thousands of GitHub stars into an AI-organized, searchable knowledge base.**
 
-Local-first desktop app & self-hostable web workspace that syncs your stars, writes summaries and tags with your own AI models, searches by meaning, answers commit-pinned repo questions, tracks releases for your OS, and connects to coding agents via MCP.
+AI Summaries & Categories · Vector Semantic Search · Commit-Pinned Repo Q&A · Smart Release Tracking · MCP Agent Server · Desktop Plugins
 
 <p>
-  <a href="https://github.com/AmintaCCCP/GithubStarsManager/releases"><strong>Download Desktop</strong></a> ·
-  <a href="#docker-self-host"><strong>Docker Self-Host</strong></a> ·
-  <a href="#quick-start"><strong>Quick Start</strong></a> ·
-  <a href="#demo-video"><strong>Demo Video</strong></a> ·
-  <a href="https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage-EN"><strong>Plugin Wiki</strong></a>
+  <b>English</b> &nbsp;|&nbsp; <a href="README_zh.md">简体中文</a>
+</p>
+
+<img src="assets/readme/hero.svg" alt="GithubStarsManager — Turn thousands of GitHub stars into an AI-organized, searchable knowledge base." width="100%" />
+
+<p>
+  <a href="https://github.com/AmintaCCCP/GithubStarsManager/releases"><b>⬇️ Download Desktop</b></a>
+  &nbsp;·&nbsp;
+  <a href="#docker-self-host"><b>🐳 Docker Self-Host</b></a>
+  &nbsp;·&nbsp;
+  <a href="#quick-start"><b>⚡ Quick Start</b></a>
+  &nbsp;·&nbsp;
+  <a href="#integrations"><b>🧠 Vector Search &amp; MCP</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage-EN"><b>🔌 Plugin Docs</b></a>
 </p>
 
 <p>
@@ -32,8 +36,9 @@ Local-first desktop app & self-hostable web workspace that syncs your stars, wri
 </p>
 
 <p>
-  <a href="https://www.producthunt.com/products/githubstarsmanager?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-githubstarsmanager" target="_blank" rel="noopener noreferrer"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1001489&theme=light&t=1754373322417" alt="GithubStarsManager - AI organizes GitHub stars for easy find | Product Hunt" width="230" height="50" /></a>
-  <a href="https://trendshift.io/repositories/28489?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-28489" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/28489/daily?language=TypeScript" alt="AmintaCCCP/GithubStarsManager | Trendshift" width="230" height="50" /></a>
+  <a href="https://www.producthunt.com/products/githubstarsmanager?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-githubstarsmanager" target="_blank" rel="noopener noreferrer"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1001489&theme=light&t=1754373322417" alt="GithubStarsManager - AI organizes GitHub stars for easy find | Product Hunt" width="220" height="48" /></a>
+  &nbsp;
+  <a href="https://trendshift.io/repositories/28489?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-28489" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/28489/daily?language=TypeScript" alt="AmintaCCCP/GithubStarsManager | Trendshift" width="220" height="48" /></a>
 </p>
 
 </div>

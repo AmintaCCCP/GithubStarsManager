@@ -1,13 +1,5 @@
 <div align="center">
 
-<p>
-  <a href="README.md">English</a> &nbsp;|&nbsp; <b>简体中文</b>
-</p>
-
-<img src="assets/readme/hero.svg" alt="GithubStarsManager — 把上千个 GitHub 星标变成 AI 整理、可语义检索的本地开源知识库" width="100%" />
-
-<br />
-
 <img src="assets/readme/brand/logo.png" alt="GithubStarsManager Logo" width="72" />
 
 # GithubStarsManager
@@ -15,6 +7,12 @@
 **把上千个 GitHub 星标，变成真正搜得到、用得上的本地开源知识库。**
 
 AI 自动摘要与分类 · 向量语义搜索 · 锚定提交的仓库问答 · 智能 Release 追踪 · MCP Agent 接入 · 桌面端插件生态
+
+<p>
+  <a href="README.md">English</a> &nbsp;|&nbsp; <b>简体中文</b>
+</p>
+
+<img src="assets/readme/hero.svg" alt="GithubStarsManager — 把上千个 GitHub 星标变成 AI 整理、可语义检索的本地开源知识库" width="100%" />
 
 <p>
   <a href="https://github.com/AmintaCCCP/GithubStarsManager/releases"><b>⬇️ 下载桌面端</b></a>
