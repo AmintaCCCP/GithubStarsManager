@@ -23,7 +23,7 @@ export const ReleasePluginRecommendations: React.FC<{
   if (processors.length === 0 || release.assets.length === 0) return null;
 
   return (
-    <section className="mb-3 rounded-lg bg-raised p-3 shadow-elev-1" aria-label={t('releasePluginRecommendations.plugin-asset-recommendations')}>
+    <section className="mb-3 rounded-lg border border-default bg-raised p-3" aria-label={t('releasePluginRecommendations.plugin-asset-recommendations')}>
       <div className="mb-2 flex items-center gap-1.5 text-label-sm font-medium text-foreground">
         <Sparkles className="size-3.5 text-accent-text" aria-hidden="true" />
         {t('releasePluginRecommendations.plugin-asset-recommendations')}

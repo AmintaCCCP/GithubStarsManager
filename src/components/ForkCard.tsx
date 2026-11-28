@@ -49,7 +49,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`ui-card cursor-pointer transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant ${
+      className={`fork-card ui-card cursor-pointer transition-[background-color,box-shadow] duration-micro ease-out-subtle hover:duration-instant ${
         isWorkflowsExpanded ? 'bg-raised shadow-elev-1' : ''
       }`}
     >

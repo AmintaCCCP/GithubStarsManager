@@ -1081,7 +1081,11 @@ html[data-animation='reduced'] *::after {
   transition: var(--app-motion-surface);
 }
 
-.ui-card:not(.linear-card-selected):not(.is-expanded):not(.ring-1):hover {
+/* Flat list rows (repository list, gists, releases, forks, discovery) are excluded
+   here: they keep their own hairline dividers and must not change borders or gain
+   elevation on hover — the .app-*-list hover rules below handle them with a subtle
+   background tint only. */
+.ui-card:not(.linear-card-selected):not(.is-expanded):not(.ring-1):not(.repository-card--list):not(.app-list-row):not(.release-card):not(.fork-card):hover {
   border-color: var(--border-alpha-strong);
   background: var(--surface-raised);
 }
@@ -2484,10 +2488,13 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
   border-bottom: 0;
 }
 
-.app-repository-list > .ui-card:hover,
-.app-flat-list > .ui-card:hover,
-.app-flat-list > div > .ui-card:hover,
-.app-fork-list > .ui-card:hover {
+/* Hover on flat list rows: a subtle background tint only — no border change, no
+   shadow. Rows carrying a persistent state fill (selected repository row, expanded
+   fork row) keep that fill instead of the hover tint. */
+.app-repository-list > .ui-card:not(.bg-fill-selected):hover,
+.app-flat-list > .ui-card:not(.bg-fill-selected):not(.bg-raised):hover,
+.app-flat-list > div > .ui-card:not(.bg-fill-selected):not(.bg-raised):hover,
+.app-fork-list > .ui-card:not(.bg-fill-selected):not(.bg-raised):hover {
   background: var(--fill-hover);
 }
 

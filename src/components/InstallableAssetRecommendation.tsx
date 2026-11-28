@@ -103,7 +103,7 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
 
   return (
     <section
-      className="mb-3 rounded-lg bg-raised px-3.5 py-3 shadow-elev-1"
+      className="mb-3 rounded-lg border border-default bg-raised px-3.5 py-3"
       data-testid="installable-asset-recommendation"
       aria-label={
         platformKnown
