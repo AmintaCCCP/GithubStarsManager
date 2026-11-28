@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   BookOpen,
@@ -92,6 +92,22 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
     setDragActionId(null);
     setDragOverActionId(null);
   };
+
+  // armed 后若拖拽未发起就结束按压（切走窗口后窗外释放、行外释放等行内
+  // onPointerUp 收不到的路径），全局兜底解除 armed；仅重置尚未进入真实拖拽
+  // 的状态（dragActionId 为 null），不打断进行中的拖拽。
+  useEffect(() => {
+    if (dragArmedId === null) return undefined;
+    const clearArmedIfIdle = () => {
+      if (dragActionId === null) setDragArmedId(null);
+    };
+    window.addEventListener('pointerup', clearArmedIfIdle, true);
+    window.addEventListener('blur', clearArmedIfIdle);
+    return () => {
+      window.removeEventListener('pointerup', clearArmedIfIdle, true);
+      window.removeEventListener('blur', clearArmedIfIdle);
+    };
+  }, [dragArmedId, dragActionId]);
 
   const pluginActionMap = useMemo(() => {
     const map = new Map<string, RegisteredPluginAction>();

@@ -46,7 +46,7 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="md" className="h-control rounded-md gap-1.5 border border-border-default bg-sunken px-2.5 hover:border-alpha-strong">
+        <Button type="button" variant="ghost" size="md" className="h-control rounded-md gap-1.5 border border-default bg-sunken px-2.5 hover:border-alpha-strong">
           <span>{t(`searchBar.sort-${value}`)}</span>
           <ChevronDown className="size-3.5 text-tertiary" />
         </Button>
@@ -908,7 +908,7 @@ export const SearchBar: React.FC = () => {
             size="icon"
             aria-label={searchFilters.sortOrder === 'desc' ? t('searchBar.sort-descending') : t('searchBar.sort-ascending')}
             title={searchFilters.sortOrder === 'desc' ? t('searchBar.sort-descending') : t('searchBar.sort-ascending')}
-            className="size-control rounded-md border border-border-default bg-sunken text-secondary hover:border-alpha-strong hover:text-foreground"
+            className="size-control rounded-md border border-default bg-sunken text-secondary hover:border-alpha-strong hover:text-foreground"
           >
             {searchFilters.sortOrder === 'desc' ? <ArrowDown className="size-3.5" aria-hidden="true" /> : <ArrowUp className="size-3.5" aria-hidden="true" />}
           </Button>

@@ -2488,6 +2488,13 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
   border-bottom: 0;
 }
 
+/* Expanded fork rows carry a persistent raised fill; this rule must out-rank the
+   transparent list-row background above (ForkCard toggles the .bg-raised class),
+   and the hover rule below opts them out via its :not(.bg-raised) guard. */
+.app-fork-list > .ui-card.bg-raised {
+  background: var(--surface-raised);
+}
+
 /* Hover on flat list rows: a subtle background tint only — no border change, no
    shadow. Rows carrying a persistent state fill (selected repository row, expanded
    fork row) keep that fill instead of the hover tint. The last selector covers

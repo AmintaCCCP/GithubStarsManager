@@ -153,15 +153,40 @@ describe('RepositoryCardActionsSettings', () => {
     renderComponent();
 
     const pluginRow = screen.getByRole('button', { name: '拖拽仓库洞察排序' }).closest('div[draggable]') as HTMLElement;
+    const firstRow = screen.getByRole('button', { name: '拖拽AI 分析排序' }).closest('div[draggable]') as HTMLElement;
     const dataTransfer = {
       setData: vi.fn(),
       effectAllowed: '',
       dropEffect: '',
     };
 
-    // 未按住把手直接拖拽：dragStart 被阻止，drop 不触发重排
+    // 未按住把手直接拖拽：dragStart 被阻止，即便投放到另一行（真实重排尝试）也不会保存
     fireEvent.dragStart(pluginRow, { dataTransfer });
-    fireEvent.drop(pluginRow, { dataTransfer });
+    fireEvent.drop(firstRow, { dataTransfer });
+
+    expect(setRepositoryCardActions).not.toHaveBeenCalled();
+  });
+
+  it('clears armed state on window blur before the drag starts', () => {
+    renderComponent();
+
+    const pluginHandle = screen.getByRole('button', { name: '拖拽仓库洞察排序' });
+    const pluginRow = pluginHandle.closest('div[draggable]') as HTMLElement;
+    const firstRow = screen.getByRole('button', { name: '拖拽AI 分析排序' }).closest('div[draggable]') as HTMLElement;
+    const dataTransfer = {
+      setData: vi.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+
+    // 按住把手后切走窗口（未发起拖拽）：armed 解除，随后 dragStart 被阻止，
+    // 投放到其他行也不会触发重排
+    fireEvent.pointerDown(pluginHandle);
+    expect(pluginRow).toHaveAttribute('draggable', 'true');
+    fireEvent.blur(window);
+    expect(pluginRow).not.toHaveAttribute('draggable', 'true');
+    fireEvent.dragStart(pluginRow, { dataTransfer });
+    fireEvent.drop(firstRow, { dataTransfer });
 
     expect(setRepositoryCardActions).not.toHaveBeenCalled();
   });
