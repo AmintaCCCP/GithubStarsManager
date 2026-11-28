@@ -264,7 +264,7 @@ const RepositoriesView = React.memo(({
         />
       </div>
       <div className="workspace-content app-workspace-content flex flex-col !p-0 lg:!py-2 lg:!pr-2.5 lg:!pl-0">
-        <div className="min-w-0 flex-1 space-y-4 bg-paper px-4 py-4 shadow-elev-0 sm:px-5 lg:rounded-lg">
+        <div className="min-w-0 flex-1 space-y-4 px-4 py-4 sm:px-5">
           <WorkspacePageHeader
             eyebrow={t('categorySidebar.workspace-label')}
             section={t('header.menu-repositories')}
