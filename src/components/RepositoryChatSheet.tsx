@@ -351,6 +351,8 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
         side="right"
         className={`gap-0 p-0 ${fullscreen ? 'inset-0 left-0 right-0 w-screen max-w-none sm:max-w-none' : 'w-[min(100vw-1rem,56rem)] sm:max-w-none'}`}
         closeLabel={t('repositoryChatSheet.close-repository-chat')}
+        // 内置关闭按钮与 h-11 头部行同高对齐：(44 - 28) / 2 = 8px = top-2，保证与新建会话/展开/更多按钮同一中线。
+        closeClassName="top-2"
         onPointerDownOutside={(event) => {
           event.preventDefault();
           window.setTimeout(onClose, 0);

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   BookOpen,
@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Edit3,
   ExternalLink,
+  GripVertical,
   MessageSquareText,
   PackageOpen,
   type LucideIcon,
@@ -56,6 +57,7 @@ interface RepositoryCardActionsSettingsProps {
   moveUpLabel: (action: string) => string;
   moveDownLabel: (action: string) => string;
   visibilityLabel: (action: string) => string;
+  dragHandleLabel: (action: string) => string;
 }
 
 export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettingsProps> = ({
@@ -65,6 +67,7 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
   moveUpLabel,
   moveDownLabel,
   visibilityLabel,
+  dragHandleLabel,
 }) => {
   const t = useT('repositories');
   const { actions, setActions } = useAppStore(
@@ -74,6 +77,37 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
     })),
   );
   const { actions: pluginActions } = usePluginActions('repository-card');
+
+  // 原生 HTML5 拖拽重排（与 MenuManagementPanel 同一模式，行内含开关等交互控件，
+  // 故增加“把手 armed 预备”一步，避免从开关/按钮误拖）：
+  // - dragArmedId：按住把手后才允许该行发起拖拽；未发起拖拽时松开即解除（pointerup），
+  //   避免行一直停留在可拖拽状态；
+  // - dragActionId：当前拖拽中的行；dragOverActionId：悬停目标行（高亮提示落点）。
+  const [dragArmedId, setDragArmedId] = useState<string | null>(null);
+  const [dragActionId, setDragActionId] = useState<string | null>(null);
+  const [dragOverActionId, setDragOverActionId] = useState<string | null>(null);
+
+  const resetDragState = () => {
+    setDragArmedId(null);
+    setDragActionId(null);
+    setDragOverActionId(null);
+  };
+
+  // armed 后若拖拽未发起就结束按压（切走窗口后窗外释放、行外释放等行内
+  // onPointerUp 收不到的路径），全局兜底解除 armed；仅重置尚未进入真实拖拽
+  // 的状态（dragActionId 为 null），不打断进行中的拖拽。
+  useEffect(() => {
+    if (dragArmedId === null) return undefined;
+    const clearArmedIfIdle = () => {
+      if (dragActionId === null) setDragArmedId(null);
+    };
+    window.addEventListener('pointerup', clearArmedIfIdle, true);
+    window.addEventListener('blur', clearArmedIfIdle);
+    return () => {
+      window.removeEventListener('pointerup', clearArmedIfIdle, true);
+      window.removeEventListener('blur', clearArmedIfIdle);
+    };
+  }, [dragArmedId, dragActionId]);
 
   const pluginActionMap = useMemo(() => {
     const map = new Map<string, RegisteredPluginAction>();
@@ -114,6 +148,17 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
     const reordered = [...displayedActions];
     const [item] = reordered.splice(index, 1);
     reordered.splice(index + delta, 0, item);
+    saveWithInactive(reordered);
+  };
+
+  const handleDropAtIndex = (event: React.DragEvent<HTMLDivElement>, targetIndex: number) => {
+    event.preventDefault();
+    const sourceIndex = displayedActions.findIndex((entry) => entry.id === dragActionId);
+    resetDragState();
+    if (sourceIndex < 0 || sourceIndex === targetIndex) return;
+    const reordered = [...displayedActions];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
     saveWithInactive(reordered);
   };
 
@@ -175,10 +220,56 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
             ) : null;
           }
 
+          const isDragging = dragActionId === item.id;
+          const isDropTarget = dragActionId !== null && !isDragging && dragOverActionId === item.id;
+
           return (
             <React.Fragment key={item.id}>
               {index > 0 && <SettingsDivider />}
-              <div className="flex min-h-12 items-center gap-3 px-3.5 py-2">
+              <div
+                className={`flex min-h-12 select-none items-center gap-3 px-3.5 py-2 transition-[background-color,opacity] duration-micro ease-out-subtle hover:duration-instant ${
+                  isDragging ? 'bg-fill-selected opacity-50' : ''
+                } ${isDropTarget ? 'bg-accent-tint' : ''}`}
+                draggable={dragArmedId === item.id}
+                onDragStart={(event) => {
+                  if (dragArmedId !== item.id) {
+                    event.preventDefault();
+                    return;
+                  }
+                  event.dataTransfer.setData('text/plain', item.id);
+                  event.dataTransfer.effectAllowed = 'move';
+                  setDragActionId(item.id);
+                }}
+                onDragOver={(event) => {
+                  if (dragActionId === null || dragActionId === item.id) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  if (dragOverActionId !== item.id) setDragOverActionId(item.id);
+                }}
+                onDragLeave={() => {
+                  if (dragOverActionId === item.id) setDragOverActionId(null);
+                }}
+                // armed 后未发起拖拽就松开（含把手上的普通点击经冒泡到达这里）：
+                // 解除可拖拽状态，行不会一直停留在“待拖拽”，避免从开关/行体误拖。
+                onPointerUp={() => {
+                  if (dragActionId === null) setDragArmedId(null);
+                }}
+                onDrop={(event) => handleDropAtIndex(event, index)}
+                onDragEnd={resetDragState}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={`shrink-0 text-tertiary hover:text-secondary ${
+                    isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                  }`}
+                  aria-label={dragHandleLabel(label)}
+                  title={dragHandleLabel(label)}
+                  onPointerDown={() => setDragArmedId(item.id)}
+                >
+                  <GripVertical className="size-3.5" />
+                </Button>
                 {iconNode}
                 <span className="min-w-0 flex-1 truncate text-label font-medium text-foreground">
                   {label}

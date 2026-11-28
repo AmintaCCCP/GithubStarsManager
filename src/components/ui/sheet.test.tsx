@@ -38,4 +38,19 @@ describe('Sheet portal event boundaries', () => {
 
     expect(onContainerClick).not.toHaveBeenCalled();
   });
+
+  it('merges closeClassName into the built-in close button so custom headers can align it', () => {
+    render(
+      <Sheet open>
+        <SheetContent side="right" closeLabel="关闭" closeClassName="top-2">
+          <div>Sheet empty area</div>
+        </SheetContent>
+      </Sheet>,
+    );
+
+    const closeButton = screen.getByRole('button', { name: '关闭' });
+    // tailwind-merge 保证 top-2 覆盖默认 top-3（与头部行垂直居中）
+    expect(closeButton.className).toContain('top-2');
+    expect(closeButton.className).not.toMatch(/\btop-3\b/);
+  });
 });

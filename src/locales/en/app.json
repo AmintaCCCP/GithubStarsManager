@@ -1239,6 +1239,7 @@
     "card-actions-hint": "Set the button order. Actions hidden from the card remain available in More actions.",
     "quick-action-visibility": "Show {{action}} on cards",
     "reset-card-actions": "Reset quick actions",
+    "drag-handle-v1": "Drag {{v1}} to reorder",
     "card-field-description": "Description",
     "card-field-tags": "Tags",
     "card-field-language": "Language",

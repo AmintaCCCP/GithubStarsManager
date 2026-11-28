@@ -605,22 +605,22 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       <div className="ui-toolbar app-repository-controls flex flex-col gap-2.5 py-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2.5">
 
-          {/* AI Analysis Select */}
+          {/* AI Analysis Select — 深色下拉按钮，与工具栏右侧的同步按钮同一风格 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
-                variant="outline"
+                variant="primary"
                 size="md"
                 disabled={isLoading}
                 aria-label={t('repositoryList.ai-analysis-actions')}
-                className="h-control w-auto min-w-28 justify-between gap-1.5 rounded-md px-2.5 text-label font-medium"
+                className="h-control w-auto min-w-28 justify-between gap-1.5 rounded-md px-2.5 text-label font-medium shadow-elev-0"
               >
-                <Bot className="size-3.5 shrink-0 text-secondary" />
+                <Bot className="size-3.5 shrink-0" />
                 {isLoading
                   ? t('repositoryList.analyzing-v1-v2', { v1: analysisProgress.current, v2: analysisProgress.total })
                   : t('repositoryList.ai-analysis')}
-                <ChevronDown className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
+                <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">

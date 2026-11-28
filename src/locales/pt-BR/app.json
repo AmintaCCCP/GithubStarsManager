@@ -1239,6 +1239,7 @@
     "card-actions-hint": "Defina a ordem dos botões. Ações ocultas continuam disponíveis no menu Mais ações.",
     "quick-action-visibility": "Mostrar {{action}} nos cartões",
     "reset-card-actions": "Restaurar ações rápidas",
+    "drag-handle-v1": "Arraste {{v1}} para reordenar",
     "card-field-description": "Descrição",
     "card-field-tags": "Etiquetas",
     "card-field-language": "Linguagem",

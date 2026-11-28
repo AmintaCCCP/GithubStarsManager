@@ -497,6 +497,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
         moveUpLabel={(action) => t('menuManagementPanel.move-v1-up', { v1: action })}
         moveDownLabel={(action) => t('menuManagementPanel.move-v1-down', { v1: action })}
         visibilityLabel={(action) => t('themeSettingsCard.quick-action-visibility', { action })}
+        dragHandleLabel={(action) => t('themeSettingsCard.drag-handle-v1', { v1: action })}
       />
     </>
   );
