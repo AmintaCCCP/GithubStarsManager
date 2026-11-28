@@ -1239,6 +1239,7 @@
     "card-actions-hint": "调整卡片按钮顺序；关闭快捷显示后，仍可在“更多操作”菜单中使用。",
     "quick-action-visibility": "在卡片上显示{{action}}",
     "reset-card-actions": "恢复默认按钮排列",
+    "drag-handle-v1": "拖拽{{v1}}调整顺序",
     "card-field-description": "描述",
     "card-field-tags": "标签",
     "card-field-language": "主要语言",

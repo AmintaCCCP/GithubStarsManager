@@ -1239,6 +1239,7 @@
     "card-actions-hint": "Définissez l’ordre. Les actions masquées restent accessibles dans le menu Plus d’actions.",
     "quick-action-visibility": "Afficher {{action}} sur les cartes",
     "reset-card-actions": "Réinitialiser les actions rapides",
+    "drag-handle-v1": "Glisser {{v1}} pour réordonner",
     "card-field-description": "Description",
     "card-field-tags": "Étiquettes",
     "card-field-language": "Langage",

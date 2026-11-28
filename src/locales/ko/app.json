@@ -1239,6 +1239,7 @@
     "card-actions-hint": "버튼 순서를 조정하세요. 카드에서 숨긴 작업도 더 보기 메뉴에서 사용할 수 있습니다.",
     "quick-action-visibility": "카드에 {{action}} 표시",
     "reset-card-actions": "빠른 작업 초기화",
+    "drag-handle-v1": "{{v1}} 항목을 드래그해 순서 변경",
     "card-field-description": "설명",
     "card-field-tags": "태그",
     "card-field-language": "언어",

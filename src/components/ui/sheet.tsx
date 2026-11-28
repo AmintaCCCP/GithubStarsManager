@@ -43,8 +43,10 @@ const SheetContent = React.forwardRef<
     side?: SheetSide;
     showClose?: boolean;
     closeLabel?: string;
+    /** 追加到内置关闭按钮上的类，用于与自定义头部行垂直居中对齐（如 top-2）。 */
+    closeClassName?: string;
   }
->(({ side = 'right', showClose = true, closeLabel = 'Close', className, children, onPointerDown, onClick, ...props }, ref) => (
+>(({ side = 'right', showClose = true, closeLabel = 'Close', closeClassName, className, children, onPointerDown, onClick, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
@@ -66,7 +68,10 @@ const SheetContent = React.forwardRef<
     >
       {children}
       {showClose && (
-        <DialogPrimitive.Close className="motion-press absolute right-3 top-3 inline-grid size-control place-items-center rounded-md text-secondary hover:bg-fill-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none">
+        <DialogPrimitive.Close className={cn(
+          'motion-press absolute right-3 top-3 inline-grid size-control place-items-center rounded-md text-secondary hover:bg-fill-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none',
+          closeClassName,
+        )}>
           <X className="size-4" aria-hidden="true" />
           <span className="sr-only">{closeLabel}</span>
         </DialogPrimitive.Close>

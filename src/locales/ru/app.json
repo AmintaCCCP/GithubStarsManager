@@ -1239,6 +1239,7 @@
     "card-actions-hint": "Настройте порядок кнопок. Скрытые действия остаются в меню дополнительных действий.",
     "quick-action-visibility": "Показывать {{action}} на карточках",
     "reset-card-actions": "Сбросить быстрые действия",
+    "drag-handle-v1": "Перетащите «{{v1}}», чтобы изменить порядок",
     "card-field-description": "Описание",
     "card-field-tags": "Теги",
     "card-field-language": "Язык",

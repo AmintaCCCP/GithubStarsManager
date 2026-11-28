@@ -1239,6 +1239,7 @@
     "card-actions-hint": "Lege die Reihenfolge fest. Ausgeblendete Aktionen bleiben im Menü „Weitere Aktionen“ verfügbar.",
     "quick-action-visibility": "{{action}} auf Karten anzeigen",
     "reset-card-actions": "Schnellaktionen zurücksetzen",
+    "drag-handle-v1": "{{v1}} zum Umsortieren ziehen",
     "card-field-description": "Beschreibung",
     "card-field-tags": "Tags",
     "card-field-language": "Sprache",

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RepositoryCardActionsSettings } from './RepositoryCardActionsSettings';
 import { useAppStore } from '../../store/useAppStore';
@@ -64,6 +64,7 @@ describe('RepositoryCardActionsSettings', () => {
         moveUpLabel={(a) => `${a}上移`}
         moveDownLabel={(a) => `${a}下移`}
         visibilityLabel={(a) => `显示${a}`}
+        dragHandleLabel={(a) => `拖拽${a}排序`}
       />,
     );
 
@@ -106,6 +107,63 @@ describe('RepositoryCardActionsSettings', () => {
     const pluginIndex = lastCall.findIndex((a) => a.id === 'plugin:com.example.insights:view-insights');
     // Originally at index 7 (after 7 built-ins), should now be at index 6
     expect(pluginIndex).toBe(6);
+  });
+
+  it('renders a drag handle for every action row', () => {
+    renderComponent();
+
+    const handles = screen.getAllByRole('button', { name: /拖拽.+排序/ });
+    // 7 built-ins + 1 enabled plugin action
+    expect(handles).toHaveLength(8);
+  });
+
+  it('reorders actions when a row is dragged onto another row', () => {
+    renderComponent();
+
+    const pluginHandle = screen.getByRole('button', { name: '拖拽仓库洞察排序' });
+    const firstHandle = screen.getByRole('button', { name: '拖拽AI 分析排序' });
+    const pluginRow = pluginHandle.closest('div[draggable]') as HTMLElement;
+    const firstRow = firstHandle.closest('div[draggable]') as HTMLElement;
+    expect(pluginRow).not.toBeNull();
+    expect(firstRow).not.toBeNull();
+
+    const dataTransfer = {
+      setData: vi.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+
+    // 只有按住把手后该行才可拖拽（与真实手势一致）
+    fireEvent.pointerDown(pluginHandle);
+    fireEvent.dragStart(pluginRow, { dataTransfer });
+    fireEvent.dragOver(firstRow, { dataTransfer });
+    fireEvent.drop(firstRow, { dataTransfer });
+    fireEvent.dragEnd(pluginRow, { dataTransfer });
+
+    expect(setRepositoryCardActions).toHaveBeenCalled();
+    const savedActions = setRepositoryCardActions.mock.calls[0][0] as RepositoryCardActionPreference[];
+    expect(savedActions[0].id).toBe('plugin:com.example.insights:view-insights');
+    expect(savedActions.map((action) => action.id)).toEqual([
+      'plugin:com.example.insights:view-insights',
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => item.id),
+    ]);
+  });
+
+  it('ignores drag starts that are not armed via the drag handle', () => {
+    renderComponent();
+
+    const pluginRow = screen.getByRole('button', { name: '拖拽仓库洞察排序' }).closest('div[draggable]') as HTMLElement;
+    const dataTransfer = {
+      setData: vi.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+
+    // 未按住把手直接拖拽：dragStart 被阻止，drop 不触发重排
+    fireEvent.dragStart(pluginRow, { dataTransfer });
+    fireEvent.drop(pluginRow, { dataTransfer });
+
+    expect(setRepositoryCardActions).not.toHaveBeenCalled();
   });
 
   it('resets actions including enabled plugin actions', async () => {
