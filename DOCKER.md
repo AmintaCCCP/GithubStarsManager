@@ -1,222 +1,207 @@
-# Docker Deployment
+# Docker Deployment Guide
 
-This application can be deployed using Docker with minimal configuration. Existing deployments use separate frontend and backend containers; an additional opt-in full-stack image is available for users who prefer a single container. The existing images and `docker-compose.yml` remain supported and unchanged.
+**English** | [简体中文](DOCKER_zh.md) · [← Back to README](README.md)
+
+Deploy **GithubStarsManager** with Docker in minutes. You can run the default **Split Compose** setup (separate Nginx frontend + Node.js backend) or the optional **Full-Stack Single Container** (one Node/Express process serving the web UI, `/api`, and MCP endpoints from the same origin). Existing images, `docker-compose.yml`, API paths, and desktop clients remain 100% compatible.
+
+**Quick Navigation:** [Choose a Mode](#choose-a-deployment-mode) · [Image Tags](#published-images--tags) · [Split Compose](#option-1-split-compose-default) · [Full-Stack Container](#option-2-full-stack-single-container-optional) · [Auth Hardening](#security-hardening--api_secret-guide) · [Env Reference](#environment-variables) · [Multi-Account & MCP](#multi-account--mcp-server) · [Backup & Migration](#data-persistence-backup--migration) · [Troubleshooting](#troubleshooting)
+
+---
+
+## Choose a Deployment Mode
+
+| Deployment Mode | Image(s) & Compose File | Exposed Port | Best For | Compatibility |
+|---|---|---|---|---|
+| **Split Compose** *(Default)* | `github-stars-manager-frontend` + `github-stars-manager-server` (`docker-compose.yml`) | `8080:80` (Nginx → `backend:3000`) | Independent frontend/backend upgrades, custom Nginx/proxy setups, existing deployments | Existing default — unchanged |
+| **Full-Stack Single Container** *(Optional)* | `github-stars-manager-fullstack` (`docker-compose.fullstack.yml`) | `8080:3000` (Single Node/Express process) | Personal servers, Mac/homelab, NAS — one container, one image tag, one volume | Additive — same URLs & `backend-data` volume |
+| **Standalone Backend** | `github-stars-manager-backend` *(legacy alias: `-server`)* | `3000:3000` | Self-hosted sync/MCP backend for the Desktop app or a custom frontend | Canonical `-backend` recommended for new setups |
+
+> [!TIP]
+> All published GHCR images include multi-architecture manifests for **`linux/amd64`** and **`linux/arm64`**. Docker automatically pulls the right build for x86_64 servers, Apple Silicon Macs, and ARM64 SBCs/NAS devices.
+
+---
 
 ## Prerequisites
 
-- Docker installed on your system
-- Docker Compose (optional, but recommended)
+- **Docker** installed on your host
+- **Docker Compose v2** (`docker compose`) recommended — legacy `docker-compose` also works with `docker-compose.yml`
 
-## Quick Start (Using Pre-built Images from GHCR)
-
-The fastest way to get started — no build required:
+If the GHCR package is private, authenticate before pulling:
 
 ```bash
-# Using Docker Compose (pulls images automatically)
-docker-compose up -d
-
-# The application will be available at http://localhost:8080
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
 ```
 
-> **Note:** If the GHCR package is set to private, you must authenticate before pulling:
-> ```bash
-> docker login ghcr.io -u YOUR_GITHUB_USERNAME
-> ```
-> Use a [Personal Access Token](https://github.com/settings/tokens) (with `read:packages` scope) as the password.
+Use a GitHub [Personal Access Token](https://github.com/settings/tokens) with the `read:packages` scope as the password.
 
-Available image tags (all role-specific images share the same tagging scheme):
-- `latest` — latest build from the `main` branch
-- `v0.8.4` — the exact release tag; it must match the root `package.json` client version
-- `0.8.4`, `0.8`, `0` — convenience semver tags derived from the same `v0.8.4` release
-- `sha-abc1234` — specific commit builds
+---
 
-The root `package.json` is the single version source for desktop clients and Docker releases. A release workflow rejects a Git tag unless it is exactly `v` plus that file's `version`, so matching release image tags and client versions are published together.
+## Published Images & Tags
 
-Published images:
-- Frontend: `ghcr.io/amintacccp/github-stars-manager-frontend`
-- Backend (canonical): `ghcr.io/amintacccp/github-stars-manager-backend`
-- Full stack (optional): `ghcr.io/amintacccp/github-stars-manager-fullstack`
-- Backend legacy compatibility alias: `ghcr.io/amintacccp/github-stars-manager-server`
+| Role | GHCR Image | Notes |
+|---|---|---|
+| Frontend | `ghcr.io/amintacccp/github-stars-manager-frontend` | Static SPA served by Nginx; proxies `/api/`, `/mcp`, `/mcp/`, `/sse`, `/messages` |
+| Backend *(canonical)* | `ghcr.io/amintacccp/github-stars-manager-backend` | Recommended for new standalone backend deployments |
+| Backend *(legacy alias)* | `ghcr.io/amintacccp/github-stars-manager-server` | Receives identical tags for backward compatibility with `docker-compose.yml` |
+| Full-Stack *(optional)* | `ghcr.io/amintacccp/github-stars-manager-fullstack` | Single Node/Express container (`STATIC_DIR=/app/public`) serving UI + API + MCP |
 
-The `-frontend`, `-backend`, and `-fullstack` names identify the image role consistently. The existing `-server` backend alias continues to receive the same tags so current `docker-compose.yml` and direct `docker run` deployments remain unchanged.
+All role images share the same tagging scheme (derived from root `package.json`, currently `0.9.1`):
 
-## Optional Single-Container Full-Stack Deployment
+| Tag | Meaning |
+|---|---|
+| `latest` | Latest build from the `main` branch |
+| `v0.9.1` | Exact release tag matching `v<version>` in root `package.json` |
+| `0.9.1`, `0.9`, `0` | Convenience semver tags derived from the same `v0.9.1` release |
+| `sha-<short-sha>` | Specific commit build (e.g., `sha-abc1234`) |
 
-The full-stack image is an additional deployment option. It runs one Node/Express process that serves the web application, `/api`, and MCP endpoints from the same origin. It does **not** replace the standalone backend image, frontend image, or existing `docker-compose.yml` workflow.
+> [!NOTE]
+> Root `package.json` is the single version source for desktop releases and Docker release builds. The release workflow enforces that Git tags match `v<version>` so desktop clients and Docker image tags stay in sync.
 
-Use the dedicated Compose file for the simplest setup. Before starting, create a `.env` file with an API secret; the full-stack Compose file refuses to start without it so a new network-facing deployment is not accidentally unauthenticated.
+---
+
+## Option 1: Split Compose (Default)
+
+`docker-compose.yml` runs the Nginx frontend on port `8080` and the Node.js backend internally on port `3000`, proxying `/api`, `/mcp`, and SSE endpoints automatically.
+
+### 1. Create a `.env` file (recommended)
+
+Create `.env` in the repository root to set an explicit `API_SECRET` and optionally pin image versions:
+
+```dotenv
+API_SECRET=replace-with-a-long-random-secret
+# Optional: omit to auto-generate and persist in /app/data/.encryption-key
+# ENCRYPTION_KEY=replace-with-your-encryption-key
+# Pin release versions (omit to track latest from main)
+BACKEND_IMAGE_TAG=0.9.1
+FRONTEND_IMAGE_TAG=0.9.1
+# BACKEND_HOST=backend:3000
+```
+
+### 2. Start the stack
 
 ```bash
-API_SECRET=replace-with-a-long-random-secret
-# Optional: set this to keep a chosen encryption key rather than generating one in the data volume.
-# ENCRYPTION_KEY=replace-with-your-encryption-key
+docker compose up -d
 
-# This leaves docker-compose.yml unchanged for existing deployments.
-docker compose -f docker-compose.fullstack.yml up -d
-
-# Open the application at http://localhost:8080
+# Verify health
 curl http://localhost:8080/api/health
 ```
 
-You can also run the full-stack image directly. The data volume stores SQLite data and an automatically generated encryption key, so keep the `-v` option when upgrading or recreating the container. A direct `docker run` does not load Compose's `.env` file; export `IMAGE_TAG` (or replace it inline) to pin the image version.
+Open **`http://localhost:8080`** in your browser.
+
+> [!IMPORTANT]
+> If you start Split Compose **without** setting `API_SECRET`, the backend no longer runs unauthenticated. On first start it generates a random secret and writes it to `/app/data/.api-secret` (never printed to logs). Retrieve it once with:
+> ```bash
+> docker compose exec backend cat /app/data/.api-secret
+> ```
+> Then paste it into the Web UI / Desktop **API Secret** field. See [Security Hardening & `API_SECRET` Guide](#security-hardening--api_secret-guide) for details.
+
+---
+
+## Option 2: Full-Stack Single Container (Optional)
+
+The full-stack image (`ghcr.io/amintacccp/github-stars-manager-fullstack`) serves the web SPA, `/api`, MCP, and SSE endpoints from **one Node/Express process** — no Nginx or process supervisor inside the container. It sits alongside `docker-compose.yml` and does not modify your existing split setup.
+
+### With Docker Compose
+
+`docker-compose.fullstack.yml` requires `API_SECRET` in `.env` so a network-facing deployment cannot start unauthenticated:
+
+```dotenv
+# Required by docker-compose.fullstack.yml
+API_SECRET=replace-with-a-long-random-secret
+
+# Optional: pin release version (default: latest)
+IMAGE_TAG=0.9.1
+
+# Optional: omit for new installs so the server generates /app/data/.encryption-key.
+# If migrating an existing deployment that set ENCRYPTION_KEY, keep the EXACT same value.
+# ENCRYPTION_KEY=the-exact-existing-key
+
+# Only set to false when accessing directly over plain HTTP from another machine (no TLS reverse proxy)
+# CSP_UPGRADE_INSECURE_REQUESTS=false
+```
+
+Start and verify:
 
 ```bash
-# Set this to 0.8.4 for a version-pinned deployment, or latest for main.
-export IMAGE_TAG=0.8.4
+docker compose -f docker-compose.fullstack.yml up -d
+curl http://localhost:8080/api/health
+```
+
+Open **`http://localhost:8080`** in your browser.
+
+### With `docker run`
+
+Direct `docker run` does not load Compose's `.env` file. Always keep `-v github-stars-data:/app/data` so your SQLite databases and encryption key survive upgrades:
+
+```bash
+# Use 0.9.1 for a version-pinned release, or latest for main
+export IMAGE_TAG=0.9.1
 
 docker run -d \
   --name github-stars-manager-fullstack \
   -p 8080:3000 \
   -v github-stars-data:/app/data \
-  -e API_SECRET="your-secret-here" \
+  -e API_SECRET="replace-with-a-long-random-secret" \
   ghcr.io/amintacccp/github-stars-manager-fullstack:${IMAGE_TAG}
 ```
 
-For a new deployment, omit `ENCRYPTION_KEY` and the service generates a key in the persisted data volume. If an existing deployment already uses `ENCRYPTION_KEY`, always pass the **exact same value** on every recreation and during migration; an environment-provided key overrides the file key, and changing it makes already encrypted credentials unreadable.
+> [!IMPORTANT]
+> **Plain HTTP LAN Access (`http://<host-ip>:8080`):** The full-stack server sends Helmet's `upgrade-insecure-requests` CSP directive by default. If you access it directly over plain HTTP from another device without a TLS reverse proxy, browsers will rewrite the app's own assets to `https://` (`ERR_SSL_PROTOCOL_ERROR`) and render a blank page. Set `CSP_UPGRADE_INSECURE_REQUESTS=false` in `.env` (or `-e CSP_UPGRADE_INSECURE_REQUESTS=false`) for plain-HTTP LAN access. Keep the default `true` whenever a reverse proxy terminates TLS.
 
-The full-stack image serves plain HTTP unless you put it behind TLS. Because it sends `upgrade-insecure-requests` by default, add `-e CSP_UPGRADE_INSECURE_REQUESTS=false` when you open it directly over `http://<host>:8080` from another machine. Without it the browser rewrites the app's own assets to `https://` and the page stays blank. Keep the default when a reverse proxy terminates TLS.
+**Deploying behind a reverse proxy (Nginx / Caddy / Traefik):** `docker-compose.yml` sets `TRUST_PROXY=1` on the split backend automatically, whereas the full-stack image defaults to `trust proxy = false`. Add `TRUST_PROXY=1` (or your proxy hop count) to the full-stack environment when sitting behind a reverse proxy so rate limiting and logs record real client IPs.
 
-For Compose deployments, add `IMAGE_TAG` to the same `.env` file to pin a full-stack version:
+---
 
-```bash
-API_SECRET=replace-with-a-long-random-secret
-IMAGE_TAG=0.8.4
-# Only for plain-HTTP access from another machine (no TLS proxy in front).
-# CSP_UPGRADE_INSECURE_REQUESTS=false
-# Set this only when preserving an existing environment-provided key.
-# ENCRYPTION_KEY=the-exact-existing-key
-```
+## Standalone Containers & Local Builds
 
-### Migrate an Existing Docker Compose Deployment
+### Standalone Backend (`docker run`)
 
-Migration is optional. Existing frontend-plus-backend deployments continue to work and require no action. If the current backend has an `API_SECRET`, preserve the exact value in the full-stack `.env`; this keeps current browser, API, and MCP clients authenticated without reconfiguration. If the existing backend has no `API_SECRET`, generate a strong new value in the full-stack `.env` and configure every direct API and MCP client with it after cutover; the full-stack Compose file intentionally does not start unauthenticated. If the existing service explicitly sets `ENCRYPTION_KEY`, copy the **same value** into the full-stack `.env` as well. Replace `<existing-backend-data-volume>` with the volume name returned by `docker volume ls`; when Compose is run from this repository with its default project name, it normally ends in `_backend-data`.
+Use the canonical `-backend` image when pairing with the Desktop app, a custom reverse proxy, or an externally hosted frontend:
 
 ```bash
-# Stop all SQLite writers without deleting the named data volume.
-# Default Compose project name:
-docker compose down
-# If you use a custom project name, use it for every command below instead:
-# docker compose -p <project-name> down
-
-# Create a portable backup only after the database is quiesced.
-docker run --rm \
-  -v <existing-backend-data-volume>:/data:ro \
-  -v "$PWD":/backup \
-  alpine tar czf /backup/github-stars-manager-data-backup.tgz -C /data .
-
-# Copy the current API_SECRET into .env before startup; copy the same
-# ENCRYPTION_KEY too when the old service set one explicitly.
-# Reuse the same Compose project directory and volume name.
-docker compose -f docker-compose.fullstack.yml up -d
-# For a custom project: docker compose -p <project-name> -f docker-compose.fullstack.yml up -d
-
-# Verify the UI, API, and persisted data.
-curl http://localhost:8080/api/health
-```
-
-Both Compose files declare the same `backend-data` volume key. When they run from the same directory with the same Compose project name, the full-stack deployment reuses the existing SQLite database and `.encryption-key`. If you normally use `docker compose -p <project>`, pass the same `-p <project>` value for the migration command.
-
-To roll back from a Compose deployment, stop the full-stack service and start the original split deployment again. If the full-stack service was created with direct `docker run`, stop and remove that container instead before starting Compose. Do not add `-v` to any of these commands, because that would delete the persisted data volume.
-
-```bash
-# Full-stack service started by Compose:
-docker compose -f docker-compose.fullstack.yml down
-# For a custom project: docker compose -p <project-name> -f docker-compose.fullstack.yml down
-
-# Full-stack service started by direct docker run (use this instead of Compose down):
-# docker stop github-stars-manager-fullstack
-# docker rm github-stars-manager-fullstack
-
-# Restore the existing split deployment.
-docker compose up -d
-# For a custom project: docker compose -p <project-name> up -d
-```
-
-To pin specific versions in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` and/or
-`FRONTEND_IMAGE_TAG` in your `.env` file:
-
-```bash
-BACKEND_IMAGE_TAG=0.8.4
-FRONTEND_IMAGE_TAG=0.8.4
-```
-
-## Backend Server (docker run)
-
-The backend image is published to GHCR and can be run standalone. New standalone deployments should use the canonical `-backend` image. The legacy `-server` image remains published with identical tags exclusively for existing `docker-compose.yml` and direct deployments, so no current user must change an image reference.
-
-```bash
-# Basic — auto-generated API secret, port 3000, data persisted in volume
+# Minimal (auto-generates /app/data/.api-secret and /app/data/.encryption-key)
 docker run -d \
   --name github-stars-backend \
   -v github-stars-data:/app/data \
   -p 3000:3000 \
-  ghcr.io/amintacccp/github-stars-manager-backend:latest
+  ghcr.io/amintacccp/github-stars-manager-backend:0.9.1
 
-# With custom API secret and encryption key
-docker run -d \
-  --name github-stars-backend \
-  -v github-stars-data:/app/data \
-  -p 3000:3000 \
-  -e API_SECRET="your-secret-here" \
-  -e ENCRYPTION_KEY="your-encryption-key" \
-  ghcr.io/amintacccp/github-stars-manager-backend:latest
+# Retrieve the auto-generated API secret
+docker exec github-stars-backend cat /app/data/.api-secret
+```
 
-# Map to a different host port (e.g. 8080)
+With explicit secrets or a custom host port:
+
+```bash
 docker run -d \
   --name github-stars-backend \
   -v github-stars-data:/app/data \
   -p 8080:3000 \
   -e API_SECRET="your-secret-here" \
-  ghcr.io/amintacccp/github-stars-manager-backend:latest
+  -e ENCRYPTION_KEY="your-encryption-key" \
+  ghcr.io/amintacccp/github-stars-manager-backend:0.9.1
 ```
 
-### Environment Variables
+### Standalone Frontend (`docker run`)
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `API_SECRET` | Optional for standalone backend | Auto-generated (saved to `data/.api-secret`) | Bearer token for API authentication. If unset, a secure random secret is generated on first start and persisted to `data/.api-secret`; all `/api` requests then require it as a Bearer token. Retrieve it once via `docker exec <backend-container> cat /app/data/.api-secret` (the secret value is never written to logs), then enter it as the client API Secret; if the file is unavailable, set the `API_SECRET` environment variable explicitly on the container. Required by `docker-compose.fullstack.yml` so the new single-container web service cannot start unauthenticated. |
-| `ALLOW_INSECURE_NO_AUTH` | No | unset | Set to `1` or `true` to restore the legacy zero-config dev mode when `API_SECRET` is unset: `/api` accepts unauthenticated requests and the server logs a loud warning. Never enable this on a publicly reachable deployment. |
-| `ENCRYPTION_KEY` | No | Auto-generated (saved to `data/.encryption-key`) | AES-256 key for encrypting stored secrets. Accepts any format — 64-char hex, shorter hex, base64, or plain text (all normalized via SHA-256) |
-| `PORT` | No | `3000` | Server listening port |
-| `DB_PATH` | No | `data/data.db` | Path to SQLite database file |
-
-> **Note:** The data volume (`/app/data`) stores both the database and the auto-generated encryption key. Always mount it to persist data across container restarts.
-
-## Full Stack with Docker Compose
-
-`docker-compose.yml` runs both frontend and backend:
+Point `BACKEND_HOST` at a reachable backend address (`host.docker.internal:3000` on Docker Desktop, or the backend container name/IP on a shared Docker network):
 
 ```bash
-docker-compose up -d
+docker run -d \
+  --name github-stars-frontend \
+  -p 8080:80 \
+  -e BACKEND_HOST=host.docker.internal:3000 \
+  ghcr.io/amintacccp/github-stars-manager-frontend:0.9.1
 ```
 
-To customize secrets and image versions, create a `.env` file in the project root:
+### Building Locally
 
-```bash
-API_SECRET=my-strong-secret
-ENCRYPTION_KEY=my-encryption-key
-BACKEND_IMAGE_TAG=0.8.4    # pin backend image version (default: latest)
-FRONTEND_IMAGE_TAG=0.8.4   # pin frontend image version (default: latest)
-# BACKEND_HOST=backend:3000 # target for the frontend's /api proxy (default: backend:3000)
-```
+<details>
+<summary>Local build commands (Split Compose, Frontend Dockerfile, Full-Stack Dockerfile)</summary>
 
-Then `docker-compose up -d` reads them automatically.
+**Split Compose with an override file (recommended — keeps `docker-compose.yml` clean):**
 
-## Building Locally with Docker
-
-### Using Docker Compose (local build)
-
-**Option A — Edit `docker-compose.yml` directly:**
-
-Comment out the `image:` line and uncomment `build: ./server`, then:
-
-```bash
-docker-compose up -d --build
-```
-
-**Option B — Use an override file (no editing needed):**
-
-Create `docker-compose.override.yml` in the project root:
+Create `docker-compose.override.yml` in the repo root (do **not** commit it to git):
 
 ```yaml
 services:
@@ -224,86 +209,139 @@ services:
     build: ./server
 ```
 
-Then run `docker-compose up -d --build`. The override file takes precedence automatically. To switch back to GHCR images, simply delete the override file.
-
-> **Note:** Do NOT commit the override file to git — it would force local builds for all users.
-
-### Using Docker directly (frontend only)
-
-The pre-built frontend image is published to GHCR — no local build required:
+Then build and start:
 
 ```bash
-# Pull the published image
-docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
+docker compose up -d --build
+```
 
-# Run the container (point /api proxy at your backend)
+Delete `docker-compose.override.yml` to switch back to GHCR images. (Alternatively, comment out `image:` and uncomment `build:` directly in `docker-compose.yml`.)
+
+**Frontend only (`Dockerfile`):**
+
+```bash
+docker build -t github-stars-manager-frontend:local .
 docker run -d -p 8080:80 \
   -e BACKEND_HOST=host.docker.internal:3000 \
-  --name github-stars-manager \
-  ghcr.io/amintacccp/github-stars-manager-frontend:latest
-
-# The application will be available at http://localhost:8080
+  --name github-stars-frontend \
+  github-stars-manager-frontend:local
 ```
 
-> `BACKEND_HOST` sets the upstream the frontend proxies `/api/` to. In Docker Compose
-> it defaults to `backend:3000`. When running standalone, point it at your backend's
-> reachable address (e.g. `host.docker.internal:3000` on Docker Desktop, or the backend
-> container's IP/host on a shared network).
-
-To build the image locally instead (uses the repository `Dockerfile`):
+**Full-Stack single container (`Dockerfile.fullstack`):**
 
 ```bash
-docker build -t github-stars-manager .
-docker run -d -p 8080:80 \
-  -e BACKEND_HOST=host.docker.internal:3000 \
-  --name github-stars-manager github-stars-manager
+docker build -f Dockerfile.fullstack -t github-stars-manager-fullstack:local .
+docker run -d \
+  --name github-stars-manager-fullstack \
+  -p 8080:3000 \
+  -v github-stars-data:/app/data \
+  -e API_SECRET="your-secret-here" \
+  github-stars-manager-fullstack:local
 ```
 
-## CORS Handling
+</details>
 
-This Docker setup handles CORS in two ways:
+---
 
-1. **Nginx CORS Headers**: The Nginx configuration adds appropriate CORS headers to allow API calls to external services.
+## Security Hardening & `API_SECRET` Guide
 
-2. **Client-Side Handling**: The application is designed to work with any AI or WebDAV service URL configured by the user, without requiring proxying.
+Starting with the **2026-11-11 auth-hardening release**, the backend **fails closed** when `API_SECRET` is omitted:
 
-## Stopping the Container
+1. **`API_SECRET` is set (recommended):** The backend uses the exact environment variable value unchanged (preserving any leading/trailing whitespace for legacy compatibility).
+2. **`API_SECRET` is unset (default):** On first start, the backend atomically generates a 64-character hex random secret and saves it to `/app/data/.api-secret` (`0600`). Subsequent restarts reuse the same file. **The secret value is never printed to container logs.** All `/api/*` endpoints (except `GET /api/health`) require `Authorization: Bearer <secret>`.
+3. **`ALLOW_INSECURE_NO_AUTH=1` (dev escape hatch only):** Explicitly opts back into the legacy unauthenticated mode when `API_SECRET` is unset, logging a prominent startup warning.
+
+> [!WARNING]
+> **Never** set `ALLOW_INSECURE_NO_AUTH=1` or `true` on any deployment reachable from the internet or an untrusted network.
+
+### Retrieving an Auto-Generated Secret
 
 ```bash
-# With Docker Compose
-docker-compose down
+# Split Compose deployment
+docker compose exec backend cat /app/data/.api-secret
 
-# With Docker directly
-docker stop github-stars-manager && docker rm github-stars-manager
-
-# Stop backend only
-docker stop github-stars-backend && docker rm github-stars-backend
+# Standalone backend container
+docker exec github-stars-backend cat /app/data/.api-secret
 ```
 
-## Note on Desktop Packaging
+### Upgrading an Older Unauthenticated Deployment
 
-This Docker setup does not affect the existing desktop packaging workflows. The GitHub Actions workflow for building desktop applications remains unchanged and continues to work as before.
-## MCP Server (Agent access)
+If your existing deployment ran without `API_SECRET` before upgrading, choose one of two paths:
 
-With the existing Docker Compose deployment, the backend MCP endpoints are exposed through nginx (frontend container) so agents on the host do not need a published backend port. The optional full-stack Compose deployment exposes the same endpoint URLs directly from its single Node service:
+1. **Use the auto-generated secret:** Pull and restart the updated image, run `docker compose exec backend cat /app/data/.api-secret`, and enter that secret once in the Web UI / Desktop **Backend Settings → API Secret**.
+2. **Pin your own secret (recommended):** Generate a strong secret (e.g., `openssl rand -hex 32`), add `API_SECRET=<secret>` to `.env`, restart with `docker compose up -d`, and enter the same secret in your clients.
 
-| Endpoint | URL (default compose) | Notes |
-|----------|------------------------|--------|
-| Streamable HTTP | `http://localhost:8080/mcp` | Same URL for split Compose and optional full-stack Compose; preferred for Claude Code / modern clients |
-| Legacy SSE | `http://localhost:8080/mcp/sse` | Same URL for split Compose and optional full-stack Compose; GET opens `text/event-stream`, then clients POST to `/mcp/sse/messages?sessionId=…` |
-| Legacy SSE (alias) | `http://localhost:8080/sse` | Same protocol; messages at `/messages?sessionId=…` |
+> [!NOTE]
+> If the `/app/data` directory is read-only or `.api-secret` is empty/unreadable, the backend falls back to a temporary per-process in-memory secret (which changes on every restart) instead of crash-looping. Fix volume permissions or set `API_SECRET` explicitly to keep clients connected across restarts.
 
-**Desktop (Electron)** after enabling MCP in Settings:
+---
 
-| Endpoint | URL |
-|----------|-----|
-| Streamable HTTP | `http://127.0.0.1:3927/mcp` |
-| Legacy SSE | `http://127.0.0.1:3927/sse` (messages: `/messages?sessionId=…`) |
+## Environment Variables
 
-1. Open the app → **Settings → MCP Server**.
-2. Toggle **Enable MCP Server** (requires backend connection).
-3. Copy the token (always viewable) and the JSON agent config.
-4. Paste into Claude Code / Cursor MCP settings, for example:
+### Backend & Full-Stack Runtime
+
+| Variable | Split Backend | Full-Stack | Default | Description |
+|---|---|---|---|---|
+| `API_SECRET` | Optional *(auto-generated)* | **Required** in Compose | Auto-generated in `data/.api-secret` | Bearer token protecting `/api/*` (except `/api/health`). If unset in standalone/split mode, generated once and persisted to `/app/data/.api-secret`. Required by `docker-compose.fullstack.yml`. |
+| `ALLOW_INSECURE_NO_AUTH` | Optional | Not recommended | unset | Set to `1` or `true` (case-insensitive) to disable `/api` auth when `API_SECRET` is unset (local dev only). Logs a loud warning. |
+| `ENCRYPTION_KEY` | Optional | Optional | Auto-generated in `data/.encryption-key` | AES-256 key encrypting stored secrets (GitHub token, AI keys, WebDAV passwords, MCP token). Accepts 64-char hex as-is, or any other string (normalized to 32 bytes via SHA-256). Env var overrides the file key. |
+| `PORT` | Optional | Optional | `3000` | Internal Node/Express listening port (`docker-compose.fullstack.yml` maps host `8080:3000`). |
+| `DB_PATH` | Optional | Optional | `data/data.db` (`/app/data/data.db`) | Default-profile SQLite database path. Multi-account profile DBs are stored in `<dirname(DB_PATH)>/profiles/<profileId>.db`. |
+| `TRUST_PROXY` | Set to `1` in Compose | Optional (`false`) | `false` | Express `trust proxy` setting (`true`, `false`, hop count like `1`, or proxy IP/subnet). Set to `1` when behind Nginx/Caddy/Traefik so rate limiting sees real client IPs. |
+| `CSP_UPGRADE_INSECURE_REQUESTS` | Optional | Default `true` in Compose | `true` | Controls Helmet's `upgrade-insecure-requests` CSP directive. Set to `false`, `0`, or `no` for direct plain-HTTP LAN access without a TLS reverse proxy. |
+| `CSP_CONNECT_SRC` | Optional | Optional | Built-in allowlist | Comma-separated extra origins appended to CSP `connect-src` for browser-direct mode (e.g., custom AI proxies or Cloudflare Worker URLs). Built-in origins include `'self'`, GitHub API/raw/gist, GitHubTrendingRSS, OpenAI, and Gemini. |
+| `STATIC_DIR` | Unset | `/app/public` *(built-in)* | unset | Directory of compiled SPA assets served by Express. Set automatically in `Dockerfile.fullstack`; leave unset for API-only backend. |
+| `NODE_ENV` | Optional | `production` *(built-in)* | `development` | When `production`, hides error stack traces in API responses. |
+
+### Frontend Nginx & Compose Tag Variables
+
+| Variable | Applies To | Default | Description |
+|---|---|---|---|
+| `BACKEND_HOST` | Split Frontend (`Dockerfile`) | `backend:3000` | Upstream `host:port` that Nginx proxies `/api/`, `/mcp`, `/mcp/`, `/sse`, and `/messages` to. |
+| `RESOLVER` | Split Frontend (`Dockerfile`) | `127.0.0.11` | DNS resolver used by Nginx for runtime upstream resolution (Docker embedded DNS; override in Kubernetes/ECS). |
+| `BACKEND_IMAGE_TAG` | `docker-compose.yml` | `latest` | Backend image tag (e.g., `0.9.1`). |
+| `FRONTEND_IMAGE_TAG` | `docker-compose.yml` | `latest` | Frontend image tag (e.g., `0.9.1`). |
+| `IMAGE_TAG` | `docker-compose.fullstack.yml` | `latest` | Full-stack image tag (e.g., `0.9.1`). |
+
+---
+
+## Multi-Account & MCP Server
+
+### Multi-Account Backend Isolation
+
+GithubStarsManager supports switching between multiple GitHub accounts with full storage-boundary isolation:
+
+- **Default account** continues using `/app/data/data.db` with zero overhead and no migration required.
+- **Additional accounts** are routed to isolated SQLite databases at `/app/data/profiles/<profileId>.db` (valid profile IDs match `^p_[a-z0-9_-]{1,32}$`).
+- **API profile routing:** Clients send the `X-GSM-Profile: <profileId>` header on `/api/*` requests. Missing, empty, or `default` targets `data.db`; invalid IDs return `400 INVALID_PROFILE_HEADER`.
+- **Profile management endpoints** (protected by `API_SECRET`):
+  - `GET /api/profiles` — lists secondary profile databases and stored GitHub user metadata
+  - `DELETE /api/profiles/:id` — safely closes and removes `profiles/<id>.db` (plus `-wal`/`-shm`); returns `409 PROFILE_IN_USE` if requests are active
+- **Connection pool:** The server manages secondary profile DBs in an LRU pool (up to 16 open handles) with reference-counted idle eviction so active requests are never interrupted.
+
+### MCP Server (AI Agent Access)
+
+Both Split Compose (proxied via Nginx) and Full-Stack Compose (served directly by Express) expose the exact same MCP URLs on port `8080` — no extra backend port needs to be published:
+
+| Transport | Docker URL (Split & Full-Stack) | Desktop (Electron) URL | Notes |
+|---|---|---|---|
+| **Streamable HTTP** *(recommended)* | `http://localhost:8080/mcp` | `http://127.0.0.1:3927/mcp` | Stateless POST-only (`GET`/`DELETE` return `405`). Preferred for Claude Code & modern clients. |
+| **Legacy SSE** | `http://localhost:8080/mcp/sse` | `http://127.0.0.1:3927/sse` | `GET` opens `text/event-stream`; `POST` messages to `/mcp/sse/messages?sessionId=…`. |
+| **Legacy SSE (alias)** | `http://localhost:8080/sse` | `http://127.0.0.1:3927/sse` | Backward-compatible alias; `POST` messages to `/messages?sessionId=…`. |
+
+#### Multi-Account MCP Profile Routing
+
+Each account profile has its own SQLite database, its own **Enable MCP Server** toggle, and its own encrypted `mcp_token`. To target a secondary account from an MCP client, pass either:
+
+- **Query parameter:** `http://localhost:8080/mcp?profile=p_<id>` (also supported on `/mcp/sse?profile=p_<id>` and `/sse?profile=p_<id>`)
+- **HTTP header:** `X-GSM-Profile: p_<id>` *(takes precedence over `?profile=` if both are sent)*
+
+#### Setup Steps
+
+1. Open the app → switch to the target GitHub account → go to **Settings → MCP Server**.
+2. Toggle **Enable MCP Server** (requires a connected backend).
+3. Copy the token and ready-to-paste agent JSON config (for secondary accounts, the UI automatically includes `?profile=<id>` in the URL).
+4. Paste into Claude Code, Cursor, or another MCP client:
 
 ```json
 {
@@ -318,10 +356,137 @@ With the existing Docker Compose deployment, the backend MCP endpoints are expos
 }
 ```
 
-**Notes**
+For a secondary account profile (either `?profile=<id>` in the URL or `X-GSM-Profile` in `headers`):
 
-- MCP uses a **separate token** from `API_SECRET` (backend UI auth). Resetting the MCP token does not break app↔backend sync.
-- The MCP bearer is **stable**: stored encrypted in SQLite (`mcp_token`) on the backend, and in IndexedDB with other app state on desktop. It is created once when you first enable MCP and **only changes if you click Reset Token**.
-- Pure frontend (no backend) does not show the MCP settings page.
-- `gsm_vector_search` appears only when Vector Search is configured and enabled in the app.
-- Enabling MCP is additive: existing SQLite data is unchanged; disabling MCP only stops the endpoint.
+```json
+{
+  "mcpServers": {
+    "github-stars-manager-work": {
+      "url": "http://localhost:8080/mcp?profile=p_work123",
+      "headers": {
+        "Authorization": "Bearer gsm_mcp_..."
+      }
+    }
+  }
+}
+```
+
+> [!NOTE]
+> - **Separate credentials:** MCP uses its own `mcp_token` (`Authorization: Bearer …` or `X-MCP-Token: …`), independent from `API_SECRET`. Resetting the MCP token will not break app↔backend sync.
+> - **Stable token:** Encrypted in that profile's SQLite DB (`mcp_token`), minted once on first enable, and only changes if you click **Reset Token**.
+> - **Fail-closed profile lookup:** Requesting a non-existent profile DB returns `404` (`MCP_DISABLED`) without creating phantom `.db` files; invalid profile IDs return `400`.
+> - **Dynamic tools:** `gsm_vector_search` is advertised only when Vector Search is configured and enabled for that profile. Pure frontend deployments (no backend) hide the MCP settings page.
+
+---
+
+## Data Persistence, Backup & Migration
+
+### What Lives in `/app/data`
+
+Always mount a persistent volume at `/app/data`. Inside this volume, the backend stores:
+
+| Path inside `/app/data` | Purpose |
+|---|---|
+| `data.db` *(+ `-wal`, `-shm`)* | Default account SQLite database (stars, summaries, tags, settings, encrypted credentials, MCP token) |
+| `profiles/p_<id>.db` *(+ `-wal`, `-shm`)* | Isolated SQLite databases for additional multi-account profiles |
+| `.encryption-key` | Auto-generated AES-256 key (`0600`) used when `ENCRYPTION_KEY` env var is unset |
+| `.api-secret` | Auto-generated API secret (`0600`) used when `API_SECRET` env var is unset |
+
+> [!WARNING]
+> **Back up `/app/data/.encryption-key` (or your `ENCRYPTION_KEY` env var)!** Both your SQLite databases and `.encryption-key` live on the same volume. If you lose the key—or pass a different `ENCRYPTION_KEY` env var when recreating/migrating—all encrypted credentials (GitHub token, AI keys, WebDAV passwords, MCP tokens) become unreadable. Note that an explicit `ENCRYPTION_KEY` environment variable always overrides the `.encryption-key` file.
+
+### Backing Up the Data Volume
+
+Stop all SQLite writers first (without `-v`!) so WAL/journal files are flushed cleanly:
+
+```bash
+# Find your volume name (typically <project-name>_backend-data for Compose)
+docker volume ls
+
+# Stop containers without deleting the volume
+docker compose down
+
+# Create a portable archive of databases, profiles/, .encryption-key, and .api-secret
+docker run --rm \
+  -v <existing-backend-data-volume>:/data:ro \
+  -v "$PWD":/backup \
+  alpine tar czf /backup/github-stars-manager-data-backup.tgz -C /data .
+```
+
+### Migrating Split Compose → Full-Stack Single Container
+
+Migration is completely **optional** — both Compose files declare the same `backend-data` volume key, so running from the same directory (and same `-p <project-name>`, if used) reuses all existing databases, secondary profiles, and keys automatically.
+
+1. **Stop the split stack and back up the volume** (never pass `-v`):
+   ```bash
+   docker compose down
+   # Custom project name: docker compose -p <project-name> down
+
+   docker run --rm \
+     -v <existing-backend-data-volume>:/data:ro \
+     -v "$PWD":/backup \
+     alpine tar czf /backup/github-stars-manager-data-backup.tgz -C /data .
+   ```
+2. **Prepare `.env`:**
+   - Copy your existing `API_SECRET` unchanged (or if the old split backend used auto-generated `.api-secret`, copy its value into `API_SECRET=` in `.env`; if it had no auth previously, generate a strong new `API_SECRET` and update your clients after cutover).
+   - If the old service explicitly set `ENCRYPTION_KEY`, copy the **exact same value** into `.env`.
+   - Optionally set `IMAGE_TAG=0.9.1`.
+3. **Start the full-stack container** using the same directory / project name:
+   ```bash
+   docker compose -f docker-compose.fullstack.yml up -d
+   # Custom project name: docker compose -p <project-name> -f docker-compose.fullstack.yml up -d
+   ```
+4. **Verify** health, UI, synced repos/profiles, and MCP:
+   ```bash
+   curl http://localhost:8080/api/health
+   ```
+
+### Rolling Back to Split Compose
+
+Stop the full-stack container (without `-v`) and bring the split stack back up:
+
+```bash
+# If started with Compose:
+docker compose -f docker-compose.fullstack.yml down
+# Custom project name: docker compose -p <project-name> -f docker-compose.fullstack.yml down
+
+# If started with direct docker run (use instead of Compose down):
+# docker stop github-stars-manager-fullstack && docker rm github-stars-manager-fullstack
+
+# Restore Split Compose:
+docker compose up -d
+# Custom project name: docker compose -p <project-name> up -d
+```
+
+---
+
+## CORS, Stopping & Desktop Compatibility
+
+- **CORS & Proxy Headers:** In Split mode, Nginx proxies `/api/`, `/mcp`, `/mcp/`, `/sse`, and `/messages` to `BACKEND_HOST` and adds CORS headers for static routes. In Full-Stack mode, Express serves the SPA and API from the same origin and sets Helmet CSP (`CSP_CONNECT_SRC` can extend browser-direct origins for custom AI/Worker endpoints).
+- **Stopping Containers** *(never add `-v` unless you intend to permanently erase `/app/data`)*:
+  ```bash
+  # Split Compose
+  docker compose down
+
+  # Full-Stack Compose
+  docker compose -f docker-compose.fullstack.yml down
+
+  # Standalone docker run containers
+  docker stop github-stars-manager-fullstack && docker rm github-stars-manager-fullstack
+  docker stop github-stars-backend && docker rm github-stars-backend
+  ```
+- **Desktop Packaging:** Docker deployment files and workflows are completely independent of the Electron desktop packaging pipeline.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| **`401` / `AUTH_NOT_CONFIGURED`** after upgrading | Auth hardening auto-generated `/app/data/.api-secret` because `API_SECRET` was unset | Run `docker compose exec backend cat /app/data/.api-secret` and enter it in client **API Secret**, or set `API_SECRET` explicitly in `.env` and restart. |
+| **Blank page** over `http://<LAN-IP>:8080` in Full-Stack mode | Helmet's `upgrade-insecure-requests` rewrites `http://` assets to `https://` | Set `CSP_UPGRADE_INSECURE_REQUESTS=false` in `.env` (or `-e`) when accessing directly over plain HTTP without a TLS reverse proxy. |
+| **Browser-direct AI or Vector Worker requests blocked by CSP** | Custom endpoint origin not in default `connect-src` allowlist | Set `CSP_CONNECT_SRC=https://your-ai-proxy.example.com,https://your-worker.workers.dev` on the backend/full-stack container. |
+| **Full-Stack Compose refuses to start** (`Set API_SECRET in .env...`) | `docker-compose.fullstack.yml` enforces non-empty `API_SECRET` | Add `API_SECRET=<long-random-secret>` to `.env` in the same directory before running `docker compose -f docker-compose.fullstack.yml up -d`. |
+| **Stored tokens/keys unreadable after recreate or migration** | `ENCRYPTION_KEY` changed or `/app/data/.encryption-key` was lost | Restore `/app/data/.encryption-key` from backup, or pass the exact previous `ENCRYPTION_KEY` value. |
+| **MCP returns `404` (`MCP_DISABLED`) for a secondary account** | MCP is disabled for that profile, or `?profile=<id>` doesn't match an existing profile DB | Switch to that account in the app → **Settings → MCP Server**, enable MCP, and copy the generated URL (`?profile=p_…`) and profile-specific token. |
+| **`denied` when pulling GHCR images** | Package visibility or stale registry credentials | Run `docker login ghcr.io -u YOUR_GITHUB_USERNAME` with a PAT containing `read:packages`. |

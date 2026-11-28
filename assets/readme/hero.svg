@@ -1,200 +1,425 @@
 <svg xmlns="http://www.w3.org/2000/svg"
      width="1200" height="420" viewBox="0 0 1200 420"
-     role="img" aria-labelledby="title desc">
-  <title id="title">GithubStarsManager</title>
-  <desc id="desc">AI-powered GitHub stars manager: auto-sync, semantic search, AI categorization, release tracking, and one-click downloads.</desc>
+     role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">GithubStarsManager — AI-Powered GitHub Stars Manager</title>
+  <desc id="hero-desc">Turn thousands of GitHub stars into an AI-organized, searchable knowledge base. Desktop client, Docker, MCP Server, Plugins, 16 Themes, and Multi-Account support.</desc>
 
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#020817" />
-      <stop offset="100%" stop-color="#0F172A" />
+    <!-- Main banner surface -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070D1A" />
+      <stop offset="55%" stop-color="#0C1527" />
+      <stop offset="100%" stop-color="#0A1222" />
     </linearGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#16A249" stop-opacity="0.18" />
-      <stop offset="100%" stop-color="#16A249" stop-opacity="0" />
+
+    <!-- Subtle outer border for both GitHub Light & Dark -->
+    <linearGradient id="frameBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#334155" stop-opacity="0.75" />
+      <stop offset="50%" stop-color="#475569" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0.45" />
     </linearGradient>
-    <linearGradient id="cardFade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.5" />
-      <stop offset="100%" stop-color="#1E293B" stop-opacity="0.15" />
+
+    <!-- Ambient emerald & indigo glows -->
+    <radialGradient id="emeraldGlow" cx="14%" cy="10%" r="48%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="indigoGlow" cx="88%" cy="92%" r="52%">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="amberGlow" cx="6%" cy="15%" r="16%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Brand title crisp gradient -->
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#CBD5E1" />
     </linearGradient>
+
+    <!-- Star emblem gradient -->
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+
+    <!-- Workspace shell panel surface -->
+    <linearGradient id="shellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111C33" />
+      <stop offset="100%" stop-color="#0B1325" />
+    </linearGradient>
+
+    <!-- Card surface gradient -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#17233C" />
+      <stop offset="100%" stop-color="#121C32" />
+    </linearGradient>
+
+    <!-- Subtle background dot pattern -->
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="0.85" fill="#94A3B8" opacity="0.12" />
+    </pattern>
+
+    <!-- Outer rounded clip -->
+    <clipPath id="bannerClip">
+      <rect x="0.5" y="0.5" width="1199" height="419" rx="20" />
+    </clipPath>
+
+    <!-- Window shell rounded clip -->
+    <clipPath id="shellClip">
+      <rect x="0" y="0" width="524" height="368" rx="14" />
+    </clipPath>
   </defs>
 
-  <!-- Background -->
-  <rect width="1200" height="420" fill="url(#bg)" />
-
-  <!-- Subtle grid dots -->
-  <g fill="#F8FAFC" opacity="0.025">
-    <circle cx="200" cy="100" r="1" /><circle cx="400" cy="60" r="1" />
-    <circle cx="600" cy="140" r="1" /><circle cx="800" cy="80" r="1" />
-    <circle cx="1000" cy="120" r="1" /><circle cx="150" cy="300" r="1" />
-    <circle cx="350" cy="360" r="1" /><circle cx="550" cy="280" r="1" />
-    <circle cx="750" cy="340" r="1" /><circle cx="950" cy="260" r="1" />
-    <circle cx="1100" cy="380" r="1" />
+  <!-- ====== BANNER BACKGROUND ====== -->
+  <g clip-path="url(#bannerClip)">
+    <rect width="1200" height="420" fill="url(#bgGrad)" />
+    <rect width="1200" height="420" fill="url(#dotGrid)" />
+    <rect width="1200" height="420" fill="url(#emeraldGlow)" />
+    <rect width="1200" height="420" fill="url(#indigoGlow)" />
+    <rect width="1200" height="420" fill="url(#amberGlow)" />
   </g>
 
-  <!-- Decorative star (green, top-left motif) -->
-  <g transform="translate(64 56)" fill="#16A249" opacity="0.35">
-    <path d="M0 -11 L3.27 -3.40 L11 -3.40 L4.88 1.30 L6.78 9 L0 4.40 L-6.78 9 L-4.88 1.30 L-11 -3.40 L-3.27 -3.40 Z" />
-  </g>
+  <!-- Crisp outer border -->
+  <rect x="0.5" y="0.5" width="1199" height="419" rx="20" fill="none" stroke="url(#frameBorder)" stroke-width="1" />
 
-  <!-- ====== LEFT SIDE: TITLE & VALUE ====== -->
-  <g transform="translate(64 48)">
+  <!-- ====== LEFT COLUMN: BRAND, VALUE PROP & CAPABILITIES ====== -->
+  <g transform="translate(56, 46)">
+    <!-- Eyebrow badge -->
+    <g>
+      <rect x="0" y="0" width="228" height="28" rx="14" fill="#10B981" fill-opacity="0.1" stroke="#10B981" stroke-opacity="0.3" stroke-width="1" />
+      <!-- Golden star motif -->
+      <path d="M18 7.5 L19.85 11.45 L24.2 12 L21 15 L21.85 19.3 L18 17.2 L14.15 19.3 L15 15 L11.8 12 L16.15 11.45 Z" fill="url(#starGrad)" />
+      <text x="32" y="18"
+            font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+            font-size="11" font-weight="600" fill="#6EE7B7" letter-spacing="0.9">LOCAL-FIRST · AI-POWERED</text>
+    </g>
+
     <!-- Title -->
-    <text x="0" y="98"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="56" font-weight="700" fill="#F8FAFC"
-          letter-spacing="-1.8">GithubStarsManager</text>
+    <text x="0" y="88"
+          font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-size="46" font-weight="700" fill="url(#titleGrad)"
+          letter-spacing="-1.3">GithubStarsManager</text>
 
-    <!-- Subtitle -->
+    <!-- Tagline (2 crisp lines) -->
+    <text x="0" y="130"
+          font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-size="19" font-weight="400" fill="#94A3B8" letter-spacing="-0.15">Turn thousands of GitHub stars into an</text>
     <text x="0" y="158"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="24" font-weight="400" fill="#94A3B8"
-          letter-spacing="-0.2">AI organizes your GitHub stars</text>
-    <text x="0" y="192"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="24" font-weight="400" fill="#94A3B8"
-          letter-spacing="-0.2">so you can actually find them.</text>
+          font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-size="19" font-weight="500" fill="#E2E8F0" letter-spacing="-0.15">AI-organized, searchable knowledge base.</text>
 
-    <!-- Feature chips -->
-    <g transform="translate(0 236)">
-      <rect x="0" y="0" width="96" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
-      <text x="48" y="21"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">Auto-sync</text>
+    <!-- Capability Chips: Row 1 -->
+    <g transform="translate(0, 194)">
+      <!-- Chip 1: AI Categorize -->
+      <rect x="0" y="0" width="132" height="32" rx="8" fill="#131E34" stroke="#293856" stroke-width="1" />
+      <circle cx="16" cy="16" r="3.5" fill="#10B981" />
+      <text x="28" y="20.5"
+            font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+            font-size="13" font-weight="500" fill="#E2E8F0">AI Categorize</text>
 
-      <rect x="104" y="0" width="108" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
-      <text x="158" y="21"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">AI Categorize</text>
+      <!-- Chip 2: Semantic Search -->
+      <rect x="142" y="0" width="150" height="32" rx="8" fill="#131E34" stroke="#293856" stroke-width="1" />
+      <circle cx="158" cy="16" r="3.5" fill="#818CF8" />
+      <text x="170" y="20.5"
+            font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+            font-size="13" font-weight="500" fill="#E2E8F0">Semantic Search</text>
 
-      <rect x="220" y="0" width="114" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
-      <text x="277" y="21"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">Semantic Search</text>
-
-      <rect x="342" y="0" width="118" height="32" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
-      <text x="401" y="21"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="14" font-weight="500" fill="#F8FAFC" text-anchor="middle">Release Tracking</text>
+      <!-- Chip 3: Commit-Pinned Q&A -->
+      <rect x="302" y="0" width="174" height="32" rx="8" fill="#131E34" stroke="#293856" stroke-width="1" />
+      <circle cx="318" cy="16" r="3.5" fill="#38BDF8" />
+      <text x="330" y="20.5"
+            font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+            font-size="13" font-weight="500" fill="#E2E8F0">Commit-Pinned Q&amp;A</text>
     </g>
 
-    <!-- Stats line -->
-    <text x="0" y="308"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="18" font-weight="400" fill="#64748B"
-          letter-spacing="-0.15">Desktop client · Docker · MCP Server · 12 themes</text>
+    <!-- Capability Chips: Row 2 -->
+    <g transform="translate(0, 236)">
+      <!-- Chip 4: Release Filter -->
+      <rect x="0" y="0" width="132" height="32" rx="8" fill="#131E34" stroke="#293856" stroke-width="1" />
+      <circle cx="16" cy="16" r="3.5" fill="#FBBF24" />
+      <text x="28" y="20.5"
+            font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+            font-size="13" font-weight="500" fill="#E2E8F0">Release Filter</text>
+
+      <!-- Chip 5: MCP Server -->
+      <rect x="142" y="0" width="124" height="32" rx="8" fill="#131E34" stroke="#293856" stroke-width="1" />
+      <circle cx="158" cy="16" r="3.5" fill="#A78BFA" />
+      <text x="170" y="20.5"
+            font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+            font-size="13" font-weight="500" fill="#E2E8F0">MCP Server</text>
+
+      <!-- Chip 6: Desktop Plugins -->
+      <rect x="276" y="0" width="146" height="32" rx="8" fill="#131E34" stroke="#293856" stroke-width="1" />
+      <circle cx="292" cy="16" r="3.5" fill="#34D399" />
+      <text x="304" y="20.5"
+            font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+            font-size="13" font-weight="500" fill="#E2E8F0">Desktop Plugins</text>
+    </g>
+
+    <!-- Hairline divider -->
+    <line x1="0" y1="294" x2="476" y2="294" stroke="#1E293B" stroke-width="1" />
+
+    <!-- Metadata line -->
+    <text x="0" y="322"
+          font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-size="13" font-weight="500" fill="#94A3B8" letter-spacing="0.1">Desktop · Docker · MCP Server · Plugins · 16 Themes · Multi-Account</text>
   </g>
 
-  <!-- ====== RIGHT SIDE: APP UI MOCKUP ====== -->
-  <g transform="translate(660 24)">
-    <!-- Outer panel -->
-    <rect x="0" y="0" width="490" height="372" rx="14" fill="#0F172A" stroke="#1E293B" stroke-width="1" />
+  <!-- ====== RIGHT COLUMN: v0.9.x WORKSPACE SHELL UI PREVIEW ====== -->
+  <g transform="translate(636, 26)">
+    <!-- Window Frame -->
+    <g clip-path="url(#shellClip)">
+      <rect x="0" y="0" width="524" height="368" fill="url(#shellGrad)" />
 
-    <!-- Top bar -->
-    <rect x="0" y="0" width="490" height="46" rx="14" fill="#0F172A" />
-    <rect x="0" y="32" width="490" height="14" fill="#0F172A" />
-    <rect x="64" y="14" width="200" height="22" rx="6" fill="#1E293B" stroke="#334155" stroke-width="0.5" />
-    <text x="74" y="30"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="11" font-weight="400" fill="#64748B">Search stars…</text>
+      <!-- Top Title / Navigation Bar -->
+      <rect x="0" y="0" width="524" height="36" fill="#0B1222" />
+      <line x1="0" y1="36" x2="524" y2="36" stroke="#1E293B" stroke-width="1" />
 
-    <!-- Sidebar -->
-    <rect x="12" y="54" width="44" height="306" rx="8" fill="#1E293B" opacity="0.5" />
-    <text x="34" y="82"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">All</text>
-    <circle cx="34" cy="108" r="4" fill="#16A249" opacity="0.6" />
-    <text x="34" y="128"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">AI</text>
-    <circle cx="34" cy="150" r="3" fill="#D98006" opacity="0.5" />
-    <text x="34" y="168"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">Dev</text>
-    <circle cx="34" cy="190" r="3" fill="#3178C6" opacity="0.5" />
-    <text x="34" y="208"
-          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-          font-size="9" font-weight="500" fill="#64748B" text-anchor="middle">Lib</text>
-    <circle cx="34" cy="230" r="3" fill="#F8FAFC" opacity="0.3" />
+      <!-- macOS window dots -->
+      <circle cx="16" cy="18" r="4" fill="#EF4444" opacity="0.85" />
+      <circle cx="30" cy="18" r="4" fill="#F59E0B" opacity="0.85" />
+      <circle cx="44" cy="18" r="4" fill="#22C55E" opacity="0.85" />
 
-    <!-- Card 1 -->
-    <g transform="translate(64 58)">
-      <rect x="0" y="0" width="414" height="96" rx="10" fill="url(#cardFade)" stroke="#1E293B" stroke-width="0.5" />
-      <!-- Language dot -->
-      <circle cx="18" cy="22" r="5" fill="#3178C6" />
-      <!-- Repo name -->
-      <text x="30" y="26"
-            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-            font-size="13" font-weight="600" fill="#F8FAFC">facebook/react</text>
-      <!-- Star -->
-      <path d="M340 18 L341.99 23.24 L347.64 23.65 L343.19 27.36 L344.82 32.85 L340 29.44 L335.18 32.85 L336.81 27.36 L332.36 23.65 L338.01 23.24 Z"
-            fill="#D98006" opacity="0.8" />
-      <text x="350" y="27"
-            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-            font-size="12" font-weight="500" fill="#94A3B8">198K</text>
-      <!-- Description -->
-      <text x="18" y="50"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="12" font-weight="400" fill="#64748B">A declarative JavaScript library for building user interfaces.</text>
-      <!-- AI tags -->
-      <rect x="18" y="66" width="60" height="20" rx="4" fill="#16A249" fill-opacity="0.12" />
-      <text x="48" y="80"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="10" font-weight="500" fill="#16A249" text-anchor="middle">Frontend</text>
-      <rect x="84" y="66" width="48" height="20" rx="4" fill="#6366F1" fill-opacity="0.12" />
-      <text x="108" y="80"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="10" font-weight="500" fill="#818CF8" text-anchor="middle">UI</text>
+      <!-- Nav Tabs -->
+      <g transform="translate(120, 8)">
+        <rect x="0" y="0" width="48" height="20" rx="5" fill="#1E293B" />
+        <text x="24" y="13.5" text-anchor="middle"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="10" font-weight="600" fill="#F8FAFC">Stars</text>
+        <text x="74" y="13.5" text-anchor="middle"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="10" font-weight="500" fill="#64748B">Releases</text>
+        <text x="128" y="13.5" text-anchor="middle"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="10" font-weight="500" fill="#64748B">Discover</text>
+        <text x="180" y="13.5" text-anchor="middle"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="10" font-weight="500" fill="#64748B">Plugins</text>
+      </g>
+
+      <!-- Multi-Account Switcher Pill -->
+      <g transform="translate(410, 7)">
+        <rect x="0" y="0" width="102" height="22" rx="11" fill="#16223A" stroke="#2B3D5E" stroke-width="1" />
+        <circle cx="13" cy="11" r="5" fill="#6366F1" />
+        <circle cx="13" cy="9.8" r="1.7" fill="#EEF2FF" />
+        <path d="M9.8 14.3 C10.4 12.6 15.6 12.6 16.2 14.3" fill="#EEF2FF" />
+        <text x="23" y="14.5"
+              font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+              font-size="9.5" font-weight="500" fill="#CBD5E1">2 accounts</text>
+        <path d="M89 9.5 L92 12.5 L95 9.5" fill="none" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+      </g>
+
+      <!-- Left Context Sidebar -->
+      <g transform="translate(10, 44)">
+        <rect x="0" y="0" width="112" height="314" rx="10" fill="#0E172B" stroke="#1E293B" stroke-width="1" />
+
+        <text x="12" y="21"
+              font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+              font-size="8.5" font-weight="600" fill="#64748B" letter-spacing="0.8">WORKSPACE</text>
+
+        <!-- Active Category: All Stars -->
+        <rect x="6" y="29" width="100" height="24" rx="6" fill="#1A2844" />
+        <rect x="6" y="34" width="2.5" height="14" rx="1.25" fill="#10B981" />
+        <text x="15" y="44.5"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="10" font-weight="600" fill="#F8FAFC">All Stars</text>
+        <text x="98" y="44.5" text-anchor="end"
+              font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+              font-size="9" fill="#94A3B8">1,286</text>
+
+        <!-- Subscribed Releases -->
+        <text x="15" y="69"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="10" font-weight="500" fill="#94A3B8">Releases</text>
+        <text x="98" y="69" text-anchor="end"
+              font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+              font-size="9" fill="#64748B">189</text>
+
+        <line x1="12" y1="84" x2="100" y2="84" stroke="#1E293B" stroke-width="1" />
+
+        <text x="12" y="102"
+              font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+              font-size="8.5" font-weight="600" fill="#64748B" letter-spacing="0.8">CATEGORIES</text>
+
+        <!-- Category rows -->
+        <circle cx="17" cy="120" r="3" fill="#10B981" />
+        <text x="25" y="123.5" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" fill="#CBD5E1">AI / ML</text>
+        <text x="100" y="123.5" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="9" fill="#64748B">500</text>
+
+        <circle cx="17" cy="144" r="3" fill="#818CF8" />
+        <text x="25" y="147.5" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" fill="#CBD5E1">MCP &amp; CLI</text>
+        <text x="100" y="147.5" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="9" fill="#64748B">136</text>
+
+        <circle cx="17" cy="168" r="3" fill="#38BDF8" />
+        <text x="25" y="171.5" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" fill="#CBD5E1">DevTools</text>
+        <text x="100" y="171.5" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="9" fill="#64748B">486</text>
+
+        <circle cx="17" cy="192" r="3" fill="#FBBF24" />
+        <text x="25" y="195.5" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" fill="#CBD5E1">Desktop</text>
+        <text x="100" y="195.5" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="9" fill="#64748B">164</text>
+
+        <!-- Sidebar footer: Local-first & Sync status -->
+        <line x1="12" y1="274" x2="100" y2="274" stroke="#1E293B" stroke-width="1" />
+        <circle cx="17" cy="292" r="3" fill="#10B981" />
+        <text x="25" y="295.5"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="9.5" font-weight="500" fill="#94A3B8">Synced · Local</text>
+      </g>
+
+      <!-- Main Workspace Panel -->
+      <g transform="translate(132, 44)">
+        <!-- Search & Semantic Mode Bar -->
+        <rect x="0" y="0" width="382" height="30" rx="8" fill="#0A1222" stroke="#263554" stroke-width="1" />
+        <!-- Magnifying glass icon -->
+        <circle cx="15" cy="14" r="4.2" fill="none" stroke="#64748B" stroke-width="1.3" />
+        <line x1="18.2" y1="17.2" x2="21" y2="20" stroke="#64748B" stroke-width="1.3" stroke-linecap="round" />
+        <text x="28" y="18.5"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="10.5" fill="#CBD5E1">diagram &amp; workflow agent tools...</text>
+
+        <!-- AI Search active pill -->
+        <rect x="304" y="5" width="72" height="20" rx="5" fill="#4F46E5" fill-opacity="0.28" stroke="#818CF8" stroke-opacity="0.45" stroke-width="1" />
+        <text x="340" y="18.5" text-anchor="middle"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+              font-size="9.5" font-weight="600" fill="#C7D2FE">AI Search</text>
+
+        <!-- CARD 1: AI-Enriched Repo Card with Platform Badges & Quick Actions -->
+        <g transform="translate(0, 40)">
+          <rect x="0" y="0" width="382" height="86" rx="10" fill="url(#cardGrad)" stroke="#243452" stroke-width="1" />
+
+          <!-- Repo Title + Star Count -->
+          <circle cx="15" cy="19" r="4" fill="#3178C6" />
+          <text x="26" y="22.5"
+                font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                font-size="11.5" font-weight="600" fill="#F8FAFC">openclaw/openclaw</text>
+
+          <!-- Subtle quick action icon indicators -->
+          <g transform="translate(256, 12)" stroke="#64748B" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Sparkle / AI -->
+            <path d="M5 1 L6 4 L9 5 L6 6 L5 9 L4 6 L1 5 L4 4 Z" stroke="#10B981" />
+            <!-- Chat / Q&A -->
+            <rect x="16" y="1.5" width="9" height="7" rx="2" />
+            <!-- Release / Package -->
+            <rect x="32" y="1.5" width="9" height="7" rx="1.5" />
+            <line x1="32" y1="4.5" x2="41" y2="4.5" />
+          </g>
+
+          <!-- Stars count -->
+          <path d="M324 14.5 L325.4 17.6 L328.8 18 L326.2 20.3 L326.9 23.6 L324 21.9 L321.1 23.6 L321.8 20.3 L319.2 18 L322.6 17.6 Z" fill="#FBBF24" />
+          <text x="333" y="22.5"
+                font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                font-size="10.5" font-weight="500" fill="#CBD5E1">395K</text>
+
+          <!-- AI Summary -->
+          <text x="14" y="45"
+                font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                font-size="10.5" fill="#94A3B8">Personal AI assistant with multi-channel routing &amp; private local state.</text>
+
+          <!-- Tags & Platform Badges -->
+          <g transform="translate(14, 57)">
+            <rect x="0" y="0" width="68" height="19" rx="4.5" fill="#10B981" fill-opacity="0.14" />
+            <text x="34" y="12.5" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#6EE7B7">AI Analyzed</text>
+
+            <rect x="74" y="0" width="46" height="19" rx="4.5" fill="#6366F1" fill-opacity="0.18" />
+            <text x="97" y="12.5" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" fill="#A5B4FC">Agent</text>
+
+            <rect x="126" y="0" width="50" height="19" rx="4.5" fill="#1E293B" />
+            <text x="151" y="12.5" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" fill="#CBD5E1">macOS</text>
+
+            <rect x="182" y="0" width="42" height="19" rx="4.5" fill="#1E293B" />
+            <text x="203" y="12.5" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="9.5" fill="#CBD5E1">Linux</text>
+
+            <text x="354" y="12.5" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="9.5" fill="#64748B">MIT</text>
+          </g>
+        </g>
+
+        <!-- CARD 2: Commit-Pinned Repository Q&A with Citations -->
+        <g transform="translate(0, 136)">
+          <rect x="0" y="0" width="382" height="86" rx="10" fill="url(#cardGrad)" stroke="#38BDF8" stroke-opacity="0.34" stroke-width="1" />
+
+          <!-- Header -->
+          <circle cx="15" cy="19" r="4" fill="#38BDF8" />
+          <text x="26" y="22.5"
+                font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                font-size="11" font-weight="600" fill="#E0F2FE">Repository Q&amp;A</text>
+
+          <rect x="122" y="10" width="64" height="17" rx="4.5" fill="#0C4A6E" fill-opacity="0.65" stroke="#38BDF8" stroke-opacity="0.35" stroke-width="0.75" />
+          <text x="154" y="21.5" text-anchor="middle"
+                font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                font-size="9" font-weight="500" fill="#7DD3FC">@f5ab379</text>
+
+          <text x="368" y="22" text-anchor="end"
+                font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                font-size="9" fill="#64748B">14 files · verified</text>
+
+          <!-- Answer excerpt -->
+          <text x="14" y="45"
+                font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                font-size="10.5" fill="#CBD5E1">Commit-pinned answer with traceable read-only source citations.</text>
+
+          <!-- Line-level citation chips -->
+          <g transform="translate(14, 57)">
+            <rect x="0" y="0" width="114" height="19" rx="4.5" fill="#0284C7" fill-opacity="0.18" stroke="#38BDF8" stroke-opacity="0.25" stroke-width="0.75" />
+            <text x="57" y="12.5" text-anchor="middle"
+                  font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                  font-size="9" fill="#7DD3FC">README.md:L25-L32</text>
+
+            <rect x="122" y="0" width="112" height="19" rx="4.5" fill="#0284C7" fill-opacity="0.18" stroke="#38BDF8" stroke-opacity="0.25" stroke-width="0.75" />
+            <text x="178" y="12.5" text-anchor="middle"
+                  font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                  font-size="9" fill="#7DD3FC">SKILL.md:L91-L101</text>
+
+            <text x="354" y="12.5" text-anchor="end"
+                  font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                  font-size="9" fill="#64748B">Read-only</text>
+          </g>
+        </g>
+
+        <!-- CARD 3: Smart Current-OS Release Asset Highlight -->
+        <g transform="translate(0, 232)">
+          <rect x="0" y="0" width="382" height="82" rx="10" fill="url(#cardGrad)" stroke="#10B981" stroke-opacity="0.32" stroke-width="1" />
+
+          <!-- Release header -->
+          <circle cx="15" cy="19" r="4" fill="#10B981" />
+          <text x="26" y="22.5"
+                font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                font-size="11.5" font-weight="600" fill="#F8FAFC">ladybird/ladybird</text>
+
+          <rect x="158" y="10" width="44" height="17" rx="4.5" fill="#1E293B" />
+          <text x="180" y="21.5" text-anchor="middle"
+                font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                font-size="9" fill="#CBD5E1">v0.9.1</text>
+
+          <!-- Current System Filter badge -->
+          <rect x="242" y="10" width="126" height="17" rx="4.5" fill="#064E3B" fill-opacity="0.75" stroke="#10B981" stroke-opacity="0.35" stroke-width="0.75" />
+          <text x="305" y="21.5" text-anchor="middle"
+                font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                font-size="9" font-weight="500" fill="#6EE7B7">macOS · Apple Silicon</text>
+
+          <!-- Recommended asset bar -->
+          <g transform="translate(14, 38)">
+            <rect x="0" y="0" width="354" height="32" rx="7" fill="#0B1325" stroke="#1E293B" stroke-width="1" />
+            <text x="12" y="19.5"
+                  font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                  font-size="10" fill="#E2E8F0">ladybird-v0.9.1-macos-arm64.dmg</text>
+
+            <rect x="246" y="7" width="76" height="18" rx="4" fill="#10B981" fill-opacity="0.18" />
+            <text x="284" y="19" text-anchor="middle"
+                  font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                  font-size="9" font-weight="600" fill="#6EE7B7">Recommended</text>
+
+            <!-- Download icon -->
+            <path d="M337 11 L337 19 M333.5 16 L337 19.5 L340.5 16 M333 22 L341 22"
+                  fill="none" stroke="#34D399" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </g>
+        </g>
+      </g>
     </g>
 
-    <!-- Card 2 -->
-    <g transform="translate(64 162)">
-      <rect x="0" y="0" width="414" height="96" rx="10" fill="url(#cardFade)" stroke="#1E293B" stroke-width="0.5" />
-      <circle cx="18" cy="22" r="5" fill="#16A249" />
-      <text x="30" y="26"
-            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-            font-size="13" font-weight="600" fill="#F8FAFC">tailwindlabs/tailwindcss</text>
-      <path d="M340 18 L341.99 23.24 L347.64 23.65 L343.19 27.36 L344.82 32.85 L340 29.44 L335.18 32.85 L336.81 27.36 L332.36 23.65 L338.01 23.24 Z"
-            fill="#D98006" opacity="0.8" />
-      <text x="350" y="27"
-            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-            font-size="12" font-weight="500" fill="#94A3B8">64K</text>
-      <text x="18" y="50"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="12" font-weight="400" fill="#64748B">A utility-first CSS framework for rapid UI development.</text>
-      <rect x="18" y="66" width="60" height="20" rx="4" fill="#16A249" fill-opacity="0.12" />
-      <text x="48" y="80"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="10" font-weight="500" fill="#16A249" text-anchor="middle">Frontend</text>
-      <rect x="84" y="66" width="48" height="20" rx="4" fill="#D98006" fill-opacity="0.12" />
-      <text x="108" y="80"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="10" font-weight="500" fill="#D98006" text-anchor="middle">CSS</text>
-    </g>
-
-    <!-- Card 3 -->
-    <g transform="translate(64 266)">
-      <rect x="0" y="0" width="414" height="96" rx="10" fill="url(#cardFade)" stroke="#1E293B" stroke-width="0.5" />
-      <circle cx="18" cy="22" r="5" fill="#D98006" />
-      <text x="30" y="26"
-            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-            font-size="13" font-weight="600" fill="#F8FAFC">pallets/flask</text>
-      <path d="M340 18 L341.99 23.24 L347.64 23.65 L343.19 27.36 L344.82 32.85 L340 29.44 L335.18 32.85 L336.81 27.36 L332.36 23.65 L338.01 23.24 Z"
-            fill="#D98006" opacity="0.8" />
-      <text x="350" y="27"
-            font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-            font-size="12" font-weight="500" fill="#94A3B8">62K</text>
-      <text x="18" y="50"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="12" font-weight="400" fill="#64748B">A lightweight web framework for Python.</text>
-      <rect x="18" y="66" width="60" height="20" rx="4" fill="#D98006" fill-opacity="0.12" />
-      <text x="48" y="80"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="10" font-weight="500" fill="#D98006" text-anchor="middle">Backend</text>
-      <rect x="84" y="66" width="48" height="20" rx="4" fill="#3178C6" fill-opacity="0.12" />
-      <text x="108" y="80"
-            font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif"
-            font-size="10" font-weight="500" fill="#3178C6" text-anchor="middle">API</text>
-    </g>
+    <!-- Crisp Window Outer Border -->
+    <rect x="0.5" y="0.5" width="523" height="367" rx="14" fill="none" stroke="#2D3E5E" stroke-width="1" />
   </g>
 </svg>

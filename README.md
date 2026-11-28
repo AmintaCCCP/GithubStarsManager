@@ -1,324 +1,269 @@
-<p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="GithubStarsManager — AI organizes your GitHub stars so you can actually find them. Vector search, repository Q&amp;A, MCP, and release tracking, all local-first.">
+<div align="center">
+
+<img src="assets/readme/hero.svg" alt="GithubStarsManager — Turn thousands of GitHub stars into an AI-organized, searchable knowledge base." width="100%" />
+
+<p>
+  <strong>English</strong> &nbsp;|&nbsp; <a href="README_zh.md">简体中文</a>
 </p>
 
-<div align="center">
-<img src="assets/readme/brand/logo.png" alt="GithubStarsManager logo" width="80">
+<img src="assets/readme/brand/logo.png" alt="GithubStarsManager logo" width="68" />
 
 # GithubStarsManager
 
-![100% Local Data](https://img.shields.io/badge/Data%20storage-100%25%20local-success?style=flat&logo=database&logoColor=white) ![AI Support](https://img.shields.io/badge/AI-multi--model-blue?style=flat&logo=openai&logoColor=white) ![All Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat&logo=electron&logoColor=white) [![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/AmintaCCCP/GithubStarsManager) <a href="https://linux.do"><img src="https://img.shields.io/badge/LINUX-DO-FFB003.svg?logo=data:image/svg%2bxml;base64,DQo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiPjxwYXRoIGQ9Ik00Ni44Mi0uMDU1aDYuMjVxMjMuOTY5IDIuMDYyIDM4IDIxLjQyNmM1LjI1OCA3LjY3NiA4LjIxNSAxNi4xNTYgOC44NzUgMjUuNDV2Ni4yNXEtMi4wNjQgMjMuOTY4LTIxLjQzIDM4LTExLjUxMiA3Ljg4NS0yNS40NDUgOC44NzRoLTYuMjVxLTIzLjk3LTIuMDY0LTM4LjAwNC0yMS40M1EuOTcxIDY3LjA1Ni0uMDU0IDUzLjE4di02LjQ3M0MxLjM2MiAzMC43ODEgOC41MDMgMTguMTQ4IDIxLjM3IDguODE3IDI5LjA0NyAzLjU2MiAzNy41MjcuNjA0IDQ2LjgyMS0uMDU2IiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZWNlY2VjO2ZpbGwtb3BhY2l0eToxIi8+PHBhdGggZD0iTTQ3LjI2NiAyLjk1N3EyMi41My0uNjUgMzcuNzc3IDE1LjczOGE0OS43IDQ5LjcgMCAwIDEgNi44NjcgMTAuMTU3cS00MS45NjQuMjIyLTgzLjkzIDAgOS43NS0xOC42MTYgMzAuMDI0LTI0LjM4N2E2MSA2MSAwIDAgMSA5LjI2Mi0xLjUwOCIgc3R5bGU9InN0cm9rZTpub25lO2ZpbGwtcnVsZTpldmVub2RkO2ZpbGw6IzE5MTkxOTtmaWxsLW9wYWNpdHk6MSIvPjxwYXRoIGQ9Ik03Ljk4IDcwLjkyNmMyNy45NzctLjAzNSA1NS45NTQgMCA4My45My4xMTNRODMuNDI2IDg3LjQ3MyA2Ni4xMyA5NC4wODZxLTE4LjgxIDYuNTQ0LTM2LjgzMi0xLjg5OC0xNC4yMDMtNy4wOS0yMS4zMTctMjEuMjYyIiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZjlhZjAwO2ZpbGwtb3BhY2l0eToxIi8+PC9zdmc+" alt="LINUX DO" /></a>
+**Turn thousands of GitHub stars into an AI-organized, searchable knowledge base.**
 
-<a href="https://www.producthunt.com/products/githubstarsmanager?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-githubstarsmanager" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1001489&theme=light&t=1754373322417" alt="GithubStarsManager - AI&#0032;organizes&#0032;GitHub&#0032;stars&#0032;for&#0032;easy&#0032;find | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a> <a href="https://trendshift.io/repositories/28489?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-28489" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/28489/daily?language=TypeScript" alt="AmintaCCCP%2FGithubStarsManager | Trendshift" width="250" height="55"/></a>
+Local-first desktop app & self-hostable web workspace that syncs your stars, writes summaries and tags with your own AI models, searches by meaning, answers commit-pinned repo questions, tracks releases for your OS, and connects to coding agents via MCP.
 
-**Tired of starring everything and finding nothing?**
-
-GitHub Stars Manager automatically syncs your starred repos, uses AI to summarize and categorize them, and lets you find anything with semantic search. Track releases, filter assets, and one-click download — smarter than manual tags, simpler than GitHub.
-
-<p align="center">
-  <a href="README_zh.md"><img src="./assets/readme/sections/lang-en.svg" width="100%" alt="Current language: English. Click to open the Chinese README."></a>
+<p>
+  <a href="https://github.com/AmintaCCCP/GithubStarsManager/releases"><strong>Download Desktop</strong></a> ·
+  <a href="#docker-self-host"><strong>Docker Self-Host</strong></a> ·
+  <a href="#quick-start"><strong>Quick Start</strong></a> ·
+  <a href="#demo-video"><strong>Demo Video</strong></a> ·
+  <a href="https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage-EN"><strong>Plugin Wiki</strong></a>
 </p>
+
+<p>
+  <img src="https://img.shields.io/badge/Data_Storage-100%25_Local-2ea44f?style=flat&logo=sqlite&logoColor=white" alt="100% Local Data" />
+  <img src="https://img.shields.io/badge/AI-Multi--Model-0969da?style=flat&logo=openai&logoColor=white" alt="Multi-Model AI" />
+  <img src="https://img.shields.io/badge/Platform-macOS_%7C_Windows_%7C_Linux_%7C_Docker-6e40c9?style=flat&logo=electron&logoColor=white" alt="All Platforms" />
+  <img src="https://img.shields.io/badge/UI_Languages-10-1f883d?style=flat" alt="10 UI Languages" />
+  <a href="https://zread.ai/AmintaCCCP/GithubStarsManager"><img src="https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff" alt="Ask Zread" /></a>
+  <a href="https://linux.do"><img src="https://img.shields.io/badge/LINUX-DO-FFB003.svg?logo=data:image/svg%2bxml;base64,DQo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiPjxwYXRoIGQ9Ik00Ni44Mi0uMDU1aDYuMjVxMjMuOTY5IDIuMDYyIDM4IDIxLjQyNmM1LjI1OCA3LjY3NiA4LjIxNSAxNi4xNTYgOC44NzUgMjUuNDV2Ni4yNXEtMi4wNjQgMjMuOTY4LTIxLjQzIDM4LTExLjUxMiA3Ljg4NS0yNS40NDUgOC44NzRoLTYuMjVxLTIzLjk3LTIuMDY0LTM4LjAwNC0yMS40M1EuOTcxIDY3LjA1Ni0uMDU0IDUzLjE4di02LjQ3M0MxLjM2MiAzMC43ODEgOC41MDMgMTguMTQ4IDIxLjM3IDguODE3IDI5LjA0NyAzLjU2MiAzNy41MjcuNjA0IDQ2LjgyMS0uMDU2IiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZWNlY2VjO2ZpbGwtb3BhY2l0eToxIi8+PHBhdGggZD0iTTQ3LjI2NiAyLjk1N3EyMi41My0uNjUgMzcuNzc3IDE1LjczOGE0OS43IDQ5LjcgMCAwIDEgNi44NjcgMTAuMTU3cS00MS45NjQuMjIyLTgzLjkzIDAgOS43NS0xOC42MTYgMzAuMDI0LTI0LjM4N2E2MSA2MSAwIDAgMSA5LjI2Mi0xLjUwOCIgc3R5bGU9InN0cm9rZTpub25lO2ZpbGwtcnVsZTpldmVub2RkO2ZpbGw6IzE5MTkxOTtmaWxsLW9wYWNpdHk6MSIvPjxwYXRoIGQ9Ik03Ljk4IDcwLjkyNmMyNy45NzctLjAzNSA1NS45NTQgMCA4My45My4xMTNRODMuNDI2IDg3LjQ3MyA2Ni4xMyA5NC4wODZxLTE4LjgxIDYuNTQ0LTM2LjgzMi0xLjg5OC0xNC4yMDMtNy4wOS0yMS4zMTctMjEuMjYyIiBzdHlsZT0ic3Ryb2tlOm5vbmU7ZmlsbC1ydWxlOmV2ZW5vZGQ7ZmlsbDojZjlhZjAwO2ZpbGwtb3BhY2l0eToxIi8+PC9zdmc+" alt="LINUX DO" /></a>
+</p>
+
+<p>
+  <a href="https://www.producthunt.com/products/githubstarsmanager?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-githubstarsmanager" target="_blank" rel="noopener noreferrer"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1001489&theme=light&t=1754373322417" alt="GithubStarsManager - AI organizes GitHub stars for easy find | Product Hunt" width="230" height="50" /></a>
+  <a href="https://trendshift.io/repositories/28489?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-28489" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/28489/daily?language=TypeScript" alt="AmintaCCCP/GithubStarsManager | Trendshift" width="230" height="50" /></a>
+</p>
+
 </div>
 
-## See it
+---
 
-<p align="center">
-  <img src="./assets/readme/sections/see-it.svg" width="100%" alt="See it — product screenshots of Stars, search, releases, and repository Q&amp;A.">
-</p>
+## Demo Video
+
+See GithubStarsManager in action — syncing stars, running AI organization, searching semantically, tracking releases, and asking repository questions:
 
 https://github.com/user-attachments/assets/ad3493a0-948a-4de5-8de1-4e9afc46ec4d
 
+---
+
+## Core Workflows
+
+Stop starring projects and losing them. Everything from AI organization and semantic discovery to commit-pinned answers and OS-matched downloads lives in one fast desktop or self-hosted workspace.
+
+<p align="center">
+  <img src="assets/readme/screenshots/repo.png" width="100%" alt="GithubStarsManager Stars workspace showing 1,286 AI-organized repositories, category sidebar, platform badges, multi-account switcher, and customizable card quick actions" />
+  <br />
+  <sub><i>Main Stars workspace — smart category sidebar, platform badges, multi-account switching, and draggable card quick actions. Screenshots show the Simplified Chinese UI; the app ships natively in <a href="#interface-languages">10 languages</a>.</i></sub>
+</p>
+
 <table>
   <tr>
-    <td width="50%"><img src="assets/readme/screenshots/repo.png" alt="Stars view: AI-categorized starred repositories with tags, language dots, and a category sidebar" /></td>
-    <td width="50%"><img src="assets/readme/screenshots/search.png" alt="Search and filters: keyword, language, tag, analysis status, and subscription filters over starred repos" /></td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/search.png" width="100%" alt="AI Semantic Search matching natural-language intent across starred repositories" />
+      <br />
+      <strong>Search by intent, not memory</strong> — Natural-language semantic search surfaces the right repos even when your query shares zero keywords with their names.
+    </td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/filter.png" width="100%" alt="Multi-dimensional filter panel for AI status, languages, platforms, licenses, tags, star range, and recent activity" />
+      <br />
+      <strong>Slice thousands of stars in seconds</strong> — Combine filters across AI status, platform (macOS/Linux/Docker/CLI), license, star range, recent pushes, and category locks.
+    </td>
   </tr>
   <tr>
-    <td><img src="assets/readme/screenshots/release.png" alt="Release timeline: subscribed repos, unread markers, platform filters, and one-click asset downloads" /></td>
-    <td><img src="assets/readme/screenshots/copilot.png" alt="Repository Q&A assistant: commit-pinned, read-only answers with traceable sources" /></td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/copilot.png" width="100%" alt="Commit-pinned Repository Q&A with retrieval trace, clickable file:line citations, and 30-day session history" />
+      <br />
+      <strong>Commit-pinned Repository Q&amp;A</strong> — Ask focused repo questions with README/docs fast-path, streaming answers, transparent file traces, and clickable <code>file:line</code> citations.
+    </td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/readme.png" width="100%" alt="Built-in README reader with auto-generated TOC, multi-language README switcher, and interleaved bilingual translation" />
+      <br />
+      <strong>In-app bilingual README reader</strong> — Read GitHub-flavored Markdown (Alerts, KaTeX, Mermaid) with auto-TOC, locale README switching, and paragraph-by-paragraph bilingual translation.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/release.png" width="100%" alt="Unified Release timeline with built-in Current System asset filter highlighting recommended macOS Apple Silicon downloads" />
+      <br />
+      <strong>Release tracking with Current System filter</strong> — Auto-detects your OS and CPU architecture to highlight recommended installers, with AI changelog summaries and aria2 downloads.
+    </td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/discovery.png" width="100%" alt="Discovery Center aggregating GitHub Trending, Code Search, X Tweets, Telegram channels, and curated newsletters" />
+      <br />
+      <strong>Discovery Center &amp; Global Code Search</strong> — Track GitHub Trending (with rank history &amp; streaks), 8 built-in channels (X, Telegram, newsletters), custom RSS/Atom/JSON feeds, and public code search.
+    </td>
+  </tr>
+</table>
+
+---
+
+## Key Capabilities
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+
+**AI Organization, Bilingual Reading & Batch Import**
+- Auto-sync all stars, then batch-generate summaries, tags, platforms, and categories with pause/resume and **locked categories** AI never overwrites.
+- **Star from Links:** paste prose, Markdown, URLs, or JSON to extract, preview (with README), and batch-star up to 50 repos (keeps 10-item per-account history).
+- **Bilingual README & Auto-Translated Descriptions:** near-fullscreen reader with TOC, GFM Alerts, KaTeX, Mermaid, multi-language README switching, and Original / Translated / Bilingual modes.
+
+</td>
+    <td width="50%" valign="top">
+
+**Semantic Vector Search & "Find Similar"**
+- Powered by [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) with a **one-click CLI deploy wizard** (`npm run deploy:vector`) — no dashboard clicking required.
+- Incremental indexing, auto-detected vector dimensions, and **no-reindex reranking** (SiliconFlow `BAAI/bge-reranker-v2-m3` or LLM reranking).
+- Upgraded **3-stage no-vector AI fallback** (query expansion + local lexical recall + LLM selection) when Vectorize isn't enabled, plus **Find similar repositories** on every repo card.
+
+</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+
+**Commit-Pinned Repository Q&A**
+- Rebuilt with a **README/docs fast-path**, automatic intent rewriting, explicit evidence gates, a **50 MB local snapshot cache**, and real streaming responses.
+- Choose task depth (*Default / Quick / Deep / Unlimited*), search Release notes & Issues, inspect clickable `file:line` citations with hover previews, and jump across chats in the **Global Q&A History drawer**.
+
+</td>
+    <td width="50%" valign="top">
+
+**Smart Release Tracking**
+- Aggregate releases from starred, watched, or custom repositories in one inbox with **Latest Version Only** mode and AI changelog summaries.
+- Built-in **Current System** filter matches your OS and CPU architecture automatically; layer keyword blacklists and per-filter include/exclude repo rules, then download in-browser or via aria2 RPC.
+
+</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+
+**8-Channel Discovery & Global Code Search**
+- Browse **8 built-in channels**: Trending (with daily ranking history, streaks & star growth), Hot Release, Most Popular, Topic, X Tweets, Telegram Channels, Ruanyifeng Weekly, and Repo Search (including AI Semantic Search mode).
+- Add up to **10 custom RSS/Atom/JSON feeds**, hide/show channels, and run **Global Code Search** across public GitHub code with path, extension, and language filters.
+
+</td>
+    <td width="50%" valign="top">
+
+**Redesigned Workspace, 16 Themes & Multi-Account**
+- Unified desktop Workspace Shell with per-module sidebars, **16 curated themes** (independent light/dark palettes, follow-system mode, custom accent/radius/font scale), toggleable repo card fields, and **draggable card quick actions**.
+- **Multi-Account Switching** via storage-boundary isolation: separate local IndexedDB/state, per-profile backend SQLite & MCP endpoints (`X-GSM-Profile` / `?profile=<id>`), and cross-profile WebDAV/Vectorize conflict protection.
+- Also includes **Fork sync & GitHub Actions**, **Gist vault** with AI summaries, and **bidirectional GitHub Lists sync**.
+
+</td>
   </tr>
 </table>
 
 <details>
-<summary>More views — Discover, Forks, Gists, Settings, MCP</summary>
+<summary>More Views — Forks, Gists, 16 Themes &amp; AI Config</summary>
 
-| View | Screenshot |
-|------|------------|
-| Discover / Trending | ![Discovery](assets/readme/screenshots/discovery.png) |
-| Fork management | ![Forks](assets/readme/screenshots/fork.png) |
-| Gist management | ![Gists](assets/readme/screenshots/gist.png) |
-| Settings | ![Settings](assets/readme/screenshots/settings.png) |
-| AI models | ![AI config](assets/readme/screenshots/ai.png) |
-| Network proxy | ![Network](assets/readme/screenshots/network.png) |
-| Vector search | ![Vectorize](assets/readme/screenshots/vectorize.png) |
-| MCP server | ![MCP](assets/readme/screenshots/mcp.png) |
-
-</details>
-
-<p align="center">
-  <img src="./assets/readme/workflow.svg" width="100%" alt="Four steps: sync stars, AI-organize them, find by meaning, then act with Q&amp;A, MCP, and release tracking.">
-</p>
-
-## ✨ Key Features
-
-<p align="center">
-  <img src="./assets/readme/sections/key-features.svg" width="100%" alt="Key features — AI management, vector search, repository Q&amp;A, MCP, and release tracking.">
-</p>
+<br />
 
 <table>
   <tr>
     <td width="50%" valign="top">
-
-**🤖 AI-managed repositories**
-
-Your stars stop being a pile and become a library. The app syncs every starred repo, then AI writes summaries, tags, and categories for them — in bulk, with pause/resume, and with locked categories it will never overwrite. Search by intent instead of remembering exact names.
-
-</td>
+      <img src="assets/readme/screenshots/fork.png" width="100%" alt="Fork management view with upstream update detection, target-branch sync modal, and GitHub Actions triggers" />
+      <br />
+      <strong>Fork Management</strong> — Track upstream commits across all forks, sync into any target branch with conflict handling, and trigger GitHub Actions workflows inline.
+    </td>
     <td width="50%" valign="top">
-
-**🧠 Vector search — including "find similar repositories"**
-
-Natural-language search over your stars, powered by [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/): repo descriptions (or full READMEs) are embedded and matched by semantic similarity, with optional AI reranking and automatic keyword fallback. And on any repo card, one click of **Find similar repositories** builds a semantic neighborhood around it — instantly surfacing the starred repos closest to it.
-
-</td>
+      <img src="assets/readme/screenshots/gist.png" width="100%" alt="Gist vault with AI-generated summary banner, multi-file syntax-highlighted preview, and one-click copy" />
+      <br />
+      <strong>Gist Vault</strong> — Manage personal and starred Gists with a multi-file editor, AI summaries, semantic search, syntax highlighting, and one-click copy.
+    </td>
   </tr>
   <tr>
-    <td valign="top">
-
-**💬 Repository Q&A Assistant**
-
-Ask simple, focused questions about a single repository right from its card. Every session is pinned to a specific commit, shows the read-only evidence behind each answer with traceable sources, and keeps its history locally. It doesn't index the whole repository — for deep code analysis, use a mature coding agent.
-
-</td>
-    <td valign="top">
-
-**🛰️ MCP Server**
-
-Agents like Claude Code and Cursor can read and search your AI-enriched stars through the [Model Context Protocol](https://modelcontextprotocol.io/) — Streamable HTTP or legacy SSE, Bearer-token auth, read-only tools, enabled from Settings with a copyable agent config. No extra install.
-
-</td>
-  </tr>
-  <tr>
-    <td valign="top">
-
-**📡 Release tracking**
-
-Subscribe to repositories and watch every new version land in one unified timeline. Filter assets by platform and file type, save custom keyword rules, and download with one click — in the browser or straight into aria2.
-
-</td>
-    <td valign="top">
-
-**Also included**
-
-Fork sync and GitHub Actions, Gist browse/edit with AI summaries, 12 theme presets, HTTP/SOCKS5 proxy, WebDAV backup, Discover (Trending / Hot Release / Most Popular), diagnostic logs, bilingual wiki jump, local plugins, and a packaged desktop client.
-
-</td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/settings.png" width="100%" alt="Appearance settings showing 16 built-in themes with independent light and dark palettes, card field toggles, and draggable quick actions" />
+      <br />
+      <strong>16 Themes &amp; Card Customization</strong> — Pick separate light/dark palettes from 16 built-in themes, toggle visible repo card fields, and drag to reorder card quick actions.
+    </td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/ai.png" width="100%" alt="AI model configuration modal with provider format, concurrency 1-10, reasoning effort, tool calling toggle, custom prompts, and README translation engine" />
+      <br />
+      <strong>Multi-Model AI Config</strong> — Switch between OpenAI, Anthropic, Ollama, DeepSeek, OpenRouter, or custom endpoints with 1–10 concurrency, reasoning effort, tool calling, custom prompts, and README translation engine settings.
+    </td>
   </tr>
 </table>
 
-### Everything else
+</details>
 
-| Feature | Description |
-|---------|-------------|
-| **Auto-sync Stars** | Connect your GitHub token to automatically pull all starred repositories |
-| **GitHub Lists Sync** | Bidirectional sync with native GitHub Lists: pull Lists into tags/categories with auto-lock, push local categories back as GitHub Lists |
-| **Semantic Search** | Find repos by intent, not exact names |
-| **Repository Release Downloads** | Open a repository's current releases from its card; browse paginated assets, release notes, source archives, and optional AI summaries, then download in the browser or through a configured RPC downloader |
-| **One-click Downloads** | Expand release assets and download instantly |
-| **Smart Asset Filters** | Match assets by keywords (dmg / mac / arm64 / aarch64) |
-| **Discovery Center** | Browse GitHub Trending, hot releases, and most popular projects |
-| **Fork Management** | View, sync upstream, and trigger GitHub Actions workflows on forked repos |
-| **Gist Management** | Browse, create, edit, and delete Gists; AI-powered summaries and semantic search |
-| **12 Theme Presets** | Switch instantly between 12 built-in palettes, each with coordinated light and dark variants, from Settings with live previews |
-| **Network Proxy** | HTTP / SOCKS5 proxy with protocol-level connection testing |
-| **Remote Download (aria2)** | Send release assets to aria2 for download via JSON-RPC |
-| **Diagnostic Logs** | Unified frontend/backend log viewer with debug capture mode |
-| **Bilingual Wiki Jump** | Deepwiki (EN) or zread (ZH) based on repository language |
-| **Local plugins** | Electron-only extensions: repository actions, exporters, release recommendations, and sandboxed plugin pages. [Usage](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage-EN) · [Development](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Development-EN) |
-| **Packaged Client** | No environment setup required — download and run |
+<details>
+<summary>Full Settings Reference (15 Tabs across 3 Groups)</summary>
 
-### Optional Backend Server
+| Group | Tabs | What you can configure |
+|-------|------|------------------------|
+| **Application** | General · Appearance · Star Sync | 10 UI languages, auto-launch & minimize-to-tray, auto-update toggle; 16 themes, follow-system, custom tokens, card fields & draggable quick actions; GitHub Lists bidirectional sync |
+| **AI & data** | AI Config · WebDAV · Backup · Backend · Categories · Menu · Data Management | Multi-provider LLM configs (concurrency, reasoning effort, tool calling, prompts, Q&A budgets, README translation); WebDAV (incl. custom `User-Agent`); incremental backup/restore; self-hosted backend URL, `API_SECRET`, & per-device routing (`auto`/`backend`/`browser`); category colors/locks; top nav visibility & order; JSON import/export & reset |
+| **Connection & diagnostics** | Diagnostic Logs · Network · Plugin Management · Vector Search · MCP Server | Full-stack log viewer with auto-redaction & diagnostic bundle export; HTTP/SOCKS5 proxy & aria2 JSON-RPC; Desktop Plugin Marketplace & permissions; Cloudflare Vectorize & reranking; local/remote MCP server |
 
-Deploy an Express + SQLite backend for:
+</details>
 
-- **Cross-device Sync** — Share data between browsers and devices
-- **CORS-free API Proxying** — AI and WebDAV calls route through the server
-- **Encrypted Token Storage** — API keys stored securely, never exposed to browser
-- **Network Proxy Forwarding** — Route all outbound requests (GitHub, AI, WebDAV) through HTTP/SOCKS5 proxy
-- **RPC Download Proxy** — Forward aria2 download requests through the server with encrypted secret storage
+> [!NOTE]
+> **Repository Q&A scope:** The Q&A assistant is built for focused questions about a single repository. It does not index every file in the codebase and may occasionally return incomplete evidence or decline to answer. For whole-codebase debugging, multi-file refactoring, or code edits, clone the repo locally and use a dedicated coding agent.
 
 ---
 
-## 🔍 Interface notes
+## Desktop Plugin Ecosystem
 
-### 1. Repository Management (`Stars` View)
+Extend the **Electron desktop client** with community and local plugins via the built-in **Plugin Marketplace** — browse and search by source, install or update in one click, add external GitHub registries, and inspect permission changes, revocations, or blocks before enabling.
 
-**Features:**
-- **Auto-sync** — Connect your GitHub token to automatically pull all starred repos
-- **AI Batch Analysis** — Select multiple repos and use AI to auto-generate descriptions, tags, and categories; supports pause/resume
-- **Repo Card Display** — Shows stars, forks, language, default branch status; supports expanding README preview
-- **Category Sidebar** — Drag to reorder categories, custom category colors, collapse/expand sidebar; supports locking categories to prevent AI overrides
-- **Bulk Action Toolbar** — Bulk categorize to a specified category, bulk restore AI analysis results
-- **Multi-layout Support** — Adapts layout for desktop and tablet
-- **Subscription Indicators** — Shows which repos have Release update subscriptions
-- **AI Analysis Status** — Shows analyzed / not analyzed / analysis failed; filter by analysis status
-- **Find similar repositories** — From any card, jump to a semantic neighborhood of starred repos closest to it (requires Vector Search)
+Official showcase plugins in [`examples/plugins/`](examples/plugins/):
+- **Repo Insights** (`repo-insights`) — Live per-repo health dashboard: health score, 52-week commit activity, code churn, contributors, bus factor, release cadence, language breakdown, security advisories, and 6-axis health radar.
+- **Repo Info Card** (`repo-info-card`) — AI-generated shareable editorial repo cards in 3 visual styles, custom aspect ratios, and 10+ languages with live HTML/code preview and `@2x` PNG export.
+- **Repo Custom Fields** (`repo-custom-fields`) — Compact popup to attach clickable URLs, install commands/code snippets, and Markdown notes directly to any repo.
+- Also ships `markdown-exporter` and `smart-release-recommender`.
 
----
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/plugins.png" width="100%" alt="Desktop Plugin Manager showing community registry, installed plugins, enable switches, and granular permission pills" />
+      <br />
+      <strong>Plugin Marketplace &amp; Permissions</strong> — Browse community registries, toggle plugins, and audit explicit permissions (<code>repositories:read</code>, <code>ai:invoke</code>, <code>network:*</code>, <code>storage</code>).
+    </td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/repoInsights.png" width="100%" alt="Repo Insights plugin displaying health score ring, KPI cards, 52-week commit activity, and 6-axis health radar" />
+      <br />
+      <strong>Repo Insights</strong> — Run objective repository due diligence with health score, 52-week commit charts, release cadence, and 6-axis radar without leaving the app.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/infocard.png" width="100%" alt="Repo Info Card plugin generating an editorial repo card with style switcher, aspect ratios, live preview, and 2x PNG export" />
+      <br />
+      <strong>Repo Info Card</strong> — Generate designer-grade editorial repo cards in 3 styles, multiple ratios, and 10+ languages, then copy HTML or save <code>@2x</code> PNGs.
+    </td>
+    <td width="50%" valign="top">
+      <img src="assets/readme/screenshots/customFields.png" width="100%" alt="Repo Custom Fields compact popup attaching clickable website link and copyable install command to a repository" />
+      <br />
+      <strong>Repo Custom Fields</strong> — Turn starred repos into your personal handbook by attaching doc links, copyable install commands, and Markdown notes.
+    </td>
+  </tr>
+</table>
 
-### 2. Repository Q&A Assistant
+**Trust model & docs:** Local plugins are **Electron desktop only** (browser and Docker frontend builds do not include the plugin host). Installed plugins stay disabled until you explicitly grant their Manifest permissions. Worker plugins run as isolated Node.js processes (**not a security sandbox**); page plugins render inside a restricted iframe. Enable via **Settings → Plugins**.
 
-Ask concise questions about a single repository directly from its card. Each conversation is tied to a specific commit and shows the evidence used to produce the answer.
-
-**Features:**
-- **Commit-pinned, read-only evidence** — Sources remain tied to the repository revision selected when the conversation starts.
-- **Traceable answers** — Inspect source links and the assistant's retrieval activity alongside each response.
-- **Local session history** — Revisit, search, and manage conversations independently for each repository.
-- **Configurable retrieval budgets** — Control limits for turns, tool calls, document/code reads, and response duration in AI settings.
-
-> **Early-access notice:** This feature is designed for simple repository questions and may fail, return incomplete evidence, or be unable to answer. It does not index every file in the queried repository. For complex, whole-codebase analysis, multi-file reasoning, debugging, or code changes, clone the repository locally and use a mature coding agent.
-
----
-
-### 3. Release Timeline (`Releases` View)
-
-**Features:**
-- **Release Subscription Management** — Subscribe/unsubscribe to repo releases; supports bulk unsubscribe
-- **Timeline Display** — Lists all new releases in reverse chronological order; shows read/unread status
-- **Smart Asset Filtering** — Filter by platform (macOS / Windows / Linux / ARM); filter by file type (dmg / zip / deb / rpm / apk)
-- **Custom Filter Rules** — Save custom keyword filter rules
-- **Expand & Download** — Expand release assets list, one-click copy download links; shows file size
-- **Release Details** — Displays version number, release name, time since release
-- **Multi-view Modes** — List view / Grid view toggle
-- **Paginated Loading** — Load historical release records page by page
-- **Refresh Status Indicator** — Shows last refresh time
-
----
-
-### 4. Discovery Center (`Discover` View)
-
-**Features:**
-- **Five Discovery Channels** — Trending / Hot Release / Most Popular / Topic / Search
-- **Trending Time Range** — Three time dimensions: Today / This Week / This Month
-- **Trending Filtering Rules** — Updated within 30 days, 50+ stars, sorted by stars descending
-- **Platform Filtering** — Filter by OS (All / macOS / Windows / Linux / Browser)
-- **Programming Language Filtering** — Filter by language (JavaScript / TypeScript / Python / Go / Rust, etc.)
-- **AI Repo Analysis** — One-click AI analysis for trending repos
-- **Subscribe to Trending Repos** — Add interesting trending repos to subscription list
-- **Mobile Tab Navigation** — Channel switching adapted for mobile devices
-
-> Trending data is sourced from GitHub's trending RSS feed, auto-updated every 30 minutes. Perfect for discovering emerging hot projects, tracking tech trends, and finding learning directions.
+- [Plugin Usage Guide (Wiki)](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage-EN) — install, enable, permissions, and where plugin actions appear
+- [Plugin Development Guide (Wiki)](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Development-EN) — Manifest format, Worker API, page bridge, and platform limits
+- [Plugin V1 Development Reference](docs/plugins/v1-development.md) — in-repo V1.4–V1.6 technical spec & API reference
+- Examples: [`examples/plugins/`](examples/plugins/)
 
 ---
 
-### 5. Fork Management (`Forks` View)
+## Quick Start
 
-**Features:**
-- **Fork Listing** — Automatically fetches all your forked repos with upstream update detection
-- **One-click Sync** — Merge upstream changes into any branch with conflict handling
-- **GitHub Actions** — View and trigger workflow runs directly from fork cards
-- **Read/Unread Tracking** — Pulse indicator for forks with new upstream commits
-- **Search & Pagination** — Full-text search, configurable page sizes
+### Desktop Client (Recommended)
 
----
+No Node.js or CORS setup required — download the slimmed (~100 MB asar-packed) native installer for **macOS, Windows, or Linux**:
 
-### 6. Gist Management (`Gist` View)
+- **[Download Latest Release](https://github.com/AmintaCCCP/GithubStarsManager/releases)**
+- Includes **auto-launch**, **minimize-to-tray** (with 10-language tray menu & Restart App), **auto-update toggle** with per-version "Don't remind me", local **MCP server**, and **Plugin Marketplace**.
+- **macOS Gatekeeper:** The DMG ships with a built-in **Fix Damaged App** helper if macOS flags the unsigned app on first launch.
 
-**Features:**
-- **Gist Listing** — Automatically syncs all your Gists and starred Gists with category filtering (All / Mine / Starred)
-- **Create & Edit** — Multi-file Gist editor with syntax-highlighted code blocks; supports adding, renaming, and deleting files
-- **AI Analysis** — One-click AI summarization for Gist content; batch analysis with pause/resume
-- **Semantic Search** — AI-powered search reranking to find Gists by intent, not just filename
-- **Detail View** — Expandable Gist detail modal with file content, syntax highlighting, and copy-to-clipboard
-- **Star & Unstar** — Star/unstar Gists directly from the card
-- **Smart Filtering** — Filter by analysis status, language, and sort by name/date/file count
+### Docker Self-Host
 
----
-
-### 7. Search & Filters
-
-**Features:**
-- **Multi-dimensional Search** — Keyword search, repo status filter, tag filter, language filter, platform filter
-- **AI Analysis Status Filter** — Analyzed / Not Analyzed / Analysis Failed / Edited
-- **Release Subscription Filter** — Subscribed / Not Subscribed to Release
-- **Category Status Filter** — Category Locked / Not Locked
-- **Shortcut Keys Support** — Displays search shortcut hints
-- **Search Statistics** — Shows result count and filter conditions
-- **Search Demo Mode** — Demonstrates semantic search capabilities
-
----
-
-### 8. Settings Panel
-
-**Settings Groups:**
-
-| Group | Features |
-|-------|----------|
-| **General** | Language toggle (ZH/EN), light/dark mode, and live-preview switching among 12 built-in theme presets |
-| **AI Config** | Configure OpenAI / Anthropic / Ollama / compatible APIs; supports custom endpoints and keys |
-| **WebDAV** | Backup config for Jianguoyun, Nextcloud, ownCloud, and standard WebDAV services |
-| **Backup** | Backup history, manual backup/restore, incremental backup |
-| **Backend Server** | Connect to self-hosted backend, API key authentication, sync status indicator |
-| **Network** | HTTP/SOCKS5 proxy config with protocol-level testing; aria2 RPC remote download setup |
-| **Category** | Category management, category sorting, default category override rules |
-| **Data Management** | Data import/export, clear local data, reset all data |
-| **Vector Search** | Configure Cloudflare Vectorize worker, embedding model, index mode (description / README), and manage index rebuild |
-| **MCP Server** | Enable MCP so agents (Claude Code, Cursor, etc.) can search your AI-enriched stars via Streamable HTTP / SSE with Bearer-token auth |
-| **Plugins** | Install local plugins, grant permissions, configure SearXNG for page search. Desktop only — see the [plugin wiki](https://github.com/AmintaCCCP/GithubStarsManager/wiki) |
-
-**Appearance:** Select any of the 12 built-in theme presets in **Settings → General → Appearance**. Every preset includes coordinated light and dark palettes and applies immediately across the application.
-
----
-
-### 9. Custom AI Models
-
-**Features:**
-- **Multi AI Provider Support** — OpenAI (GPT-3.5/GPT-4), Anthropic (Claude), Ollama (local models), any OpenAI-compatible API
-- **Custom Endpoints** — Supports privately deployed AI services
-- **Connection Testing** — Test API connection after configuration
-- **AI Model Selection** — Choose the specific model to use
-
-## 🌍 Interface Languages
-
-The UI ships in **10 languages**: 简体中文 · English · 日本語 · Español · Português (Brasil) · Русский · 繁體中文 · Français · Deutsch · 한국어.
-
-- Switch anytime in **Settings → General → Language**, or via the language picker on the login screen; the choice is persisted per browser and the desktop client follows it too.
-- First launch picks up your browser/OS language automatically.
-- AI-generated content follows the UI language: repository summaries & tags, Gist summaries, Release changelog digests, and Repository Q&A answers are written in the selected language (built-in prompts; a custom prompt keeps full user control).
-- Built-in categories follow the UI language as well — display names, AI tag matching, and GitHub Lists syncing all rename automatically when you switch languages.
-- Missing translations gracefully fall back to English. Translation drafts are machine-assisted and get refined over time — **PRs for translation improvements are very welcome** ([`src/locales`](src/locales)).
-
-## 🛠 Tech Stack
-
-- **Frontend**: React 18 + TypeScript + Tailwind CSS
-- **State Management**: Zustand
-- **Icons**: Lucide React + Font Awesome
-- **Build Tool**: Vite
-- **Deployment**: Netlify
-
-## 👋🏻 How to Use
-
-<p align="center">
-  <img src="./assets/readme/sections/how-to-use.svg" width="100%" alt="How to use — desktop client, source, or Docker.">
-</p>
-
-### 💻 Desktop Client (Recommended)
-
-You can download desktop client here:
-https://github.com/AmintaCCCP/GithubStarsManager/releases
-
-### 🤖 Run With code
-
-1. Download the source code, or clone the repository
-2. Navigate to the directory, and open a Terminal window at the downloaded folder.
-3. Run `npm install` to install dependencies and `npm run dev` to build
-
-> [!TIP]
-> When running the project locally using `npm run dev`, calls to AI services and WebDAV may fail due to CORS restrictions. To avoid this issue, use the prebuilt client application or build the client yourself. Alternatively, run the backend server (`cd server && npm run dev`) to proxy API calls and avoid CORS entirely.
-
-### 🐳 Run With Docker
-
-Pre-built backend **and frontend** images are available on GHCR — no local build required. Existing Docker users should continue to use the unchanged two-service Compose deployment:
+Pre-built images are published to GHCR — no local build required. Existing Docker users should keep using the unchanged two-service Compose deployment:
 
 ```bash
 docker pull ghcr.io/amintacccp/github-stars-manager-server:latest
@@ -326,50 +271,52 @@ docker pull ghcr.io/amintacccp/github-stars-manager-frontend:latest
 docker-compose up -d
 ```
 
-An additional **optional full-stack image** (`ghcr.io/amintacccp/github-stars-manager-fullstack`) is available for users who prefer one container, one image tag, and one persistent data volume. It serves the same web UI, `/api`, and MCP endpoints from one origin. Set `API_SECRET` in a root `.env` file first; the full-stack Compose file refuses to start a new unauthenticated deployment:
+Frontend runs on port `8080`, backend on port `3000`, with data persisted in a Docker volume. This split deployment remains the recommended choice when you want to version, operate, or scale frontend and backend independently.
+
+An **optional single-container full-stack image** (`ghcr.io/amintacccp/github-stars-manager-fullstack`) is also available if you prefer one container, one tag, and one volume serving the web UI, `/api`, and MCP endpoints from one origin. Set `API_SECRET` in a root `.env` file first — the full-stack Compose file refuses to start an unauthenticated deployment:
 
 ```bash
 API_SECRET=replace-with-a-long-random-secret
 docker compose -f docker-compose.fullstack.yml up -d
 ```
 
-This new option does not replace or modify the existing frontend image, backend image, `docker-compose.yml`, or desktop clients. The canonical role names are `-frontend`, `-backend`, and `-fullstack`; the existing `-server` backend image remains a compatibility alias for current deployments. Formal `vX.Y.Z` Docker tags must match the root `package.json` client version, while `latest` and `sha-*` remain development and traceability tags. See [DOCKER.md](DOCKER.md#optional-single-container-full-stack-deployment) for full-stack deployment, migration, backup, and rollback instructions.
+The canonical image role names are `-frontend`, `-backend`, and `-fullstack`; the existing `-server` backend image remains a compatibility alias for current deployments. Formal `vX.Y.Z` Docker tags match the root `package.json` version (`0.9.1`), while `latest` and `sha-*` are development and traceability tags.
 
 > [!NOTE]
-> If the package is private, run `docker login ghcr.io` first (use a [PAT](https://github.com/settings/tokens) with `read:packages` scope).
+> If the GHCR package is private, run `docker login ghcr.io` first using a [GitHub PAT](https://github.com/settings/tokens) with `read:packages` scope.
 
-See [DOCKER.md](DOCKER.md) for detailed instructions. The Docker setup handles CORS properly and allows you to configure any AI or WebDAV service URLs directly in the application.
+See [DOCKER.md](DOCKER.md) and the [single-container full-stack guide](DOCKER.md#optional-single-container-full-stack-deployment) for migration, backup, and rollback instructions.
 
-### 🖥️ Backend Server (Optional)
+### Optional Backend Server
 
-The app works fully without a backend (pure frontend, localStorage). An optional Express + SQLite backend adds:
-- **Cross-device sync**: Share data between browsers/devices
-- **CORS-free proxying**: AI and WebDAV calls go through the server, avoiding browser CORS issues
-- **Token security**: API keys stored encrypted on server, never exposed to browser network tab
+The web app works purely in the browser (`localStorage`), or you can connect the optional **Express + SQLite** backend for:
+- **Cross-device sync** & **per-profile multi-account isolation**
+- **CORS-free API proxying** for AI providers and WebDAV
+- **Encrypted token storage** (API keys never exposed to the browser network tab)
+- **Network proxy forwarding** (HTTP/SOCKS5) and **aria2 RPC download proxying**
+- **Backend-restore login** ("Already have backend data" on the login screen)
 
-#### Quick Start (Docker — recommended)
-```bash
-docker-compose up -d
-```
-Frontend on port 8080, backend on port 3000. Data is persisted in a Docker volume. This existing split deployment remains the recommended option when you need to version, operate, or scale the frontend and backend independently; the optional single-container alternative is documented in [DOCKER.md](DOCKER.md#optional-single-container-full-stack-deployment).
+To pin versions or customize secrets with split Compose, create a `.env` file:
 
-To customize, create a `.env` file:
 ```bash
 API_SECRET=your-secret
 ENCRYPTION_KEY=your-key
-BACKEND_IMAGE_TAG=0.8.4   # pin backend image version (default: latest)
-FRONTEND_IMAGE_TAG=0.8.4  # pin frontend image version (default: latest)
+BACKEND_IMAGE_TAG=0.9.1   # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.9.1  # pin frontend image version (default: latest)
 ```
 
-#### Backend only (docker run)
+<details>
+<summary>Backend-only <code>docker run</code> &amp; manual Node.js setup</summary>
+
+**Backend only (`docker run`):**
 ```bash
-# Basic — auto-generated API secret, port 3000
+# Basic — auto-generated API secret stored in /app/data/.api-secret, port 3000
 docker run -d --name github-stars-backend \
   -v github-stars-data:/app/data \
   -p 3000:3000 \
   ghcr.io/amintacccp/github-stars-manager-server:latest
 
-# With custom secret and encryption key
+# With explicit secret and encryption key
 docker run -d --name github-stars-backend \
   -v github-stars-data:/app/data \
   -p 3000:3000 \
@@ -378,235 +325,210 @@ docker run -d --name github-stars-backend \
   ghcr.io/amintacccp/github-stars-manager-server:latest
 ```
 
-#### Manual Setup
+**Manual setup:**
 ```bash
 cd server
 npm install
 npm run dev
 ```
 
-#### Environment Variables
+</details>
+
+> [!IMPORTANT]
+> **Upgrading an existing deployment (Security Hardening):** The backend no longer runs with authentication disabled when `API_SECRET` is unset.
+> 1. On first start, the backend generates a secure random secret and writes it to `data/.api-secret` inside the data volume — **the secret value is never printed to logs**. Retrieve it once via:
+>    - Compose: `docker compose exec backend cat /app/data/.api-secret`
+>    - Standalone container: `docker exec <backend-container> cat /app/data/.api-secret`
+>    - Or read the file directly from the volume, or set `API_SECRET` explicitly in the server environment.
+> 2. Enter this secret once as the **API Secret** in the web UI (login screen or **Settings → Backend Server**). Existing encrypted data is unaffected.
+> 3. Optionally pin `API_SECRET` in `.env` (an explicit env var always takes precedence). For zero-config local development only, set `ALLOW_INSECURE_NO_AUTH=1` (`npm run dev` sets this for you).
+> 4. **Back up `data/.encryption-key`:** if you rely on the auto-generated key, it lives on the same volume as your encrypted database — losing the volume makes stored secrets (GitHub token, AI keys, WebDAV passwords) unrecoverable.
+
+**Connecting frontend to backend:**
+1. Open **Settings → Backend Server** (or choose **Already have backend data** on the login screen).
+2. Enter the backend URL and **API Secret** (from `data/.api-secret` or your explicit `API_SECRET`).
+3. Click **Test Connection** and use **Sync to Backend** / **Sync from Backend** (per-device request routing can be set to `auto`, `backend`, or `browser`).
+
+<details>
+<summary>Backend Environment Variables</summary>
+
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `API_SECRET` | No | Bearer token for API authentication. If unset, a secure random secret is generated on first start and persisted to `data/.api-secret`; all `/api` requests then require it as a Bearer token. |
-| `ALLOW_INSECURE_NO_AUTH` | No | Set to `1` or `true` to restore the legacy zero-config dev mode when `API_SECRET` is unset: `/api` accepts unauthenticated requests and the server logs a loud warning. Never enable this on a publicly reachable deployment. |
-| `ENCRYPTION_KEY` | No | AES-256 key for encrypting stored secrets. Auto-generated if unset. |
-| `PORT` | No | Server port (default: 3000) |
-| `CSP_CONNECT_SRC` | No | Comma-separated extra origins appended to the `connect-src` CSP directive, for custom AI provider / vector-search worker endpoints called directly from the browser (e.g. `https://ai.example.com,https://worker.example.org`). |
-| `CSP_UPGRADE_INSECURE_REQUESTS` | No | Defaults to on, which sends `upgrade-insecure-requests`. Set to `false` when the full-stack image is served over plain HTTP (e.g. `http://<lan-ip>:3000`); otherwise the browser rewrites the SPA's own assets to `https://` and the page stays blank. Only disable it for HTTP deployments you do not intend to put behind TLS. |
+| `API_SECRET` | No | Bearer token for `/api` authentication. If unset, a random secret is generated on first start and persisted to `data/.api-secret`; all `/api` requests require it as a Bearer token. |
+| `ALLOW_INSECURE_NO_AUTH` | No | Set to `1` or `true` to restore legacy zero-config dev mode when `API_SECRET` is unset (`/api` accepts unauthenticated requests and logs a loud warning). **Never enable on a publicly reachable deployment.** |
+| `ENCRYPTION_KEY` | No | AES-256 key for encrypting stored secrets. Auto-generated to `data/.encryption-key` if unset. |
+| `PORT` | No | Server port (default: `3000`). |
+| `CSP_CONNECT_SRC` | No | Comma-separated extra origins appended to the `connect-src` CSP directive for custom AI provider or vector-search worker endpoints called directly from the browser (e.g. `https://ai.example.com,https://worker.example.org`). |
+| `CSP_UPGRADE_INSECURE_REQUESTS` | No | Defaults to on (`upgrade-insecure-requests`). Set to `false` when serving the full-stack image over plain HTTP (e.g. `http://<lan-ip>:3000`); otherwise browsers rewrite the SPA's own assets to `https://` and the page stays blank. Only disable for HTTP deployments not placed behind TLS. |
 
-#### Upgrading an existing deployment (security hardening)
-As a security hardening measure, the backend no longer runs with authentication disabled when `API_SECRET` is unset. If you are upgrading an existing deployment that never set `API_SECRET`:
-1. On first start the backend generates a secure random secret and stores it in `data/.api-secret` (inside the data volume) — the secret value is never written to logs. Retrieve it once with `docker compose exec backend cat /app/data/.api-secret` (Compose deployments) or `docker exec <backend-container> cat /app/data/.api-secret` (standalone container), or read the file directly from the volume; if the file is unavailable, set the `API_SECRET` environment variable explicitly on the server.
-2. Enter this secret once as the "API Secret" in the web UI (login screen or Settings → Backend Server). Existing encrypted data is unaffected.
-3. Optionally pin the secret by setting `API_SECRET` explicitly in your `.env` file; an explicitly configured secret always takes precedence. For zero-config local development, set `ALLOW_INSECURE_NO_AUTH=1` (the `npm run dev` script does this for you).
-4. If you rely on the auto-generated `data/.encryption-key`, back it up: your encrypted data and this key live on the same volume — if the volume is lost, all stored secrets (GitHub token, AI keys, WebDAV passwords) are unrecoverable.
+</details>
 
-#### Connecting Frontend to Backend
-1. Open Settings panel in the app
-2. Find "Backend Server" section
-3. Enter API Secret (the auto-generated one from `data/.api-secret`, or your own `API_SECRET`)
-4. Click "Test Connection" — green indicator means connected
-5. Use "Sync to Backend" / "Sync from Backend" to transfer data
+### Run from Source & Static Hosting
 
-## 🤖 AI Service Configuration
-
-The app supports multiple AI providers. Configure yours in the Settings panel:
-
-- **OpenAI**: GPT-3.5 / GPT-4
-- **Anthropic**: Claude
-- **Ollama**: local models with no API key needed
-- **Any OpenAI-compatible API**: custom endpoint + key
-
-Steps: open Settings, add an AI config, enter your endpoint and key, pick a model, then test the connection.
-
-## 🌐 Network Proxy Configuration
-
-The app supports routing all outbound requests through a proxy:
-
-- **HTTP Proxy** — Standard HTTP CONNECT tunneling with optional authentication
-- **SOCKS5 Proxy** — Full SOCKS5 support including username/password auth (RFC 1929)
-- **Protocol-level Testing** — Connection test performs actual protocol handshakes, not just TCP connect
-- **Encrypted Storage** — Proxy passwords are encrypted at rest with AES-256-GCM
-
-Configure in Settings → Network tab (available in Electron client or with backend server).
-
-![network](assets/readme/screenshots/network.png)
-
-## ⬇️ Remote Download (aria2 RPC)
-
-Send release download links directly to an aria2 daemon:
-
-1. Start aria2 with RPC enabled: `aria2c --enable-rpc --rpc-listen-port=6800`
-2. Open Settings → Network → Remote Download
-3. Enter host, port, and optional secret
-4. Test connection, then save
-5. Release asset buttons will now queue downloads to aria2
-
-Works in both backend-proxied mode and client-only mode (direct browser→aria2 connection).
-
-## 🧠 Vector Semantic Search (Optional)
-
-<p align="center">
-  <img src="./assets/readme/sections/vector-search.svg" width="100%" alt="Vector search — embed stars into Cloudflare Vectorize and find similar repositories.">
-</p>
-
-Vector Semantic Search uses [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) to provide high-precision, natural-language search over your starred repositories. Instead of keyword matching, it embeds repo descriptions (or full README content) into vectors and searches by semantic similarity.
-
-**How it works:**
-1. Frontend generates embeddings via your configured provider (OpenAI, Gemini, Cohere, Ollama, SiliconFlow, or any OpenAI-compatible API)
-2. A lightweight Cloudflare Worker acts as a pure Vectorize proxy (store / query / delete)
-3. On search, the query is embedded and matched against the vector index; results are optionally reranked by your AI service
-4. When disabled or on failure, the app automatically falls back to keyword-based AI search
-
-**Supported Embedding Providers:**
-
-| Provider | Models | Dimensions |
-|----------|--------|------------|
-| OpenAI | text-embedding-3-small / large | 1536 / 3072 |
-| Gemini | text-embedding-004 | 768 |
-| Cohere | embed-multilingual-v3.0 | 1024 |
-| Ollama | nomic-embed-text / bge-m3 | 768 / 1024 |
-| SiliconFlow | BAAI/bge-large-zh-v1.5 | 1024 |
-| OpenAI-compatible | (custom) | (custom) |
-
-**Quick setup:**
-1. Deploy the Cloudflare Worker — see [cloudflare-worker/README.md](cloudflare-worker/README.md) for step-by-step deployment instructions
-2. In the app: **Settings → Vector Search** — enter the Worker URL and auth token
-3. Configure an embedding provider (API key + model)
-4. Click **Rebuild Index** to embed and upload all repos
-5. Use the **AI Search** button — it will automatically use vector search when enabled
-
-> [!WARNING]
-> After changing the embedding model, you must rebuild the index — different models produce incompatible vector dimensions.
-
-### Find similar repositories
-
-From any repo card, click **Find similar** (or **Find similar repositories** in the card menu) to see which of your stars are semantically closest to it:
-
-- The repo's text is embedded as a query against your vector index, and results are ranked by similarity — the repo itself is excluded
-- Matches appear in a dedicated "Similar repositories" view with a banner showing the anchor repo; click **Reset** (or any category) to return to your previous view
-- Requires Vector Semantic Search to be configured and enabled; without it, the action is unavailable
-
-## 🛰️ MCP Server (Agent access)
-
-<p align="center">
-  <img src="./assets/readme/sections/mcp.svg" width="100%" alt="MCP server — let agents search AI-enriched stars through Model Context Protocol.">
-</p>
-
-Let agents (Claude Code, Cursor, etc.) read your AI-enriched starred repositories — summaries, tags, categories — and search them via the [Model Context Protocol](https://modelcontextprotocol.io/).
-
-- **Streamable HTTP** (preferred): `POST /mcp` on the app origin (backend/Docker mode) or `http://127.0.0.1:3927/mcp` (desktop local mode)
-- **Legacy SSE**: `/mcp/sse` + `/mcp/sse/messages` (backend), `/sse` + `/messages` (desktop) — for older clients
-- **Bearer-token auth** with a stable token (`gsm_mcp_...`): generated once when enabled, kept across restarts, only changes when you reset it
-
-**Enable:** Settings → MCP Server → toggle on. The panel shows the endpoint URLs, the token, and a one-click copyable agent config (JSON) for both Streamable HTTP and SSE. No extra install needed.
+```bash
+git clone https://github.com/AmintaCCCP/GithubStarsManager.git
+cd GithubStarsManager
+npm install
+npm run dev
+```
 
 > [!TIP]
-> The MCP token is **separate** from the backend `API_SECRET`. Pure frontend (no backend) hides the MCP settings page; it works with the desktop (Electron) client or a connected backend.
+> Under `npm run dev`, direct browser calls to some AI providers or WebDAV servers may hit CORS limits. Use the Desktop client, Docker deployment, or run the local backend (`cd server && npm run dev`) to proxy requests cleanly.
 
-**Exposed tools (read-only):**
+The production build (`npm run build` → `dist/`) is a static site that deploys directly to **Netlify**, **Vercel**, **GitHub Pages** (`gh-pages`), **Cloudflare Pages**, or any static HTTP server (nginx, Caddy).
+
+---
+
+## Integrations
+
+### AI Service Configuration
+
+Configure one or more providers in **Settings → AI Config** and test connections before saving:
+
+- **OpenAI** (GPT-4o / GPT-4 / o-series) · **Anthropic** (Claude) · **Ollama** (local models, no API key) · **Any OpenAI-compatible API** (DeepSeek, OpenRouter, SiliconFlow, self-hosted endpoints)
+- Tune batch analysis **concurrency (1–10)**, **reasoning effort**, **function calling**, custom system prompts, Q&A retrieval budgets, and your **README translation engine**.
+
+### Vector Semantic Search
+
+High-precision natural-language search and **Find similar repositories** powered by [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/). Your client generates embeddings via your chosen provider, while a minimal Cloudflare Worker proxies vector upsert/query/delete operations.
+
+#### One-Click Interactive Deployment Wizard (Recommended)
+
+Deploy the Vectorize Worker without touching the Cloudflare web dashboard — the interactive TUI in [`cloudflare-worker/`](cloudflare-worker/README.md) guides every step via Wrangler CLI:
+
+```bash
+# From the repository root
+npm run deploy:vector
+
+# Or inside cloudflare-worker/
+cd cloudflare-worker
+./deploy.sh                  # macOS / Linux (or: node deploy.mjs)
+.\deploy.ps1                 # Windows PowerShell (or double-click deploy.bat)
+npm run deploy:interactive   # Cross-platform NPM script
+```
+
+**Why use the wizard:**
+- **Zero dashboard clicking** — automates index probing, `AUTH_TOKEN` secret injection, and Worker deployment end-to-end.
+- **Preserves existing index & data** — keeps your existing Vectorize index and vectors intact across updates with no re-indexing required.
+- **Saved local config for one-click redeploy** — stores parameters locally in `.deploy-config.json` so future updates redeploy in one step.
+- **Automatic post-deploy verification** — tests connectivity right after deployment and prints a copy-ready Worker URL and auth token card.
+
+See [cloudflare-worker/README.md](cloudflare-worker/README.md) for full wizard details and manual step-by-step instructions.
+
+#### Search Capabilities & Embedding Providers
+
+- **Flexible indexing:** Index repo descriptions or full READMEs, run **Incremental Index** updates, and **auto-detect** vector dimensions.
+- **No-reindex reranking:** Enable SiliconFlow `BAAI/bge-reranker-v2-m3` or LLM reranking anytime without rebuilding your vector index.
+- **Automatic fallback:** When Vector Search is disabled or unreachable, AI Search falls back to the 3-stage keyword + lexical + LLM pipeline.
+- **Find similar repositories:** Click **Find similar** on any repo card to open a ranked semantic neighborhood excluding the anchor repo.
+
+| Embedding Provider | Example Models | Dimensions |
+|--------------------|----------------|------------|
+| OpenAI | `text-embedding-3-small` / `large` | 1536 / 3072 |
+| Gemini | `text-embedding-004` | 768 |
+| Cohere | `embed-multilingual-v3.0` | 1024 |
+| Ollama (local) | `nomic-embed-text` / `bge-m3` | 768 / 1024 |
+| SiliconFlow | `BAAI/bge-large-zh-v1.5` / `BAAI/bge-m3` | 1024 |
+| OpenAI-compatible | Custom model | Custom / Auto-detect |
+
+> [!WARNING]
+> Changing the embedding model requires clicking **Rebuild Index** — different models produce incompatible vector dimensions.
+
+<p align="center">
+  <img src="assets/readme/screenshots/vectorize.png" width="88%" alt="Vector Search settings showing Cloudflare Vectorize Worker connection, incremental indexing, multi-provider embedding chips, and automatic dimension detection" />
+</p>
+
+### MCP Server
+
+Give coding agents (**Claude Code**, **Cursor**, etc.) direct read-only access to your AI-enriched stars via the [Model Context Protocol](https://modelcontextprotocol.io/) — zero extra install required.
+
+- **Streamable HTTP** (preferred): `POST /mcp` on the backend/Docker origin, or `http://127.0.0.1:3927/mcp` in Electron desktop mode.
+- **Legacy SSE:** `/mcp/sse` + `/mcp/sse/messages` (backend) or `/sse` + `/messages` (desktop) for older clients.
+- **Stable Bearer auth:** Uses a dedicated `gsm_mcp_...` token generated on first enable and persisted across restarts until reset (**separate** from `API_SECRET`).
+- **Multi-account profile targeting:** Scope requests to a specific account profile via `X-GSM-Profile` header or `?profile=<id>`.
+- **Desktop & pure-SPA notes:** Electron binds loopback (`127.0.0.1`) only (port configurable, default `3927`). Pure browser mode without a backend hides the MCP settings page.
+
+Enable in **Settings → MCP Server** and copy the ready-made JSON config straight into your agent.
+
+<p align="center">
+  <img src="assets/readme/screenshots/mcp.png" width="88%" alt="MCP Server settings running locally on 127.0.0.1:3927 with persistent Bearer token, Streamable HTTP and SSE endpoints, and copyable Agent JSON config" />
+</p>
+
+<details>
+<summary>Exposed MCP Tools (10 Read-Only Tools &amp; Query Semantics)</summary>
 
 | Tool | Description |
 |------|-------------|
-| `gsm_status` | Server status: repo count, vector availability, version |
-| `gsm_search_repos` | Keyword search over stars with filters (languages / tags / platforms / licenses / category / stars) and pagination |
-| `gsm_get_repo` | Fetch one repo by numeric id or `owner/repo`, with AI-processed fields |
-| `gsm_get_repos` | Fetch up to 50 repos in input order; preserves duplicates and reports partial `not_found` entries |
-| `gsm_get_repo_evidence` | Return deterministic local repository and latest release-cache evidence; missing values stay `null` |
+| `gsm_status` | Server status: repo count, vector availability, version, `availableTools`, and `conditionalTools` |
+| `gsm_search_repos` | Keyword search with filters (`languages`, `tags`, `platforms`, `licenses`, `category`, stars) and pagination |
+| `gsm_get_repo` | Fetch one repo by numeric ID or `owner/repo` with AI-enriched fields |
+| `gsm_get_repos` | Batch-fetch up to 50 repos in input order; preserves duplicates and reports partial `not_found` entries |
+| `gsm_get_repo_evidence` | Deterministic local repo + cached release evidence with `evidenceFreshness`; missing values stay `null` |
 | `gsm_list_categories` | List custom categories |
 | `gsm_list_repos_by_category` | List repos in a category with pagination |
-| `gsm_stats` | Aggregate stats (languages, analysis, tags) |
-| `gsm_find_similar_repos` | Find similar starred repos with the existing vector index; excludes the source repo and is listed only when Vector Search is available |
-| `gsm_vector_search` | Semantic vector search — listed only when Vector Search is configured and enabled |
+| `gsm_stats` | Aggregate stats across languages, AI analysis status, and tags |
+| `gsm_find_similar_repos` | Find similar starred repos using the existing vector index (excludes source repo; listed only when Vector Search is enabled) |
+| `gsm_vector_search` | Semantic vector search (listed only when Vector Search is configured and enabled) |
 
-`gsm_vector_search` accepts optional `languages`, `tags`, `platforms`, `licenses`, `category`, `minStars`, `maxStars`, `isAnalyzed`, and `isSubscribed` filters. When a filter is supplied, the Worker returns at most 50 semantic candidates and GithubStarsManager applies the filter locally before truncating to `topK`; this is not an exact filtered topK over the complete vector corpus. With no filter, the existing query behavior is unchanged. Evidence reads the local repository database and cached releases only, never performs unbounded GitHub fan-out, and does not infer missing fields or return adoption decisions.
+**Semantics notes:**
+- `gsm_vector_search` accepts optional `languages`, `tags`, `platforms`, `licenses`, `category`, `minStars`, `maxStars`, `isAnalyzed`, and `isSubscribed` filters. When filters are supplied, the Worker returns at most 50 semantic candidates and GithubStarsManager filters locally before truncating to `topK` (not an exact filtered `topK` over the entire corpus). Unfiltered behavior is unchanged.
+- `gsm_status` returns `availableTools` (registered for the current config) and `conditionalTools` (the vector-gated tools regardless of current availability).
+- `gsm_get_repo_evidence` reads only the local repository database and cached releases, never triggers unbounded GitHub fan-out, and does not infer missing fields or return adoption decisions. `evidenceFreshness` derives from stored repo `updated_at`, analysis timestamps, and cached release `published_at` (unsaved sync timestamps stay `null`).
 
-`gsm_status` also returns `availableTools` (the exact names registered for the current configuration) and `conditionalTools` (the vector-gated names, whether currently available or not). `gsm_get_repo_evidence` includes `evidenceFreshness` from stored repository `updated_at`, analysis timestamps, and cached release `published_at`; local repository-sync and release-cache update timestamps are returned as `null` because they are not stored.
+</details>
 
-**Desktop (Electron) notes:** binds loopback (`127.0.0.1`) only — local agents only; host/port adjustable in Settings (default port `3927`).
+### Network Proxy, Remote Download (aria2) & Diagnostic Logs
 
-![MCP](assets/readme/screenshots/mcp.png)
-
-## 🔌 Local plugins (desktop)
-
-The Electron app can load **trusted local plugins** from a directory. They stay disabled until you grant the permissions in their Manifest. Worker plugins run as isolated Node.js (not a security sandbox); page plugins run in a restricted iframe.
-
-- [Plugin usage](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage-EN) — install, enable, permissions, where actions appear
-- [Plugin development](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Development-EN) — Manifest, Worker API, page bridge, limits
-- Examples: [`examples/plugins/`](https://github.com/AmintaCCCP/GithubStarsManager/tree/main/examples/plugins)
-
-**Enable:** Settings → Plugins → Install local plugin. Browser and Docker frontend builds do not include this host.
-
-## 🔄 GitHub Lists Bidirectional Sync
-
-Native [GitHub Lists](https://github.com/features/lists) (starred lists) sync both ways, in addition to the classic REST star sync:
-
-- **Pull (GitHub → app)** — choose **Starred repos & lists** in **Settings → Star Sync** (or on first login). Lists are fetched via GraphQL; each list name is applied as a custom tag, and unlocked repos are categorized to the matching category and **auto-locked** so AI analysis won't reset them.
-- **Push (app → GitHub)** — click **Push categories to GitHub lists** in **Settings → Star Sync**. Each local category is written back as a same-named GitHub List (existing lists overwritten, missing lists created private by default); repos join the lists matching their category, and memberships in lists not managed locally are preserved.
-
-> [!NOTE]
-> Scope is persistent: switch anytime between **Starred repos only** and **Starred repos & lists** in Settings → Star Sync.
-
-## 💾 WebDAV Backup Configuration
-
-Back up and sync your data via any standard WebDAV service:
-
-- **Jianguoyun (坚果云)**: recommended for users in China
-- **Nextcloud**: self-hosted cloud storage
-- **ownCloud**: enterprise-grade option
-- **Any standard WebDAV server**
-
-Steps: open Settings, add a WebDAV config, enter the server URL, username, password, and path, test the connection, then enable auto-backup.
-
-## 🚀 Deployment
+- **HTTP / SOCKS5 Proxy:** Full HTTP CONNECT and RFC 1929 SOCKS5 auth with protocol-level handshake testing and AES-256-GCM encrypted password storage (Desktop or Backend mode).
+- **aria2 JSON-RPC Remote Download:** Start `aria2c --enable-rpc --rpc-listen-port=6800`, configure host/port/secret in **Settings → Network → Remote Download**, and queue release assets straight to aria2 (works in both backend-proxied and direct browser→aria2 modes).
+- **Diagnostic Logs:** Inspect unified frontend/backend logs in **Settings → Diagnostic Logs**, toggle debug capture, and export auto-redacted diagnostic bundles for bug reports.
 
 <p align="center">
-  <img src="./assets/readme/sections/deploy.svg" width="100%" alt="Deploy — static hosting, split Docker, or a single full-stack container.">
+  <img src="assets/readme/screenshots/network.png" width="88%" alt="Network settings showing HTTP and SOCKS5 proxy configuration alongside aria2 JSON-RPC remote download settings with live connection testing" />
 </p>
 
-The build output is a static site, so it deploys anywhere static hosting is supported:
+### GitHub Lists Sync & WebDAV Backup
 
-- **Netlify**: connect your fork, set build command `npm run build`, publish directory `dist`
-- **Vercel**: same as Netlify — import repo, build runs automatically
-- **GitHub Pages**: push the `dist` folder to a `gh-pages` branch
-- **Cloudflare Pages**: connect repo, build command `npm run build`, output `dist`
-- **Self-hosted**: serve the `dist` folder with any HTTP server (nginx, Caddy, etc.)
+- **GitHub Lists Bidirectional Sync** (**Settings → Star Sync**):
+  - **Pull (GitHub → app):** Switch sync scope to **Starred repos & lists** (persistent) to fetch native [GitHub Lists](https://github.com/features/lists) via GraphQL, apply list names as tags, and map unlocked repos to matching categories with **auto-lock**.
+  - **Selective Push (app → GitHub):** Push all or **selected** local categories back as private GitHub Lists with pre-validation against GitHub's 32-list and 32-character limits while preserving memberships in unmanaged lists.
+- **WebDAV Backup** (**Settings → WebDAV**): Back up and restore via Jianguoyun, Nextcloud, ownCloud, or any standard WebDAV server — with auto-backup, incremental snapshots, custom `User-Agent` support, and cross-profile conflict protection.
 
-For Docker deployment see the [Backend Server](#️-backend-server-optional) section above.
+---
 
-## Who it's for
+## Interface Languages
 
-- Developers with hundreds/thousands of stars
-- People who systematically track releases
-- "Lazy-efficient" users who don't want manual tagging
+The UI ships natively in **10 languages**:
 
-## Additional Notes
+`简体中文` · `English` · `日本語` · `Español` · `Português (Brasil)` · `Русский` · `繁體中文` · `Français` · `Deutsch` · `한국어`
 
-1. The backend is optional but recommended for web deployment. Without it, all data is stored in your browser's localStorage — back up important data regularly.
-2. I can't write code, this app is entirely written by the AI, mainly for my personal requirement. If you have a new feature or meet a bug, I can only try to do it, but I can't guarantee it, because it depends on the AI to do it successfully.😹
+- Auto-detects your browser/OS language on first launch; switch anytime in **Settings → General → Language** or on the login screen (desktop tray menu follows too).
+- Built-in AI prompts (repo summaries & tags, Gist summaries, Release changelog digests, Repository Q&A) and built-in categories follow the selected UI language automatically.
+- Missing keys gracefully fall back to English. Translation improvements via PR are always welcome in [`src/locales`](src/locales).
 
-## 🤝 Contributing
+---
 
-Contributions are welcome!
+## Tech Stack
 
-1. Fork the project
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- **Frontend:** React 19 · TypeScript · Tailwind CSS 4 · Radix UI (shadcn/ui) · Zustand 5 · Lucide React · Vite 8
+- **Desktop:** Electron 45
+- **Optional Backend:** Express 5 · better-sqlite3 13 · SQLite
 
-## 📄 License
+---
 
-MIT — see [LICENSE](LICENSE) for details.
+## Community, Notes & License
 
-## ⭐ Support
+**Who it's for:** Developers juggling hundreds or thousands of starred repos, teams tracking releases systematically, and anyone using AI coding agents who wants their curated GitHub library searchable via MCP.
 
-If you find this project useful, please give it a star!
+**Good to know:**
+1. Without the optional backend or desktop client, web deployments store data in browser `localStorage` — back up regularly via WebDAV or JSON export.
+2. Full transparency from the author: I can't write code — this app is built entirely with AI, originally for my own workflow. If you request a feature or hit a bug, I'll happily try to get it done, though success depends on the AI pulling it off. 😹
 
-For questions or suggestions, open an [Issue](https://github.com/AmintaCCCP/GithubStarsManager/issues) or reach out to the author.
+**Contributing:** Fork the repo, create a branch (`git checkout -b feature/AmazingFeature`), commit your changes, push, and open a Pull Request. Found a bug or idea? Open an [Issue](https://github.com/AmintaCCCP/GithubStarsManager/issues).
 
-## StarMapper
+**License:** MIT — see [LICENSE](LICENSE). If GithubStarsManager saves you time, consider giving it a ⭐!
+
+### StarMapper
 
 <a href="https://starmapper.bruniaux.com/AmintaCCCP/GithubStarsManager?utm_source=map-embed&utm_medium=readme&utm_campaign=stargazer-map">
   <picture>
@@ -616,21 +538,12 @@ For questions or suggestions, open an [Issue](https://github.com/AmintaCCCP/Gith
   </picture>
 </a>
 
-## Star History
+### Star History
 
 <a href="https://github.com/AmintaCCCP/GithubStarsManager">
   <picture>
-    <source
-      media="(prefers-color-scheme: dark)"
-      srcset="https://starfolio.aminta.top/star-history/githubstarsmanager?theme=dark"
-    />
-    <source
-      media="(prefers-color-scheme: light)"
-      srcset="https://starfolio.aminta.top/star-history/githubstarsmanager?theme=light"
-    />
-    <img
-      alt="Star history chart"
-      src="https://starfolio.aminta.top/star-history/githubstarsmanager?theme=light"
-    />
+    <source media="(prefers-color-scheme: dark)" srcset="https://starfolio.aminta.top/star-history/githubstarsmanager?theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://starfolio.aminta.top/star-history/githubstarsmanager?theme=light" />
+    <img alt="Star history chart" src="https://starfolio.aminta.top/star-history/githubstarsmanager?theme=light" />
   </picture>
 </a>
