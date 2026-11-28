@@ -2490,11 +2490,14 @@ button.ui-switch[data-state='checked'] .ui-switch-thumb {
 
 /* Hover on flat list rows: a subtle background tint only — no border change, no
    shadow. Rows carrying a persistent state fill (selected repository row, expanded
-   fork row) keep that fill instead of the hover tint. */
+   fork row) keep that fill instead of the hover tint. The last selector covers
+   release rows in the grouped repository view, which do not sit directly under an
+   .app-flat-list container (the timeline list above already matches them). */
 .app-repository-list > .ui-card:not(.bg-fill-selected):hover,
 .app-flat-list > .ui-card:not(.bg-fill-selected):not(.bg-raised):hover,
 .app-flat-list > div > .ui-card:not(.bg-fill-selected):not(.bg-raised):hover,
-.app-fork-list > .ui-card:not(.bg-fill-selected):not(.bg-raised):hover {
+.app-fork-list > .ui-card:not(.bg-fill-selected):not(.bg-raised):hover,
+.release-card:not(.is-expanded):hover {
   background: var(--fill-hover);
 }
 

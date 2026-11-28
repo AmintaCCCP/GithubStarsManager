@@ -166,6 +166,28 @@ describe('RepositoryCardActionsSettings', () => {
     expect(setRepositoryCardActions).not.toHaveBeenCalled();
   });
 
+  it('disarms a row after a plain handle click without dragging', () => {
+    renderComponent();
+
+    const pluginHandle = screen.getByRole('button', { name: '拖拽仓库洞察排序' });
+    const pluginRow = pluginHandle.closest('div[draggable]') as HTMLElement;
+    const firstRow = screen.getByRole('button', { name: '拖拽AI 分析排序' }).closest('div[draggable]') as HTMLElement;
+    const dataTransfer = {
+      setData: vi.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+
+    // 按住把手但未发起拖拽即松开：armed 解除，随后的 dragStart 被阻止，
+    // 落到其他行上也不会触发重排
+    fireEvent.pointerDown(pluginHandle);
+    fireEvent.pointerUp(pluginHandle);
+    fireEvent.dragStart(pluginRow, { dataTransfer });
+    fireEvent.drop(firstRow, { dataTransfer });
+
+    expect(setRepositoryCardActions).not.toHaveBeenCalled();
+  });
+
   it('resets actions including enabled plugin actions', async () => {
     const user = userEvent.setup();
     state.repositoryCardActions = [

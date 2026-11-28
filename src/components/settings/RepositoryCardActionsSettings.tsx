@@ -78,8 +78,10 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
   );
   const { actions: pluginActions } = usePluginActions('repository-card');
 
-  // 原生 HTML5 拖拽重排（与 CategorySidebar 同一模式）：
-  // - dragArmedId：按住把手后才允许该行发起拖拽，避免从开关/按钮误拖；
+  // 原生 HTML5 拖拽重排（与 MenuManagementPanel 同一模式，行内含开关等交互控件，
+  // 故增加“把手 armed 预备”一步，避免从开关/按钮误拖）：
+  // - dragArmedId：按住把手后才允许该行发起拖拽；未发起拖拽时松开即解除（pointerup），
+  //   避免行一直停留在可拖拽状态；
   // - dragActionId：当前拖拽中的行；dragOverActionId：悬停目标行（高亮提示落点）。
   const [dragArmedId, setDragArmedId] = useState<string | null>(null);
   const [dragActionId, setDragActionId] = useState<string | null>(null);
@@ -209,9 +211,9 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
             <React.Fragment key={item.id}>
               {index > 0 && <SettingsDivider />}
               <div
-                className={`flex min-h-12 items-center gap-3 px-3.5 py-2 transition-[background-color,opacity] duration-micro ease-out-subtle hover:duration-instant ${
-                  isDragging ? 'opacity-50' : ''
-                } ${isDropTarget ? 'bg-fill-selected' : ''}`}
+                className={`flex min-h-12 select-none items-center gap-3 px-3.5 py-2 transition-[background-color,opacity] duration-micro ease-out-subtle hover:duration-instant ${
+                  isDragging ? 'bg-fill-selected opacity-50' : ''
+                } ${isDropTarget ? 'bg-accent-tint' : ''}`}
                 draggable={dragArmedId === item.id}
                 onDragStart={(event) => {
                   if (dragArmedId !== item.id) {
@@ -230,6 +232,11 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
                 }}
                 onDragLeave={() => {
                   if (dragOverActionId === item.id) setDragOverActionId(null);
+                }}
+                // armed 后未发起拖拽就松开（含把手上的普通点击经冒泡到达这里）：
+                // 解除可拖拽状态，行不会一直停留在“待拖拽”，避免从开关/行体误拖。
+                onPointerUp={() => {
+                  if (dragActionId === null) setDragArmedId(null);
                 }}
                 onDrop={(event) => handleDropAtIndex(event, index)}
                 onDragEnd={resetDragState}
